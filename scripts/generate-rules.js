@@ -1,7 +1,8 @@
 /**
  * generate-rules.js
  *
- * .claude/rules/ 와 .claude/skills/ 를 스캔하여
+ * .claude/rules/ 와 .claude/skills/ (Claude), 그리고
+ * .agents/skills/ 와 .codex/agents/ (Codex) 를 스캔하여
  * src/data/ruleRelationships.js 를 자동 생성한다.
  *
  * 사용: pnpm generate-rules
@@ -14,6 +15,8 @@ import { join, basename, relative } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname.replace(/\/$/, '');
 const RULES_DIR = join(ROOT, '.claude', 'rules');
 const SKILLS_DIR = join(ROOT, '.claude', 'skills');
+const AGENTS_SKILLS_DIR = join(ROOT, '.agents', 'skills');
+const CODEX_AGENTS_DIR = join(ROOT, '.codex', 'agents');
 const OUT = join(ROOT, 'src', 'data', 'ruleRelationships.js');
 
 /** 첫 번째 heading에서 우선순위 키워드를 추출한다 */
@@ -36,6 +39,12 @@ function parseSkillDescription(content) {
   if (match) return match[1].trim();
   const line = content.split('\n').find((l) => l.startsWith('>'));
   return line ? line.replace(/^>\s*/, '') : '';
+}
+
+/** Codex 서브에이전트 TOML에서 description 값을 추출한다 */
+function parseTomlDescription(content) {
+  const m = content.match(/^description\s*=\s*"((?:[^"\\]|\\.)*)"/m);
+  return m ? m[1].trim() : '';
 }
 
 // ── 노드 수집 ──
@@ -102,6 +111,61 @@ if (existsSync(SKILLS_DIR)) {
         edges.push({ from: skillId, to: resId, type: 'resources', note: '' });
       }
     }
+  }
+}
+
+// ── Codex 자산 (.agents/skills, .codex/agents) ──
+// Codex 스킬은 얇은 어댑터로 .claude 원본을 canonical SSOT 로 참조한다.
+
+if (existsSync(AGENTS_SKILLS_DIR) || existsSync(CODEX_AGENTS_DIR)) {
+  nodes.push({
+    id: 'agents-md',
+    name: 'AGENTS.md',
+    priority: 'root',
+    path: 'AGENTS.md',
+    description: 'Codex 규칙 진입점 (.agents/skills · .codex/agents 라우터)',
+  });
+}
+
+// Codex Skills (.agents/skills/*)
+if (existsSync(AGENTS_SKILLS_DIR)) {
+  for (const dir of readdirSync(AGENTS_SKILLS_DIR, { withFileTypes: true }).filter((d) => d.isDirectory()).sort((a, b) => a.name.localeCompare(b.name))) {
+    const skillPath = join(AGENTS_SKILLS_DIR, dir.name, 'SKILL.md');
+    if (!existsSync(skillPath)) continue;
+
+    const skillContent = readFileSync(skillPath, 'utf-8');
+    const skillId = `codex-skill--${dir.name}`;
+
+    nodes.push({
+      id: skillId,
+      name: `${dir.name} (Codex Skill)`,
+      priority: 'Codex Skill',
+      path: `.agents/skills/${dir.name}/SKILL.md`,
+      description: parseSkillDescription(skillContent),
+    });
+    edges.push({ from: 'agents-md', to: skillId, type: 'activates', note: '' });
+
+    // canonical SSOT 링크: vdl-<name> → <name> (Claude 원본 스킬)
+    const canonical = dir.name.replace(/^vdl-/, '');
+    if (nodes.some((n) => n.id === canonical)) {
+      edges.push({ from: skillId, to: canonical, type: 'references', note: 'canonical SSOT' });
+    }
+  }
+}
+
+// Codex Subagents (.codex/agents/*.toml)
+if (existsSync(CODEX_AGENTS_DIR)) {
+  for (const file of readdirSync(CODEX_AGENTS_DIR).filter((f) => f.endsWith('.toml')).sort()) {
+    const content = readFileSync(join(CODEX_AGENTS_DIR, file), 'utf-8');
+    const id = `codex-agent--${basename(file, '.toml').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    nodes.push({
+      id,
+      name: basename(file),
+      priority: 'Codex Agent',
+      path: `.codex/agents/${file}`,
+      description: parseTomlDescription(content),
+    });
+    edges.push({ from: 'agents-md', to: id, type: 'activates', note: '' });
   }
 }
 
@@ -182,6 +246,8 @@ export const priorityMeta = {
   SHOULD: { color: '#0288D1', label: '관련 작업 시 준수', order: 3 },
   Skill: { color: '#7B1FA2', label: 'Skill (의도 기반 활성화)', order: 4 },
   'Skill Resource': { color: '#9E9E9E', label: 'Skill Resource (on-demand)', order: 5 },
+  'Codex Skill': { color: '#00897B', label: 'Codex Skill (.agents/skills)', order: 6 },
+  'Codex Agent': { color: '#5E35B1', label: 'Codex Subagent (.codex/agents)', order: 7 },
 };
 
 export const ruleNodes = ${JSON.stringify(nodes, null, 2)};
@@ -204,7 +270,10 @@ writeFileSync(OUT, output, 'utf-8');
 const ruleCount = nodes.filter((n) => ['CRITICAL', 'MUST', 'SHOULD'].includes(n.priority)).length;
 const skillCount = nodes.filter((n) => n.priority === 'Skill').length;
 const resourceCount = nodes.filter((n) => n.priority === 'Skill Resource').length;
+const codexSkillCount = nodes.filter((n) => n.priority === 'Codex Skill').length;
+const codexAgentCount = nodes.filter((n) => n.priority === 'Codex Agent').length;
 
 console.log(`Generated ${OUT}`);
 console.log(`  Rules: ${ruleCount}, Skills: ${skillCount}, Resources: ${resourceCount}`);
+console.log(`  Codex Skills: ${codexSkillCount}, Codex Agents: ${codexAgentCount}`);
 console.log(`  Edges: ${edges.length}, Conditions: ${conditionMatrix.length}`);

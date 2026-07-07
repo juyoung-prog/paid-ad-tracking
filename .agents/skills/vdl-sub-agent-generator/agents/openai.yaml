@@ -1,0 +1,4 @@
+interface:
+  display_name: "VDL Subagent Generator"
+  short_description: "Generate Codex subagents as .codex/agents/*.toml"
+  default_prompt: "Use $vdl-sub-agent-generator to create a Codex subagent TOML for this task."

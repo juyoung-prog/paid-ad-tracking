@@ -1,0 +1,13 @@
+interface:
+  display_name: "VDL Supabase Integration"
+  short_description: "Wire a Supabase backend from ux-flow's Entity ID Dictionary"
+  default_prompt: "Use $vdl-supabase-integration to connect supabase, design the DB schema, auth, and RLS from ux-flow's data model."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "supabase"
+      description: "Supabase MCP server. Read-only exploration and verification only (schema inspection, test queries, RLS/trigger checks, logs). State changes go through the Supabase CLI migration files per resources/mcp-cli-playbook.md, never through MCP."

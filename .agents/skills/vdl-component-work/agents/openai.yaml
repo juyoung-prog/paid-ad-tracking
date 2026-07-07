@@ -1,0 +1,4 @@
+interface:
+  display_name: "VDL Component Work"
+  short_description: "Component and story workflow for the MUI design system"
+  default_prompt: "Use $vdl-component-work to create, modify, delete, or refactor a component or story in this repo."

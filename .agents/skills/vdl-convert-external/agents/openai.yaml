@@ -1,0 +1,4 @@
+interface:
+  display_name: "VDL Convert External"
+  short_description: "Convert external code to project-compliant MUI sx JSX"
+  default_prompt: "Use $vdl-convert-external to convert this external component into a project-compliant MUI sx-based JSX component."

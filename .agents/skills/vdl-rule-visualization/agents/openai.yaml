@@ -1,0 +1,7 @@
+interface:
+  display_name: "VDL Rule Visualization"
+  short_description: "Sync ruleRelationships.js across the .claude and Codex trees"
+  default_prompt: "Use $vdl-rule-visualization to resync the rule relationship graph after a rule, skill, or subagent change."
+
+policy:
+  allow_implicit_invocation: false

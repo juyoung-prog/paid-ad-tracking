@@ -1,0 +1,4 @@
+interface:
+  display_name: "VDL Skill Creator"
+  short_description: "Create or port skills to the Codex .agents/skills standard"
+  default_prompt: "Use $vdl-skill-creator to port a .claude skill into a Codex skill or author a new one."

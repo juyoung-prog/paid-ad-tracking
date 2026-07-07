@@ -1,0 +1,4 @@
+interface:
+  display_name: "VDL Stable Layout"
+  short_description: "Space model first, then stability check"
+  default_prompt: "Use $vdl-stable-layout to frame a stable layout skeleton for this screen."

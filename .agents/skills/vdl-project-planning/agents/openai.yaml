@@ -1,0 +1,7 @@
+interface:
+  display_name: "VDL Project Planning"
+  short_description: "Sequential, approval-gated planning docs in docs/"
+  default_prompt: "Use $vdl-project-planning to draft the project-summary, ux-flow, and visual-direction docs for this initiative."
+
+policy:
+  allow_implicit_invocation: false
