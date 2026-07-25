@@ -185,7 +185,7 @@ export function FileDropzone({
         sx={{
           position: 'relative',
           height: variantHeight[variant],
-          borderRadius: 2,
+          borderRadius: '4px',
           overflow: 'hidden',
           border: '2px solid',
           borderColor: isComplete ? 'success.main' : 'divider',
@@ -226,7 +226,7 @@ export function FileDropzone({
             <LinearProgress
               variant="determinate"
               value={uploadProgress}
-              sx={{ width: '60%', height: 6, borderRadius: 1 }}
+              sx={{ width: '60%', height: 6, borderRadius: 0 }}
             />
           </Box>
         )}
@@ -245,7 +245,7 @@ export function FileDropzone({
               color: 'white',
               px: 1.5,
               py: 0.5,
-              borderRadius: 1,
+              borderRadius: '4px',
             }}
           >
             <CheckCircleIcon fontSize="small" />
@@ -320,7 +320,7 @@ export function FileDropzone({
       onDrop={handleDrop}
       sx={{
         height: variantHeight[variant],
-        borderRadius: 2,
+        borderRadius: '4px',
         border: '2px dashed',
         borderColor: error ? 'error.main' : isDragActive ? 'primary.main' : 'divider',
         backgroundColor: isDragActive ? 'action.hover' : 'background.paper',

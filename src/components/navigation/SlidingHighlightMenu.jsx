@@ -102,7 +102,7 @@ function SlidingHighlightMenu({
                   position: 'absolute',
                   inset: 0,
                   backgroundColor: 'rgba(0, 0, 0, 0.06)',
-                  borderRadius: 4,
+                  borderRadius: '4px',
                 }
               }
             />

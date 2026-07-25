@@ -97,7 +97,7 @@ const NavMenu = forwardRef(function NavMenu({
       fontSize: sizeStyle.fontSize,
       fontWeight: isActive ? 600 : 400,
       textDecoration: 'none',
-      borderRadius: variant === 'pills' ? 99 : 1,
+      borderRadius: variant === 'pills' ? '999px' : '4px',
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       opacity: isDisabled ? 0.5 : 1,
       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',

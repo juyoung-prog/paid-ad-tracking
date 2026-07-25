@@ -54,11 +54,12 @@ export function InlineObject({
         mx: `${spacing}em`,
         borderRadius: rounded ? '50%' : 0,
         overflow: 'hidden',
-        transition: hover ? 'transform 0.2s ease-out, box-shadow 0.2s ease-out' : 'none',
+        transition: hover ? 'transform 0.2s ease-out' : 'none',
         cursor: hover ? 'pointer' : 'inherit',
+        // scale+rotate 변환만으로도 hover 피드백이 충분히 뚜렷해서, 별도
+        // shadow는 순수 장식이었다 — 제거(디자인 시스템 감사로 발견).
         '&:hover': hover ? {
           transform: 'scale(1.1) rotate(3deg)',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
         } : {},
         '& > img, & > svg': {
           width: '100%',

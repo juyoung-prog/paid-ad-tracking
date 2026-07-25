@@ -1,30 +1,12 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
-import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 
 import { defaultTheme as theme } from './styles/themes';
-
-function HomePage() {
-  return (
-    <Box
-      sx={{
-        p: 4,
-        textAlign: 'center',
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-      }}
-    >
-      <Typography variant="h3" gutterBottom>
-        Starter Kit
-      </Typography>
-      <Typography color="text.secondary">Your design system foundation</Typography>
-    </Box>
-  );
-}
+import { PaidAdsShell } from './pages/paidAdsDashboard/PaidAdsShell';
+import { DashboardPage } from './pages/paidAdsDashboard/DashboardPage';
+import { StoresPage } from './pages/paidAdsDashboard/StoresPage';
+import { ReportsPage } from './pages/paidAdsDashboard/ReportsPage';
 
 function App() {
   return (
@@ -32,7 +14,13 @@ function App() {
       <CssBaseline />
       <BrowserRouter>
         <Routes>
-          <Route index element={<HomePage />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route element={<PaidAdsShell />}>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/stores" element={<StoresPage />} />
+            <Route path="/reports" element={<ReportsPage />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

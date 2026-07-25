@@ -252,7 +252,11 @@ export function MoodboardCard({
             }}
             sx={{
               bgcolor: 'background.paper',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              // 임의 shadow 대신 border로 사진 배경과의 경계를 준다 — bgcolor가
+              // 이미 불투명(paper)이라 shadow 없이도 아래 이미지와 확실히
+              // 구분된다(디자인 시스템 감사로 발견).
+              border: '1px solid',
+              borderColor: 'divider',
               '&:hover': { bgcolor: 'white' },
             }}
           >
@@ -268,7 +272,11 @@ export function MoodboardCard({
             }}
             sx={{
               bgcolor: 'background.paper',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              // 임의 shadow 대신 border로 사진 배경과의 경계를 준다 — bgcolor가
+              // 이미 불투명(paper)이라 shadow 없이도 아래 이미지와 확실히
+              // 구분된다(디자인 시스템 감사로 발견).
+              border: '1px solid',
+              borderColor: 'divider',
               '&:hover': {
                 bgcolor: 'error.light',
                 color: 'white',
@@ -288,7 +296,7 @@ export function MoodboardCard({
           left: 8,
           px: 1.5,
           py: 0.5,
-          borderRadius: 1,
+          borderRadius: '4px',
           bgcolor: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(4px)',
         }}
@@ -319,11 +327,14 @@ export function MoodboardCard({
       onMouseLeave={handleMouseLeave}
       sx={{
         cursor: 'pointer',
-        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
-        border: 'none',
+        transition: 'border-color 0.2s ease',
+        // CustomCard(내부적으로 CardContainer variant="outlined")가 이미 주는
+        // 기본 테두리를 border:'none'으로 지워버리고 shadow+lift로만 hover를
+        // 표현했었다 — border를 되살리고 hover에선 색만 진하게 바꿔서
+        // (translateY+shadow 없이) border만으로 위계를 만든다(디자인 시스템
+        // 감사로 발견).
         '&:hover': {
-          transform: 'translateY(-4px)',
-          boxShadow: '0 12px 24px -8px rgba(0,0,0,0.15)',
+          borderColor: 'primary.main',
           '& .moodboard-actions': {
             opacity: 1,
           },

@@ -154,7 +154,7 @@ export function BentoItem({
         gridRow: getSpanValue(rowSpan),
         backgroundColor: background,
         overflow: isContained ? 'hidden' : 'visible',
-        borderRadius: 2,
+        borderRadius: '6px',
         position: 'relative',
         ...sx,
       } }

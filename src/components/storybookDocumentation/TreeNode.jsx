@@ -51,7 +51,7 @@ export const TreeNode = ({ keyName, value, depth = 0, defaultOpen = false }) => 
           py: 0.5,
           px: 1,
           cursor: isExpandable ? 'pointer' : 'default',
-          borderRadius: 1,
+          borderRadius: 0,
           '&:hover': isExpandable ? { backgroundColor: 'action.hover' } : {},
           borderLeft: depth > 0 ? '1px solid' : 'none',
           borderColor: 'divider',

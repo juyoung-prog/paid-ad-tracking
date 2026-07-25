@@ -5,7 +5,9 @@
  * 피그마의 Design Tokens / Variables와 동일한 역할입니다.
  *
  * ## 핵심 철학
- * - **Sharp Corners**: borderRadius 0 (날카로운 모서리)
+ * - **Flat by default**: shape.borderRadius 0 — Button/Card/Paper 등 구조 표면은 각짐
+ * - **Role-based radius**: 전역 shape을 올리지 않고 Input/Select/Chip(4px),
+ *   분석·참조 카드형 컨테이너(6px) 등 역할 단위로만 예외를 둠 (resources/mui-theme.md 참고)
  * - **Dimmed Shadow**: offset 없이 blur만 사용하는 은은한 그림자
  * - **Pure White**: 깔끔한 흰색 배경
  * - **Brand Blue**: Primary 색상 #0000FF
@@ -34,28 +36,30 @@ const palette = {
   },
 
   // 상태 색상 (Feedback)
+  // Brand Blue(#0000FF)의 채도에 맞춰 재조정, info는 primary와 색상군이
+  // 겹치지 않도록 청록 계열로 분리 (Visual Direction 문서 참고)
   error: {
-    light: '#ef5350',
-    main: '#d32f2f',
-    dark: '#c62828',
+    light: '#DE5B4E',
+    main: '#B3261E',
+    dark: '#7A160F',
     contrastText: '#FFFFFF',
   },
   warning: {
-    light: '#ff9800',
-    main: '#ed6c02',
-    dark: '#e65100',
+    light: '#C98A2E',
+    main: '#8A5A00',
+    dark: '#5C3C00',
     contrastText: '#FFFFFF',
   },
   success: {
-    light: '#4caf50',
-    main: '#2e7d32',
-    dark: '#1b5e20',
+    light: '#4FAE6F',
+    main: '#167C3D',
+    dark: '#0E5A2B',
     contrastText: '#FFFFFF',
   },
   info: {
-    light: '#03a9f4',
-    main: '#0288d1',
-    dark: '#01579b',
+    light: '#4FA3B0',
+    main: '#0E6B7A',
+    dark: '#06505C',
     contrastText: '#FFFFFF',
   },
 
@@ -124,7 +128,7 @@ const typography = {
   ].join(','),
 
   // 헤딩 폰트 패밀리
-  headingFontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+  headingFontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
 
   // 폰트 크기 기준
   fontSize: 14,
@@ -138,42 +142,44 @@ const typography = {
 
   // 헤딩 스타일
   h1: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 900,
     fontSize: '2.5rem',      // 40px
     lineHeight: 1.2,
     letterSpacing: '-0.02em',
   },
   h2: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 900,
     fontSize: '2rem',        // 32px
     lineHeight: 1.2,
     letterSpacing: '-0.02em',
   },
   h3: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 800,
     fontSize: '1.75rem',     // 28px
     lineHeight: 1.3,
     letterSpacing: '-0.01em',
   },
   h4: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 700,
     fontSize: '1.5rem',      // 24px
     lineHeight: 1.3,
     letterSpacing: '-0.01em',
+    fontVariantNumeric: 'tabular-nums', // KPI 등 숫자 자릿수 변경 시 레이아웃 고정
   },
   h5: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 700,
     fontSize: '1.25rem',     // 20px
     lineHeight: 1.4,
     letterSpacing: '0',
+    fontVariantNumeric: 'tabular-nums', // 성과 지표 등 숫자 레이아웃 고정
   },
   h6: {
-    fontFamily: '"Outfit", "Pretendard Variable", Pretendard, sans-serif',
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 600,
     fontSize: '1.125rem',    // 18px
     lineHeight: 1.4,
@@ -333,6 +339,14 @@ const components = {
     },
   },
   MuiButton: {
+    // disableElevation을 전역 defaultProps로 걸었다가 되돌렸다 — Paid Ads
+    // Dashboard 한 화면에서 관찰된 그림자 불일치를 고치려던 건데, 이 테마는
+    // Button.stories.jsx/Dialog.stories.jsx/Card.stories.jsx 등 프로젝트
+    // 전체 컴포넌트가 공유하는 전역 테마라서 영향 범위를 확인하지 않은 채
+    // 다른 모든 컨테인드 버튼의 기본 모양을 바꿔버리는 문제가 있었다.
+    // Paid Ads 쪽 버튼들은 각 파일에서 개별적으로 sx={{ boxShadow: 'none' }}
+    // 을 다시 붙이는 방식으로 되돌렸다 — 범위가 넓은 디자인 시스템 차원의
+    // "그림자 없는 버튼" 결정은 여기서 임의로 내리지 않는다.
     styleOverrides: {
       root: {
         borderRadius: 0,
@@ -347,10 +361,39 @@ const components = {
       },
     },
   },
+  // Input/Select는 역할별로 4px — shape.borderRadius(전역 0)는 그대로 두고
+  // 이 컴포넌트에만 예외를 준다. Button/Card/Paper 같은 구조 표면은 각지고,
+  // 입력 컨트롤은 별개의 상호작용 객체로 읽히게 한다. TextField/Select(outlined)
+  // 둘 다 이 override를 공유한다 (mui-theme.md의 Surface Radius System 참고).
+  MuiOutlinedInput: {
+    styleOverrides: {
+      root: {
+        borderRadius: 4,
+      },
+    },
+  },
   MuiChip: {
     styleOverrides: {
       root: {
         borderRadius: 4,
+      },
+    },
+  },
+  MuiTableRow: {
+    styleOverrides: {
+      root: {
+        // 인터랙티브 행 hover — 클릭 가능한 행에 cursor pointer 적용 시 함께 사용
+        '&.MuiTableRow-hover:hover': {
+          backgroundColor: 'rgba(0, 0, 0, 0.03)',
+        },
+      },
+    },
+  },
+  MuiDrawer: {
+    styleOverrides: {
+      paper: {
+        width: 440,
+        boxSizing: 'border-box',
       },
     },
   },

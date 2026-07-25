@@ -93,7 +93,7 @@ export function CarouselIndicator({
           maxWidth: 200,
           height: currentSize.line.height,
           backgroundColor: inactiveColor,
-          borderRadius: 1,
+          borderRadius: 0,
           overflow: 'hidden',
           ...sx,
         } }
@@ -140,7 +140,15 @@ export function CarouselIndicator({
                 width: isVertical ? currentSize.line.height : currentSize.line.width,
                 height: isVertical ? currentSize.line.width : currentSize.line.height,
                 backgroundColor: isActive ? activeColor : inactiveColor,
-                borderRadius: 0.5,
+                // 고정 0.5는 sx borderRadius 곱셈 규칙상 0px로 사라지는 버그였고,
+                // 의도(미세한 라운딩 vs 완전 캡슐)도 코드만으론 불명확했다 —
+                // common/ui/Indicator.jsx의 동일 역할(line/dash)은 height/2로
+                // "완전 캡슐"을 계산해서 쓰고 있어 그 의도를 따른다. width!=height인
+                // 사각형에 borderRadius:'50%'를 주면 각 축 기준으로 비율 계산되어
+                // 캡슐(스타디움) 모양이 되므로, 역할표에 없는 새 px 값을 만들지
+                // 않고 이미 승인된 50% 값 그대로 재사용한다(디자인 시스템 감사로
+                // 발견).
+                borderRadius: '50%',
                 cursor: onClick ? 'pointer' : 'default',
                 transition: 'all 0.2s ease-out',
                 transform: isActive ? 'scaleX(1.2)' : 'scaleX(1)',

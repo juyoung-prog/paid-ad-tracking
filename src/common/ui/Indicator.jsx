@@ -219,7 +219,7 @@ const Indicator = forwardRef(function Indicator({
           maxWidth: 180,
           height: dimensions.progressHeight,
           backgroundColor: inactiveColor,
-          borderRadius: dimensions.progressHeight / 2,
+          borderRadius: `${dimensions.progressHeight / 2}px`,
           overflow: 'hidden',
           ...sx,
         }}
@@ -325,7 +325,7 @@ const Indicator = forwardRef(function Indicator({
               sx={{
                 width: isVertical ? dimensions.line.height : dimensions.line.width,
                 height: isVertical ? dimensions.line.width : dimensions.line.height,
-                borderRadius: dimensions.line.height / 2,
+                borderRadius: `${dimensions.line.height / 2}px`,
                 backgroundColor: isActive ? activeColor : inactiveColor,
                 opacity: isActive ? 1 : 0.5,
                 transition: hasAnimation
@@ -359,7 +359,7 @@ const Indicator = forwardRef(function Indicator({
               sx={{
                 width: isActive ? activeWidth : baseWidth,
                 height: isActive ? activeHeight : baseHeight,
-                borderRadius: dimensions.dash.height / 2,
+                borderRadius: `${dimensions.dash.height / 2}px`,
                 backgroundColor: isActive ? activeColor : inactiveColor,
                 opacity: isActive ? 1 : 0.5,
                 transition: hasAnimation

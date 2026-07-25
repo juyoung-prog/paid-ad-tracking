@@ -32,3 +32,6 @@ export { PageContainer } from './PageContainer.jsx';
 // AppShell - 반응형 앱 셸
 export { AppShell } from './AppShell.jsx';
 export { useAppShell } from './useAppShell.js';
+
+// LastUpdatedBar - 최근 수정 시각 표시
+export { LastUpdatedBar } from './LastUpdatedBar.jsx';

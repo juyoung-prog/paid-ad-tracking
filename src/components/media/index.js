@@ -19,3 +19,6 @@ export { Indicator } from '../../common/ui/Indicator.jsx';
 
 // CarouselIndicator - 레거시 호환용 (Indicator 사용 권장)
 export { CarouselIndicator } from './CarouselIndicator.jsx';
+
+// CampaignThumbnail - 캠페인 소재 썸네일 (플랫폼색 이니셜 fallback 포함)
+export { CampaignThumbnail } from './CampaignThumbnail.jsx';

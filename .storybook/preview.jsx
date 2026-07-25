@@ -1,16 +1,18 @@
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
+import '@fontsource-variable/outfit';
 import { defaultTheme } from '../src/styles/themes';
 
-// Google Fonts 로드 (Material Symbols + 기본 폰트)
+// Google Fonts 로드 (Material Symbols)
+// Outfit Variable은 @fontsource-variable/outfit로 셀프 호스팅한다
+// (Google Fonts CSS2 API는 family 이름을 항상 'Outfit'으로 내려줘서
+// theme의 '"Outfit Variable"' 참조와 이름이 어긋나기 때문)
 const googleFonts = [
   // Material Symbols
   'Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
   'Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
   'Material+Symbols+Sharp:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200',
-  // Default Theme Font
-  'Outfit:wght@300;400;500;600;700;800;900',
 ];
 
 googleFonts.forEach((font) => {

@@ -5,7 +5,7 @@
  * 직접 수정하지 마세요. 수정이 필요하면 스크립트를 수정하세요.
  *
  * 생성: pnpm generate-rules
- * 생성일: 2026-07-07
+ * 생성일: 2026-07-25
  */
 
 export const priorityMeta = {

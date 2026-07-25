@@ -158,7 +158,7 @@ export function TagInput({
       minHeight: currentSize.minHeight,
       px: currentSize.px,
       py: 1,
-      borderRadius: 1,
+      borderRadius: '4px',
       cursor: isDisabled ? 'not-allowed' : 'text',
       opacity: isDisabled ? 0.5 : 1,
       transition: 'all 0.2s ease',
@@ -177,7 +177,13 @@ export function TagInput({
       backgroundColor: 'background.paper',
       border: '1px solid',
       borderColor: isFocused ? 'primary.main' : 'divider',
-      boxShadow: isFocused ? '0 0 0 3px rgba(0, 0, 255, 0.1)' : 'none',
+      // 포커스 강조는 shadow 링 대신 outline으로 — outline은 box 레이아웃에
+      // 영향을 안 줘서(border-width처럼 크기가 안 밀림) CardContainer 등 이
+      // 코드베이스의 다른 focus-visible 패턴과도 일치한다(디자인 시스템 감사로
+      // 발견 — border+spacing+radius만으로 위계를 만드는 원칙).
+      outline: isFocused ? '2px solid' : 'none',
+      outlineColor: 'primary.light',
+      outlineOffset: 1,
       '&:hover': {
         borderColor: isFocused ? 'primary.main' : 'text.secondary',
       },
@@ -263,7 +269,7 @@ export function TagInput({
           sx={{
             mt: 0.5,
             p: 1,
-            borderRadius: 1,
+            borderRadius: '4px',
             border: '1px solid',
             borderColor: 'divider',
             backgroundColor: 'background.paper',
