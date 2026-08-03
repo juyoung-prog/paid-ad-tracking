@@ -80,10 +80,28 @@ sequenceDiagram
 | `sync-campaigns` | 플랫폼 캠페인 목록 조회 → `campaigns` upsert |
 | `sync-performance` | 플랫폼 insights/report 조회 → `performance_records` upsert(`source='api'`) |
 
-## 5단계 — 프론트엔드 전환
+## 5단계 — 프론트엔드 전환 (완료)
 
-- `usePaidAdsStore`를 localStorage 단독에서 Supabase 클라이언트 호출(`src/hooks/data/`)로 전환 — `component-work` 스킬로 "Connect Meta Account"/"Connect TikTok Account" 버튼과 연결 상태 UI를 만든다.
-- mock 데이터(`paidAdsMockData.js`)는 Storybook 전용으로 남기고, 실제 페이지는 Supabase 훅을 사용하도록 분리한다.
+- `usePaidAdsStore`가 localStorage 대신 Supabase를 읽고 쓴다. 컬럼명 변환은
+  `paidAdsMappers.js` 한 곳에만 둔다(snake_case ↔ camelCase).
+- mock 데이터는 Storybook 전용으로 남겼다. 페이지는 그대로 두고 `PaidAdsStoreProvider`로
+  `createMockPaidAdsStore()`를 주입해 백엔드 없이 렌더한다.
+- `/settings`에 연결 상태·"연결하기"·"지금 동기화"를 만들었다. 토큰은 화면에 오지 않는다 —
+  `connections_public` 뷰만 읽는다.
+- **로그인 화면이 필수다.** 모든 테이블의 RLS가 `owner_id = auth.uid()`라 세션 없이는
+  쿼리가 에러 없이 빈 배열을 돌려준다. 즉 "데이터 없음"과 "로그인 안 됨"이 화면에서
+  구분되지 않아, App이 세션을 먼저 확인하고 없으면 `LoginPage`를 그린다.
+  사용자 계정은 Supabase 대시보드에서 미리 만든다(가입 폼은 두지 않는다).
+
+### 프론트/DB 스키마 어긋남
+
+초기 스키마 이후 프론트가 따로 발전해 세 필드가 DB에 없었다 —
+`campaignGroup`, `budgetDaily`, `shortCode`. 이대로 붙이면 저장은 성공한 것처럼 보이는데
+그 값만 조용히 사라진다. `00000000000003_align_schema_with_frontend.sql`에서 추가했다.
+반대로 DB에만 있는 `event_tag`/`tags`/`result_url`/`reported_at`은 남겨뒀다.
+
+또 프론트의 `generateId('camp')`는 `camp-<uuid>` 형태라 `uuid` 컬럼에 안 들어간다.
+삽입 시 이 id를 버리고 DB의 `gen_random_uuid()` 기본값이 만든 행을 그대로 받아 쓴다.
 
 ## 6단계 — 동기화 스케줄
 
@@ -91,7 +109,10 @@ sequenceDiagram
   → `00000000000002_sync_constraints_and_cron.sql`에 구현. 스케줄은 UTC 09:00 / 09:30(≈ 04:00~05:00 ET).
   Edge Function 호출에 필요한 프로젝트 URL·service_role 키는 레포에 두지 않고 Vault에서 읽는다 —
   **프로젝트 생성 후 SQL Editor에서 `vault.create_secret` 2줄을 1회 실행해야 cron이 동작한다**(해당 파일 주석 참조).
-- **수동**: 헤더의 "Sync now" 버튼으로 즉시 Edge Function 호출 — App Review 승인 전이나 급할 때 유용. *(UI 미구현)*
+- **수동**: `/settings`의 "지금 동기화" 버튼이 `sync-campaigns` → `sync-performance`를 차례로
+  호출한다. 순서가 중요하다 — 뒤집으면 방금 새로 들어온 캠페인의 성과를 그 회차에 놓친다.
+  이 두 함수는 `verify_jwt`가 켜져 있지만, 로그인한 사용자의 세션 토큰으로 통과한다
+  (함수 내부에서는 service_role로 동작).
 
 ## 성과 지표 필드 매핑
 
