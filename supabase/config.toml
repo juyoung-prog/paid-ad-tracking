@@ -380,6 +380,30 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# OAuth 흐름의 4개 함수는 JWT 검증을 끈다.
+# - *-callback: Meta/TikTok이 브라우저 리다이렉트로 호출하므로 Authorization 헤더가 없다.
+#   기본값(verify_jwt = true)이면 콜백이 401로 막혀 OAuth가 절대 완료되지 않는다.
+# - *-start: 302 리다이렉트를 반환하는 함수라 프론트가 supabase.functions.invoke()가 아니라
+#   window.location으로 브라우저를 보내야 한다 — 이때도 헤더를 실을 수 없다.
+#
+# 대신 이 4개는 인증 없이 호출 가능해지므로, 사용자 식별은 헤더가 아니라 state 파라미터로
+# 옮겨야 한다(현재 *-callback의 owner_id TODO). 그 전까지는 콜백이 owner_id 없이 upsert하며
+# unique(owner_id, account_id) 충돌 처리가 성립하지 않는다.
+#
+# sync-campaigns / sync-performance는 여기 넣지 않는다 — pg_cron이 service_role 키를
+# Bearer로 붙여 호출하므로 JWT 검증이 켜져 있어야 외부에서 임의로 못 부른다.
+[functions.auth-meta-start]
+verify_jwt = false
+
+[functions.auth-meta-callback]
+verify_jwt = false
+
+[functions.auth-tiktok-start]
+verify_jwt = false
+
+[functions.auth-tiktok-callback]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -1,6 +1,7 @@
 -- Paid Ads Tracking Dashboard — Initial Schema
--- 02-ux-flow.md 데이터 모델을 그대로 반영. kmtmuwyzumjpkfbtqpbz(paid ad dashboard) 프로젝트에
--- mcp__supabase__apply_migration으로 적용 완료. 단일 사용자 기준(auth.uid() 소유)으로 가정했다 —
+-- 02-ux-flow.md 데이터 모델을 그대로 반영. 아직 어느 Supabase 프로젝트에도 적용되지 않았다
+-- (이전 주석에 있던 kmtmuwyzumjpkfbtqpbz 프로젝트는 더 이상 존재하지 않는다 — DNS 미해석).
+-- 단일 사용자 기준(auth.uid() 소유)으로 가정했다 —
 -- 02-ux-flow.md "대상 사용자: 1인 운영, 향후 팀원 합류 예정"에 따라 team 확장 시 별도
 -- 마이그레이션으로 owner_id를 team_id로 승격하는 걸 전제로 한다.
 

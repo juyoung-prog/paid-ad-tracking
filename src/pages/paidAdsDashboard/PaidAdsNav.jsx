@@ -6,6 +6,7 @@ const LINKS = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/reports', label: 'Reports' },
   { to: '/stores', label: 'Stores' },
+  { to: '/settings', label: 'Settings' },
 ];
 
 /**

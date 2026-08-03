@@ -25,18 +25,26 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const admin = supabaseAdmin();
-  const { data: connections, error } = await admin
-    .from('connections')
-    .select('owner_id, platform, account_id, access_token, ad_accounts(external_account_id)');
 
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: corsHeaders });
+  // ad_accounts를 임베드로 끌어오지 않고 따로 읽는다 — PostgREST의 to-one 임베드는
+  // supabase-js 타입 추론에서 배열로 잡혀 deno check(배포 시 실행됨)를 통과하지 못한다.
+  const [{ data: connections, error }, { data: adAccounts, error: accError }] = await Promise.all([
+    admin.from('connections').select('owner_id, platform, account_id, access_token'),
+    admin.from('ad_accounts').select('id, external_account_id'),
+  ]);
+
+  if (error || accError) {
+    return new Response(JSON.stringify({ error: error?.message ?? accError?.message }), { status: 500, headers: corsHeaders });
   }
+
+  const externalIdByAccount = new Map(
+    (adAccounts ?? []).map((a) => [a.id, a.external_account_id])
+  );
 
   const results: Record<string, number> = {};
 
   for (const conn of connections ?? []) {
-    const externalAccountId = conn.ad_accounts?.external_account_id;
+    const externalAccountId = externalIdByAccount.get(conn.account_id);
     if (!externalAccountId) continue;
 
     const raw =
