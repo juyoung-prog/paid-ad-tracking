@@ -15,9 +15,11 @@ Deno.serve(async (req) => {
     );
   }
 
-  // 우리 계정 구조상 TikTok은 tiktok-unified 하나뿐이라 accountId를 state에 실을 필요는
-  // 없지만, 추후 계정이 늘어날 가능성을 감안해 동일한 state 패턴을 유지한다.
-  const state = encodeURIComponent(JSON.stringify({ accountId: 'tiktok-unified' }));
+  // state에는 accountId 슬러그만 평문으로 싣는다. JSON을 넣으면 {, ", : 가 들어가는데
+  // TikTok 인가 화면이 이 문자들에서 502(System Error)로 죽는 사례가 있었다.
+  // 콘솔이 제시하는 예시(state=your_custom_params)도 단순 문자열이다.
+  // encodeURIComponent를 직접 걸지 않는다 — 아래 searchParams.set이 이미 인코딩한다.
+  const state = 'tiktok-unified';
 
   const authUrl = new URL('https://business-api.tiktok.com/portal/auth');
   authUrl.searchParams.set('app_id', appId);

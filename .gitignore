@@ -18,6 +18,15 @@ dist-ssr
 # Claude Code 개인 설정
 CLAUDE.local.md
 
+# 작업 중 참고용 스크린샷 등을 주고받는 임시 폴더 (프로젝트 산출물 아님)
+ref/
+
+# 이 프로젝트는 pnpm을 쓴다. npx 실행 등으로 생기는 npm 락파일은 커밋하지 않는다.
+package-lock.json
+
+# Edge Function 타입체크(deno check)를 임시로 돌릴 때 생기는 파일
+deno.lock
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
