@@ -7,6 +7,32 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 
+/** stores에서 읽어온 매장 목록. 캠페인 이름의 접두사를 여기에 맞춰본다. */
+type StoreIndex = { byId: Set<string>; byRegion: Map<string, string[]> };
+
+/**
+ * 캠페인 이름 접두사로 대상 매장을 정한다. 이 계정은 "G10_...", "BF2_...",
+ * "GA_...", "AllStores_..." 규칙을 쓴다.
+ *
+ * 정확히 일치할 때만 매장을 붙인다 — 접두사가 stores에 없는 값이면 추측하지 않고
+ * all_stores로 둔다. 비슷한 이름에 억지로 맞추면 성과가 조용히 엉뚱한 매장에 귀속되고,
+ * 그건 빈 값보다 나쁘다(사용자가 틀린 걸 알아채지 못한다).
+ */
+function resolveTarget(name: string, stores: StoreIndex) {
+  const prefix = name.split('_')[0]?.trim() ?? '';
+
+  if (stores.byId.has(prefix)) {
+    return { target_scope: 'single_store', target_store_ids: [prefix] };
+  }
+
+  const regionStores = stores.byRegion.get(prefix.toUpperCase());
+  if (regionStores && regionStores.length > 0) {
+    return { target_scope: 'multi_store', target_store_ids: regionStores };
+  }
+
+  return { target_scope: 'all_stores', target_store_ids: [] };
+}
+
 /** campaigns에 넣을 행. NOT NULL 컬럼이 하나라도 빠지면 insert가 통째로 실패한다. */
 type CampaignRow = {
   owner_id: string;
@@ -100,7 +126,7 @@ function mapMetaGoal(objective: string | undefined) {
   }
 }
 
-function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>): CampaignRow {
+function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
   const createdAt = new Date(item.created_time ?? Date.now());
   const fallback = fallbackRange(createdAt);
   // Meta는 캠페인에 기간이 있으므로 이름을 파싱할 필요가 없다.
@@ -111,8 +137,7 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
     ...base,
     external_campaign_id: String(item.id),
     name: item.name,
-    target_scope: 'all_stores',
-    target_store_ids: [],
+    ...resolveTarget(item.name ?? '', stores),
     start_date: startDate,
     end_date: endDate < startDate ? startDate : endDate,
     budget_planned: Number(item.lifetime_budget ?? 0) / 100, // Meta는 최소 화폐 단위(센트)로 준다
@@ -154,7 +179,7 @@ function mapTikTokGoal(objective: string | undefined) {
   }
 }
 
-function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>): CampaignRow {
+function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
   const range = parseRangeFromName(item.campaign_name ?? '', createdAt) ?? fallbackRange(createdAt);
 
@@ -162,11 +187,8 @@ function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'plat
     ...base,
     external_campaign_id: String(item.campaign_id),
     name: item.campaign_name,
-    // 어느 매장을 대상으로 하는지는 플랫폼이 모르는 우리 쪽 정보다. 이름의 접두사
-    // (G10 / BF2 / AllStores)로 유추할 수 있지만 규칙이 깨지면 조용히 틀린 매장에
-    // 귀속되므로, 비워두고 사용자가 화면에서 지정하게 한다.
-    target_scope: 'all_stores',
-    target_store_ids: [],
+    // 대상 매장은 플랫폼이 모르는 우리 쪽 정보라 이름 접두사에서 얻는다(resolveTarget).
+    ...resolveTarget(item.campaign_name ?? '', stores),
     start_date: range.startDate,
     end_date: range.endDate,
     // BUDGET_MODE_INFINITE면 budget이 0으로 온다. 계획 예산은 사용자가 넣는 값이다.
@@ -184,18 +206,38 @@ Deno.serve(async (req) => {
 
   // ad_accounts를 임베드로 끌어오지 않고 따로 읽는다 — PostgREST의 to-one 임베드는
   // supabase-js 타입 추론에서 배열로 잡혀 deno check(배포 시 실행됨)를 통과하지 못한다.
-  const [{ data: connections, error }, { data: adAccounts, error: accError }] = await Promise.all([
+  const [
+    { data: connections, error },
+    { data: adAccounts, error: accError },
+    { data: storeRows, error: storeError },
+  ] = await Promise.all([
     admin.from('connections').select('owner_id, platform, account_id, access_token'),
     admin.from('ad_accounts').select('id, external_account_id'),
+    admin.from('stores').select('id, region'),
   ]);
 
-  if (error || accError) {
-    return new Response(JSON.stringify({ error: error?.message ?? accError?.message }), { status: 500, headers: corsHeaders });
+  if (error || accError || storeError) {
+    return new Response(
+      JSON.stringify({ error: error?.message ?? accError?.message ?? storeError?.message }),
+      { status: 500, headers: corsHeaders }
+    );
   }
 
   const externalIdByAccount = new Map(
     (adAccounts ?? []).map((a) => [a.id, a.external_account_id])
   );
+
+  // 매장이 한 건도 없으면 resolveTarget이 전부 all_stores로 떨어진다. 그게 맞는 동작이다 —
+  // 없는 매장에 캠페인을 붙일 수는 없다.
+  const stores: StoreIndex = {
+    byId: new Set((storeRows ?? []).map((s) => s.id)),
+    byRegion: (storeRows ?? []).reduce((acc, s) => {
+      const list = acc.get(s.region) ?? [];
+      list.push(s.id);
+      acc.set(s.region, list);
+      return acc;
+    }, new Map<string, string[]>()),
+  };
 
   const results: Record<string, { inserted: number; updated: number; failed: number }> = {};
   const errors: string[] = [];
@@ -217,7 +259,7 @@ Deno.serve(async (req) => {
         : await fetchTikTokCampaigns(conn.access_token, externalAccountId);
 
     const rows: CampaignRow[] = raw.map((item: any) =>
-      conn.platform === 'meta' ? mapMetaCampaign(item, base) : mapTikTokCampaign(item, base)
+      conn.platform === 'meta' ? mapMetaCampaign(item, base, stores) : mapTikTokCampaign(item, base, stores)
     );
     if (rows.length === 0) continue;
 
