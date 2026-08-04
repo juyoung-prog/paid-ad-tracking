@@ -204,16 +204,39 @@ Deno.serve(async (req) => {
   cutoff.setDate(cutoff.getDate() - POST_END_SYNC_DAYS);
   const cutoffDate = cutoff.toISOString().slice(0, 10);
 
-  const { data: campaigns, error: campaignsError } = await admin
+  // 시작한 캠페인 전부를 일단 읽고, 아래에서 대상만 고른다. 종료일로 DB에서 바로
+  // 걸러내면 "이미 끝난 채로 처음 들어온 캠페인"이 영영 한 번도 조회되지 않는다.
+  const { data: allCampaigns, error: campaignsError } = await admin
     .from('campaigns')
     .select('id, owner_id, platform, account_id, external_campaign_id, start_date, end_date')
     .not('external_campaign_id', 'is', null)
-    .lte('start_date', today)
-    .gte('end_date', cutoffDate);
+    .lte('start_date', today);
 
   if (campaignsError) {
     return new Response(JSON.stringify({ error: campaignsError.message }), { status: 500, headers: corsHeaders });
   }
+
+  // 이미 성과를 한 번이라도 받아둔 캠페인 집합.
+  const { data: recorded, error: recordedError } = await admin
+    .from('performance_records')
+    .select('campaign_id');
+
+  if (recordedError) {
+    return new Response(JSON.stringify({ error: recordedError.message }), { status: 500, headers: corsHeaders });
+  }
+  const hasRecord = new Set((recorded ?? []).map((r) => r.campaign_id));
+
+  // 대상 선정:
+  //  (1) 아직 창 안에 있는 캠페인 — 값이 계속 변하므로 매일 갱신한다.
+  //  (2) 성과 기록이 하나도 없는 캠페인 — 종료된 지 오래됐어도 최초 1회는 받아야 한다.
+  //      TikTok은 query_lifetime=true로 끝난 캠페인의 누적값도 준다. 한 번 받고 나면
+  //      (1)에 걸리지 않는 한 다시 조회되지 않으므로 rate limit을 계속 쓰지 않는다.
+  //
+  // 이 두 번째 조건이 없으면, 연동을 시작한 시점에 이미 끝나 있던 캠페인은 영원히
+  // 빈칸으로 남는다(실제로 31건 중 26건이 그 상태였다).
+  const campaigns = (allCampaigns ?? []).filter(
+    (c) => c.end_date >= cutoffDate || !hasRecord.has(c.id)
+  );
 
   // campaigns와 connections 사이에는 직접 FK가 없다(둘 다 ad_accounts를 가리킨다).
   // PostgREST 임베드로는 못 따라가므로 두 테이블을 따로 읽어 (owner_id, account_id)로 잇는다.
@@ -237,7 +260,7 @@ Deno.serve(async (req) => {
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => { skipped[reason] = (skipped[reason] ?? 0) + 1; };
 
-  for (const c of campaigns ?? []) {
+  for (const c of campaigns) {
     const accessToken = tokenByAccount.get(`${c.owner_id}:${c.account_id}`);
     if (!accessToken) { skip('no_connection'); continue; }
 
