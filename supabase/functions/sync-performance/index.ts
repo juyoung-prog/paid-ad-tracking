@@ -64,7 +64,7 @@ function num(value: unknown): number | null {
  *     캠페인 104건이 전부 no_data로 빠졌다. date_preset=maximum이 누적이고,
  *     이래야 TikTok의 query_lifetime=true와 같은 의미가 된다.
  */
-async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountId: string) {
+async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountId: string): Promise<{ byCampaign: Map<string, any>; errorMessage: string | null }> {
   const fields = [
     'campaign_id',
     'impressions', 'reach', 'clicks', 'spend',
@@ -83,14 +83,16 @@ async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountI
     const json: any = await res.json();
     if (json?.error) {
       console.error('Meta insights 조회 실패', { externalAccountId, message: json.error.message });
-      return byCampaign;
+      // 실패를 반환값에 담는다 — 콘솔에만 찍으면 토큰이 만료돼도 응답은 200 성공이고
+      // 데이터만 0건이라 아무도 고장 난 걸 모른다.
+      return { byCampaign, errorMessage: `Meta insights 조회 실패 — ${json.error.message}` };
     }
     for (const row of json.data ?? []) {
       if (row.campaign_id) byCampaign.set(String(row.campaign_id), row);
     }
     url = json.paging?.next ?? null;
   }
-  return byCampaign;
+  return { byCampaign, errorMessage: null };
 }
 
 /** Meta는 여러 지표를 [{ action_type, value }] 배열로 준다. */
@@ -182,11 +184,13 @@ async function fetchTikTokReport(accessToken: string, advertiserId: string, camp
   const json = await res.json();
 
   // TikTok은 HTTP 200에 body의 code로 실패를 알린다 — res.ok만 보면 에러를 놓친다.
+  // API 실패와 "이 캠페인은 집행 실적이 없다"를 구분해서 돌려준다. 둘을 뭉뚱그리면
+  // 토큰이 죽었을 때도 그냥 no_data로 보여 원인을 못 찾는다.
   if (json?.code !== 0) {
     console.error('TikTok report 실패', { campaignId, code: json?.code, message: json?.message });
-    return null;
+    return { metrics: null, errorMessage: `TikTok report 실패 (code ${json?.code}) — ${json?.message}` };
   }
-  return json?.data?.list?.[0]?.metrics ?? null;
+  return { metrics: json?.data?.list?.[0]?.metrics ?? null, errorMessage: null };
 }
 
 // 우리 필드 ↔ TikTok Report 필드 매핑 (05-api-integration.md 표 기준).
@@ -290,6 +294,7 @@ Deno.serve(async (req) => {
 
   // Meta는 계정 단위로 한 번만 부른다(캠페인마다 부르지 않는다 —
   // fetchMetaInsightsByCampaign 주석 참고). 대상에 있는 계정만 받는다.
+  const errors: string[] = [];
   const metaInsights = new Map<string, Map<string, any>>();
   const metaAccountIds = new Set(
     campaigns.filter((c) => c.platform === 'meta').map((c) => c.account_id)
@@ -298,7 +303,9 @@ Deno.serve(async (req) => {
     const externalAccountId = externalIdByAccount.get(accountId);
     const accessToken = [...tokenByAccount.entries()].find(([k]) => k.endsWith(`:${accountId}`))?.[1];
     if (!externalAccountId || !accessToken) continue;
-    metaInsights.set(accountId, await fetchMetaInsightsByCampaign(accessToken, externalAccountId));
+    const result = await fetchMetaInsightsByCampaign(accessToken, externalAccountId);
+    if (result.errorMessage) errors.push(`meta:${accountId}: ${result.errorMessage}`);
+    metaInsights.set(accountId, result.byCampaign);
   }
 
   let synced = 0;
@@ -317,8 +324,9 @@ Deno.serve(async (req) => {
     } else if (c.platform === 'tiktok') {
       const advertiserId = externalIdByAccount.get(c.account_id);
       if (!advertiserId) { skip('no_advertiser_id'); continue; }
-      const raw = await fetchTikTokReport(accessToken, advertiserId, c.external_campaign_id);
-      metrics = raw ? mapTikTokReport(raw) : null;
+      const report = await fetchTikTokReport(accessToken, advertiserId, c.external_campaign_id);
+      if (report.errorMessage) errors.push(`${c.external_campaign_id}: ${report.errorMessage}`);
+      metrics = report.metrics ? mapTikTokReport(report.metrics) : null;
     }
 
     if (!metrics) { skip('no_data'); continue; }
@@ -342,7 +350,10 @@ Deno.serve(async (req) => {
     synced += 1;
   }
 
-  return new Response(JSON.stringify({ synced, skipped }), {
+  // 실패가 하나라도 있으면 200으로 성공이라 말하지 않는다. cron이 이 상태 코드를 보고
+  // sync_runs에 실패로 남기고 재시도한다.
+  return new Response(JSON.stringify({ synced, skipped, errors }), {
+    status: errors.length > 0 ? 207 : 200,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 });

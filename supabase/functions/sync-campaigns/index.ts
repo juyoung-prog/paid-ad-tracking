@@ -10,6 +10,13 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 /** 페이지네이션 상한. 응답이 잘못돼도 무한 루프에 빠지지 않게 하는 안전장치다. */
 const MAX_PAGES = 50;
 
+/**
+ * 플랫폼 조회 결과. 실패를 errorMessage로 돌려주는 게 핵심이다 —
+ * 예전에는 콘솔에만 찍고 빈 배열을 반환해서, 토큰이 만료돼도 응답은 200 성공이고
+ * 데이터만 0건이 됐다. 그러면 아무도 고장 난 걸 모른다.
+ */
+type FetchResult = { items: any[]; errorMessage: string | null };
+
 /** stores에서 읽어온 매장 목록. 캠페인 이름의 접두사·본문을 여기에 맞춰본다. */
 type StoreIndex = {
   byId: Set<string>;
@@ -202,7 +209,7 @@ function fallbackRange(createdAt: Date, isRunning: boolean, lastModifiedAt?: Dat
  * 페이지를 끝까지 따라간다. Meta는 응답의 paging.next에 다음 페이지 URL을 통째로 준다.
  * 한 페이지만 읽으면 계정에 캠페인이 많을 때 뒤쪽이 조용히 사라진다.
  */
-async function fetchMetaCampaigns(accessToken: string, externalAccountId: string) {
+async function fetchMetaCampaigns(accessToken: string, externalAccountId: string): Promise<FetchResult> {
   const fields = 'id,name,status,objective,start_time,stop_time,created_time,updated_time,lifetime_budget';
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/campaigns?fields=${fields}&limit=200&access_token=${accessToken}`;
@@ -216,12 +223,12 @@ async function fetchMetaCampaigns(accessToken: string, externalAccountId: string
     const json: any = await res.json();
     if (json?.error) {
       console.error('Meta campaigns 조회 실패', json.error);
-      return all;
+      return { items: all, errorMessage: `Meta campaigns 조회 실패 — ${json.error.message}` };
     }
     all.push(...(json.data ?? []));
     url = json.paging?.next ?? null;
   }
-  return all;
+  return { items: all, errorMessage: null };
 }
 
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
@@ -276,7 +283,7 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
  * 이 계정은 캠페인이 31개인데 10개만 들어와 21개가 조용히 누락됐던 적이 있다.
  * page_size 최대는 1000이고, 그래도 남으면 page를 올려 계속 읽는다.
  */
-async function fetchTikTokCampaigns(accessToken: string, advertiserId: string) {
+async function fetchTikTokCampaigns(accessToken: string, advertiserId: string): Promise<FetchResult> {
   const all: any[] = [];
 
   for (let page = 1; page <= MAX_PAGES; page += 1) {
@@ -291,7 +298,7 @@ async function fetchTikTokCampaigns(accessToken: string, advertiserId: string) {
     // TikTok은 HTTP 200에 body의 code로 실패를 알린다 — res.ok만 보면 에러를 놓친다.
     if (json?.code !== 0) {
       console.error('TikTok campaign/get 실패', { page, code: json?.code, message: json?.message });
-      return all;
+      return { items: all, errorMessage: `TikTok campaign/get 실패 (code ${json?.code}) — ${json?.message}` };
     }
 
     all.push(...(json?.data?.list ?? []));
@@ -299,7 +306,7 @@ async function fetchTikTokCampaigns(accessToken: string, advertiserId: string) {
     const totalPage = json?.data?.page_info?.total_page ?? 1;
     if (page >= totalPage) break;
   }
-  return all;
+  return { items: all, errorMessage: null };
 }
 
 /** TikTok objective → 우리 goal enum. 모르는 값은 traffic으로 둔다. */
@@ -403,10 +410,14 @@ Deno.serve(async (req) => {
     }
 
     const base = { owner_id: conn.owner_id, platform: conn.platform, account_id: conn.account_id };
-    const raw =
+    const fetched =
       conn.platform === 'meta'
         ? await fetchMetaCampaigns(conn.access_token, externalAccountId)
         : await fetchTikTokCampaigns(conn.access_token, externalAccountId);
+
+    // 일부라도 받았으면 그건 저장한다(부분 성공). 다만 실패 사실은 반드시 남긴다.
+    if (fetched.errorMessage) errors.push(`${key}: ${fetched.errorMessage}`);
+    const raw = fetched.items;
 
     const rows: CampaignRow[] = raw.map((item: any) =>
       conn.platform === 'meta' ? mapMetaCampaign(item, base, stores) : mapTikTokCampaign(item, base, stores)
