@@ -40,6 +40,13 @@ function resolveStoreId(name: string, stores: StoreIndex) {
   const prefix = name.split('_')[0]?.trim() ?? '';
   if (stores.byId.has(prefix)) return prefix;
 
+  // 코드가 접두사가 아니라 이름 중간에 오기도 한다 — Meta 쪽에 "Reach_BF2_2MonthsDeals"
+  // 같은 이름이 실제로 있다. 앞뒤가 영숫자가 아닐 때만 인정해 "BF2"가 다른 단어의
+  // 일부로 우연히 걸리는 것을 막는다.
+  for (const storeId of stores.byId) {
+    if (new RegExp(`(^|[^A-Za-z0-9])${storeId}([^A-Za-z0-9]|$)`, 'i').test(name)) return storeId;
+  }
+
   const lower = name.toLowerCase();
   for (const [storeName, storeId] of stores.byName) {
     if (storeName.length >= 4 && lower.includes(storeName)) return storeId;
