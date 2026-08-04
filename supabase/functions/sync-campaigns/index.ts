@@ -7,6 +7,9 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 
+/** 페이지네이션 상한. 응답이 잘못돼도 무한 루프에 빠지지 않게 하는 안전장치다. */
+const MAX_PAGES = 50;
+
 /** stores에서 읽어온 매장 목록. 캠페인 이름의 접두사를 여기에 맞춰본다. */
 type StoreIndex = { byId: Set<string>; byRegion: Map<string, string[]> };
 
@@ -60,7 +63,9 @@ function toISODate(value: Date) {
  * 연도는 플랫폼이 준 생성 시각에서 가져온다. 끝이 시작보다 앞서면 해를 넘긴 것으로 본다.
  */
 function parseRangeFromName(name: string, createdAt: Date) {
-  const match = name.match(/(\d{2})(\d{2})\s*[~-]\s*(\d{2})(\d{2})/);
+  // 구분자가 ~ / - / _ 셋 다 실제로 쓰인다(0710~0831, 0625-0709, 0414_0602).
+  // 아래 월/일 검증이 있어서 "2024_2025" 같은 우연한 4자리 쌍은 걸러진다.
+  const match = name.match(/(\d{2})(\d{2})\s*[~\-_]\s*(\d{2})(\d{2})/);
   if (!match) return null;
 
   const [, startMonth, startDay, endMonth, endDay] = match;
@@ -78,30 +83,59 @@ function parseRangeFromName(name: string, createdAt: Date) {
 }
 
 /**
- * 이름에서 기간을 못 읽었을 때의 대체값. 생성일부터 오늘까지로 둔다 —
- * 끝을 미래로 지어내면 대시보드가 "진행중"이라고 거짓말하고, 하루짜리로 두면 종료된 것으로
- * 보여 성과 동기화 대상에서 빠진다. 사용자가 화면에서 고치면 그 값이 유지된다.
+ * 이름에서 기간을 못 읽었을 때의 대체값.
+ *
+ * 아직 돌고 있는 캠페인이면 끝을 오늘로 둔다 — 미래로 지어내면 남은 기간이 거짓이 되고,
+ * 하루짜리로 두면 종료된 것으로 보여 성과 동기화 대상에서 아예 빠진다.
+ *
+ * 이미 꺼진 캠페인이면 마지막 수정 시각을 끝으로 쓴다. 여기서 오늘을 넣으면 2024년에
+ * 끝난 캠페인이 대시보드에 "진행중"으로 몇 년째 떠 있게 된다 — 실제로 Labor Day GA/FL이
+ * 2024-08 시작에 종료일 오늘로 들어와 있었다. 정확한 종료일은 플랫폼이 캠페인 레벨에서
+ * 주지 않으므로(광고그룹 스케줄에 있다) 마지막 수정 시각이 얻을 수 있는 가장 가까운 근사다.
+ *
+ * @param {Date} createdAt - 플랫폼이 준 생성 시각
+ * @param {boolean} isRunning - 아직 켜져 있는지
+ * @param {Date} [lastModifiedAt] - 마지막 수정 시각(꺼진 캠페인의 종료일 근사)
  */
-function fallbackRange(createdAt: Date) {
+function fallbackRange(createdAt: Date, isRunning: boolean, lastModifiedAt?: Date) {
   const today = toISODate(new Date());
   const created = toISODate(createdAt);
-  return { startDate: created <= today ? created : today, endDate: today };
+  const startDate = created <= today ? created : today;
+
+  if (isRunning || !lastModifiedAt) return { startDate, endDate: today };
+
+  const modified = toISODate(lastModifiedAt);
+  return { startDate, endDate: modified < startDate ? startDate : modified };
 }
 
 // ============================================================
 // Meta
 // ============================================================
 
+/**
+ * 페이지를 끝까지 따라간다. Meta는 응답의 paging.next에 다음 페이지 URL을 통째로 준다.
+ * 한 페이지만 읽으면 계정에 캠페인이 많을 때 뒤쪽이 조용히 사라진다.
+ */
 async function fetchMetaCampaigns(accessToken: string, externalAccountId: string) {
-  const res = await fetch(
-    `https://graph.facebook.com/v19.0/act_${externalAccountId}/campaigns?fields=id,name,status,objective,start_time,stop_time,created_time,lifetime_budget&access_token=${accessToken}`
-  );
-  const json = await res.json();
-  if (json?.error) {
-    console.error('Meta campaigns 조회 실패', json.error);
-    return [];
+  const fields = 'id,name,status,objective,start_time,stop_time,created_time,updated_time,lifetime_budget';
+  let url: string | null =
+    `https://graph.facebook.com/v19.0/act_${externalAccountId}/campaigns?fields=${fields}&limit=200&access_token=${accessToken}`;
+  const all: any[] = [];
+
+  // 응답이 잘못돼 next가 계속 나오는 상황에서도 무한히 돌지 않도록 상한을 둔다.
+  for (let page = 0; url && page < MAX_PAGES; page += 1) {
+    const res: Response = await fetch(url);
+    // 명시적으로 any를 준다 — url의 타입이 json에서, json이 url에서 유도돼
+    // TS가 순환으로 판단하고 추론을 포기한다(TS7022).
+    const json: any = await res.json();
+    if (json?.error) {
+      console.error('Meta campaigns 조회 실패', json.error);
+      return all;
+    }
+    all.push(...(json.data ?? []));
+    url = json.paging?.next ?? null;
   }
-  return json.data ?? [];
+  return all;
 }
 
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
@@ -128,7 +162,8 @@ function mapMetaGoal(objective: string | undefined) {
 
 function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
   const createdAt = new Date(item.created_time ?? Date.now());
-  const fallback = fallbackRange(createdAt);
+  // Meta의 status는 ACTIVE/PAUSED/ARCHIVED/DELETED.
+  const fallback = fallbackRange(createdAt, item.status === 'ACTIVE', new Date(item.updated_time ?? item.created_time ?? Date.now()));
   // Meta는 캠페인에 기간이 있으므로 이름을 파싱할 필요가 없다.
   const startDate = item.start_time ? item.start_time.slice(0, 10) : fallback.startDate;
   const endDate = item.stop_time ? item.stop_time.slice(0, 10) : fallback.endDate;
@@ -149,18 +184,35 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
 // TikTok
 // ============================================================
 
+/**
+ * 페이지를 끝까지 따라간다. TikTok은 page_size를 안 주면 기본 10건만 준다 —
+ * 이 계정은 캠페인이 31개인데 10개만 들어와 21개가 조용히 누락됐던 적이 있다.
+ * page_size 최대는 1000이고, 그래도 남으면 page를 올려 계속 읽는다.
+ */
 async function fetchTikTokCampaigns(accessToken: string, advertiserId: string) {
-  const res = await fetch(
-    `https://business-api.tiktok.com/open_api/v1.3/campaign/get/?advertiser_id=${advertiserId}`,
-    { headers: { 'Access-Token': accessToken } }
-  );
-  const json = await res.json();
-  // TikTok은 HTTP 200에 body의 code로 실패를 알린다 — res.ok만 보면 에러를 놓친다.
-  if (json?.code !== 0) {
-    console.error('TikTok campaign/get 실패', { code: json?.code, message: json?.message });
-    return [];
+  const all: any[] = [];
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const url = new URL('https://business-api.tiktok.com/open_api/v1.3/campaign/get/');
+    url.searchParams.set('advertiser_id', advertiserId);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('page_size', '1000');
+
+    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const json = await res.json();
+
+    // TikTok은 HTTP 200에 body의 code로 실패를 알린다 — res.ok만 보면 에러를 놓친다.
+    if (json?.code !== 0) {
+      console.error('TikTok campaign/get 실패', { page, code: json?.code, message: json?.message });
+      return all;
+    }
+
+    all.push(...(json?.data?.list ?? []));
+
+    const totalPage = json?.data?.page_info?.total_page ?? 1;
+    if (page >= totalPage) break;
   }
-  return json?.data?.list ?? [];
+  return all;
 }
 
 /** TikTok objective → 우리 goal enum. 모르는 값은 traffic으로 둔다. */
@@ -181,7 +233,13 @@ function mapTikTokGoal(objective: string | undefined) {
 
 function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
-  const range = parseRangeFromName(item.campaign_name ?? '', createdAt) ?? fallbackRange(createdAt);
+  const range =
+    parseRangeFromName(item.campaign_name ?? '', createdAt) ??
+    fallbackRange(
+      createdAt,
+      item.operation_status === 'ENABLE',
+      new Date(item.modify_time ?? item.create_time ?? Date.now())
+    );
 
   return {
     ...base,
