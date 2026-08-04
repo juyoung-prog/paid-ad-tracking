@@ -39,6 +39,31 @@ function formatDateTime(value) {
 }
 
 /**
+ * 만료까지 남은 일수와 만료 여부.
+ *
+ * 남은 일수는 올림한다 — 내림하면 "23시간 뒤 만료"가 0일이 되어 아직 하루 남았는데도
+ * "오늘 만료"로 보인다. 대신 만료 여부는 계산된 일수가 아니라 시각을 직접 비교한다.
+ * 올림만 쓰면 1시간 전에 만료된 토큰이 0일로 올라와 "오늘 만료"로 보이기 때문이다.
+ *
+ * 만료 시각이 없으면(TikTok처럼 영구 토큰) null을 돌려주고 아무 경고도 하지 않는다.
+ */
+function getExpiry(value) {
+  if (!value) return { remainingDays: null, isExpired: false };
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diff = new Date(value).getTime() - Date.now();
+  return { remainingDays: Math.ceil(diff / msPerDay), isExpired: diff <= 0 };
+}
+
+/**
+ * 만료 며칠 전부터 경고할지.
+ *
+ * Meta 사용자 토큰은 60일짜리고 refresh_token이 없어(플랫폼 정책) 사람이 다시
+ * 인증하는 것 외엔 갱신 수단이 없다. 만료된 뒤에 알면 그날 동기화는 이미 비어 있다.
+ * 2주면 잊고 지나가도 한 번쯤 설정 화면을 볼 여유가 있다.
+ */
+const EXPIRY_WARNING_DAYS = 14;
+
+/**
  * SettingsPage
  *
  * 플랫폼 계정 연결 관리 화면(/settings). 02-ux-flow.md 시나리오 6에 해당한다.
@@ -57,6 +82,17 @@ export function SettingsPage() {
 
   const accountById = new Map(adAccounts.map((a) => [a.id, a]));
   const connectionByAccountId = new Map(connections.map((c) => [c.accountId, c]));
+
+  // 만료됐거나 곧 만료되는 연결. 상단 경고와 목록 칩이 같은 판정을 쓰도록 여기서 한 번 계산한다.
+  const expiringConnections = CONNECT_TARGETS.map((target) => {
+    const connection = connectionByAccountId.get(target.accountId);
+    const { remainingDays, isExpired } = getExpiry(connection?.expiresAt);
+    return {
+      label: accountById.get(target.accountId)?.label ?? target.label,
+      remainingDays,
+      isExpired,
+    };
+  }).filter((c) => c.remainingDays !== null && c.remainingDays <= EXPIRY_WARNING_DAYS);
 
   const handleSyncNow = async () => {
     setSyncState({ isRunning: true, message: null, severity: 'info' });
@@ -96,12 +132,25 @@ export function SettingsPage() {
         <Alert severity={ syncState.severity } sx={ { mb: 2 } }>{ syncState.message }</Alert>
       ) }
 
+      {/* 목록 안의 칩만으로는 스크롤해야 보인다. 손댈 게 있으면 맨 위에서 한 번 말한다.
+          Meta 토큰은 60일마다 만료되는데 자동 갱신 수단이 없어(플랫폼 정책) 사람이
+          다시 인증해야 하고, 만료된 뒤에 알면 그날 동기화는 이미 비어 있다. */}
+      { expiringConnections.length > 0 && (
+        <Alert severity={ expiringConnections.some((c) => c.isExpired) ? 'error' : 'warning' } sx={ { mb: 2 } }>
+          { expiringConnections.map((c) => c.label).join(', ') } 연결이
+          { expiringConnections.some((c) => c.isExpired) ? ' 만료됐습니다' : ' 곧 만료됩니다' }.
+          아래에서 다시 연결하세요 — 만료되면 자동 동기화가 데이터를 가져오지 못합니다.
+        </Alert>
+      ) }
+
       <Paper elevation={ 0 } sx={ { border: 1, borderColor: 'divider' } }>
         <Stack divider={ <Divider /> }>
           { CONNECT_TARGETS.map((target) => {
             const account = accountById.get(target.accountId);
             const connection = connectionByAccountId.get(target.accountId);
             const isConnected = Boolean(connection);
+            const { remainingDays, isExpired } = getExpiry(connection?.expiresAt);
+            const isExpiringSoon = !isExpired && remainingDays !== null && remainingDays <= EXPIRY_WARNING_DAYS;
 
             return (
               <Stack
@@ -119,6 +168,16 @@ export function SettingsPage() {
                       color={ isConnected ? 'success' : 'default' }
                       variant={ isConnected ? 'filled' : 'outlined' }
                     />
+                    {/* 만료는 "연결됨" 옆에 붙여야 읽힌다 — 아래 캡션에만 날짜를 두면
+                        연결됐다는 초록 칩만 보고 지나친다. */}
+                    { isExpired && <Chip size="small" color="error" label="만료됨 — 다시 연결 필요" /> }
+                    { isExpiringSoon && (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        label={ remainingDays <= 1 ? '곧 만료' : `${remainingDays}일 후 만료` }
+                      />
+                    ) }
                   </Stack>
 
                   <Typography variant="caption" color="text.secondary" component="div">
@@ -135,8 +194,10 @@ export function SettingsPage() {
                   ) }
                 </Box>
 
+                {/* 손댈 필요가 있는 연결은 버튼도 채워진 형태로 올려 눈에 띄게 한다. */}
                 <Button
-                  variant={ isConnected ? 'outlined' : 'contained' }
+                  variant={ !isConnected || isExpired || isExpiringSoon ? 'contained' : 'outlined' }
+                  color={ isExpired ? 'error' : 'primary' }
                   href={ startUrl(target) }
                   disabled={ isLoading }
                   sx={ { flexShrink: 0 } }
