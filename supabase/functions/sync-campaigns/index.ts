@@ -10,8 +10,84 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 /** 페이지네이션 상한. 응답이 잘못돼도 무한 루프에 빠지지 않게 하는 안전장치다. */
 const MAX_PAGES = 50;
 
-/** stores에서 읽어온 매장 목록. 캠페인 이름의 접두사를 여기에 맞춰본다. */
-type StoreIndex = { byId: Set<string>; byRegion: Map<string, string[]> };
+/** stores에서 읽어온 매장 목록. 캠페인 이름의 접두사·본문을 여기에 맞춰본다. */
+type StoreIndex = {
+  byId: Set<string>;
+  byRegion: Map<string, string[]>;
+  /** [매장명(소문자), 매장 id] — 이름에 매장 코드 없이 매장명만 쓴 캠페인용 */
+  byName: [string, string][];
+};
+
+/**
+ * 한 매장의 오프닝을 이루는 단계 이름들. 이 단어가 들어 있으면 그 캠페인은
+ * 독립 이벤트가 아니라 오프닝 시리즈의 한 단계다(02-ux-flow.md 데이터 모델의
+ * campaignGroup 설명: ComingSoon/NowOpen/GrandOpening/1MonthDeals 4단계를 하나로 묶는다).
+ */
+const OPENING_PHASE = /coming\s*soon|now\s*open|nowopen|grand'?s?\s*opening|grandopening|month\s*deals|monthdeals/i;
+
+/** 이름 조각이 기간 표기인지. "0710~0831" / "0402_0410" / "0325" 형태. */
+function isDateToken(token: string) {
+  return /^\d{4}([~_-]\d{4})?$/.test(token);
+}
+
+/**
+ * 캠페인 이름이 가리키는 매장을 찾는다.
+ * 접두사 코드(G10_, BF4_)를 먼저 보고, 없으면 본문에서 매장명을 찾는다 —
+ * "Beauty Master Florida Mall Now Open"처럼 코드 없이 매장명만 쓴 캠페인이 실제로 있다.
+ * 매장명은 긴 것부터 맞춰 "Florida Mall"이 "Mall"에 밀리지 않게 한다.
+ */
+function resolveStoreId(name: string, stores: StoreIndex) {
+  const prefix = name.split('_')[0]?.trim() ?? '';
+  if (stores.byId.has(prefix)) return prefix;
+
+  const lower = name.toLowerCase();
+  for (const [storeName, storeId] of stores.byName) {
+    if (storeName.length >= 4 && lower.includes(storeName)) return storeId;
+  }
+  return null;
+}
+
+/**
+ * 전부 소문자이거나 전부 대문자인 문자열만 Title Case로 바꾼다.
+ * "labor day"와 "Labor Day"가 서로 다른 이벤트로 갈라지는 걸 막으면서,
+ * "WorldCup2026"처럼 의도적으로 섞어 쓴 표기는 그대로 둔다.
+ */
+function normalizeCase(value: string) {
+  const isUniform = value === value.toLowerCase() || value === value.toUpperCase();
+  if (!isUniform) return value;
+  return value
+    .toLowerCase()
+    .replace(/\b[a-z]/g, (ch) => ch.toUpperCase());
+}
+
+/**
+ * 캠페인을 묶을 이벤트 이름을 정한다. campaigns.campaign_group에 들어간다.
+ *
+ * 규칙 1) 매장이 특정되고 오프닝 단계 이름이면 "{매장코드} Opening" —
+ *   한 매장의 ComingSoon~1MonthDeals가 하나의 이벤트가 된다.
+ * 규칙 2) 그 외에는 이름에서 매장/지역 접두사·기간·회차 접미사를 떼고 남은 것을 쓴다.
+ *   "Labor Day FL"과 "labor day GA"가 같은 "Labor Day"로 모이도록 대소문자를 정규화한다.
+ *
+ * 아무것도 못 뽑으면 null을 돌려준다 — 그러면 campaignGroupKey()가 이름을 그대로
+ * 그룹 키로 쓴다(그 캠페인만 단독 이벤트). 억지로 만들어 붙이지 않는다.
+ */
+function resolveEventGroup(name: string, stores: StoreIndex) {
+  const storeId = resolveStoreId(name, stores);
+  if (storeId && OPENING_PHASE.test(name)) return `${storeId} Opening`;
+
+  const parts = name.split('_').map((p) => p.trim()).filter(Boolean);
+  const kept = parts.filter((part, index) => {
+    if (index === 0 && (stores.byId.has(part) || stores.byRegion.has(part.toUpperCase()))) return false;
+    if (index === 0 && part.toUpperCase() === 'ALLSTORES') return false;
+    if (isDateToken(part)) return false;
+    if (/^\d{1,2}$/.test(part)) return false; // "_2" 같은 회차 접미사
+    return true;
+  });
+
+  // 지역 접미사를 뗀다 — "Labor Day FL"/"labor day GA"는 같은 이벤트다.
+  const base = kept.join(' ').replace(/\s+(FL|GA|ALL)$/i, '').replace(/\s+/g, ' ').trim();
+  return base ? normalizeCase(base) : null;
+}
 
 /**
  * 캠페인 이름 접두사로 대상 매장을 정한다. 이 계정은 "G10_...", "BF2_...",
@@ -22,12 +98,14 @@ type StoreIndex = { byId: Set<string>; byRegion: Map<string, string[]> };
  * 그건 빈 값보다 나쁘다(사용자가 틀린 걸 알아채지 못한다).
  */
 function resolveTarget(name: string, stores: StoreIndex) {
-  const prefix = name.split('_')[0]?.trim() ?? '';
-
-  if (stores.byId.has(prefix)) {
-    return { target_scope: 'single_store', target_store_ids: [prefix] };
+  // 접두사 코드와 본문 매장명을 모두 본다 — "Beauty Master Florida Mall Now Open"처럼
+  // 코드 없이 매장명만 쓴 캠페인이 실제로 있고, 그동안 전부 all_stores로 떨어졌다.
+  const storeId = resolveStoreId(name, stores);
+  if (storeId) {
+    return { target_scope: 'single_store', target_store_ids: [storeId] };
   }
 
+  const prefix = name.split('_')[0]?.trim() ?? '';
   const regionStores = stores.byRegion.get(prefix.toUpperCase());
   if (regionStores && regionStores.length > 0) {
     return { target_scope: 'multi_store', target_store_ids: regionStores };
@@ -43,6 +121,7 @@ type CampaignRow = {
   account_id: string;
   external_campaign_id: string;
   name: string;
+  campaign_group: string | null;
   target_scope: string;
   target_store_ids: string[];
   start_date: string;
@@ -172,6 +251,7 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
     ...base,
     external_campaign_id: String(item.id),
     name: item.name,
+    campaign_group: resolveEventGroup(item.name ?? '', stores),
     ...resolveTarget(item.name ?? '', stores),
     start_date: startDate,
     end_date: endDate < startDate ? startDate : endDate,
@@ -245,7 +325,8 @@ function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'plat
     ...base,
     external_campaign_id: String(item.campaign_id),
     name: item.campaign_name,
-    // 대상 매장은 플랫폼이 모르는 우리 쪽 정보라 이름 접두사에서 얻는다(resolveTarget).
+    // 대상 매장과 이벤트 묶음은 플랫폼이 모르는 우리 쪽 정보라 이름에서 얻는다.
+    campaign_group: resolveEventGroup(item.campaign_name ?? '', stores),
     ...resolveTarget(item.campaign_name ?? '', stores),
     start_date: range.startDate,
     end_date: range.endDate,
@@ -271,7 +352,7 @@ Deno.serve(async (req) => {
   ] = await Promise.all([
     admin.from('connections').select('owner_id, platform, account_id, access_token'),
     admin.from('ad_accounts').select('id, external_account_id'),
-    admin.from('stores').select('id, region'),
+    admin.from('stores').select('id, region, name'),
   ]);
 
   if (error || accError || storeError) {
@@ -295,6 +376,10 @@ Deno.serve(async (req) => {
       acc.set(s.region, list);
       return acc;
     }, new Map<string, string[]>()),
+    // 긴 이름부터 맞춰 "Florida Mall"이 짧은 이름에 밀리지 않게 한다.
+    byName: (storeRows ?? [])
+      .map((s) => [String(s.name).toLowerCase(), s.id] as [string, string])
+      .sort((a, b) => b[0].length - a[0].length),
   };
 
   const results: Record<string, { inserted: number; updated: number; failed: number }> = {};
