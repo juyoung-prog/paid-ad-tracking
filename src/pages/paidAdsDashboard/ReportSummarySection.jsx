@@ -5,6 +5,8 @@ import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -154,6 +156,58 @@ const CREATIVE_COLUMNS = [
   { header: 'Profile Visits', cell: (r) => fmtNumber(r.profileVisits) },
 ];
 
+
+/**
+ * Performance 탭에서 Event를 골랐을 때 쓸 수 있는 비교 지표.
+ * 한 번에 하나만 그린다 — 축이 다른 두 지표를 한 그래프에 겹치면(이중 축)
+ * 어느 막대가 어느 축인지 알 수 없고, 축 범위만 바꿔도 결론이 뒤집힌다.
+ */
+const PHASE_METRICS = [
+  { key: 'spend', label: 'Spend', format: fmtCurrency },
+  { key: 'impressions', label: 'Impressions', format: fmtNumber },
+  { key: 'follows', label: 'Follows', format: fmtNumber },
+  { key: 'hookRate', label: 'Hook Rate', format: fmtPercent },
+];
+
+/**
+ * 같은 이름의 캠페인(= 한 phase)을 플랫폼 구분 없이 합쳐 지표를 낸다.
+ * buildPhaseTimeline과 같은 묶음 기준을 써서 Plan 탭과 같은 순서·같은 단위로 읽힌다.
+ *
+ * hookRate는 캠페인별 비율을 평균 내지 않는다 — 노출이 100인 캠페인의 50%와
+ * 노출이 100만인 캠페인의 1%를 평균 내면 25.5%라는 존재하지 않는 숫자가 나온다.
+ * 분자(hookViews)와 분모(impressions)를 각각 합친 뒤 다시 나눈다.
+ */
+function buildPhasePerformance(campaigns, rowByCampaignId) {
+  const byName = new Map();
+  campaigns.forEach((c) => {
+    if (!byName.has(c.name)) byName.set(c.name, { name: c.name, startDate: c.startDate, rows: [] });
+    const phase = byName.get(c.name);
+    if (c.startDate < phase.startDate) phase.startDate = c.startDate;
+    const row = rowByCampaignId.get(c.id);
+    if (row) phase.rows.push(row);
+  });
+
+  const sum = (rows, key) => {
+    const values = rows.map((r) => r[key]).filter((v) => v != null);
+    return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
+  };
+
+  return [...byName.values()]
+    .map((phase) => {
+      const impressions = sum(phase.rows, 'impressions');
+      const hookViews = sum(phase.rows, 'hookViews');
+      return {
+        name: phase.name,
+        startDate: phase.startDate,
+        spend: sum(phase.rows, 'spend'),
+        impressions,
+        follows: sum(phase.rows, 'follows'),
+        hookRate: impressions ? (hookViews ?? 0) / impressions : null,
+      };
+    })
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+}
+
 function toCsvRow(values) {
   return values.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
 }
@@ -270,6 +324,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
   const [reportTab, setReportTab] = useState('plan');
   const [groupValues, setGroupValues] = useState({ platform: '', campaignGroup: '' });
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
+  const [phaseMetric, setPhaseMetric] = useState('spend');
 
   const filteredCampaigns = campaigns.filter((c) => {
     if (groupValues.platform && c.platform !== groupValues.platform) return false;
@@ -287,6 +342,14 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
     () => filteredCampaigns.map((c) => getGoalMetricsRow(c, performanceRecords.find((r) => r.campaignId === c.id))),
     [filteredCampaigns, performanceRecords]
   );
+
+  // Plan 탭이 Event를 골랐을 때만 타임라인을 그리는 것과 같은 조건이다 —
+  // 여러 Event가 섞인 상태에서 phase 막대를 그리면 서로 무관한 캠페인이 한 축에 놓인다.
+  const phasePerformance = useMemo(() => {
+    if (!groupValues.campaignGroup) return [];
+    const rowByCampaignId = new Map(goalRows.map((r) => [r.campaignId, r]));
+    return buildPhasePerformance(filteredCampaigns, rowByCampaignId);
+  }, [groupValues.campaignGroup, filteredCampaigns, goalRows]);
 
   // FilterBar의 Campaign Group 드롭다운 옵션 — Dashboard와 동일 규칙(명시적으로
   // 태그한 campaignGroup은 1개여도 옵션, 이름만 우연히 겹치는 경우만 2개 이상).
@@ -653,7 +716,87 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
           No campaigns match the current filters.
         </Typography>
       ) : (
-        GOAL_META.map(({ value, label }) => {
+        <>
+          {/* Event를 고르면 phase별 비교 막대를 표 위에 얹는다 — 표는 캠페인 단위라
+              "이 이벤트의 어느 단계가 잘 됐나"를 한눈에 못 본다. Plan 탭의 Gantt와
+              같은 묶음(buildPhaseTimeline과 동일 기준)·같은 순서(시작일)를 쓴다.
+
+              막대는 한 번에 한 지표만 그린다. 축이 다른 두 지표를 겹치면(이중 축)
+              축 범위만 바꿔도 결론이 뒤집힌다. 색은 phase마다 다르게 주지 않고 하나로
+              통일한다 — 여기서 색이 나르는 정보는 크기뿐이고, phase는 왼쪽 이름으로
+              이미 구분된다(색을 순환시키면 색맹 구분 문제만 생긴다). */}
+          {phasePerformance.length > 0 && (
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                  Phase별 {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label}
+                </Typography>
+                <ToggleButtonGroup
+                  size="small"
+                  exclusive
+                  value={phaseMetric}
+                  onChange={(_, next) => { if (next) setPhaseMetric(next); }}
+                  aria-label="비교할 지표"
+                >
+                  {PHASE_METRICS.map((m) => (
+                    <ToggleButton key={m.key} value={m.key} sx={{ textTransform: 'none', px: 1.5 }}>
+                      {m.label}
+                    </ToggleButton>
+                  ))}
+                </ToggleButtonGroup>
+              </Box>
+
+              {(() => {
+                const metric = PHASE_METRICS.find((m) => m.key === phaseMetric) ?? PHASE_METRICS[0];
+                const values = phasePerformance.map((p) => p[metric.key]).filter((v) => v != null);
+                const max = values.length > 0 ? Math.max(...values) : 0;
+
+                if (max <= 0) {
+                  return (
+                    <Typography variant="body2" color="text.secondary">
+                      이 이벤트에는 {metric.label} 값이 아직 없습니다.
+                    </Typography>
+                  );
+                }
+
+                return phasePerformance.map((phase) => {
+                  const value = phase[metric.key];
+                  const ratio = value != null ? value / max : 0;
+                  return (
+                    <Box key={phase.name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        title={phase.name}
+                        sx={{ width: 200, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {phase.name}
+                      </Typography>
+                      {/* 막대 자체에는 텍스트를 넣지 않는다 — 값이 작으면 막대 안에
+                          글자가 안 들어가 잘린다. 값은 항상 막대 오른쪽 바깥에 둔다. */}
+                      <Box sx={{ flexGrow: 1, minWidth: 0, backgroundColor: 'grey.100', height: 14 }}>
+                        <Box
+                          sx={{
+                            width: `${Math.max(ratio * 100, value ? 0.5 : 0)}%`,
+                            height: '100%',
+                            backgroundColor: 'primary.main',
+                          }}
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{ width: 96, flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {value != null ? metric.format(value) : '—'}
+                      </Typography>
+                    </Box>
+                  );
+                });
+              })()}
+            </Box>
+          )}
+
+        {GOAL_META.map(({ value, label }) => {
           const rowsForGoal = goalRows.filter((r) => r.goal === value);
           if (rowsForGoal.length === 0) return null;
           const extraColumns = [...goalExtraColumns(value), ...CREATIVE_COLUMNS];
@@ -690,7 +833,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
               </TableContainer>
             </Box>
           );
-        })
+        })}
+        </>
       )}
     </Box>
   );

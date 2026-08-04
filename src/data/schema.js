@@ -575,6 +575,9 @@ export function getCampaignMetricsRow(campaign, record) {
     // 아래는 계산하지 않고 그대로 전달한다 — 플랫폼이 준 원본 값이다.
     // 수기 입력 레코드에는 없을 수 있어 전부 null 허용이고, 표는 "—"로 그린다.
     videoPlays: record?.videoPlays ?? null,
+    // hookViews는 표에 직접 안 쓰지만 여러 캠페인을 하나로 합칠 때 필요하다 —
+    // 비율끼리 평균 내면 틀린다. 분자와 분모를 각각 합쳐서 다시 나눠야 한다.
+    hookViews: record?.hookViews ?? null,
     heldViews: record?.heldViews ?? null,
     avgWatchSeconds: record?.avgWatchSeconds ?? null,
     likes: record?.likes ?? null,
@@ -624,6 +627,9 @@ export function getGoalMetricsRow(campaign, record) {
     // 아래는 goal과 무관하게 "소재가 어땠는가"를 말하는 값이라 goal별로 고르지 않고
     // 전부 그대로 전달한다. 어떤 목적의 캠페인이든 영상이 붙으면 의미가 있다.
     videoPlays: record?.videoPlays ?? null,
+    // hookViews는 표에 직접 안 쓰지만 여러 캠페인을 하나로 합칠 때 필요하다 —
+    // 비율끼리 평균 내면 틀린다. 분자와 분모를 각각 합쳐서 다시 나눠야 한다.
+    hookViews: record?.hookViews ?? null,
     heldViews: record?.heldViews ?? null,
     avgWatchSeconds: record?.avgWatchSeconds ?? null,
     likes: record?.likes ?? null,
