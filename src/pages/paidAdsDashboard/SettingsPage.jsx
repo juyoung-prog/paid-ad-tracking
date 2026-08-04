@@ -12,6 +12,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import { supabase } from '../../lib/supabase';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { useConnections } from './useConnections';
+import { useSyncRuns } from './useSyncRuns';
 
 /**
  * 연결 가능한 광고 계정 목록. ad_accounts 테이블은 "연결이 끝난 뒤에" 채워지므로
@@ -51,6 +52,7 @@ function formatDateTime(value) {
 export function SettingsPage() {
   const { adAccounts, refresh: refreshStore } = usePaidAdsStore();
   const { connections, isLoading, error, refresh: refreshConnections } = useConnections();
+  const { lastSuccessAt, recentFailures, refresh: refreshRuns } = useSyncRuns();
   const [syncState, setSyncState] = useState({ isRunning: false, message: null, severity: 'info' });
 
   const accountById = new Map(adAccounts.map((a) => [a.id, a]));
@@ -72,7 +74,7 @@ export function SettingsPage() {
       return;
     }
 
-    await Promise.all([refreshStore(), refreshConnections()]);
+    await Promise.all([refreshStore(), refreshConnections(), refreshRuns()]);
     setSyncState({
       isRunning: false,
       message: `동기화 완료 — 성과 ${performanceRes?.data?.synced ?? 0}건 갱신`,
@@ -147,6 +149,17 @@ export function SettingsPage() {
         </Stack>
       </Paper>
 
+      {/* 자동 동기화가 실패해도 화면에 아무 흔적이 없으면 아무도 모른다 —
+          cron은 하루 1회라 한 번 놓치면 그날 데이터가 통째로 빈다.
+          재시도로 이미 복구된 실패는 띄우지 않는다(마지막 성공 이후 것만). */}
+      { recentFailures.length > 0 && (
+        <Alert severity="warning" sx={ { mt: 3 } }>
+          최근 자동 동기화가 { recentFailures.length }회 실패했습니다
+          { recentFailures[0].statusCode ? ` (마지막 응답 ${recentFailures[0].statusCode})` : '' }.
+          아래 "지금 동기화"로 직접 실행해보세요.
+        </Alert>
+      ) }
+
       <Stack direction="row" spacing={ 2 } sx={ { mt: 3, alignItems: 'center' } }>
         <Button
           variant="outlined"
@@ -156,9 +169,16 @@ export function SettingsPage() {
         >
           { syncState.isRunning ? '동기화 중…' : '지금 동기화' }
         </Button>
-        <Typography variant="caption" color="text.secondary">
-          자동 동기화는 매일 UTC 09:00(캠페인) / 09:30(성과)에 실행됩니다.
-        </Typography>
+        <Box>
+          <Typography variant="caption" color="text.secondary" component="div">
+            자동 동기화는 매일 UTC 09:00(캠페인) / 09:30(성과)에 실행됩니다.
+          </Typography>
+          <Typography variant="caption" color="text.secondary" component="div">
+            { lastSuccessAt
+              ? `마지막 성공 ${formatDateTime(lastSuccessAt)}`
+              : '아직 자동 동기화가 성공한 기록이 없습니다.' }
+          </Typography>
+        </Box>
       </Stack>
     </Box>
   );
