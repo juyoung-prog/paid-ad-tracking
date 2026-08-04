@@ -31,6 +31,7 @@ import { LastUpdatedBar } from '../../components/layout/LastUpdatedBar';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
+import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
 import { getEffectiveStatus, calcBudgetPacing, calcAutoBudgetPlanned, campaignGroupKey, ALERT_SEVERITY, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore } from './usePaidAdsStore';
@@ -912,6 +913,11 @@ export function DashboardPage() {
                 values={performanceValues}
                 onChange={(field, value) => setPerformanceValues((v) => ({ ...v, [field]: value }))}
               />
+              {/* 플랫폼이 자동 수집한 지표. 입력 폼 바로 아래 두되 form 안에 남긴다 —
+                  같은 "이 캠페인의 성과"라는 묶음이고, 위는 사람이 넣는 값, 아래는
+                  고칠 수 없는 값이라는 대비가 붙어 있을 때 가장 잘 읽힌다.
+                  수집된 지표가 하나도 없으면 컴포넌트가 스스로 아무것도 안 그린다. */}
+              <PlatformMetricList metrics={performanceValues} sx={{ mt: 3 }} />
               {/* Campaign Details의 Save 버튼과 크기를 맞춘다(size="small") — 같은
                   Drawer 안에서 "저장" 역할을 하는 버튼끼리 높이가 다르면 안 된다. */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
