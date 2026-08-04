@@ -122,10 +122,29 @@ sequenceDiagram
 | `reach` | `reach` | `reach` |
 | `clicks` | `clicks` (또는 `link_click`) | `clicks` |
 | `spend` | `spend` | `spend` |
+| `videoPlays` | `video_play_actions` | `video_play_actions` |
 | `hookViews` | `video_p25_watched_actions` (근사치) | `video_watched_2s` |
-| `heldViews` | `video_p100_watched_actions` | `video_watched_6s` |
+| `heldViews` | `video_p100_watched_actions` | `video_views_p100` |
+| `avgWatchSeconds` | `video_avg_time_watched_actions` | `average_video_play` |
+| `likes` / `comments` / `shares` | `actions` 중 `post_reaction` / `comment` / `post` | `likes` / `comments` / `shares` |
 | `engagements` | `post_engagement` | `likes` + `comments` + `shares` (합산) |
+| `follows` | — (캠페인 레벨 대응 지표 없음) | `follows` |
+| `profileVisits` | — | `profile_visits` |
 | `conversions` | `actions` 중 `offsite_conversion` 등 | `conversion` |
+
+**`heldViews`는 "완전 시청"이다.** 한때 TikTok만 `video_watched_6s`(6초 시청)를 넣어
+같은 컬럼에 플랫폼마다 다른 의미가 섞였다 — 실측으로 6초 2,119 vs 완전 시청 484로
+4배 이상 차이가 나서 플랫폼 간 비교가 조용히 틀렸다. 지금은 양쪽 다 완전 시청이다.
+
+**파생 지표는 저장하지 않는다.** TikTok은 `ctr`/`cpc`/`cpm`/`frequency`/
+`cost_per_1000_reached`/`conversion_rate`/`cost_per_conversion`을 전부 주지만,
+`spend`/`impressions`/`clicks`에서 계산되는 값이라 저장하면 원본과 어긋났을 때 어느 쪽이
+맞는지 알 수 없다. 화면은 `schema.js`의 `calcCPM()` 등으로 계산한다.
+
+**실계정에서 거부된 지표**: `saves`/`bookmark`/`total_save`(캠페인 레벨 미제공),
+`video_views`, `video_watched_25`~`100`. 저장 수는 TikTok Marketing API로 받을 수 없다.
+일일 예산도 캠페인 레벨에는 없다 — 광고그룹에 설정되고, 이 계정은 캠페인이 전부
+`BUDGET_MODE_INFINITE`라 `budget`이 0으로 온다.
 
 **TikTok 리포트 호출 방식** — 캠페인 목록(`campaign/get`)과 성과가 별도 엔드포인트다.
 `report/integrated/get`에 `report_type=BASIC`, `data_level=AUCTION_CAMPAIGN`,

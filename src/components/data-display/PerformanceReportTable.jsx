@@ -21,6 +21,24 @@ function fmtPercent(value) {
   return `${(value * 100).toFixed(2)}%`;
 }
 
+function fmtSeconds(value) {
+  if (value == null) return '—';
+  return `${value.toFixed(2)}s`;
+}
+
+// 소재·상호작용 지표. 계산값이 아니라 플랫폼이 준 원본이라 이 컴포넌트는 그대로 그린다.
+// 수기 입력 레코드에는 없는 값이라 '—'가 나오는 게 정상이다.
+const CREATIVE_COLUMNS = [
+  { header: 'Video Plays', get: (r) => fmtNumber(r.videoPlays) },
+  { header: 'Held Views', get: (r) => fmtNumber(r.heldViews) },
+  { header: 'Avg Watch', get: (r) => fmtSeconds(r.avgWatchSeconds) },
+  { header: 'Likes', get: (r) => fmtNumber(r.likes) },
+  { header: 'Comments', get: (r) => fmtNumber(r.comments) },
+  { header: 'Shares', get: (r) => fmtNumber(r.shares) },
+  { header: 'Follows', get: (r) => fmtNumber(r.follows) },
+  { header: 'Profile Visits', get: (r) => fmtNumber(r.profileVisits) },
+];
+
 /**
  * PerformanceReportTable 컴포넌트
  *
@@ -29,6 +47,9 @@ function fmtPercent(value) {
  * CPM/CTR/CPC를 직접 계산하지 않는다. 가로 폭이 좁아지면 컨테이너 자체가
  * 스크롤되도록 처리해 표가 페이지 레이아웃을 밀어내지 않게 한다
  * (overflow-containment).
+ *
+ * 뒤쪽 8개 컬럼(Video Plays~Profile Visits)은 계산값이 아니라 플랫폼이 준 원본이다.
+ * API로 들어온 레코드에만 있고 수기 입력에는 없어 '—'로 그려진다.
  *
  * Props:
  * @param {Array<ReturnType<typeof import('../../data/schema').getCampaignMetricsRow>>} rows - getCampaignMetricsRow() 결과 배열 [Required]
@@ -63,6 +84,9 @@ export function PerformanceReportTable({ rows, onRowClick, sx }) {
             <TableCell align="right" sx={{ fontWeight: 600 }}>CPM</TableCell>
             <TableCell align="right" sx={{ fontWeight: 600 }}>CTR</TableCell>
             <TableCell align="right" sx={{ fontWeight: 600 }}>CPC</TableCell>
+            {CREATIVE_COLUMNS.map((col) => (
+              <TableCell key={col.header} align="right" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{col.header}</TableCell>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -97,6 +121,9 @@ export function PerformanceReportTable({ rows, onRowClick, sx }) {
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(row.cpm)}</TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtPercent(row.ctr)}</TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtCurrency(row.cpc)}</TableCell>
+              {CREATIVE_COLUMNS.map((col) => (
+                <TableCell key={col.header} align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{col.get(row)}</TableCell>
+              ))}
             </TableRow>
           ))}
         </TableBody>

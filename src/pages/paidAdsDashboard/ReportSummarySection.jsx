@@ -130,6 +130,26 @@ function goalExtraColumns(goalValue) {
   }
 }
 
+function fmtSeconds(value) {
+  if (value == null) return '—';
+  return `${value.toFixed(2)}s`;
+}
+
+// goal별 컬럼 뒤에 모든 표가 공통으로 붙이는 블록. 위 goalExtraColumns가 "이 목적에서
+// 판단 근거가 되는가"로 고르는 것과 달리, 여기 지표는 목적이 아니라 소재가 어땠는지를
+// 말한다 — 영상이 붙은 캠페인이면 목적과 무관하게 의미가 있어서 goal별로 나누지 않는다.
+// 수기 입력 레코드에는 없는 값이라 '—'로 그려진다.
+const CREATIVE_COLUMNS = [
+  { header: 'Video Plays', cell: (r) => fmtNumber(r.videoPlays) },
+  { header: 'Held Views', cell: (r) => fmtNumber(r.heldViews) },
+  { header: 'Avg Watch', cell: (r) => fmtSeconds(r.avgWatchSeconds) },
+  { header: 'Likes', cell: (r) => fmtNumber(r.likes) },
+  { header: 'Comments', cell: (r) => fmtNumber(r.comments) },
+  { header: 'Shares', cell: (r) => fmtNumber(r.shares) },
+  { header: 'Follows', cell: (r) => fmtNumber(r.follows) },
+  { header: 'Profile Visits', cell: (r) => fmtNumber(r.profileVisits) },
+];
+
 function toCsvRow(values) {
   return values.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',');
 }
@@ -149,6 +169,8 @@ function performanceToCsv(rows) {
   const header = [
     'Campaign', 'Platform', 'Goal', 'Spend', 'Impressions', 'Reach', 'Clicks',
     'Engagements', 'Conversions', 'CPM', 'CTR', 'CPC', 'Engagement Rate', 'CPA',
+    'Video Plays', 'Held Views', 'Avg Watch (s)', 'Likes', 'Comments', 'Shares',
+    'Follows', 'Profile Visits',
   ];
   const lines = rows.map((r) =>
     toCsvRow([
@@ -159,6 +181,10 @@ function performanceToCsv(rows) {
       r.cpc != null ? r.cpc.toFixed(2) : '',
       r.engagementRate != null ? (r.engagementRate * 100).toFixed(2) : '',
       r.cpa != null ? r.cpa.toFixed(2) : '',
+      r.videoPlays ?? '', r.heldViews ?? '',
+      r.avgWatchSeconds != null ? r.avgWatchSeconds.toFixed(2) : '',
+      r.likes ?? '', r.comments ?? '', r.shares ?? '',
+      r.follows ?? '', r.profileVisits ?? '',
     ])
   );
   return [toCsvRow(header), ...lines].join('\n');
@@ -623,7 +649,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
         GOAL_META.map(({ value, label }) => {
           const rowsForGoal = goalRows.filter((r) => r.goal === value);
           if (rowsForGoal.length === 0) return null;
-          const extraColumns = goalExtraColumns(value);
+          const extraColumns = [...goalExtraColumns(value), ...CREATIVE_COLUMNS];
           return (
             <Box key={value} sx={{ mb: 3 }}>
               <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>

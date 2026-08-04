@@ -153,9 +153,16 @@ export function rowToPerformanceRecord(row) {
     reach: num(row.reach),
     clicks: num(row.clicks),
     spend: num(row.spend) ?? 0,
+    videoPlays: num(row.video_plays),
     hookViews: num(row.hook_views),
     heldViews: num(row.held_views),
+    avgWatchSeconds: num(row.avg_watch_seconds),
+    likes: num(row.likes),
+    comments: num(row.comments),
+    shares: num(row.shares),
     engagements: num(row.engagements),
+    follows: num(row.follows),
+    profileVisits: num(row.profile_visits),
     conversions: num(row.conversions),
   };
 }
@@ -177,9 +184,16 @@ export function performanceRecordToRow(record, recordedAt) {
     reach: record.reach ?? null,
     clicks: record.clicks ?? null,
     spend: record.spend ?? 0,
+    video_plays: record.videoPlays ?? null,
     hook_views: record.hookViews ?? null,
     held_views: record.heldViews ?? null,
+    avg_watch_seconds: record.avgWatchSeconds ?? null,
+    likes: record.likes ?? null,
+    comments: record.comments ?? null,
+    shares: record.shares ?? null,
     engagements: record.engagements ?? null,
+    follows: record.follows ?? null,
+    profile_visits: record.profileVisits ?? null,
     conversions: record.conversions ?? null,
   };
 }

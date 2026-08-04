@@ -115,9 +115,16 @@ export const ALERT_TYPE = Object.freeze({
  * @property {number|null} reach - Tier 1 · 공통 필수
  * @property {number|null} clicks - Tier 1 · 공통 필수 (링크 클릭수)
  * @property {number} spend - Tier 1 · 공통 필수, USD 소수점 2자리
+ * @property {number|null} videoPlays - Tier 2 · 영상 지표 (전체 재생수, 시청 조건 없음)
  * @property {number|null} hookViews - Tier 2 · 영상 지표 (3초/2초 조회수)
- * @property {number|null} heldViews - Tier 2 · 영상 지표 (완전시청수)
- * @property {number|null} engagements - Tier 3 · goal=engagement일 때만
+ * @property {number|null} heldViews - Tier 2 · 영상 지표 (완전시청수). Meta video_p100_watched_actions / TikTok video_views_p100
+ * @property {number|null} avgWatchSeconds - Tier 2 · 영상 지표 (평균 재생 시간, 초)
+ * @property {number|null} likes - Tier 3 · 상호작용 구성 요소
+ * @property {number|null} comments - Tier 3 · 상호작용 구성 요소
+ * @property {number|null} shares - Tier 3 · 상호작용 구성 요소
+ * @property {number|null} engagements - Tier 3 · goal=engagement일 때만. likes+comments+shares 합(Meta는 post_engagement)
+ * @property {number|null} follows - Tier 3 · 팔로우 획득. TikTok 전용(Meta 캠페인 레벨에 대응 지표 없음)
+ * @property {number|null} profileVisits - Tier 3 · 프로필 방문. TikTok 전용
  * @property {number|null} conversions - Tier 4 · goal=conversion|store_visit일 때만
  */
 
@@ -548,7 +555,7 @@ export function getReportSummary(campaigns, performanceRecords) {
  *
  * @param {Campaign} campaign
  * @param {PerformanceRecord} [record]
- * @returns {{ campaignId: string, name: string, platform: string, spend: number|null, impressions: number|null, clicks: number|null, cpm: number|null, ctr: number|null, cpc: number|null }}
+ * @returns {{ campaignId: string, name: string, platform: string, spend: number|null, impressions: number|null, clicks: number|null, cpm: number|null, ctr: number|null, cpc: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
  */
 export function getCampaignMetricsRow(campaign, record) {
   const spend = record?.spend ?? null;
@@ -565,6 +572,16 @@ export function getCampaignMetricsRow(campaign, record) {
     cpm: spend != null ? calcCPM(spend, impressions) : null,
     ctr: calcCTR(clicks, impressions),
     cpc: spend != null ? calcCPC(spend, clicks) : null,
+    // 아래는 계산하지 않고 그대로 전달한다 — 플랫폼이 준 원본 값이다.
+    // 수기 입력 레코드에는 없을 수 있어 전부 null 허용이고, 표는 "—"로 그린다.
+    videoPlays: record?.videoPlays ?? null,
+    heldViews: record?.heldViews ?? null,
+    avgWatchSeconds: record?.avgWatchSeconds ?? null,
+    likes: record?.likes ?? null,
+    comments: record?.comments ?? null,
+    shares: record?.shares ?? null,
+    follows: record?.follows ?? null,
+    profileVisits: record?.profileVisits ?? null,
   };
 }
 
@@ -576,7 +593,7 @@ export function getCampaignMetricsRow(campaign, record) {
  * 서로 다른 컬럼 구성의 표로 보여줄 때 이 값을 그대로 쓴다.
  * @param {Campaign} campaign
  * @param {PerformanceRecord} [record]
- * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpa: number|null }}
+ * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpa: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
  */
 export function getGoalMetricsRow(campaign, record) {
   const spend = record?.spend ?? null;
@@ -602,5 +619,15 @@ export function getGoalMetricsRow(campaign, record) {
     cpc: spend != null ? calcCPC(spend, clicks) : null,
     engagementRate: calcEngagementRate(engagements, impressions),
     cpa: spend != null ? calcCPA(spend, conversions) : null,
+    // 아래는 goal과 무관하게 "소재가 어땠는가"를 말하는 값이라 goal별로 고르지 않고
+    // 전부 그대로 전달한다. 어떤 목적의 캠페인이든 영상이 붙으면 의미가 있다.
+    videoPlays: record?.videoPlays ?? null,
+    heldViews: record?.heldViews ?? null,
+    avgWatchSeconds: record?.avgWatchSeconds ?? null,
+    likes: record?.likes ?? null,
+    comments: record?.comments ?? null,
+    shares: record?.shares ?? null,
+    follows: record?.follows ?? null,
+    profileVisits: record?.profileVisits ?? null,
   };
 }
