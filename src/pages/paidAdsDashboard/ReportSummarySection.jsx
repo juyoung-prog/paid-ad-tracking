@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { alpha, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -25,10 +26,29 @@ const PLATFORM_LABEL = {
   [PLATFORM.TIKTOK]: 'TikTok',
 };
 
-// Plan 탭에서 Event를 선택했을 때만 쓰는 phase(단계) 색 순환 — 임의 hex 대신
-// theme palette 토큰만 참조한다(design-system.md 규칙). error는 "문제"라는
-// 기존 의미가 있어 순환에서 뺀다.
-const PHASE_COLOR_TOKENS = ['info', 'success', 'warning', 'primary', 'secondary'];
+// Plan 탭 Gantt의 phase 막대 채움. 색을 순환시키지 않고 primary 하나의 명도만
+// 바꾼다(시간 순 옅음→진함).
+//
+// 왜 순환을 버렸나:
+//  1) 대비 실패. 예전 5색 순환(info/success/warning/primary/secondary)은 검증에서
+//     떨어졌다 — success↔info가 정상 시야 ΔE 12.1(기준 15), 색각이상 4.9.
+//  2) 텍스트가 안 읽혔다. 막대 채움은 {token}.light인데 글자는 {token}.contrastText
+//     (흰색)를 썼다. contrastText는 .main 기준으로 정의된 값이라 .light 위에서는
+//     2.76~4.28:1로 5개 중 4개가 WCAG AA(4.5:1)에 미달했다.
+//  3) 애초에 색이 정체성을 나를 필요가 없다. 막대마다 자기 행이 있고 이름이 막대
+//     안에 직접 적혀 있다. phase는 시간 순서가 있으니 순차 램프가 맞는 인코딩이다.
+//
+// 막대의 존재감은 테두리(primary.main, 흰 배경 대비 8.59:1)가 맡고, 채움을 밝게
+// 두어 진한 텍스트가 전 구간에서 4.95:1 이상을 유지한다.
+const PHASE_FILL_MIN_ALPHA = 0.15;
+const PHASE_FILL_MAX_ALPHA = 0.50;
+
+/** 시간 순 index를 채움 불투명도로. phase가 하나뿐이면 가장 옅은 값을 쓴다. */
+function phaseFillAlpha(index, total) {
+  if (total <= 1) return PHASE_FILL_MIN_ALPHA;
+  const t = index / (total - 1);
+  return PHASE_FILL_MIN_ALPHA + (PHASE_FILL_MAX_ALPHA - PHASE_FILL_MIN_ALPHA) * t;
+}
 
 // 같은 이름(phase)의 캠페인을 플랫폼별로 묶어 하나의 타임라인 막대 + Budget
 // Breakdown 한 행으로 합친다 — "G10 Grand Opening"이 Meta/TikTok 두 캠페인으로
@@ -42,7 +62,7 @@ function buildPhaseTimeline(campaigns) {
     byName.get(c.name).push(c);
   });
   return [...byName.entries()]
-    .map(([name, group], index) => {
+    .map(([name, group]) => {
       const startDate = group.reduce((min, c) => (c.startDate < min ? c.startDate : min), group[0].startDate);
       const endDate = group.reduce((max, c) => (c.endDate > max ? c.endDate : max), group[0].endDate);
       const byPlatform = {};
@@ -58,10 +78,11 @@ function buildPhaseTimeline(campaigns) {
         days,
         byPlatform,
         totalBudget,
-        colorToken: PHASE_COLOR_TOKENS[index % PHASE_COLOR_TOKENS.length],
       };
     })
-    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
+    // 램프는 정렬이 끝난 뒤에 매긴다 — 정렬 전 index로 주면 색이 시간 순과 어긋난다.
+    .map((phase, index, all) => ({ ...phase, fillAlpha: phaseFillAlpha(index, all.length) }));
 }
 
 // Performance 탭에서 goal별로 캠페인을 묶어 각각 다른 컬럼의 표를 그린다 —
@@ -321,6 +342,7 @@ function downloadCsv(csv, filename) {
  */
 export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
   const navigate = useNavigate();
+  const theme = useTheme();
   const [reportTab, setReportTab] = useState('plan');
   const [groupValues, setGroupValues] = useState({ platform: '', campaignGroup: '' });
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -556,9 +578,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                           left: `${left}%`,
                           width: `${width}%`,
                           height: '100%',
-                          bgcolor: `${p.colorToken}.light`,
+                          bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
                           border: '1px solid',
-                          borderColor: `${p.colorToken}.main`,
+                          borderColor: 'primary.main',
                           // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할이라
                           // '6px' — 숫자 1은 theme.shape.borderRadius(0)와 곱해져 0px가 되는
                           // 버그였다(디자인 시스템 감사로 발견).
@@ -569,7 +591,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                           overflow: 'hidden',
                         }}
                       >
-                        <Typography variant="caption" noWrap sx={{ color: `${p.colorToken}.contrastText`, fontWeight: 600 }}>
+                        <Typography variant="caption" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>
                           {p.name} · {shortDate(p.startDate)}–{shortDate(p.endDate)} · ${p.totalBudget.toLocaleString('en-US')}
                         </Typography>
                       </Box>
@@ -611,7 +633,20 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                     <TableRow key={p.name}>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: `${p.colorToken}.main`, flexShrink: 0 }} />
+                          {/* 위 Gantt 막대와 같은 램프를 쓴다 — 표의 점과 막대가 다른 색이면
+                              같은 phase인지 눈으로 이어지지 않는다. 점은 작아서 채움만으로는
+                              흐릿하므로 막대와 동일하게 primary.main 테두리를 함께 준다. */}
+                          <Box
+                            sx={{
+                              width: 10,
+                              height: 10,
+                              borderRadius: '50%',
+                              bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
+                              border: '1px solid',
+                              borderColor: 'primary.main',
+                              flexShrink: 0,
+                            }}
+                          />
                           {p.name}
                         </Box>
                       </TableCell>
