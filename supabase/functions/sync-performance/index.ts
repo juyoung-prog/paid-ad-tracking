@@ -11,6 +11,9 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 /** 종료된 캠페인을 며칠까지 계속 동기화할지. 플랫폼 지표가 사후 정정되기 때문에 바로 끊지 않는다. */
 const POST_END_SYNC_DAYS = 7;
 
+/** 페이지네이션 상한. 응답이 잘못돼도 무한 루프에 빠지지 않게 하는 안전장치다. */
+const MAX_PAGES = 50;
+
 /** performance_records에 넣는 지표 필드. 플랫폼별 매퍼가 반드시 이 형태로 반환한다. */
 type Metrics = {
   impressions: number | null;
@@ -51,15 +54,43 @@ function num(value: unknown): number | null {
 // Meta
 // ============================================================
 
-async function fetchMetaInsights(accessToken: string, campaignId: string) {
+/**
+ * 광고 계정 하나의 캠페인별 성과를 한 번에 가져와 external_campaign_id로 색인한다.
+ *
+ * 캠페인마다 /{campaign_id}/insights를 부르지 않는 이유가 둘이다:
+ *  1) 호출 수. 캠페인이 100개면 100번인데, 계정 레벨 level=campaign이면 1번(+페이지)이다.
+ *  2) 기간. Meta insights는 기간을 안 주면 최근 30일만 준다 — 한때 코드 주석이
+ *     "기간 지정 없이 누적을 준다"고 잘못 적혀 있었고, 그래서 30일보다 오래전에 끝난
+ *     캠페인 104건이 전부 no_data로 빠졌다. date_preset=maximum이 누적이고,
+ *     이래야 TikTok의 query_lifetime=true와 같은 의미가 된다.
+ */
+async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountId: string) {
   const fields = [
+    'campaign_id',
     'impressions', 'reach', 'clicks', 'spend',
     'video_play_actions', 'video_p25_watched_actions', 'video_p100_watched_actions',
     'video_avg_time_watched_actions', 'post_engagement', 'actions',
   ].join(',');
-  const res = await fetch(`https://graph.facebook.com/v19.0/${campaignId}/insights?fields=${fields}&access_token=${accessToken}`);
-  const json = await res.json();
-  return json.data?.[0] ?? null;
+
+  const byCampaign = new Map<string, any>();
+  let url: string | null =
+    `https://graph.facebook.com/v19.0/act_${externalAccountId}/insights` +
+    `?level=campaign&fields=${fields}&date_preset=maximum&limit=200&access_token=${accessToken}`;
+
+  for (let page = 0; url && page < MAX_PAGES; page += 1) {
+    const res: Response = await fetch(url);
+    // 명시적 any — url이 json에서, json이 url에서 유도돼 TS가 순환으로 본다(TS7022).
+    const json: any = await res.json();
+    if (json?.error) {
+      console.error('Meta insights 조회 실패', { externalAccountId, message: json.error.message });
+      return byCampaign;
+    }
+    for (const row of json.data ?? []) {
+      if (row.campaign_id) byCampaign.set(String(row.campaign_id), row);
+    }
+    url = json.paging?.next ?? null;
+  }
+  return byCampaign;
 }
 
 /** Meta는 여러 지표를 [{ action_type, value }] 배열로 준다. */
@@ -139,8 +170,9 @@ async function fetchTikTokReport(accessToken: string, advertiserId: string, camp
   url.searchParams.set('data_level', 'AUCTION_CAMPAIGN');
   url.searchParams.set('dimensions', JSON.stringify(['campaign_id']));
   url.searchParams.set('metrics', JSON.stringify(TIKTOK_METRICS));
-  // 캠페인 시작 이후 누적값을 받는다 — Meta insights도 기간 지정 없이 누적을 주므로
+  // 캠페인 시작 이후 누적값을 받는다. Meta 쪽은 date_preset=maximum이 같은 역할이라
   // 두 플랫폼이 같은 "그 시점까지의 누적 스냅샷" 의미를 갖는다.
+  // (Meta는 기간을 안 주면 최근 30일이다 — 그렇게 두면 오래전 끝난 캠페인이 전부 빈다.)
   url.searchParams.set('query_lifetime', 'true');
   url.searchParams.set('filtering', JSON.stringify([
     { field_name: 'campaign_ids', filter_type: 'IN', filter_value: JSON.stringify([campaignId]) },
@@ -256,6 +288,19 @@ Deno.serve(async (req) => {
     (adAccounts ?? []).map((a) => [a.id, a.external_account_id])
   );
 
+  // Meta는 계정 단위로 한 번만 부른다(캠페인마다 부르지 않는다 —
+  // fetchMetaInsightsByCampaign 주석 참고). 대상에 있는 계정만 받는다.
+  const metaInsights = new Map<string, Map<string, any>>();
+  const metaAccountIds = new Set(
+    campaigns.filter((c) => c.platform === 'meta').map((c) => c.account_id)
+  );
+  for (const accountId of metaAccountIds) {
+    const externalAccountId = externalIdByAccount.get(accountId);
+    const accessToken = [...tokenByAccount.entries()].find(([k]) => k.endsWith(`:${accountId}`))?.[1];
+    if (!externalAccountId || !accessToken) continue;
+    metaInsights.set(accountId, await fetchMetaInsightsByCampaign(accessToken, externalAccountId));
+  }
+
   let synced = 0;
   const skipped: Record<string, number> = {};
   const skip = (reason: string) => { skipped[reason] = (skipped[reason] ?? 0) + 1; };
@@ -267,7 +312,7 @@ Deno.serve(async (req) => {
     let metrics: Metrics | null = null;
 
     if (c.platform === 'meta') {
-      const raw = await fetchMetaInsights(accessToken, c.external_campaign_id);
+      const raw = metaInsights.get(c.account_id)?.get(String(c.external_campaign_id));
       metrics = raw ? mapMetaInsight(raw) : null;
     } else if (c.platform === 'tiktok') {
       const advertiserId = externalIdByAccount.get(c.account_id);
