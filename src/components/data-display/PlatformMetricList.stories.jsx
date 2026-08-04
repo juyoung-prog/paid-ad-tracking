@@ -18,6 +18,10 @@ PerformanceForm과 짝을 이루는 반대편이라 입력 필드가 아니라 �
 값이 없는 항목은 '—'로 채우지 않고 숨긴다 — 수기 등록 캠페인이나 Meta처럼 해당
 지표가 없는 플랫폼에서는 빈 줄만 늘어서서 "아직 안 왔다"인지 "원래 없다"인지
 구분이 안 되기 때문이다. 하나도 없으면 아무것도 그리지 않는다.
+
+Hook Rate / Hold Rate는 저장된 값이 아니라 schema.js의 calcHookRate/calcHoldRate로
+계산한 파생 지표다. Hook Rate 기준이 플랫폼마다 달라(TikTok 2초 / Meta 25% 시청)
+그 사실을 값 위 캡션에 함께 표시한다 — 같은 이름의 숫자를 그대로 비교하면 틀리기 때문.
         `,
       },
     },
@@ -33,6 +37,9 @@ PerformanceForm과 짝을 이루는 반대편이라 입력 필드가 아니라 �
 export const Default = {
   args: {
     metrics: {
+      // Hook Rate는 impressions가 있어야 계산된다(hookViews / impressions).
+      impressions: 327786,
+      hookViews: 22723,
       videoPlays: 325147,
       heldViews: 624,
       avgWatchSeconds: 1.15,
@@ -57,6 +64,8 @@ export const Default = {
 export const PartialMetrics = {
   args: {
     metrics: {
+      impressions: 240500,
+      hookViews: 18400,
       videoPlays: 88120,
       heldViews: 1240,
       avgWatchSeconds: 3.4,

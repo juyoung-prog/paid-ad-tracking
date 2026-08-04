@@ -2,12 +2,18 @@ import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
+import { calcHookRate, calcHoldRate } from '../../data/schema';
+
 function fmtNumber(value) {
   return value.toLocaleString('en-US');
 }
 
 function fmtSeconds(value) {
   return `${value.toFixed(2)}s`;
+}
+
+function fmtPercent(value) {
+  return `${(value * 100).toFixed(2)}%`;
 }
 
 /**
@@ -17,6 +23,20 @@ function fmtSeconds(value) {
  */
 const FIELDS = [
   { key: 'videoPlays', label: 'Video Plays', format: fmtNumber },
+  // 파생 지표. 원본 필드가 아니라 계산값이므로 derive로 뽑는다 —
+  // 계산 자체는 schema.js의 순수 함수를 재사용해 표와 같은 값이 나오게 한다.
+  {
+    key: 'hookRate',
+    label: 'Hook Rate',
+    format: fmtPercent,
+    derive: (m) => calcHookRate(m.hookViews ?? null, m.impressions ?? null),
+  },
+  {
+    key: 'holdRate',
+    label: 'Hold Rate',
+    format: fmtPercent,
+    derive: (m) => calcHoldRate(m.heldViews ?? null, m.hookViews ?? null),
+  },
   { key: 'heldViews', label: 'Held Views', format: fmtNumber },
   { key: 'avgWatchSeconds', label: 'Avg Watch', format: fmtSeconds },
   { key: 'likes', label: 'Likes', format: fmtNumber },
@@ -50,11 +70,15 @@ const FIELDS = [
  * <PlatformMetricList metrics={ performanceRecord } />
  */
 export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) {
-  const rows = FIELDS
-    .filter((field) => metrics?.[field.key] != null)
-    .map((field) => ({ label: field.label, value: field.format(metrics[field.key]) }));
+  const rows = FIELDS.reduce((acc, field) => {
+    const raw = field.derive ? field.derive(metrics ?? {}) : metrics?.[field.key];
+    if (raw != null) acc.push({ label: field.label, value: field.format(raw) });
+    return acc;
+  }, []);
 
   if (rows.length === 0) return null;
+
+  const hasHookRate = rows.some((row) => row.label === 'Hook Rate');
 
   return (
     <Box sx={ sx }>
@@ -67,6 +91,16 @@ export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) 
       <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1.5 } }>
         플랫폼에서 자동 수집된 값입니다. 직접 수정할 수 없습니다.
       </Typography>
+
+      {/* Hook Rate의 기준이 플랫폼마다 다르다는 걸 숨기면, 같은 이름의 숫자를
+          그대로 비교하게 되고 그 비교는 틀린다. 값 옆에서 바로 알려준다.
+          (Meta는 2초 연속 시청 지표가 이 계정에서 값이 하나도 안 와 p25만 쓸 수 있다.) */}
+      { hasHookRate && (
+        <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1.5 } }>
+          Hook Rate 기준이 플랫폼마다 다릅니다 — TikTok은 2초 시청, Meta는 영상의 25% 시청.
+          플랫폼 간 직접 비교는 피하세요.
+        </Typography>
+      ) }
 
       <Stack
         component="dl"

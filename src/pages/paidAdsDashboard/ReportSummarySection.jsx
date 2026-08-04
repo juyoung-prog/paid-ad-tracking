@@ -141,6 +141,10 @@ function fmtSeconds(value) {
 // 수기 입력 레코드에는 없는 값이라 '—'로 그려진다.
 const CREATIVE_COLUMNS = [
   { header: 'Video Plays', cell: (r) => fmtNumber(r.videoPlays) },
+  // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
+  // 계산 함수(calcHookRate/calcHoldRate)는 진작 있었는데 어느 화면에서도 안 쓰였다.
+  { header: 'Hook Rate', cell: (r) => fmtPercent(r.hookRate) },
+  { header: 'Hold Rate', cell: (r) => fmtPercent(r.holdRate) },
   { header: 'Held Views', cell: (r) => fmtNumber(r.heldViews) },
   { header: 'Avg Watch', cell: (r) => fmtSeconds(r.avgWatchSeconds) },
   { header: 'Likes', cell: (r) => fmtNumber(r.likes) },
@@ -169,8 +173,8 @@ function performanceToCsv(rows) {
   const header = [
     'Campaign', 'Platform', 'Goal', 'Spend', 'Impressions', 'Reach', 'Clicks',
     'Engagements', 'Conversions', 'CPM', 'CTR', 'CPC', 'Engagement Rate', 'CPA',
-    'Video Plays', 'Held Views', 'Avg Watch (s)', 'Likes', 'Comments', 'Shares',
-    'Follows', 'Profile Visits',
+    'Video Plays', 'Hook Rate', 'Hold Rate', 'Held Views', 'Avg Watch (s)',
+    'Likes', 'Comments', 'Shares', 'Follows', 'Profile Visits',
   ];
   const lines = rows.map((r) =>
     toCsvRow([
@@ -181,7 +185,10 @@ function performanceToCsv(rows) {
       r.cpc != null ? r.cpc.toFixed(2) : '',
       r.engagementRate != null ? (r.engagementRate * 100).toFixed(2) : '',
       r.cpa != null ? r.cpa.toFixed(2) : '',
-      r.videoPlays ?? '', r.heldViews ?? '',
+      r.videoPlays ?? '',
+      r.hookRate != null ? (r.hookRate * 100).toFixed(2) : '',
+      r.holdRate != null ? (r.holdRate * 100).toFixed(2) : '',
+      r.heldViews ?? '',
       r.avgWatchSeconds != null ? r.avgWatchSeconds.toFixed(2) : '',
       r.likes ?? '', r.comments ?? '', r.shares ?? '',
       r.follows ?? '', r.profileVisits ?? '',

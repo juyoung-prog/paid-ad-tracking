@@ -582,6 +582,8 @@ export function getCampaignMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
+    hookRate: calcHookRate(record?.hookViews ?? null, impressions),
+    holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
 }
 
@@ -629,5 +631,7 @@ export function getGoalMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
+    hookRate: calcHookRate(record?.hookViews ?? null, impressions),
+    holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
 }
