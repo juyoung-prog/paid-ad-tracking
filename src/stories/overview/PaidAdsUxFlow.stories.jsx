@@ -538,9 +538,9 @@ export const DataModel = {
 };
 
 const components = [
-  { name: 'AppShell', usage: '전체 레이아웃 셸 (헤더 + 메인)', type: '재활용', note: 'components/layout/AppShell.jsx' },
+  { name: 'PaidAdsShell + PaidAdsRail', usage: '전체 레이아웃 셸 — 좌측 아이콘 레일(hover 시 확장) + 본문', type: '신규(구현됨)', note: 'pages/paidAdsDashboard/PaidAdsRail.jsx — 계획 당시 AppShell(상단 GNB) 재활용 구상을 design-handoff 상속 과정에서 레일 셸로 교체' },
   { name: 'PageContainer', usage: '반응형 페이지 컨테이너', type: '재활용', note: 'components/layout/PageContainer.jsx' },
-  { name: 'StickyAsideCenterLayout', usage: '좌측 보조 패널 + 중앙 캠페인 그리드', type: '재활용', note: 'components/layout/StickyAsideCenterLayout.jsx' },
+  { name: 'StickyAsideCenterLayout', usage: '좌측 보조 패널 + 중앙 캠페인 그리드 (계획)', type: '검토 후 미채택', note: '우측에 빈 미러 컬럼을 만드는 대칭 패턴이라 이 화면과 안 맞아 직접 flex로 구현, 이후 사이드바 자체를 제거' },
   { name: 'Tabs / Table / Select / TextField / Checkbox / Button / Chip / Dialog / Drawer', usage: '상태 탭, 표, 폼 입력, 오버레이 전반', type: '재활용', note: 'MUI 컴포넌트 직접 사용' },
   { name: 'FilterBar', usage: '플랫폼/계정/매장/기간 필터', type: '수정', note: 'components/templates/FilterBar.jsx — 광고 도메인 옵션 세트로 교체' },
   { name: 'KpiBar', usage: '헤더 KPI 요약 + /reports 요약 통계', type: '신규(구현됨)', note: '라벨-위-숫자 배치, separator로 알림성 항목 분리 — Dashboard/Reports 공용' },
