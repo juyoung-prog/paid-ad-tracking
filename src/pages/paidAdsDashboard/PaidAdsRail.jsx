@@ -1,11 +1,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import InsightsOutlinedIcon from '@mui/icons-material/InsightsOutlined';
 import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import logoUrl from '../../assets/beautymaster-logo.png';
 
 /**
  * 1급 내비게이션 — 매일 오가는 화면들.
@@ -40,7 +40,11 @@ const EXPANDED_WIDTH = 240;
 const RAIL_ROW_WIDTH = RAIL_WIDTH - 20;
 const EXPANDED_ROW_WIDTH = EXPANDED_WIDTH - 20;
 
-/** 헤더 마크 한 변. 접힘 상태에서 레일 중심에 오도록 좌측 여백을 계산해 쓴다 */
+/**
+ * 헤더 마크 한 변. 접힘 상태에서 레일 중심에 오도록 좌측 여백을 계산해 쓴다.
+ * 마크는 회사(beautymaster) 자산이고 앱 구분은 옆의 제목이 한다 — 같은 팀의
+ * influencer tracking dashboard도 같은 마크에 제목만 다르게 쓴다.
+ */
 const MARK_SIZE = 20;
 
 /**
@@ -105,8 +109,12 @@ function RailRow({ icon, label, to, isActive = false }) {
         '&:hover': {
           backgroundColor: isActive ? theme.palette.accent.tintHover : theme.palette.action.hover,
         },
-        // 아이콘 크기는 호출부가 아니라 여기서 한 번에 정한다
-        '& .MuiSvgIcon-root': { fontSize: 18, flexShrink: 0 },
+        /* 아이콘 크기는 호출부가 아니라 여기서 한 번에 정한다.
+           16px인 건 취향이 아니라 정렬 때문이다 — 행 좌측 여백이 20px(레일 10 +
+           행 10)이므로 아이콘 중심이 20 + 16/2 = 28px가 되고, 이건 헤더 로고
+           중심(레일 56의 절반)과 정확히 같다. 18px로 올리면 29px가 돼서 로고
+           바로 아래 세로로 쌓이는 아이콘들이 1px씩 밀려 보인다. */
+        '& .MuiSvgIcon-root': { fontSize: 16, flexShrink: 0 },
         '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
       }) }
     >
@@ -220,7 +228,20 @@ export function PaidAdsRail({ sx }) {
           '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         }) }
       >
-        <InsightsOutlinedIcon sx={ { fontSize: MARK_SIZE, flexShrink: 0, color: 'primary.main' } } />
+        {/* 원본은 300px 정사각이고 어두운 배경이 이미지에 구워져 있다(알파 없음) —
+            그래서 배경을 깔지 않고 모서리만 굴린다. */}
+        <Box
+          component="img"
+          src={ logoUrl }
+          alt="BeautyMaster"
+          sx={ theme => ({
+            width: MARK_SIZE,
+            height: MARK_SIZE,
+            flexShrink: 0,
+            display: 'block',
+            borderRadius: `${theme.shape.radius.control}px`,
+          }) }
+        />
         <Typography
           variant="body2"
           className={ LABEL_CLASS }
