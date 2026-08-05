@@ -4,15 +4,47 @@
  * 페이지들의 필터 UI가 공유하는 얇은 헬퍼라서 데이터 레이어에 넣지 않았다.
  */
 
-// mock 데이터가 이 날짜를 기준으로 짜여 있다(예: "Ending Soon Campaign"이
-// 정확히 이 날짜 기준 D-3 이내로 끝나도록 설계됨) — 그래서 진짜 new Date()가
-// 아니라 고정값을 쓴다. status/pacing(DashboardPage)과 알림(usePaidAdsStore의
-// generateAlerts)이 이 상수를 반드시 같이 써야 한다 — 예전엔 usePaidAdsStore가
-// new Date()(실제 시스템 시각)를 썼는데, 이 둘이 어긋나면서 화면엔 Active로
-// 보이는 캠페인의 알림 문구가 다른 "오늘" 기준으로 계산돼(예: "D-3"인데 실제
-// 표시 기준으로는 D-5) 날짜가 안 맞는 버그가 있었다(실사용 시나리오 점검 중
-// 발견). 실제 서비스로 전환할 때는 이 상수를 new Date()로 교체하면 된다.
-export const TODAY = new Date('2026-07-20');
+/**
+ * "오늘"은 스토어가 소유한다 — 화면은 usePaidAdsStore()가 주는 `today`를 쓴다.
+ *
+ * 예전엔 앱 전체가 고정 상수 TODAY(2026-07-20) 하나를 썼다. 목데이터 시절엔
+ * 맞는 선택이었는데("Ending Soon"이 정확히 D-3에 오도록 시나리오가 이 날짜
+ * 기준으로 설계됨), 실계정 연결 + 일일 동기화가 시작된 뒤에도 이 상수가
+ * 남아서 8월 실데이터를 7/20 기준으로 판정했다 — 2주 전에 끝난 캠페인이
+ * Active + "D-1 ends soon"으로 뜨고, 성과 수기 입력의 recorded_at까지 영원히
+ * 7/20으로 저장되는 실버그(스크린샷 리뷰로 발견).
+ *
+ * 그렇다고 전역 new Date()로 바꾸면 반대쪽이 깨진다 — 스토리북 목데이터의
+ * 알림·상태 시나리오가 전부 고정 날짜 기준이라, 시간이 지나면 스토리가
+ * "전부 끝난 캠페인"이 된다. 그래서 시계를 스토어 계층에 넣는다:
+ * 실 스토어(useSupabasePaidAdsStore)는 startOfToday(), 목 스토어
+ * (createMockPaidAdsStore)는 MOCK_TODAY.
+ *
+ * 상수 하나가 두 "오늘"로 갈라질 때 생기던 어긋남(예전 D-3/D-5 버그)은
+ * 스토어가 단일 출처가 되면서 구조적으로 막힌다 — status/알림/pacing/Now 뷰가
+ * 전부 같은 store.today를 쓴다.
+ */
+
+/** 목데이터 시나리오의 기준일 — 목 스토어와 스토리 전용 */
+export const MOCK_TODAY = new Date('2026-07-20');
+
+/** 실제 오늘, 로컬 자정으로 정규화 — 날짜 비교가 시각에 흔들리지 않게 */
+export function startOfToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * 로컬 기준 YYYY-MM-DD. toISOString()은 UTC라 KST 자정~오전 9시 사이에는
+ * 전날 날짜가 나온다 — recorded_at 같은 "날짜" 필드에 쓰면 하루가 밀린다.
+ */
+export function toLocalISODate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 /**
  * 페이지 콘텐츠의 좌우 여백.

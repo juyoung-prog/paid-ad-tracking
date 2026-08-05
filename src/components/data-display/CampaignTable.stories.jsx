@@ -69,6 +69,52 @@ export const Default = {
 };
 
 /**
+ * 동기화로 들어온 캠페인 — 계획 예산이라는 개념 자체가 없어 budgetPlanned가
+ * 0으로 저장된다. 이때 상태줄이 "$0 · $2,261.5 spent"가 아니라 spend만
+ * 보여줘야 한다("예산 0으로 계획했는데 초과 집행"으로 읽히는 문제, 실데이터
+ * 스크린샷 리뷰로 발견). 예산·spend 둘 다 없으면 기간만 남는다 — 이 분기는
+ * 실데이터에만 있고 mockCampaigns에는 없어서 스토리로 커버리지를 만들어둔다.
+ */
+export const SyncedWithoutBudget = {
+  render: (args) => (
+    <Box>
+      <CampaignTable
+        rows={[
+          {
+            id: 'sync-01',
+            name: 'BF4_1MonthDeals_0417~0531',
+            platform: 'meta',
+            targetScope: 'single_store',
+            targetStoreIds: ['BF4'],
+            startDate: '2026-04-17',
+            endDate: '2026-07-29',
+            budgetPlanned: 0,
+            spend: 2261.5,
+            status: 'active',
+            thumbnailUrl: null,
+            creativeUrl: null,
+          },
+          {
+            id: 'sync-02',
+            name: 'G10_Grand Opening_0706~0801',
+            platform: 'tiktok',
+            targetScope: 'single_store',
+            targetStoreIds: ['G10'],
+            startDate: '2026-07-06',
+            endDate: '2026-08-01',
+            budgetPlanned: 0,
+            status: 'active',
+            thumbnailUrl: null,
+            creativeUrl: null,
+          },
+        ]}
+        onRowClick={args.onRowClick}
+      />
+    </Box>
+  ),
+};
+
+/**
  * 고긴급 알림·저긴급 중복 타겟팅이 섞인 행 — 각각 ⚠ / ⇄ 아이콘에
  * 마우스를 올리면 Tooltip으로 구체적인 문구가 보인다.
  */

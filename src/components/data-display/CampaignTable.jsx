@@ -31,11 +31,26 @@ function formatStoreLabel(targetScope, targetStoreIds) {
   return targetStoreIds.join(', ');
 }
 
+/**
+ * 우측 상태줄의 기간 뒤에 붙는 예산·집행 문자열. 없으면 빈 문자열을 돌려주고
+ * 호출부가 구분자(·)까지 통째로 생략한다.
+ *
+ * 계획 예산이 0이면 예산을 표시하지 않는다 — 동기화로 들어온 캠페인은 계획
+ * 예산이라는 개념 자체가 없어 0으로 저장되는데, "$0 · $2,261.5 spent"로 찍으면
+ * "예산을 0으로 계획했는데 초과 집행 중"으로 읽힌다(실데이터 스크린샷 리뷰로
+ * 발견). 그 경우 spend만 남긴다. 계획 예산 없이 일일 예산만 있으면 그것만
+ * 표시한다(있는 것만 말한다).
+ */
 function formatBudget(row) {
-  const budget = `$${row.budgetPlanned.toLocaleString('en-US')}`;
-  const daily = row.budgetDaily != null ? ` ($${row.budgetDaily.toLocaleString('en-US')}/day)` : '';
-  const spent = row.spend != null ? ` · $${row.spend.toLocaleString('en-US')} spent` : '';
-  return `${budget}${daily}${spent}`;
+  const parts = [];
+  if (row.budgetPlanned > 0) {
+    const daily = row.budgetDaily != null ? ` ($${row.budgetDaily.toLocaleString('en-US')}/day)` : '';
+    parts.push(`$${row.budgetPlanned.toLocaleString('en-US')}${daily}`);
+  } else if (row.budgetDaily != null) {
+    parts.push(`$${row.budgetDaily.toLocaleString('en-US')}/day`);
+  }
+  if (row.spend != null) parts.push(`$${row.spend.toLocaleString('en-US')} spent`);
+  return parts.join(' · ');
 }
 
 /**
@@ -295,7 +310,9 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                     }}
                   />
                   <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-                    {formatDate(row.startDate)}–{formatDate(row.endDate)} · {formatBudget(row)}
+                    {[`${formatDate(row.startDate)}–${formatDate(row.endDate)}`, formatBudget(row)]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </Typography>
                 </>
               )}

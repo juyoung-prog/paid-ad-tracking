@@ -36,7 +36,13 @@ function startUrl(target) {
 
 function formatDateTime(value) {
   if (!value) return null;
-  return new Date(value).toLocaleString();
+  // 로케일을 en-US로 고정한다 — 인자 없는 toLocaleString()은 브라우저 로케일을
+  // 타서 영어 UI 문장 안에 "2026. 8. 4. 오전 9:58" 같은 한글 날짜가 섞였다
+  // (실데이터 스크린샷 리뷰로 발견). LocalizedDateField가 입력을 MM/DD/YYYY로
+  // 고정한 것과 같은 "로케일 무관 표기" 원칙.
+  return new Date(value).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
 }
 
 /**

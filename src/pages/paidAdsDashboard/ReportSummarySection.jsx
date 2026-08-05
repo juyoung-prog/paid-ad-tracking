@@ -120,6 +120,18 @@ function shortDate(iso) {
   return `${Number(m)}/${Number(d)}`;
 }
 
+/**
+ * 계획 예산 셀 표기. 0도 '—'로 취급한다 — 동기화로 들어온 캠페인은 계획
+ * 예산이라는 개념 자체가 없어서 0으로 저장되는데, 그걸 "$0"으로 찍으면
+ * "예산을 0으로 계획했다"로 읽힌다(실데이터 스크린샷 리뷰에서 Total Budget
+ * 컬럼 전체가 $0으로 도배된 걸로 발견). 값이 없는 것과 0으로 계획한 것을
+ * 화면에서 구분할 수 없으므로 없음 쪽으로 몰아준다.
+ */
+function fmtBudget(value) {
+  if (!value) return '—';
+  return `$${value.toLocaleString('en-US')}`;
+}
+
 function fmtCurrency(value) {
   if (value == null) return '—';
   return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -657,7 +669,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                         }}
                       >
                         <Typography variant="caption" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>
-                          {p.name} · {shortDate(p.startDate)}–{shortDate(p.endDate)} · ${p.totalBudget.toLocaleString('en-US')}
+                          {p.name} · {shortDate(p.startDate)}–{shortDate(p.endDate)}
+                          {p.totalBudget > 0 && ` · $${p.totalBudget.toLocaleString('en-US')}`}
                         </Typography>
                       </Box>
                     </Box>
@@ -723,19 +736,19 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{p.days}</TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {p.byPlatform[PLATFORM.META]?.daily != null ? `$${p.byPlatform[PLATFORM.META].daily.toLocaleString('en-US')}` : '—'}
+                        {fmtBudget(p.byPlatform[PLATFORM.META]?.daily)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {p.byPlatform[PLATFORM.META]?.total != null ? `$${p.byPlatform[PLATFORM.META].total.toLocaleString('en-US')}` : '—'}
+                        {fmtBudget(p.byPlatform[PLATFORM.META]?.total)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {p.byPlatform[PLATFORM.TIKTOK]?.daily != null ? `$${p.byPlatform[PLATFORM.TIKTOK].daily.toLocaleString('en-US')}` : '—'}
+                        {fmtBudget(p.byPlatform[PLATFORM.TIKTOK]?.daily)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {p.byPlatform[PLATFORM.TIKTOK]?.total != null ? `$${p.byPlatform[PLATFORM.TIKTOK].total.toLocaleString('en-US')}` : '—'}
+                        {fmtBudget(p.byPlatform[PLATFORM.TIKTOK]?.total)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-                        ${p.totalBudget.toLocaleString('en-US')}
+                        {fmtBudget(p.totalBudget)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -774,7 +787,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                         {c.budgetDaily != null ? `$${c.budgetDaily.toLocaleString('en-US')}/day` : '—'}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        ${c.budgetPlanned.toLocaleString('en-US')}
+                        {fmtBudget(c.budgetPlanned)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { generateAlerts } from '../../data/schema';
 import {
@@ -10,7 +10,7 @@ import {
   rowToPerformanceRecord,
   performanceRecordToRow,
 } from './paidAdsMappers';
-import { TODAY } from './paidAdsPageUtils';
+import { startOfToday, toLocalISODate } from './paidAdsPageUtils';
 
 const EMPTY_STATE = {
   stores: [],
@@ -22,9 +22,10 @@ const EMPTY_STATE = {
 /** performance_records는 캠페인당 여러 행(날짜×source)이지만 화면 모델은 캠페인당 1건이다. */
 const LATEST_PERFORMANCE_VIEW = 'performance_records_latest';
 
-/** upsert가 쓰는 recorded_at. 화면 전체가 TODAY를 "오늘"로 쓰므로 여기도 맞춘다. */
+/** upsert가 쓰는 recorded_at — 저장 시점의 실제 로컬 날짜. 예전엔 고정
+    TODAY(2026-07-20)를 써서 8월에 넣은 성과도 7/20로 기록되는 실버그가 있었다. */
 function todayISODate() {
-  return TODAY.toISOString().slice(0, 10);
+  return toLocalISODate(new Date());
 }
 
 /**
@@ -247,11 +248,17 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     return saved;
   }, []);
 
-  // new Date()(실제 시스템 시각)가 아니라 TODAY를 쓴다 — DashboardPage의
-  // status/pacing 계산과 같은 기준일을 써야 한다. 어긋나면 화면엔 Active로
-  // 보이는 캠페인의 알림 문구가 다른 "오늘" 기준으로 계산돼(예: 실제로는
-  // D-5인데 알림엔 D-3로 표시) 날짜가 안 맞는 버그가 생긴다.
-  const alerts = generateAlerts(state.campaigns, state.performanceRecords, TODAY);
+  /**
+   * 이 스토어의 "오늘" — 화면(status/알림/pacing/Now 뷰)이 전부 이 값을 쓴다.
+   * 알림과 status가 서로 다른 "오늘"을 쓰면 D-3/D-5 어긋남 버그가 재발하므로
+   * 기준일의 단일 출처는 스토어다. 마운트 시점에 고정(useMemo []) — 렌더마다
+   * 새 Date 객체를 만들면 이 값을 deps로 갖는 useMemo가 전부 무효화된다.
+   * 자정을 넘긴 장수 세션은 새로고침 전까지 어제 기준으로 남는데, 일일 동기화
+   * 도구 특성상 하루 한 번은 새로 열게 되므로 감수한다.
+   */
+  const today = useMemo(() => startOfToday(), []);
+
+  const alerts = generateAlerts(state.campaigns, state.performanceRecords, today);
 
   return {
     stores: state.stores,
@@ -259,6 +266,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     performanceRecords: state.performanceRecords,
     adAccounts: state.adAccounts,
     alerts,
+    today,
     isLoading,
     error,
     refresh,

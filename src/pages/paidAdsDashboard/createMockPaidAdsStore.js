@@ -5,7 +5,7 @@ import {
   mockCampaigns,
   mockPerformanceRecords,
 } from '../../data/paidAdsMockData';
-import { TODAY } from './paidAdsPageUtils';
+import { MOCK_TODAY } from './paidAdsPageUtils';
 
 /**
  * createMockPaidAdsStore
@@ -35,7 +35,11 @@ export function createMockPaidAdsStore(overrides = {}) {
     adAccounts: mockAdAccounts,
     campaigns,
     performanceRecords,
-    alerts: generateAlerts(campaigns, performanceRecords, TODAY),
+    alerts: generateAlerts(campaigns, performanceRecords, MOCK_TODAY),
+    /* 목 스토어의 "오늘"은 실시간이 아니라 시나리오 기준일이다 — 목데이터의
+       알림·상태(D-3, 최근 종료 등)가 전부 이 날짜 기준으로 설계돼 있어서,
+       실제 시각을 쓰면 시간이 지날수록 스토리가 "전부 끝난 캠페인"이 된다. */
+    today: MOCK_TODAY,
     isLoading: false,
     error: null,
     refresh: noop,

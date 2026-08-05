@@ -35,7 +35,7 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 
 import { getEffectiveStatus, calcBudgetPacing, calcAutoBudgetPlanned, campaignGroupKey, ALERT_SEVERITY, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore } from './usePaidAdsStore';
-import { TODAY, PAGE_GUTTER_X, campaignInDateRange, generateId } from './paidAdsPageUtils';
+import { PAGE_GUTTER_X, campaignInDateRange, generateId } from './paidAdsPageUtils';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
 const TAB_GROUPS = {
@@ -55,11 +55,14 @@ const TAB_GROUPS = {
 const STARTING_SOON_DAYS = 7;
 const RECENTLY_ENDED_DAYS = 14;
 
-/** TODAY 기준 부호 있는 날짜 차이(일). 미래면 양수. */
-const daysFromToday = (iso) => Math.round((new Date(iso) - TODAY) / 86400000);
+/** today(스토어 소유 — 실 스토어는 실제 오늘, 목 스토어는 시나리오 기준일)
+    기준 부호 있는 날짜 차이(일). 미래면 양수. */
+const daysFromToday = (iso, today) => Math.round((new Date(iso) - today) / 86400000);
 
-const isStartingSoon = (c) =>
-  c.effectiveStatus === 'planned' && daysFromToday(c.startDate) >= 0 && daysFromToday(c.startDate) <= STARTING_SOON_DAYS;
+const isStartingSoon = (c, today) =>
+  c.effectiveStatus === 'planned' &&
+  daysFromToday(c.startDate, today) >= 0 &&
+  daysFromToday(c.startDate, today) <= STARTING_SOON_DAYS;
 
 /**
  * 최근 종료 = 성과 입력이 아직 남아있을 수 있는 캠페인. archived는 의도적으로
@@ -67,11 +70,12 @@ const isStartingSoon = (c) =>
  * (조기 종료 시점은 따로 저장하지 않음) 부호 없는 차이로 판정한다 — 계획
  * 종료일이 창 안이면 "방금 전후로 끝난 것"으로 본다.
  */
-const isRecentlyEnded = (c) =>
+const isRecentlyEnded = (c, today) =>
   (c.effectiveStatus === 'ended' || c.effectiveStatus === 'ended_early') &&
-  Math.abs(daysFromToday(c.endDate)) <= RECENTLY_ENDED_DAYS;
+  Math.abs(daysFromToday(c.endDate, today)) <= RECENTLY_ENDED_DAYS;
 
-const isInNowView = (c) => c.effectiveStatus === 'active' || isStartingSoon(c) || isRecentlyEnded(c);
+const isInNowView = (c, today) =>
+  c.effectiveStatus === 'active' || isStartingSoon(c, today) || isRecentlyEnded(c, today);
 
 /**
  * Event 필터의 "태그 없음" 센티널. Event를 1급 필터로 올리면 태그 안 된
@@ -155,6 +159,7 @@ export function DashboardPage() {
     performanceRecords,
     adAccounts,
     alerts,
+    today,
     addCampaign,
     updateCampaign,
     deleteCampaign,
@@ -210,8 +215,8 @@ export function DashboardPage() {
   };
 
   const campaignsWithStatus = useMemo(
-    () => campaigns.map((c) => ({ ...c, effectiveStatus: getEffectiveStatus(c, TODAY) })),
-    [campaigns]
+    () => campaigns.map((c) => ({ ...c, effectiveStatus: getEffectiveStatus(c, today) })),
+    [campaigns, today]
   );
 
   // 카드 클릭·알림 클릭·벨 팝오버 클릭이 전부 이 한 경로로 모인다 —
@@ -310,14 +315,14 @@ export function DashboardPage() {
    */
   const kpiItems = useMemo(() => {
     const liveCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active').length;
-    const startingSoonCount = campaignsWithStatus.filter(isStartingSoon).length;
-    const recentlyEndedCount = campaignsWithStatus.filter(isRecentlyEnded).length;
+    const startingSoonCount = campaignsWithStatus.filter((c) => isStartingSoon(c, today)).length;
+    const recentlyEndedCount = campaignsWithStatus.filter((c) => isRecentlyEnded(c, today)).length;
     return [
       { label: 'Live Now', value: liveCount, onClick: () => setTab('active') },
       { label: 'Starting Soon', value: startingSoonCount, sub: `next ${STARTING_SOON_DAYS} days`, onClick: () => setTab('planned') },
       { label: 'Recently Ended', value: recentlyEndedCount, sub: `last ${RECENTLY_ENDED_DAYS} days`, onClick: () => setTab('ended') },
     ];
-  }, [campaignsWithStatus]);
+  }, [campaignsWithStatus, today]);
 
   // 탭(상태) 자체를 뺀 나머지 필터(Platform/Store/Campaign Group/기간) — 리스트와
   // 탭 배지 숫자가 반드시 같은 기준으로 캠페인을 세야 한다. 예전엔 탭 배지가 이
@@ -336,7 +341,7 @@ export function DashboardPage() {
 
   // 상태 탭 라벨용 개수 — 위 필터를 그대로 적용해서, 탭을 눌렀을 때 실제로
   // 보일 행 수와 배지 숫자가 항상 일치하게 한다.
-  const nowCount = campaignsWithStatus.filter((c) => isInNowView(c) && matchesGroupFilters(c)).length;
+  const nowCount = campaignsWithStatus.filter((c) => isInNowView(c, today) && matchesGroupFilters(c)).length;
   const activeCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active' && matchesGroupFilters(c)).length;
   const plannedCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'planned' && matchesGroupFilters(c)).length;
   const endedCount = campaignsWithStatus.filter((c) => TAB_GROUPS.ended.includes(c.effectiveStatus) && matchesGroupFilters(c)).length;
@@ -369,7 +374,7 @@ export function DashboardPage() {
   const filteredCampaigns = campaignsWithStatus
     .filter((c) => {
       // 'now'는 상태 집합이 아니라 시간 창 조각이라 TAB_GROUPS로 표현이 안 된다
-      if (tab === 'now' ? !isInNowView(c) : !TAB_GROUPS[tab].includes(c.effectiveStatus)) return false;
+      if (tab === 'now' ? !isInNowView(c, today) : !TAB_GROUPS[tab].includes(c.effectiveStatus)) return false;
       if (!matchesGroupFilters(c)) return false;
       return true;
     })
@@ -1005,9 +1010,15 @@ export function DashboardPage() {
                 이어붙어 보인다는 피드백 — Divider로 그 경계를 명시한다. */}
             <Divider sx={{ mb: 3, borderColor: 'divider' }} />
 
-            {selectedCampaign.effectiveStatus === 'active' && (
+            {/* 예산이 하나도 없으면(동기화 캠페인) pacing 자체를 그리지 않는다 —
+                비교할 분모가 없는데 렌더하면 "No data"라면서 바로 아래
+                "($639.39 / $0)"와 "Time Elapsed 97%"를 보여주는 자기모순이
+                된다(실데이터 스크린샷 리뷰로 발견). 소진 속도는 "계획 대비"
+                개념이라 계획이 없으면 보여줄 것이 없다. */}
+            {selectedCampaign.effectiveStatus === 'active' &&
+              (selectedCampaign.budgetPlanned > 0 || selectedCampaign.budgetDaily != null) && (
               <PacingIndicator
-                {...calcBudgetPacing(selectedCampaign, Number(performanceValues.spend) || 0, TODAY)}
+                {...calcBudgetPacing(selectedCampaign, Number(performanceValues.spend) || 0, today)}
                 budgetPlanned={selectedCampaign.budgetPlanned}
                 budgetDaily={selectedCampaign.budgetDaily}
                 spend={Number(performanceValues.spend) || 0}
