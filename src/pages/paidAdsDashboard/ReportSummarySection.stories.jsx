@@ -18,7 +18,7 @@ const groupedCampaigns = [
   ['g-2', 'G10_Now Open_0706~0831', '2026-07-06', '2026-08-31', 2400],
   ['g-3', 'G10_Grand Opening_0706~0801', '2026-07-06', '2026-08-01', 1800],
   ['g-4', 'G10_1_Month Deals_0710~0831', '2026-07-10', '2026-08-31', 900],
-  ['g-5', 'G10_Final Week Push — 마지막 주 집중 집행 (전 매장 대상)', '2026-08-31', '2026-08-31', 600],
+  ['g-5', 'G10_Final Week Push — last-week concentrated spend across all stores', '2026-08-31', '2026-08-31', 600],
 ].map(([id, name, startDate, endDate, budgetPlanned]) => ({
   id,
   name,

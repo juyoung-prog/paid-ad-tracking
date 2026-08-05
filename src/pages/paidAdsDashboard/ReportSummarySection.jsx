@@ -43,6 +43,21 @@ const PLATFORM_LABEL = {
 const PHASE_FILL_MIN_ALPHA = 0.15;
 const PHASE_FILL_MAX_ALPHA = 0.50;
 
+/**
+ * 섹션 제목 — 본문 영역에서 "이 블록이 무엇인가"를 말하는 진짜 제목.
+ *
+ * 예전엔 이 자리가 대문자 overline이었고, 그 아래 부속 라벨은 오히려 문장형
+ * caption이었다 — 위계가 뒤집혀서 둘 다 같은 급으로 읽혔다. 두 단으로 나눈다:
+ * 제목은 문장형 볼드, 부속/분류 라벨만 대문자 overline.
+ *
+ * 제목 옆에는 범위(개수·합계)를 같은 줄에 붙인다. 캡션 줄을 따로 만들지 않고
+ * 제목 한 줄이 "무엇을 몇 개 기준으로 보고 있는지"까지 말하게 한다.
+ */
+const SECTION_TITLE_SX = { display: 'block', mb: 1.5, fontWeight: 600, color: 'text.primary' };
+
+/** 제목 옆 범위 텍스트 — 제목과 같은 줄, 한 단 약하게 */
+const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
+
 /** 시간 순 index를 채움 불투명도로. phase가 하나뿐이면 가장 옅은 값을 쓴다. */
 function phaseFillAlpha(index, total) {
   if (total <= 1) return PHASE_FILL_MIN_ALPHA;
@@ -631,8 +646,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                 phase가 어느 캠페인 하나에 대응하지 않고 여러 캠페인(플랫폼별)을
                 합친 값이라, 위 Plan 표와 달리 행 클릭으로 캠페인 Drawer에 못
                 보낸다(어느 캠페인을 열지 애매함) — 그래서 클릭 불가로 둔다. */}
-            <Typography variant="overline" sx={{ display: 'block', mb: 1.5, color: 'text.secondary', letterSpacing: '0.08em' }}>
-              Budget Breakdown
+            <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+              Budget Breakdown{' '}
+              <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · ${planTotalBudget.toLocaleString('en-US')} planned
+              </Typography>
             </Typography>
             <TableContainer sx={{ mb: 2, overflowX: 'auto' }}>
               <Table size="small">
@@ -741,7 +759,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                 그냥 더하면 실제보다 커 보임) — 그래서 여기선 총예산(기간과 무관하게
                 단순 합산해도 되는 값)만 비율로 보여주고, 일일예산은 위 표에서
                 캠페인별로만 보여준다. */}
-            <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'text.secondary', fontWeight: 600 }}>
+            {/* Budget Breakdown 아래 붙는 부속 블록이라 제목이 아니라 눈썹 라벨 */}
+            <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>
               Budget by Platform
             </Typography>
             {Object.entries(PLATFORM).map(([, platformValue]) => {
@@ -759,7 +778,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                   <LinearProgress
                     variant="determinate"
                     value={ratio * 100}
-                    sx={{ height: 6, borderRadius: 0, backgroundColor: 'surface.muted' }}
+                    sx={{
+                      height: 6,
+                      borderRadius: 0,
+                      backgroundColor: 'surface.muted',
+                      // 위 phase 막대와 같은 이유로 primary.light (기본은 primary.main)
+                      '& .MuiLinearProgress-bar': { backgroundColor: 'primary.light' },
+                    }}
                   />
                 </Box>
               );
@@ -783,15 +808,18 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
           {phasePerformance.length > 0 && (
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-                <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
-                  Phase별 {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label}
+                <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+                  {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label} by phase{' '}
+                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                    — {phasePerformance.length} {phasePerformance.length === 1 ? 'phase' : 'phases'}
+                  </Typography>
                 </Typography>
                 <ToggleButtonGroup
                   size="small"
                   exclusive
                   value={phaseMetric}
                   onChange={(_, next) => { if (next) setPhaseMetric(next); }}
-                  aria-label="비교할 지표"
+                  aria-label="Metric to compare"
                 >
                   {PHASE_METRICS.map((m) => (
                     <ToggleButton key={m.key} value={m.key} sx={{ textTransform: 'none', px: 1.5 }}>
@@ -809,7 +837,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                 if (max <= 0) {
                   return (
                     <Typography variant="body2" color="text.secondary">
-                      이 이벤트에는 {metric.label} 값이 아직 없습니다.
+                      No {metric.label.toLowerCase()} recorded for this event yet.
                     </Typography>
                   );
                 }
@@ -830,11 +858,16 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                       {/* 막대 자체에는 텍스트를 넣지 않는다 — 값이 작으면 막대 안에
                           글자가 안 들어가 잘린다. 값은 항상 막대 오른쪽 바깥에 둔다. */}
                       <Box sx={{ flexGrow: 1, minWidth: 0, backgroundColor: 'surface.muted', height: 14 }}>
+                        {/* primary.main(#0000FF)이 아니라 primary.light — 채도 100%
+                            파랑은 목록·표가 주인공인 화면에서 막대가 가장 강한 요소가
+                            돼버린다. 막대 안에 글자가 없으므로(값은 오른쪽 바깥) 요구
+                            대비는 비텍스트 3:1이고, light는 트랙(surface.muted) 대비
+                            3.9:1로 이를 넘긴다. */}
                         <Box
                           sx={{
                             width: `${Math.max(ratio * 100, value ? 0.5 : 0)}%`,
                             height: '100%',
-                            backgroundColor: 'primary.main',
+                            backgroundColor: 'primary.light',
                           }}
                         />
                       </Box>
@@ -857,8 +890,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
           const extraColumns = [...goalExtraColumns(value), ...CREATIVE_COLUMNS];
           return (
             <Box key={value} sx={{ mb: 3 }}>
-              <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>
-                Goal: {label}
+              <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+                {label}{' '}
+                <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                  — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}
+                </Typography>
               </Typography>
               <TableContainer sx={{ overflowX: 'auto' }}>
                 <Table size="small">

@@ -42,7 +42,7 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 40, sx 
       <Box
         component="img"
         src={thumbnailUrl}
-        alt={`${name} 소재 썸네일`}
+        alt={`${name} creative thumbnail`}
         onError={() => setErroredUrl(thumbnailUrl)}
         sx={{
           width,
@@ -59,7 +59,7 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 40, sx 
   return (
     <Box
       role="img"
-      aria-label={`${name} 썸네일 (등록된 소재 이미지 없음)`}
+      aria-label={`${name} thumbnail (no creative image uploaded)`}
       sx={{
         width,
         height: size,

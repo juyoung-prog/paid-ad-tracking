@@ -4,7 +4,6 @@ import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import LayersIcon from '@mui/icons-material/Layers';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { TARGET_SCOPE, PLATFORM, campaignGroupKey } from '../../data/schema';
@@ -166,58 +165,80 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                   </Tooltip>
                 )}
               </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
-                {/* accountLabel(예: "Georgia")은 안 보여준다 — 옆 Store 칩이 이미
-                    구체적인 매장명(예: "Union City")을 보여줘서 지역 정보가
-                    중복이라는 피드백으로 뺐다. */}
-                <Typography variant="body2" color="text.secondary">
-                  {PLATFORM_LABEL[row.platform] ?? row.platform}
-                </Typography>
-                <Chip
-                  label={formatStoreLabel(row.targetScope, row.targetStoreIds)}
-                  size="small"
-                  variant="outlined"
-                />
-                {/* 그룹명을 칩 라벨에 직접 보여준다 — "+N more in group"만 있으면
-                    실제 그룹명("G10 Grand Opening" 등)이 Tooltip 안에만 있어서
-                    마우스를 올려야만 뭘 말하는지 알 수 있었다("Also on Meta"
-                    칩은 플랫폼명이 바로 보이는데 이것만 hover 뒤에 숨어 있어
-                    일관성도 깨짐 — 실사용 피드백으로 발견). Tooltip은 보조
-                    정보(형제 캠페인 이름 목록)로만 남긴다.
-                    showGroupTag(campaignGroup을 명시적으로 입력)면 짝이 아직
-                    하나도 없어도(samePlatformSiblingCount===0) 태그만 보여준다
-                    — "Raffle 이벤트용"처럼 목적을 태그해둔 캠페인이 짝이 생기기
-                    전까지 리스트에서 아예 안 보이던 문제를 고침. */}
-                {(samePlatformSiblingCount > 0 || showGroupTag) && (
-                  <Tooltip
-                    title={
-                      samePlatformSiblingCount > 0
-                        ? `Also in this group: ${siblingRows
-                            .filter((r) => r.platform === row.platform)
-                            .map((r) => r.name)
-                            .join(', ')}`
-                        : `Tagged with campaign group "${groupKey}"`
-                    }
-                  >
-                    <Chip
-                      icon={<LayersIcon sx={{ fontSize: 14 }} />}
-                      label={samePlatformSiblingCount > 0 ? `${groupKey} (+${samePlatformSiblingCount})` : groupKey}
-                      size="small"
-                      variant="outlined"
-                      sx={{ borderColor: 'primary.light', color: 'primary.main', cursor: 'help', maxWidth: 240 }}
-                    />
-                  </Tooltip>
-                )}
-                {row.overlapNote && (
-                  <Tooltip title={row.overlapNote} arrow>
-                    <Chip
-                      label="Overlapping Target"
-                      size="small"
-                      variant="outlined"
-                      sx={{ borderColor: 'grey.400', color: 'text.secondary', cursor: 'help' }}
-                    />
-                  </Tooltip>
-                )}
+              {/* 메타 줄은 칩이 아니라 평문 + 가운뎃점이다.
+                  예전엔 Store·그룹·중복타겟이 전부 outlined Chip이라 한 행에
+                  테두리가 5~6개씩 생겨, 정작 주인공인 캠페인명보다 테두리가
+                  먼저 눈에 들어왔다. 레퍼런스(influencer tracking dashboard)의
+                  목록도 이 자리를 평문 컬럼(Instagram · T2 · General)으로 둔다.
+                  칩은 "상태"에만 남긴다(우측 상태 칩, StoreTable과 동일 기준).
+
+                  accountLabel(예: "Georgia")은 여전히 안 보여준다 — 옆 Store가
+                  이미 구체적인 매장명을 보여줘서 지역 정보가 중복이다. */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5, minWidth: 0 }}>
+                {(() => {
+                  const parts = [
+                    <Typography key="platform" variant="body2" color="text.secondary">
+                      {PLATFORM_LABEL[row.platform] ?? row.platform}
+                    </Typography>,
+                    <Typography key="store" variant="body2" color="text.secondary" noWrap>
+                      {formatStoreLabel(row.targetScope, row.targetStoreIds)}
+                    </Typography>,
+                  ];
+
+                  /* 그룹명을 그대로 노출한다 — "+N more in group"만 쓰면 실제
+                     그룹명이 Tooltip 안에만 있어 hover해야 알 수 있었다(실사용
+                     피드백). Tooltip은 형제 캠페인 이름 목록 같은 보조 정보로만
+                     남긴다. campaignGroup을 명시적으로 입력했으면 짝이 아직
+                     없어도 태그를 보여준다 — 태그해둔 캠페인이 짝이 생기기 전까지
+                     리스트에서 아예 안 보이던 문제를 고친 결정. */
+                  if (samePlatformSiblingCount > 0 || showGroupTag) {
+                    parts.push(
+                      <Tooltip
+                        key="group"
+                        title={
+                          samePlatformSiblingCount > 0
+                            ? `Also in this group: ${siblingRows
+                                .filter((r) => r.platform === row.platform)
+                                .map((r) => r.name)
+                                .join(', ')}`
+                            : `Tagged with campaign group "${groupKey}"`
+                        }
+                      >
+                        <Typography
+                          variant="body2"
+                          noWrap
+                          sx={{ color: 'text.secondary', cursor: 'help', maxWidth: 240 }}
+                        >
+                          {samePlatformSiblingCount > 0 ? `${groupKey} (+${samePlatformSiblingCount})` : groupKey}
+                        </Typography>
+                      </Tooltip>,
+                    );
+                  }
+
+                  /* 중복 타겟은 저긴급이지만 그래도 "확인해봐야 하는" 신호라,
+                     테두리를 뗀 대신 색(warning)으로 남긴다 — 평문 회색으로
+                     내리면 다른 메타와 구분이 안 돼 신호 자체가 사라진다. */
+                  if (row.overlapNote) {
+                    parts.push(
+                      <Tooltip key="overlap" title={row.overlapNote} arrow>
+                        <Typography variant="body2" noWrap sx={{ color: 'warning.main', cursor: 'help' }}>
+                          Overlapping Target
+                        </Typography>
+                      </Tooltip>,
+                    );
+                  }
+
+                  return parts.flatMap((part, i) =>
+                    i === 0
+                      ? [part]
+                      : [
+                          <Typography key={`sep-${i}`} variant="body2" sx={{ color: 'text.disabled' }} aria-hidden>
+                            ·
+                          </Typography>,
+                          part,
+                        ],
+                  );
+                })()}
               </Box>
             </Box>
 
