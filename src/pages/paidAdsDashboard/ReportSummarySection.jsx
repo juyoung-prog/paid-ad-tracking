@@ -19,7 +19,7 @@ import Typography from '@mui/material/Typography';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange } from './paidAdsPageUtils';
+import { campaignInDateRange, PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -300,12 +300,17 @@ function downloadCsv(csv, filename) {
 /**
  * ReportSummarySection
  *
- * /reports 페이지를 구성하는 섹션. 기간·플랫폼·Event 필터(FilterBar 재사용,
- * 두 탭이 공유)는 탭 위에 두고, 그 아래는 Plan/Performance 두 탭으로 나눈다 —
- * "캠페인 전에 보는 리포트"(계획: 이름·기간·일일/총예산·플랫폼별 예산)와
- * "캠페인 후 리포트"(실적: goal별로 실제 의미 있는 지표)는 답하는 질문 자체가
- * 달라서 하나의 표에 욱여넣으면 어느 쪽도 제대로 못 보여준다는 피드백으로
- * 분리했다.
+ * /reports 페이지를 구성하는 섹션. 정보 위계는 Dashboard와 같은 순서다 —
+ * KPI 툴바(sticky) → 탭 → 필터 → 내용. 예전엔 필터 → KPI → 탭 순서라 같은
+ * 앱의 두 화면이 정반대로 읽혔고, sticky가 없어 스크롤하면 KPI가 사라졌다
+ * (스크린샷 리뷰로 발견). 툴바가 sticky로 붙으려면 스크롤 컨테이너(셸 main)
+ * 기준 좌우 여백을 이 섹션이 직접 소유해야 해서, ReportsPage의 PageContainer
+ * 래핑을 걷어내고 PAGE_GUTTER_X를 여기서 쓴다.
+ *
+ * Plan/Performance 두 탭으로 나눈 이유 — "캠페인 전에 보는 리포트"(계획:
+ * 이름·기간·일일/총예산·플랫폼별 예산)와 "캠페인 후 리포트"(실적: goal별로
+ * 실제 의미 있는 지표)는 답하는 질문 자체가 달라서 하나의 표에 욱여넣으면
+ * 어느 쪽도 제대로 못 보여준다는 피드백.
  *
  * Store 필터는 한때 있었는데 뺐다 — 이 페이지의 핵심 질문은 "어떤 Event에
  * 어떤 캠페인이 있나"라서 Event가 1급 필터고, Event를 이미 골랐으면(대개
@@ -434,6 +439,71 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
 
   return (
     <Box sx={sx}>
+      {/* 페이지 툴바 — DashboardPage 툴바와 같은 문법(sticky top:0 · py:2.5 ·
+          borderBottom · PAGE_GUTTER_X). KPI는 좌측, 액션(Export CSV)은 우측 —
+          Dashboard의 KPI/New Campaign 배치와 같은 역할 분담이다. Export를
+          툴바로 올린 이유: 탭 콘텐츠 안에 있으면 스크롤로 사라지는데, 이
+          버튼은 "지금 보고 있는 탭 전체"에 대한 액션이라 탭 어디서든 닿아야
+          한다. */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 2,
+          px: PAGE_GUTTER_X,
+          py: 2.5,
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          backgroundColor: 'background.default',
+        }}
+      >
+        <KpiBar
+          items={
+            reportTab === 'plan'
+              ? [
+                  { label: 'Campaigns', value: summary.totalCampaigns },
+                  { label: 'Planned Budget', value: `$${summary.totalBudgetPlanned.toLocaleString('en-US')}` },
+                ]
+              : [
+                  { label: 'Campaigns', value: summary.totalCampaigns },
+                  { label: 'Total Spend', value: `$${summary.totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
+                  { label: 'Avg. CPM', value: summary.avgCPM != null ? `$${summary.avgCPM.toFixed(2)}` : '—', sub: 'across reported campaigns' },
+                ]
+          }
+          sx={{ minWidth: 0, flex: '1 1 auto' }}
+        />
+        <Button
+          size="small"
+          variant="outlined"
+          sx={{ flexShrink: 0 }}
+          disabled={reportTab === 'plan' ? planCampaigns.length === 0 : goalRows.length === 0}
+          onClick={() => {
+            const today = new Date().toISOString().slice(0, 10);
+            if (reportTab === 'plan') {
+              downloadCsv(planToCsv(planCampaigns), `paid-ads-plan-${today}.csv`);
+            } else {
+              downloadCsv(performanceToCsv(goalRows), `paid-ads-performance-${today}.csv`);
+            }
+          }}
+        >
+          Export CSV
+        </Button>
+      </Box>
+
+      <Box sx={{ px: PAGE_GUTTER_X, py: 3 }}>
+      <Tabs
+        value={reportTab}
+        onChange={(e, next) => setReportTab(next)}
+        sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
+      >
+        <Tab label="Plan" value="plan" sx={{ textTransform: 'none' }} />
+        <Tab label="Performance" value="performance" sx={{ textTransform: 'none' }} />
+      </Tabs>
+
       <FilterBar
         showSearch={false}
         searchValue=""
@@ -458,49 +528,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
         onDateRangeChange={setDateRange}
         sx={{ mb: 3 }}
       />
-
-      <KpiBar
-        items={
-          reportTab === 'plan'
-            ? [
-                { label: 'Campaigns', value: summary.totalCampaigns },
-                { label: 'Planned Budget', value: `$${summary.totalBudgetPlanned.toLocaleString('en-US')}` },
-              ]
-            : [
-                { label: 'Campaigns', value: summary.totalCampaigns },
-                { label: 'Total Spend', value: `$${summary.totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                { label: 'Avg. CPM', value: summary.avgCPM != null ? `$${summary.avgCPM.toFixed(2)}` : '—', sub: 'across reported campaigns' },
-              ]
-        }
-        sx={{ mb: 3 }}
-      />
-
-      <Tabs
-        value={reportTab}
-        onChange={(e, next) => setReportTab(next)}
-        sx={{ mb: 2, borderBottom: '1px solid', borderColor: 'divider' }}
-      >
-        <Tab label="Plan" value="plan" sx={{ textTransform: 'none' }} />
-        <Tab label="Performance" value="performance" sx={{ textTransform: 'none' }} />
-      </Tabs>
-
-      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
-        <Button
-          size="small"
-          variant="outlined"
-          disabled={reportTab === 'plan' ? planCampaigns.length === 0 : goalRows.length === 0}
-          onClick={() => {
-            const today = new Date().toISOString().slice(0, 10);
-            if (reportTab === 'plan') {
-              downloadCsv(planToCsv(planCampaigns), `paid-ads-plan-${today}.csv`);
-            } else {
-              downloadCsv(performanceToCsv(goalRows), `paid-ads-performance-${today}.csv`);
-            }
-          }}
-        >
-          Export CSV
-        </Button>
-      </Box>
 
       {reportTab === 'plan' ? (
         planCampaigns.length === 0 ? (
@@ -927,6 +954,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
         })}
         </>
       )}
+      </Box>
     </Box>
   );
 }

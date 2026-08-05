@@ -700,9 +700,18 @@ export function DashboardPage() {
 
         {/* 아바타 없는 2줄 리스트 — 실제 Influencer Tracking Dashboard 레퍼런스
             기준(CampaignTable 자체 주석 참고). CampaignCard 그리드는 삭제하지
-            않고 재사용 후보로 남겨뒀다. */}
-        <CampaignTable
-          rows={filteredCampaigns.map((c) => ({
+            않고 재사용 후보로 남겨뒀다.
+
+            알림 걸린 캠페인은 그룹 헤더("Action Required (N)")로 묶는다 —
+            정렬이 이미 알림을 맨 위로 올리고 있었지만(severity → 종료일),
+            어디까지가 알림 클러스터인지 경계가 없어서 "위에 있는 게 우연히
+            급한 것"인지 "급한 것만 모아둔 것"인지 화면만 봐서는 구분이 안
+            됐다. 레퍼런스의 ACTION REQUIRED 10 / UPCOMING 8 구조와 같은
+            판단이되, 접기·그룹 내 로컬 필터까지는 안 간다 — 캠페인 10여 개
+            규모에서는 접힌 그룹이 오히려 "안 보이는 데이터"를 만든다.
+            알림이 하나도 없으면 헤더 없이 예전처럼 평평한 리스트다. */}
+        {(() => {
+          const campaignRows = filteredCampaigns.map((c) => ({
             id: c.id,
             name: c.name,
             campaignGroup: c.campaignGroup,
@@ -720,10 +729,31 @@ export function DashboardPage() {
             overlapNote: overlapNoteFor(c.id),
             thumbnailUrl: c.thumbnailUrl,
             creativeUrl: c.creativeUrl,
-          }))}
-          allCampaigns={campaigns}
-          onRowClick={openCampaignDrawer}
-        />
+          }));
+          const actionRows = campaignRows.filter((r) => r.alertBadges.length > 0);
+          const otherRows = campaignRows.filter((r) => r.alertBadges.length === 0);
+          const groupHeaderSx = { display: 'block', mb: 0.5, color: 'text.secondary', letterSpacing: '0.08em' };
+
+          if (actionRows.length === 0) {
+            return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
+          }
+          return (
+            <>
+              <Typography variant="overline" sx={groupHeaderSx}>
+                Action Required ({actionRows.length})
+              </Typography>
+              <CampaignTable rows={actionRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+              {otherRows.length > 0 && (
+                <>
+                  <Typography variant="overline" sx={{ ...groupHeaderSx, mt: 3 }}>
+                    Other Campaigns ({otherRows.length})
+                  </Typography>
+                  <CampaignTable rows={otherRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+                </>
+              )}
+            </>
+          );
+        })()}
       </PageContainer>
 
       {/* 캠페인 등록 Dialog — form으로 감싸서 Enter가 Save를 트리거하게 한다.
