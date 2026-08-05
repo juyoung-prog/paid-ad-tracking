@@ -45,6 +45,41 @@ const TAB_GROUPS = {
   ended: ['ended', 'ended_early', 'archived'],
 };
 
+/**
+ * "Now" 뷰(기본 탭)의 시간 창. 실데이터 기준 전체 137건 중 130건이 종료
+ * 캠페인이라, 전체 목록이 기본이면 첫 화면의 95%가 아카이브다 — 운영자의
+ * 아침 질문("뭐 터졌나 → 지금 몇 개 도나 → 곧 시작/막 끝난 건 뭐가 있나")에
+ * 맞는 조각만 기본 시야에 둔다. 값은 그룹 헤더 라벨에도 그대로 노출한다 —
+ * 암묵적 컷오프는 "데이터가 사라졌다"는 오해로 돌아온다.
+ */
+const STARTING_SOON_DAYS = 7;
+const RECENTLY_ENDED_DAYS = 14;
+
+/** TODAY 기준 부호 있는 날짜 차이(일). 미래면 양수. */
+const daysFromToday = (iso) => Math.round((new Date(iso) - TODAY) / 86400000);
+
+const isStartingSoon = (c) =>
+  c.effectiveStatus === 'planned' && daysFromToday(c.startDate) >= 0 && daysFromToday(c.startDate) <= STARTING_SOON_DAYS;
+
+/**
+ * 최근 종료 = 성과 입력이 아직 남아있을 수 있는 캠페인. archived는 의도적으로
+ * 치운 것이라 제외한다. ended_early는 계획 종료일이 아직 미래일 수 있어서
+ * (조기 종료 시점은 따로 저장하지 않음) 부호 없는 차이로 판정한다 — 계획
+ * 종료일이 창 안이면 "방금 전후로 끝난 것"으로 본다.
+ */
+const isRecentlyEnded = (c) =>
+  (c.effectiveStatus === 'ended' || c.effectiveStatus === 'ended_early') &&
+  Math.abs(daysFromToday(c.endDate)) <= RECENTLY_ENDED_DAYS;
+
+const isInNowView = (c) => c.effectiveStatus === 'active' || isStartingSoon(c) || isRecentlyEnded(c);
+
+/**
+ * Event 필터의 "태그 없음" 센티널. Event를 1급 필터로 올리면 태그 안 된
+ * 캠페인(주로 동기화로 들어온 것)이 어떤 옵션에도 안 걸리는 사각이 생기는데,
+ * 그건 숨길 버그가 아니라 드러나야 할 운영 부채라 옵션으로 받아준다.
+ */
+const NO_EVENT = '(no-event)';
+
 // All 탭 안에서 상태가 뒤섞여 보이지 않도록(예: 알림 없는 Ended가 알림 없는
 // Active보다 위로 올라오는 것 방지) 정렬 1순위로 쓴다 — 개별 상태 탭에서는
 // 한 그룹만 걸러진 상태라 이 값이 전부 같아서 기존 정렬(severity→종료일)
@@ -126,7 +161,7 @@ export function DashboardPage() {
     upsertPerformanceRecord,
   } = usePaidAdsStore();
 
-  const [tab, setTab] = useState(() => loadLastView()?.tab ?? 'active');
+  const [tab, setTab] = useState(() => loadLastView()?.tab ?? 'now');
   const [groupValues, setGroupValues] = useState(() => loadLastView()?.groupValues ?? { platform: '', store: '' });
   const [dateRange, setDateRange] = useState(() => loadLastView()?.dateRange ?? { start: '', end: '' });
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -252,37 +287,37 @@ export function DashboardPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isFormOpen, selectedCampaignId, discardTarget]);
 
+  /**
+   * KPI는 금액이 아니라 라이프사이클 카운트다. 이 결정은 두 번 뒤집혔으므로
+   * 근거를 남긴다:
+   *
+   * 1차 — 개수만 있던 시절, "지금 얼마나 썼나를 보려면 카드를 일일이 열어야
+   * 한다"는 이유로 Active Budget/Active Spend 금액 KPI를 넣었다.
+   *
+   * 2차(현재) — 그 금액을 실무에서 아무도 안 봤다. Active Budget이 $0으로
+   * 깨진 채 떠 있어도 아무도 신고하지 않은 것이 그 증거다(깨진 숫자를 계속
+   * 노출하면 대시보드 전체의 신뢰가 같이 무너진다). 이 팀의 실제 질문은
+   * "지금 몇 개가 돌고, 곧 뭐가 시작되고, 방금 뭐가 끝났나"다. 같은 회사
+   * influencer tracking dashboard의 KPI 스트립도 전부 파이프라인 단계
+   * 카운트고 금액이 없다. 금액은 Reports(합계·CPM)와 pacing 알림(초과 집행
+   * 예외)이라는 제자리가 이미 있다.
+   *
+   * "탭 배지와 중복되는 개수 KPI는 두지 않는다"던 이전 원칙과의 관계 —
+   * Starting Soon/Recently Ended는 탭(Planned/Ended 전체)이 보여주지 못하는
+   * 시간 창 조각이고, KPI는 필터와 무관한 전역 값(탭 배지는 필터 반영)이며,
+   * 이제 항목이 클릭돼 해당 탭으로 이동한다. 순수 중복이던 그때와는 셋 다
+   * 다르다.
+   */
   const kpiItems = useMemo(() => {
-    const activeCampaigns = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active');
-    // 대시보드에는 지금까지 캠페인 "개수"만 있고 금액 KPI가 하나도 없었다 —
-    // "지금 얼마나 썼나"를 보려면 각 카드를 하나씩 열어야 했다. Active 캠페인
-    // 기준으로 계획 예산/실집행 합계를 더해 바로 답할 수 있게 한다.
-    const activeBudgetPlanned = activeCampaigns.reduce((sum, c) => sum + c.budgetPlanned, 0);
-    const activeSpendReports = activeCampaigns.filter((c) =>
-      performanceRecords.some((p) => p.campaignId === c.id && p.spend != null)
-    );
-    const activeSpend = activeSpendReports.reduce((sum, c) => {
-      const record = performanceRecords.find((p) => p.campaignId === c.id);
-      return sum + Number(record.spend);
-    }, 0);
-    // 성과를 보고한 캠페인이 일부뿐이면 합계 자체가 실제보다 작게 나온다 —
-    // "$1,800"이 마치 진행중 캠페인 전체의 실집행액인 것처럼 보이면 안 되므로,
-    // 몇 건 기준인지를 라벨에 항상 보이게 붙인다(hover에 의존하지 않음).
-    const activeSpendLabel =
-      activeSpendReports.length < activeCampaigns.length
-        ? `Active Spend (${activeSpendReports.length}/${activeCampaigns.length} reported)`
-        : 'Active Spend';
-
-    // Active/Planned/Ended 개수는 KPI 타일로 따로 두지 않는다 — 바로 아래
-    // 상태 탭(Active (n)/Planned (n)/Ended (n))이 같은 값을 이미 보여주면서
-    // 실제 필터링 기능까지 있다. 클릭도 안 되는 KPI 타일에 똑같은 숫자를
-    // 또 찍으면 순수 중복이라(전문가+실무자 리뷰로 확인됨), 여기서는 탭이
-    // 보여줄 수 없는 금액 지표만 남긴다.
+    const liveCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active').length;
+    const startingSoonCount = campaignsWithStatus.filter(isStartingSoon).length;
+    const recentlyEndedCount = campaignsWithStatus.filter(isRecentlyEnded).length;
     return [
-      { label: 'Active Budget', value: `$${activeBudgetPlanned.toLocaleString('en-US')}` },
-      { label: activeSpendLabel, value: `$${activeSpend.toLocaleString('en-US')}` },
+      { label: 'Live Now', value: liveCount, onClick: () => setTab('active') },
+      { label: 'Starting Soon', value: startingSoonCount, sub: `next ${STARTING_SOON_DAYS} days`, onClick: () => setTab('planned') },
+      { label: 'Recently Ended', value: recentlyEndedCount, sub: `last ${RECENTLY_ENDED_DAYS} days`, onClick: () => setTab('ended') },
     ];
-  }, [campaignsWithStatus, performanceRecords]);
+  }, [campaignsWithStatus]);
 
   // 탭(상태) 자체를 뺀 나머지 필터(Platform/Store/Campaign Group/기간) — 리스트와
   // 탭 배지 숫자가 반드시 같은 기준으로 캠페인을 세야 한다. 예전엔 탭 배지가 이
@@ -293,11 +328,15 @@ export function DashboardPage() {
   const matchesGroupFilters = (c) =>
     (!groupValues.platform || c.platform === groupValues.platform) &&
     (!groupValues.store || c.targetScope === TARGET_SCOPE.ALL_STORES || c.targetStoreIds.includes(groupValues.store)) &&
-    (!groupValues.campaignGroup || campaignGroupKey(c) === groupValues.campaignGroup) &&
+    (!groupValues.campaignGroup ||
+      (groupValues.campaignGroup === NO_EVENT
+        ? !c.campaignGroup
+        : campaignGroupKey(c) === groupValues.campaignGroup)) &&
     campaignInDateRange(c, dateRange);
 
   // 상태 탭 라벨용 개수 — 위 필터를 그대로 적용해서, 탭을 눌렀을 때 실제로
   // 보일 행 수와 배지 숫자가 항상 일치하게 한다.
+  const nowCount = campaignsWithStatus.filter((c) => isInNowView(c) && matchesGroupFilters(c)).length;
   const activeCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active' && matchesGroupFilters(c)).length;
   const plannedCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'planned' && matchesGroupFilters(c)).length;
   const endedCount = campaignsWithStatus.filter((c) => TAB_GROUPS.ended.includes(c.effectiveStatus) && matchesGroupFilters(c)).length;
@@ -329,7 +368,8 @@ export function DashboardPage() {
 
   const filteredCampaigns = campaignsWithStatus
     .filter((c) => {
-      if (!TAB_GROUPS[tab].includes(c.effectiveStatus)) return false;
+      // 'now'는 상태 집합이 아니라 시간 창 조각이라 TAB_GROUPS로 표현이 안 된다
+      if (tab === 'now' ? !isInNowView(c) : !TAB_GROUPS[tab].includes(c.effectiveStatus)) return false;
       if (!matchesGroupFilters(c)) return false;
       return true;
     })
@@ -627,10 +667,15 @@ export function DashboardPage() {
             onChange={(e, next) => setTab(next)}
             sx={{ borderBottom: 'none' }}
           >
-            <Tab label={`All (${allCount})`} value="all" sx={{ textTransform: 'none' }} />
+            {/* Now가 기본이고 All은 맨 뒤 — 실데이터 기준 All의 95%가 종료
+                캠페인이라, 전체 목록은 기본 시야가 아니라 아카이브 조회다.
+                데이터를 숨기는 게 아니라 기본값만 좁힌다(All은 항상 한 번의
+                클릭 거리에 있다). */}
+            <Tab label={`Now (${nowCount})`} value="now" sx={{ textTransform: 'none' }} />
             <Tab label={`Active (${activeCount})`} value="active" sx={{ textTransform: 'none' }} />
             <Tab label={`Planned (${plannedCount})`} value="planned" sx={{ textTransform: 'none' }} />
             <Tab label={`Ended (${endedCount})`} value="ended" sx={{ textTransform: 'none' }} />
+            <Tab label={`All (${allCount})`} value="all" sx={{ textTransform: 'none' }} />
           </Tabs>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             {/* Platform/Event/Store/기간이 전부 바로 아래 FilterBar 한 줄에
@@ -657,6 +702,24 @@ export function DashboardPage() {
           searchValue=""
           onSearchChange={() => {}}
           filterGroups={[
+            /* Event가 맨 앞 — 이 팀의 1차 질문은 "어느 이벤트의 캠페인인가"고
+               (Reports가 Store 필터를 뺄 때 이미 확정한 위계), Platform-first는
+               데이터 소스(Meta/TikTok API) 구조가 UI에 새어 나온 순서였다.
+               같은 이벤트의 Meta·TikTok 형제를 플랫폼으로 먼저 가르면 어차피
+               다시 합쳐 봐야 한다. "No Event"는 태그 안 된 캠페인(주로 동기화
+               유입)을 드러내는 옵션 — 태그가 없는 것도 조회돼야 채워진다. */
+            ...(campaignGroupOptions.length > 0
+              ? [{
+                  key: 'campaignGroup',
+                  label: 'Event',
+                  options: [
+                    ...campaignGroupOptions,
+                    ...(campaigns.some((c) => !c.campaignGroup)
+                      ? [{ value: NO_EVENT, label: 'No Event' }]
+                      : []),
+                  ],
+                }]
+              : []),
             {
               key: 'platform',
               label: 'Platform',
@@ -666,9 +729,6 @@ export function DashboardPage() {
                 { value: PLATFORM.TIKTOK, label: 'TikTok' },
               ],
             },
-            ...(campaignGroupOptions.length > 0
-              ? [{ key: 'campaignGroup', label: 'Event', options: campaignGroupOptions }]
-              : []),
             { key: 'store', label: 'Store', options: stores.map((s) => ({ value: s.id, label: s.id })) },
           ]}
           groupValues={groupValues}
@@ -679,11 +739,14 @@ export function DashboardPage() {
         />
 
         {/* Campaign Group(Event)으로 필터링 중일 때만 합산 예산/집행액을
-            보여준다 — 평소(그룹 필터 없음)에는 위 KpiBar의 Active Budget/
-            Spend와 내용이 겹쳐서 잡음만 된다. campaignsInGroup은 탭(상태)과
-            무관하게 그룹 전체를 세므로, 지금 Active 탭을 보고 있어도 이미
-            끝난 단계의 예산까지 포함한 진짜 전체 합계가 뜬다. */}
-        {groupValues.campaignGroup && (
+            보여준다. 상단 KPI에서 금액을 뺀 뒤로 대시보드에서 돈이 보이는
+            자리는 여기뿐인데, 이건 의도다 — 항상 떠 있는 전역 합계는 아무도
+            안 봤지만, "이 이벤트에 얼마 쓰고 있나"는 이벤트를 고른 사람이
+            바로 다음에 묻는 질문이다. campaignsInGroup은 탭(상태)과 무관하게
+            그룹 전체를 세므로, 지금 Active 탭을 보고 있어도 이미 끝난 단계의
+            예산까지 포함한 진짜 전체 합계가 뜬다. */}
+        {/* NO_EVENT는 진짜 그룹이 아니라 "태그 없음" 조회라 합산 요약이 무의미하다 */}
+        {groupValues.campaignGroup && groupValues.campaignGroup !== NO_EVENT && (
           // 얕은 배경색의 상태 요약 줄(Alert 배너에 가까운 정보 스트립) → control radius
           <Box sx={theme => ({ display: 'flex', gap: 3, mb: 2, py: 1, px: 1.5, backgroundColor: 'surface.sunken', borderRadius: `${theme.shape.radius.control}px` })}>
             <Typography variant="body2" color="text.secondary">
@@ -731,28 +794,46 @@ export function DashboardPage() {
             creativeUrl: c.creativeUrl,
           }));
           const actionRows = campaignRows.filter((r) => r.alertBadges.length > 0);
-          const otherRows = campaignRows.filter((r) => r.alertBadges.length === 0);
+          const restRows = campaignRows.filter((r) => r.alertBadges.length === 0);
           const groupHeaderSx = { display: 'block', mb: 0.5, color: 'text.secondary', letterSpacing: '0.08em' };
 
-          if (actionRows.length === 0) {
+          /* Now 탭은 라이프사이클 순서로 4그룹 — 아침에 읽는 순서 그대로다
+             (터진 것 → 도는 것 → 곧 시작 → 막 끝나서 성과 입력 남은 것).
+             컷오프(7d/14d)는 헤더에 그대로 적는다. 다른 탭은 기존 2그룹
+             (Action Required / Other) 유지 — 한 상태만 걸러진 탭에서
+             라이프사이클 분할은 전부 같은 그룹이라 의미가 없다. */
+          const sections =
+            tab === 'now'
+              ? [
+                  { label: 'Action Required', rows: actionRows },
+                  { label: 'Live', rows: restRows.filter((r) => r.status === 'active') },
+                  {
+                    label: `Starting Soon (next ${STARTING_SOON_DAYS} days)`,
+                    rows: restRows.filter((r) => r.status === 'planned'),
+                  },
+                  {
+                    label: `Recently Ended (last ${RECENTLY_ENDED_DAYS} days)`,
+                    rows: restRows.filter((r) => r.status === 'ended' || r.status === 'ended_early'),
+                  },
+                ].filter((s) => s.rows.length > 0)
+              : actionRows.length > 0
+                ? [
+                    { label: 'Action Required', rows: actionRows },
+                    { label: 'Other Campaigns', rows: restRows },
+                  ].filter((s) => s.rows.length > 0)
+                : [];
+
+          if (sections.length === 0) {
             return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
           }
-          return (
-            <>
+          return sections.map((section, i) => (
+            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
               <Typography variant="overline" sx={groupHeaderSx}>
-                Action Required ({actionRows.length})
+                {section.label} ({section.rows.length})
               </Typography>
-              <CampaignTable rows={actionRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
-              {otherRows.length > 0 && (
-                <>
-                  <Typography variant="overline" sx={{ ...groupHeaderSx, mt: 3 }}>
-                    Other Campaigns ({otherRows.length})
-                  </Typography>
-                  <CampaignTable rows={otherRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
-                </>
-              )}
-            </>
-          );
+              <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+            </Box>
+          ));
         })()}
       </PageContainer>
 

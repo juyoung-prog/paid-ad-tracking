@@ -509,6 +509,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
         searchValue=""
         onSearchChange={() => {}}
         filterGroups={[
+          /* Event가 맨 앞 — 이 페이지 스스로 "Event가 1급 필터"라며 Store를
+             뺐는데(위 컴포넌트 주석), 정작 순서는 Platform이 먼저라 위계
+             선언과 화면이 어긋나 있었다. Dashboard와 같은 순서로 맞춘다. */
+          ...(campaignGroupOptions.length > 0
+            ? [{ key: 'campaignGroup', label: 'Event', options: campaignGroupOptions }]
+            : []),
           {
             key: 'platform',
             label: 'Platform',
@@ -518,9 +524,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
               { value: PLATFORM.TIKTOK, label: 'TikTok' },
             ],
           },
-          ...(campaignGroupOptions.length > 0
-            ? [{ key: 'campaignGroup', label: 'Event', options: campaignGroupOptions }]
-            : []),
         ]}
         groupValues={groupValues}
         onGroupChange={(key, value) => setGroupValues((v) => ({ ...v, [key]: value }))}
