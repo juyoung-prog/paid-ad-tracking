@@ -1,5 +1,6 @@
 import { PageContainer } from '../../components/layout/PageContainer';
 import { usePaidAdsStore } from './usePaidAdsStore';
+import { PAGE_GUTTER_X } from './paidAdsPageUtils';
 import { ReportSummarySection } from './ReportSummarySection';
 
 /**
@@ -13,7 +14,7 @@ export function ReportsPage() {
   const { campaigns, performanceRecords } = usePaidAdsStore();
 
   return (
-    <PageContainer maxWidth={false} sx={{ py: 3 }}>
+    <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
       <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
     </PageContainer>
   );

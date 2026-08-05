@@ -35,7 +35,7 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 
 import { getEffectiveStatus, calcBudgetPacing, calcAutoBudgetPlanned, campaignGroupKey, ALERT_SEVERITY, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore } from './usePaidAdsStore';
-import { TODAY, campaignInDateRange, generateId } from './paidAdsPageUtils';
+import { TODAY, PAGE_GUTTER_X, campaignInDateRange, generateId } from './paidAdsPageUtils';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
 const TAB_GROUPS = {
@@ -107,11 +107,11 @@ function isCampaignFormValid(values) {
  * 실제로 캠페인을 등록·성과를 입력하면 새로고침해도 남는다. 알림은 저장된
  * 값이 아니라 schema.js의 generateAlerts()로 매번 다시 계산된다.
  *
- * 레이아웃: visual-direction 문서의 2컬럼 구조를 그대로 구현했다
- * (좌측 280px 고정 aside + 우측 fluid main, KPI 툴바 sticky·py:2.5). 단, 계획 단계에서
- * "재활용" 후보로 적어둔 StickyAsideCenterLayout은 실제로 붙여보니 좌우 대칭을
- * 위해 우측에 빈 미러 컬럼을 만드는 패턴이라 이 화면(우측이 꽉 차야 함)과
- * 맞지 않아, 여기서는 직접 2컬럼 flex로 구현했다.
+ * 레이아웃: 단일 컬럼(KPI 툴바 sticky·py:2.5 → 탭 → 필터 → 리스트).
+ * visual-direction 문서의 2컬럼 구조(좌측 280px 고정 aside)로 시작했지만,
+ * 필터가 좌측 aside와 상단 탭으로 쪼개져 하나의 필터링 파이프라인이 아니라
+ * 두 시스템처럼 보인다는 피드백으로 aside를 걷어냈다(아래 탭/FilterBar 주석 참고).
+ * 화면 단위 내비게이션은 글로벌 셸의 좌측 레일(PaidAdsRail)이 담당한다.
  */
 export function DashboardPage() {
   const {
@@ -511,21 +511,22 @@ export function DashboardPage() {
 
   return (
     <Box>
-      {/* 페이지 툴바 — 글로벌 셸(PaidAdsShell) 헤더 바로 아래 sticky.
+      {/* 페이지 툴바 — 본문 스크롤 컨테이너 최상단에 sticky.
           KPI/알림/등록 버튼은 페이지마다 달라서 글로벌 셸이 아니라 여기 속한다. */}
       <Box
         sx={{
           position: 'sticky',
-          top: 56,
+          // top:0 — 셸이 상단 GNB 대신 좌측 레일을 쓰면서 위에 깔릴 헤더가 없어졌다.
+          // 스크롤 주체도 문서가 아니라 셸의 main이라, 이 sticky는 그 컨테이너
+          // 기준으로 붙는다(예전 top:56은 GNB 높이를 피하려던 값이었다).
+          top: 0,
           zIndex: 10,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          // GNB(글로벌 셸 헤더)의 로고 좌측 여백이 반응형 px:{xs:2,sm:3,md:4}라,
-          // 여기가 고정 px:3(24px)이면 md 이상 화면에서 "Paid Ads Dashboard"
-          // 타이틀(32px)과 그 아래 KPI 라벨(24px) 좌측이 8px 어긋나 보였다.
-          // GNB와 같은 값을 그대로 써서 모든 브레이크포인트에서 맞춘다.
-          px: { xs: 2, sm: 3, md: 4 },
+          // 모든 화면이 공유하는 기준선 — 툴바의 KPI 라벨과 본문 좌측이 어긋나면
+          // 한 화면이 두 개의 열처럼 보인다.
+          px: PAGE_GUTTER_X,
           // py:2.5(20px) — KPI 라벨-위/숫자-아래 배치로 바뀌면서 콘텐츠가
           // 2줄(약 40px)이 됐는데, 예전 1줄 시절 고정값이던 height:56이
           // 그대로 남아있어 위아래 여백이 실제 Influencer 레퍼런스(live,
@@ -580,16 +581,17 @@ export function DashboardPage() {
             {/* 'N' 단축키 힌트 — 단축키가 있다는 걸 알 방법이 없으면 아무도 안 쓴다 */}
             <Box
               component="span"
-              sx={{
+              sx={theme => ({
                 fontSize: 11,
                 lineHeight: 1,
                 px: 0.5,
                 py: 0.25,
-                borderRadius: '3px',
+                // 버튼 *안에* 들어가는 미세 요소 → inlay radius
+                borderRadius: `${theme.shape.radius.inlay}px`,
                 border: '1px solid',
                 borderColor: 'rgba(255,255,255,0.5)',
                 opacity: 0.85,
-              }}
+              })}
             >
               N
             </Box>
@@ -603,7 +605,7 @@ export function DashboardPage() {
           KPI 툴바와 동일값 — 예전엔 좌측 사이드바 패널의 자체 padding만큼
           미리 빼는 계산이 필요했는데, 사이드바를 없애면서(아래 참고) 그
           보정도 같이 필요 없어졌다. */}
-      <PageContainer maxWidth={false} sx={{ py: 3, px: { xs: 2, sm: 3, md: 4 } }}>
+      <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
         {/* 예전엔 Platform·Event·기간 필터(FilterBar)를 좌측 280px 고정
             사이드바에, 상태(Active/Planned/Ended) 필터는 상단 탭에 따로
             뒀었다 — 근데 그러면 "이 리스트를 좁히는 컨트롤"이 물리적으로
@@ -682,10 +684,8 @@ export function DashboardPage() {
             무관하게 그룹 전체를 세므로, 지금 Active 탭을 보고 있어도 이미
             끝난 단계의 예산까지 포함한 진짜 전체 합계가 뜬다. */}
         {groupValues.campaignGroup && (
-          // 얕은 배경색의 상태 요약 줄(Alert 배너에 가까운 정보 스트립)이라 '4px' —
-          // 숫자 1은 theme.shape.borderRadius(0)와 곱해져 0px가 되는 버그였다
-          // (디자인 시스템 감사로 발견).
-          <Box sx={{ display: 'flex', gap: 3, mb: 2, py: 1, px: 1.5, backgroundColor: 'grey.50', borderRadius: '4px' }}>
+          // 얕은 배경색의 상태 요약 줄(Alert 배너에 가까운 정보 스트립) → control radius
+          <Box sx={theme => ({ display: 'flex', gap: 3, mb: 2, py: 1, px: 1.5, backgroundColor: 'surface.sunken', borderRadius: `${theme.shape.radius.control}px` })}>
             <Typography variant="body2" color="text.secondary">
               <strong>{campaignsInGroup.length}</strong> campaign{campaignsInGroup.length === 1 ? '' : 's'} in "{groupValues.campaignGroup}"
             </Typography>
@@ -892,7 +892,7 @@ export function DashboardPage() {
             {/* Campaign Details(설정 폼)와 Budget Pacing+Performance(추적 데이터)는
                 서로 다른 저장 버튼을 가진 별개의 정보 묶음인데 경계가 없어 하나로
                 이어붙어 보인다는 피드백 — Divider로 그 경계를 명시한다. */}
-            <Divider sx={{ mb: 3, borderColor: 'grey.300' }} />
+            <Divider sx={{ mb: 3, borderColor: 'divider' }} />
 
             {selectedCampaign.effectiveStatus === 'active' && (
               <PacingIndicator

@@ -76,6 +76,46 @@ const palette = {
     paper: '#FFFFFF',
   },
 
+  /**
+   * 상호작용 액센트 — 활성·선택·포커스가 모두 이 한 값에서 나온다.
+   * (design-handoff 상속: influencer tracking dashboard의 flat-SaaS 리뉴얼 결정)
+   *
+   * 자리마다 파랑이 다르면 안 된다. 칩 테두리·내비 배경·메뉴 선택이 #0000FF고
+   * 탭 밑줄·활성 글자가 #0000B2면 같은 "선택됨"인데 색이 두 개인 셈이다.
+   *
+   * 기준을 낮은 쪽(#0000B2)으로 잡는다. primary.main은 채도 100%라 화면에서
+   * 가장 강한 요소가 되는데, 목록이 주인공인 화면에서 컨트롤이 그 자리를
+   * 가져가면 안 된다. 브랜드 색 자체는 primary에 그대로 남는다.
+   */
+  accent: {
+    main: '#0000B2',
+    /** 선택 배경 — 채우지 않고 옅게 깐다 */
+    tint: 'rgba(0, 0, 178, 0.08)',
+    /** 선택 배경 hover */
+    tintHover: 'rgba(0, 0, 178, 0.14)',
+    /**
+     * 포커스 외곽 링 — 테두리는 1px로 두고 번짐으로만 알린다.
+     * 굵기를 바꾸면 레이아웃이 1px 흔들리므로 두께는 비포커스와 같게 유지한다.
+     * 0.18은 링이 테두리만큼 도드라져 컨트롤이 목록보다 강해 보였다.
+     */
+    ring: 'rgba(0, 0, 178, 0.09)',
+  },
+
+  /**
+   * 면(surface) 위계.
+   * background.default/paper가 둘 다 흰색이라 "한 단 낮은 면"을 표현할 토큰이 없었고,
+   * 그 결과 grey.50/100이 날것으로 흩어져 무엇이 사이드바고 무엇이 아바타인지
+   * 코드만 봐서는 구분되지 않았다. 이름으로 역할을 고정한다.
+   *
+   * hover/selected는 여기 두지 않는다 — action.hover/selected는 반투명이라
+   * 어떤 면 위에 올려도 합성되지만, 불투명한 grey는 흰 배경에서만 맞다.
+   */
+  surface: {
+    default: '#FFFFFF',
+    sunken: grey[50],
+    muted: grey[100],
+  },
+
   // 구분선
   divider: 'rgba(0, 0, 0, 0.12)',
 
@@ -244,6 +284,26 @@ const spacing = 8; // 기본 단위: 8px
 // ============================================================
 const shape = {
   borderRadius: 0, // Sharp corners (0px)
+
+  /**
+   * 역할별 radius — 전역 shape.borderRadius(0)는 그대로 두고 역할 단위로만 예외를 둔다.
+   *
+   * 이 값들은 원래 화면마다 '4px' / '6px' 문자열로 흩어져 있었고, 그 옆에는
+   * "숫자 4를 쓰면 shape.borderRadius(0)와 곱해져 0이 된다"는 같은 경고 주석이
+   * 반복해서 붙어 있었다. 같은 주석이 여러 파일에 복사된다는 건 토큰이 없다는
+   * 신호다. 이름을 붙여 여기 모은다.
+   *
+   * sx에서는 숫자로 쓰면 곱셈 규칙에 걸리므로 반드시 px 문자열로 넘긴다:
+   *   sx={theme => ({ borderRadius: `${theme.shape.radius.control}px` })}
+   */
+  radius: {
+    /** 입력·셀렉트·칩 등 상호작용 컨트롤. MuiOutlinedInput/MuiChip이 쓰는 값과 같다 */
+    control: 4,
+    /** 분석·참조용 카드형 컨테이너 (구조 표면인 Card/Paper는 여전히 0) */
+    container: 6,
+    /** 컨트롤 *안에* 들어가는 미세 요소 — 버튼 안 단축키 힌트 키캡 등 */
+    inlay: 3,
+  },
 };
 
 // ============================================================
@@ -369,6 +429,29 @@ const components = {
     styleOverrides: {
       root: {
         borderRadius: 4,
+        /* MUI 기본 포커스는 테두리를 2px로 굵히고 순수 파랑을 쓴다.
+           굵기가 바뀌면 레이아웃이 1px 흔들리고, 컨트롤이 목록보다 강해진다.
+           두께는 1px로 두고 바깥에 옅은 링을 둘러 상태를 알린다. */
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderWidth: 1,
+          borderColor: palette.accent.main,
+        },
+        '&.Mui-focused': {
+          boxShadow: `0 0 0 3px ${palette.accent.ring}`,
+        },
+      },
+    },
+  },
+  MuiMenuItem: {
+    styleOverrides: {
+      root: {
+        // MUI 기본값은 alpha(primary.main, 0.08) — 순수 파랑 틴트라 연보라로 보인다.
+        // 앱의 다른 "선택됨"과 같은 액센트를 쓴다.
+        '&.Mui-selected': { backgroundColor: palette.accent.tint },
+        '&.Mui-selected:hover': { backgroundColor: palette.accent.tintHover },
+        // 메뉴가 열리면 선택 항목에 포커스가 얹힌다. 이 조합을 빼두면
+        // MUI가 selectedOpacity+focusOpacity를 순수 파랑으로 다시 계산한다.
+        '&.Mui-selected.Mui-focusVisible': { backgroundColor: palette.accent.tintHover },
       },
     },
   },
@@ -376,6 +459,15 @@ const components = {
     styleOverrides: {
       root: {
         borderRadius: 4,
+      },
+      // compact 모드: small 사이즈 패딩 축소 (운영 툴 정보 밀도 기준)
+      sizeSmall: {
+        height: 20,
+        fontSize: '0.6875rem', // 11px
+      },
+      labelSmall: {
+        paddingLeft: 6,
+        paddingRight: 6,
       },
     },
   },

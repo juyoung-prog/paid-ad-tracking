@@ -1,5 +1,6 @@
 import { PageContainer } from '../../components/layout/PageContainer';
 import { usePaidAdsStore } from './usePaidAdsStore';
+import { PAGE_GUTTER_X } from './paidAdsPageUtils';
 import { StoreListSection } from './StoreListSection';
 
 /**
@@ -13,7 +14,7 @@ export function StoresPage() {
   const { stores, campaigns, addStore, updateStore } = usePaidAdsStore();
 
   return (
-    <PageContainer maxWidth={false} sx={{ py: 3 }}>
+    <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
       <StoreListSection stores={stores} campaigns={campaigns} onAddStore={addStore} onUpdateStore={updateStore} />
     </PageContainer>
   );

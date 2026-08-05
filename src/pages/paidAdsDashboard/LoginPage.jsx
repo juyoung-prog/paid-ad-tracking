@@ -51,7 +51,7 @@ export function LoginPage() {
         display: 'grid',
         placeItems: 'center',
         p: 2,
-        backgroundColor: 'grey.50',
+        backgroundColor: 'surface.sunken',
       } }
     >
       <Paper

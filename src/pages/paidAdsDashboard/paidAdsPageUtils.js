@@ -15,6 +15,20 @@
 export const TODAY = new Date('2026-07-20');
 
 /**
+ * 페이지 콘텐츠의 좌우 여백.
+ *
+ * 예전엔 화면마다 값이 달랐다 — Dashboard는 md에서 32px, Reports/Stores는
+ * MUI Container 기본값 24px, Settings는 아예 0이었다. 각 화면에 자기 헤더가
+ * 있을 땐 티가 안 났는데, 글로벌 셸이 좌측 레일로 바뀌면서 레일 경계가 모든
+ * 화면의 공통 기준선이 됐고 탭을 옮길 때마다 본문이 좌우로 움직였다.
+ *
+ * 한 곳에서만 정한다. 페이지가 늘어도 이 값을 쓰면 기준선이 어긋나지 않는다.
+ * (DashboardPage의 sticky 툴바처럼 배경·구분선이 화면 끝까지 가야 하는
+ *  요소는 padding으로 주고, 바깥 margin으로 주지 않는다.)
+ */
+export const PAGE_GUTTER_X = { xs: 2, sm: 3, md: 4 };
+
+/**
  * 캠페인 기간이 필터 dateRange와 겹치는지 확인한다.
  * @param {import('../../data/schema').Campaign} campaign
  * @param {{ start?: string, end?: string }} dateRange

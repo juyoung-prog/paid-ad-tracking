@@ -519,42 +519,64 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                     표시한다. top을 인덱스 짝/홀로 번갈아 배치(stagger)하는
                     이유: phase 시작일이 며칠 안 되게 가까우면(예: 7/16과
                     7/20) 라벨 두 개가 겹쳐 보이는 문제가 실제로 있었다. */}
-                {milestones.map((m, i) => (
-                  <Box
-                    key={m.date}
-                    sx={{
-                      position: 'absolute',
-                      left: `${timelinePct(m.date)}%`,
-                      top: 24,
-                      bottom: 24,
-                      borderLeft: '2px dashed',
-                      borderColor: 'divider',
-                    }}
-                  >
-                    <Typography
-                      variant="caption"
+                {milestones.map((m, i) => {
+                  const pct = timelinePct(m.date);
+                  const text = `${m.label} (${shortDate(m.date)})`;
+                  /* 라벨은 점선 기준 가운데 정렬이 기본이다. 그런데 타임라인 양 끝의
+                     마일스톤은 라벨 절반이 차트 바깥으로 나가 잘렸다 — 감싸는 Box의
+                     여백(px:12 = 96px)은 고정인데 라벨 길이는 가변이기 때문이다.
+                     m.label은 같은 날 시작하는 캠페인 이름을 모두 이어붙이므로 쉽게
+                     400px를 넘고, 그러면 절반만 200px라 96px 여백을 그냥 넘어간다.
+                     끝에 가까우면 정렬 기준을 바꿔 안쪽으로 눕힌다. */
+                  const labelShift = pct < 12
+                    ? 'none'                  // 시작 근처 — 점선에서 오른쪽으로 편다
+                    : pct > 88
+                      ? 'translateX(-100%)'   // 끝 근처 — 점선에서 왼쪽으로 편다
+                      : 'translateX(-50%)';
+                  return (
+                    <Box
+                      key={m.date}
                       sx={{
                         position: 'absolute',
-                        top: i % 2 === 0 ? -28 : -52,
-                        left: 0,
-                        transform: 'translateX(-50%)',
-                        whiteSpace: 'nowrap',
-                        bgcolor: 'grey.100',
-                        color: 'text.secondary',
-                        fontWeight: 600,
-                        px: 1,
-                        py: 0.25,
-                        // 숫자 4는 sx borderRadius 곱셈 규칙상 theme.shape.borderRadius(0)와
-                        // 곱해져 0px가 된다 — 마일스톤 라벨은 Chip/Badge 역할이라 '4px'
-                        // 문자열로 명시(mui-theme.md Surface Radius System, 디자인
-                        // 시스템 감사로 발견).
-                        borderRadius: '4px',
+                        left: `${pct}%`,
+                        top: 24,
+                        bottom: 24,
+                        borderLeft: '2px dashed',
+                        borderColor: 'divider',
                       }}
                     >
-                      {m.label} ({shortDate(m.date)})
-                    </Typography>
-                  </Box>
-                ))}
+                      <Typography
+                        variant="caption"
+                        // 정렬을 바꿔도 이름이 여럿 붙으면 여전히 길다. 폭을 캡으로
+                        // 막고 넘치면 말줄임 — 전체 문자열은 title로 남긴다.
+                        // (이 차트는 aria-hidden이고 정확한 값은 아래 표가 갖는다)
+                        title={text}
+                        sx={{
+                          position: 'absolute',
+                          top: i % 2 === 0 ? -28 : -52,
+                          left: 0,
+                          transform: labelShift,
+                          display: 'block',
+                          maxWidth: 240,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          bgcolor: 'surface.muted',
+                          color: 'text.secondary',
+                          fontWeight: 600,
+                          px: 1,
+                          py: 0.25,
+                          // 마일스톤 라벨은 Chip/Badge 역할 → control radius.
+                          // px 문자열로 넘기는 이유는 sx의 borderRadius 곱셈 규칙 때문 —
+                          // 숫자로 주면 shape.borderRadius(0)와 곱해져 0px가 된다.
+                          borderRadius: `${theme.shape.radius.control}px`,
+                        }}
+                      >
+                        {text}
+                      </Typography>
+                    </Box>
+                  );
+                })}
 
                 {/* Gantt 막대 — 새 차트 라이브러리 없이 순수 % 위치 계산
                     (timelinePct)만으로 그린다. 아래 Budget by Platform 막대와
@@ -581,10 +603,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                           bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
                           border: '1px solid',
                           borderColor: 'primary.main',
-                          // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할이라
-                          // '6px' — 숫자 1은 theme.shape.borderRadius(0)와 곱해져 0px가 되는
-                          // 버그였다(디자인 시스템 감사로 발견).
-                          borderRadius: '6px',
+                          // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할
+                          borderRadius: `${theme.shape.radius.container}px`,
                           display: 'flex',
                           alignItems: 'center',
                           px: 1,
@@ -739,7 +759,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                   <LinearProgress
                     variant="determinate"
                     value={ratio * 100}
-                    sx={{ height: 6, borderRadius: 0, backgroundColor: 'grey.100' }}
+                    sx={{ height: 6, borderRadius: 0, backgroundColor: 'surface.muted' }}
                   />
                 </Box>
               );
@@ -809,7 +829,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, sx }) {
                       </Typography>
                       {/* 막대 자체에는 텍스트를 넣지 않는다 — 값이 작으면 막대 안에
                           글자가 안 들어가 잘린다. 값은 항상 막대 오른쪽 바깥에 둔다. */}
-                      <Box sx={{ flexGrow: 1, minWidth: 0, backgroundColor: 'grey.100', height: 14 }}>
+                      <Box sx={{ flexGrow: 1, minWidth: 0, backgroundColor: 'surface.muted', height: 14 }}>
                         <Box
                           sx={{
                             width: `${Math.max(ratio * 100, value ? 0.5 : 0)}%`,

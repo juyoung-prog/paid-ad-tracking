@@ -13,6 +13,7 @@ import { supabase } from '../../lib/supabase';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { useConnections } from './useConnections';
 import { useSyncRuns } from './useSyncRuns';
+import { PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 /**
  * 연결 가능한 광고 계정 목록. ad_accounts 테이블은 "연결이 끝난 뒤에" 채워지므로
@@ -118,8 +119,11 @@ export function SettingsPage() {
     });
   };
 
+  /* 좌우 여백은 다른 화면과 같은 기준선(PAGE_GUTTER_X)을 쓴다 — 예전엔 이 화면만
+     여백이 0이라 레일에 딱 붙어 시작했다. box-sizing이 border-box라 maxWidth 720은
+     여백을 포함한 값이다(안쪽 폭은 그만큼 좁아지지만 줄길이는 여전히 읽기 좋다). */
   return (
-    <Box sx={ { maxWidth: 720 } }>
+    <Box sx={ { maxWidth: 720, px: PAGE_GUTTER_X, py: 3 } }>
       <Stack spacing={ 1 } sx={ { mb: 3 } }>
         <Typography variant="h5" component="h1">Settings</Typography>
         <Typography variant="body2" color="text.secondary">
