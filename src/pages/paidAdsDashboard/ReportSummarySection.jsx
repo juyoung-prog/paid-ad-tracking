@@ -21,9 +21,10 @@ import Typography from '@mui/material/Typography';
 
 import { ScrollArea } from '../../components/container/ScrollArea';
 import { FilterBar } from '../../components/templates/FilterBar';
+import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, PAGE_GUTTER_X } from './paidAdsPageUtils';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -103,6 +104,12 @@ function buildPhaseTimeline(campaigns) {
         byPlatform[c.platform] = { daily: c.budgetDaily ?? null, total: c.budgetPlanned };
       });
       const totalBudget = group.reduce((sum, c) => sum + c.budgetPlanned, 0);
+      // 플랫폼별 일일 예산의 합 = 이 phase가 하루에 쓰는 돈. 막대 라벨이
+      // 총액과 함께 이 값을 말한다 — "하루 얼마씩"과 "총 얼마"는 예산을
+      // 판단할 때 서로 대체되지 않는 두 질문이다. 아무 플랫폼도 일일 예산을
+      // 안 쓰면 null(있는 것만 말한다).
+      const dailyValues = group.map((c) => c.budgetDaily).filter((v) => v != null);
+      const totalDaily = dailyValues.length > 0 ? dailyValues.reduce((a, b) => a + b, 0) : null;
       const days = Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
       return {
         name,
@@ -111,6 +118,7 @@ function buildPhaseTimeline(campaigns) {
         days,
         byPlatform,
         totalBudget,
+        totalDaily,
       };
     })
     .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
@@ -131,12 +139,6 @@ const GOAL_META = [
   { value: GOAL.CONVERSION, label: 'Conversion' },
   { value: GOAL.STORE_VISIT, label: 'Store Visit' },
 ];
-
-// 'YYYY-MM-DD' -> 'M/D' — Plan 표 전용 짧은 표기.
-function shortDate(iso) {
-  const [, m, d] = iso.split('-');
-  return `${Number(m)}/${Number(d)}`;
-}
 
 /**
  * 값 없음 표기. 모든 포매터가 이 하나를 쓰기 때문에, "이 컬럼이 통째로 비었나"를
@@ -621,10 +623,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
 
   // Plan 탭이 Event를 골랐을 때만 타임라인을 그리는 것과 같은 조건이다 —
   // 여러 Event가 섞인 상태에서 phase 막대를 그리면 서로 무관한 캠페인이 한 축에 놓인다.
-  const phasePerformance = useMemo(() => {
-    if (!activeCampaignGroup) return [];
+  // 막대 라벨이 phase 이름으로 지표를 찾으므로 Map으로 만들어 둔다.
+  const performanceByPhaseName = useMemo(() => {
+    if (!activeCampaignGroup) return new Map();
     const rowByCampaignId = new Map(goalRows.map((r) => [r.campaignId, r]));
-    return buildPhasePerformance(filteredCampaigns, rowByCampaignId);
+    return new Map(buildPhasePerformance(filteredCampaigns, rowByCampaignId).map((p) => [p.name, p]));
   }, [activeCampaignGroup, filteredCampaigns, goalRows]);
 
   // Plan 탭 — 지금 필터에 걸린 캠페인 전체 기준(Event 선택 여부와 무관).
@@ -635,26 +638,15 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
   }, {});
   const planTotalBudget = planCampaigns.reduce((sum, c) => sum + c.budgetPlanned, 0);
 
-  // Event를 선택했을 때만 타임라인(Gantt) + Budget Breakdown 뷰를 보여준다 —
-  // 여러 Event가 섞인 상태에서 phase별 막대를 그리면 서로 무관한 캠페인들이
-  // 같은 타임라인에 뒤섞여 의미가 없다. Event 없이 볼 때는 기존 단순
-  // 표(Campaign/Period/Daily/Total)+플랫폼 비율 바를 그대로 쓴다.
+  /* Event를 선택했을 때만 타임라인을 그린다 — 여러 Event가 섞인 상태에서 phase
+     막대를 그리면 서로 무관한 캠페인들이 같은 축에 놓여 의미가 없다. Event 없이
+     볼 때 Plan은 기존 단순 표(Campaign/Period/Daily/Total)+플랫폼 비율 바를 쓰고,
+     Performance는 goal별 표만 보여준다.
+     이 값은 **두 탭이 공유한다** — 같은 Event를 골랐으면 어느 탭에서든 같은
+     타임라인이 나와야 한다(PhaseTimelineChart 주석 참고). */
+  // 타임라인 축·마일스톤 계산은 PhaseTimelineChart가 스스로 한다 — 두 탭이 같은
+  // 차트를 쓰므로 계산도 컴포넌트 안에 두는 편이 두 벌로 갈라지지 않는다.
   const phases = activeCampaignGroup ? buildPhaseTimeline(planCampaigns) : [];
-  const timelineStart = phases.reduce((min, p) => (p.startDate < min ? p.startDate : min), phases[0]?.startDate ?? '');
-  const timelineEnd = phases.reduce((max, p) => (p.endDate > max ? p.endDate : max), phases[0]?.endDate ?? '');
-  const timelineRangeMs = new Date(timelineEnd) - new Date(timelineStart) || 1;
-  const timelinePct = (iso) => ((new Date(iso) - new Date(timelineStart)) / timelineRangeMs) * 100;
-
-  // 마일스톤 = 각 phase의 시작일(실사용 확인 완료 — 종료일 기준은 이벤트마다
-  // 의미가 달라 일반화하기 어렵고, 시작일은 "다음 단계로 넘어가는 시점"이라는
-  // 뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 마커 하나에
-  // 이름을 같이 묶어 표시한다(같은 x 위치에 마커가 겹치지 않도록).
-  const milestoneMap = new Map();
-  phases.forEach((p) => {
-    if (!milestoneMap.has(p.startDate)) milestoneMap.set(p.startDate, []);
-    milestoneMap.get(p.startDate).push(p.name);
-  });
-  const milestones = [...milestoneMap.entries()].map(([date, names]) => ({ date, label: names.join(', ') }));
 
   const phaseMetaTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.META]?.total ?? 0), 0);
   const phaseTikTokTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.TIKTOK]?.total ?? 0), 0);
@@ -797,139 +789,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
           </Typography>
         ) : phases.length > 0 ? (
           <Box>
-            {/* Event 타임라인(Gantt) — phase(같은 이름의 캠페인, 플랫폼별로 합침)를
-                기간에 맞춰 가로 막대로 배치한다. 새 차트 라이브러리 없이 순수
-                % 위치 계산(순서: timelinePct)만으로 그린다 — 아래 Budget by
-                Platform 막대와 같은 접근(PacingIndicator의 LinearProgress
-                문법 재사용 원칙과 동일선상). 마일스톤(수직 점선+라벨)은 각
-                phase의 시작일을 자동으로 표시한다. */}
-            {/* 바깥 Box(px)는 실제 여백을 만들고, 안쪽 Box(position:relative)는
-                패딩 없이 그 안에서만 %로 위치를 계산한다 — absolute 자식의
-                left:%는 가장 가까운 position:relative 조상의 "패딩을 포함한"
-                박스 기준으로 계산돼서, 같은 Box에 padding과 absolute 자식을
-                같이 두면 padding이 % 계산에 반영되지 않는다(실제로 확인한
-                버그 — 마일스톤 라벨이 padding을 줬는데도 그대로 화면 밖으로
-                잘렸었다). 두 겹으로 나눠야 바깥 padding이 안쪽 %기준 폭 자체를
-                줄여서 실제로 여백처럼 동작한다. */}
-            {/* 시각 전용 구성(Box 절대위치 + %)이라 <table>/<list> 같은 의미
-                구조가 없다 — 스크린리더에 억지로 구조를 씌우기보다, 바로 아래
-                Budget Breakdown 표가 이미 같은 데이터(캠페인·기간·예산)를
-                접근 가능한 형태로 담고 있으므로 이 블록 전체를 aria-hidden으로
-                숨기고 표로 보내는 쪽을 택한다(접근성 리뷰로 발견). */}
-            <Box aria-hidden="true" sx={{ px: 12, pt: 9, pb: 3, mb: 4 }}>
-              <Box sx={{ position: 'relative' }}>
-                {/* 마일스톤(수직 점선+라벨) — 각 phase의 시작일을 자동으로
-                    표시한다. top을 인덱스 짝/홀로 번갈아 배치(stagger)하는
-                    이유: phase 시작일이 며칠 안 되게 가까우면(예: 7/16과
-                    7/20) 라벨 두 개가 겹쳐 보이는 문제가 실제로 있었다. */}
-                {milestones.map((m, i) => {
-                  const pct = timelinePct(m.date);
-                  const text = `${m.label} (${shortDate(m.date)})`;
-                  /* 라벨은 점선 기준 가운데 정렬이 기본이다. 그런데 타임라인 양 끝의
-                     마일스톤은 라벨 절반이 차트 바깥으로 나가 잘렸다 — 감싸는 Box의
-                     여백(px:12 = 96px)은 고정인데 라벨 길이는 가변이기 때문이다.
-                     m.label은 같은 날 시작하는 캠페인 이름을 모두 이어붙이므로 쉽게
-                     400px를 넘고, 그러면 절반만 200px라 96px 여백을 그냥 넘어간다.
-                     끝에 가까우면 정렬 기준을 바꿔 안쪽으로 눕힌다. */
-                  const labelShift = pct < 12
-                    ? 'none'                  // 시작 근처 — 점선에서 오른쪽으로 편다
-                    : pct > 88
-                      ? 'translateX(-100%)'   // 끝 근처 — 점선에서 왼쪽으로 편다
-                      : 'translateX(-50%)';
-                  return (
-                    <Box
-                      key={m.date}
-                      sx={{
-                        position: 'absolute',
-                        left: `${pct}%`,
-                        top: 24,
-                        bottom: 24,
-                        borderLeft: '2px dashed',
-                        borderColor: 'divider',
-                      }}
-                    >
-                      <Typography
-                        variant="caption"
-                        // 정렬을 바꿔도 이름이 여럿 붙으면 여전히 길다. 폭을 캡으로
-                        // 막고 넘치면 말줄임 — 전체 문자열은 title로 남긴다.
-                        // (이 차트는 aria-hidden이고 정확한 값은 아래 표가 갖는다)
-                        title={text}
-                        sx={{
-                          position: 'absolute',
-                          top: i % 2 === 0 ? -28 : -52,
-                          left: 0,
-                          transform: labelShift,
-                          display: 'block',
-                          maxWidth: 240,
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          bgcolor: 'surface.muted',
-                          color: 'text.secondary',
-                          fontWeight: 600,
-                          px: 1,
-                          py: 0.25,
-                          // 마일스톤 라벨은 Chip/Badge 역할 → control radius.
-                          // px 문자열로 넘기는 이유는 sx의 borderRadius 곱셈 규칙 때문 —
-                          // 숫자로 주면 shape.borderRadius(0)와 곱해져 0px가 된다.
-                          borderRadius: `${theme.shape.radius.control}px`,
-                        }}
-                      >
-                        {text}
-                      </Typography>
-                    </Box>
-                  );
-                })}
-
-                {/* Gantt 막대 — 새 차트 라이브러리 없이 순수 % 위치 계산
-                    (timelinePct)만으로 그린다. 아래 Budget by Platform 막대와
-                    같은 접근(PacingIndicator의 LinearProgress 문법 재사용
-                    원칙과 동일선상). pt:3(margin 아님)은 마일스톤 라벨(가까운
-                    stagger 단계, top:-28)의 아래쪽과 겹치지 않기 위한 여백 —
-                    margin-top을 썼더니 이 Box가 부모(position:relative, 첫
-                    in-flow 자식)와 마진이 겹쳐서(margin collapsing) 여백이
-                    안쪽이 아니라 부모 전체를 그대로 밀어버렸다(그러면
-                    마일스톤도 같이 내려가서 간격이 그대로 유지되는 버그 —
-                    실제로 측정해서 발견함). padding은 겹치지 않아 안전하다. */}
-                <Box sx={{ pt: 3 }}>
-                {phases.map((p) => {
-                  const left = timelinePct(p.startDate);
-                  const width = Math.max(timelinePct(p.endDate) - left, 1.5);
-                  return (
-                    <Box key={p.name} sx={{ position: 'relative', height: 36, mb: 1 }}>
-                      <Box
-                        sx={{
-                          position: 'absolute',
-                          left: `${left}%`,
-                          width: `${width}%`,
-                          height: '100%',
-                          bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
-                          border: '1px solid',
-                          borderColor: 'primary.main',
-                          // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할
-                          borderRadius: `${theme.shape.radius.container}px`,
-                          display: 'flex',
-                          alignItems: 'center',
-                          px: 1,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <Typography variant="caption" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>
-                          {p.name} · {shortDate(p.startDate)}–{shortDate(p.endDate)}
-                          {p.totalBudget > 0 && ` · $${p.totalBudget.toLocaleString('en-US')}`}
-                        </Typography>
-                      </Box>
-                    </Box>
-                  );
-                })}
-                </Box>
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                  <Typography variant="caption" color="text.secondary">{shortDate(timelineStart)}</Typography>
-                  <Typography variant="caption" color="text.secondary">{shortDate(timelineEnd)}</Typography>
-                </Box>
-              </Box>
-            </Box>
+            {/* Event 타임라인 — Plan·Performance 두 탭이 같은 컴포넌트를 쓴다
+                (PhaseTimelineChart 주석 참고). 막대에는 기간과 함께 일일 예산·
+                총 예산이 붙는다. */}
+            <PhaseTimelineChart phases={phases} sx={{ mb: 4 }} />
 
             {/* Budget Breakdown — phase 하나당 한 행(플랫폼별로 안 쪼갬). 각
                 phase가 어느 캠페인 하나에 대응하지 않고 여러 캠페인(플랫폼별)을
@@ -1087,21 +950,20 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
         </Typography>
       ) : (
         <>
-          {/* Event를 고르면 phase별 비교 막대를 표 위에 얹는다 — 표는 캠페인 단위라
-              "이 이벤트의 어느 단계가 잘 됐나"를 한눈에 못 본다. Plan 탭의 Gantt와
-              같은 묶음(buildPhaseTimeline과 동일 기준)·같은 순서(시작일)를 쓴다.
-
-              막대는 한 번에 한 지표만 그린다. 축이 다른 두 지표를 겹치면(이중 축)
-              축 범위만 바꿔도 결론이 뒤집힌다. 색은 phase마다 다르게 주지 않고 하나로
-              통일한다 — 여기서 색이 나르는 정보는 크기뿐이고, phase는 왼쪽 이름으로
-              이미 구분된다(색을 순환시키면 색맹 구분 문제만 생긴다). */}
-          {phasePerformance.length > 0 && (
+          {/* Event 타임라인 — Plan 탭과 **같은 차트**다(PhaseTimelineChart).
+              예전엔 여기만 별도의 "지표별 비교 막대"(이름 | 막대 | 값)를 그려서,
+              같은 Event를 골라도 탭을 옮기면 완전히 다른 그림이 나왔다(실사용
+              피드백). 시간 축 하나로 통일하고, 이 탭에서만 필요한 성과 지표는
+              막대 라벨 뒤에 덧붙인다 — 막대 길이는 양쪽 다 "기간"을 뜻하므로
+              탭을 오갈 때 읽는 규칙이 바뀌지 않는다. */}
+          {phases.length > 0 && (
             <Box sx={{ mb: 4 }}>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
                 <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
-                  {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label} by phase{' '}
+                  Event timeline{' '}
                   <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                    — {phasePerformance.length} {phasePerformance.length === 1 ? 'phase' : 'phases'}
+                    — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} ·{' '}
+                    {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label} on each bar
                   </Typography>
                 </Typography>
                 <ToggleButtonGroup
@@ -1109,7 +971,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                   exclusive
                   value={phaseMetric}
                   onChange={(_, next) => { if (next) setPhaseMetric(next); }}
-                  aria-label="Metric to compare"
+                  aria-label="Metric to show on each bar"
                 >
                   {PHASE_METRICS.map((m) => (
                     <ToggleButton key={m.key} value={m.key} sx={{ textTransform: 'none', px: 1.5 }}>
@@ -1119,58 +981,16 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                 </ToggleButtonGroup>
               </Box>
 
-              {(() => {
-                const metric = PHASE_METRICS.find((m) => m.key === phaseMetric) ?? PHASE_METRICS[0];
-                const values = phasePerformance.map((p) => p[metric.key]).filter((v) => v != null);
-                const max = values.length > 0 ? Math.max(...values) : 0;
-
-                if (max <= 0) {
-                  return (
-                    <Typography variant="body2" color="text.secondary">
-                      No {metric.label.toLowerCase()} recorded for this event yet.
-                    </Typography>
-                  );
-                }
-
-                return phasePerformance.map((phase) => {
-                  const value = phase[metric.key];
-                  const ratio = value != null ? value / max : 0;
-                  return (
-                    <Box key={phase.name} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.75 }}>
-                      <Typography
-                        variant="body2"
-                        color="text.secondary"
-                        title={phase.name}
-                        sx={{ width: 200, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      >
-                        {phase.name}
-                      </Typography>
-                      {/* 막대 자체에는 텍스트를 넣지 않는다 — 값이 작으면 막대 안에
-                          글자가 안 들어가 잘린다. 값은 항상 막대 오른쪽 바깥에 둔다. */}
-                      <Box sx={{ flexGrow: 1, minWidth: 0, backgroundColor: 'surface.muted', height: 14 }}>
-                        {/* primary.main(#0000FF)이 아니라 primary.light — 채도 100%
-                            파랑은 목록·표가 주인공인 화면에서 막대가 가장 강한 요소가
-                            돼버린다. 막대 안에 글자가 없으므로(값은 오른쪽 바깥) 요구
-                            대비는 비텍스트 3:1이고, light는 트랙(surface.muted) 대비
-                            3.9:1로 이를 넘긴다. */}
-                        <Box
-                          sx={{
-                            width: `${Math.max(ratio * 100, value ? 0.5 : 0)}%`,
-                            height: '100%',
-                            backgroundColor: 'primary.light',
-                          }}
-                        />
-                      </Box>
-                      <Typography
-                        variant="body2"
-                        sx={{ width: 96, flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
-                      >
-                        {metric.format(value)}
-                      </Typography>
-                    </Box>
-                  );
-                });
-              })()}
+              <PhaseTimelineChart
+                phases={phases}
+                barSuffix={(phase) => {
+                  const metric = PHASE_METRICS.find((m) => m.key === phaseMetric) ?? PHASE_METRICS[0];
+                  const value = performanceByPhaseName.get(phase.name)?.[metric.key];
+                  // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에
+                  // 의미 없는 기호가 매달려 라벨만 길어진다.
+                  return value != null ? `${metric.label} ${metric.format(value)}` : null;
+                }}
+              />
             </Box>
           )}
 

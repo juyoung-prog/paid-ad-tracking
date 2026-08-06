@@ -188,3 +188,12 @@ export const PAID_ADS_FONT_SX = {
   // 버튼의 Arial을 물려받는다(레퍼런스가 겪은 문제).
   '& button, & input, & select, & textarea, & optgroup': { fontFamily: 'inherit' },
 };
+
+/**
+ * 'YYYY-MM-DD' -> 'M/D'. 차트 축·막대 라벨처럼 폭이 좁은 자리에서 쓴다.
+ * ReportSummarySection과 PhaseTimelineChart가 같은 표기를 써야 해서 여기 둔다.
+ */
+export function shortDate(iso) {
+  const [, m, d] = iso.split('-');
+  return `${Number(m)}/${Number(d)}`;
+}
