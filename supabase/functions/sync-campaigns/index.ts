@@ -119,10 +119,19 @@ function resolveTarget(name: string, stores: StoreIndex) {
     return { target_scope: 'single_store', target_store_ids: [storeId] };
   }
 
+  /* 지역 표기는 앞("GA_Labor Day")에도 뒤("Labor Day FL")에도 온다. 예전엔 접두사만
+     봐서 뒤에 붙은 쪽을 통째로 놓쳤다 — 같은 파일의 resolveEventGroup은 이미
+     접미사를 알고 이벤트 이름에서 떼어내고 있었는데(그래서 "Labor Day FL"과
+     "labor day GA"가 나란히 Labor Day 그룹으로 묶였다), 정작 매장 배정에는 그
+     지식을 안 썼다. 같은 규칙을 양쪽에서 쓴다. */
   const prefix = name.split('_')[0]?.trim() ?? '';
-  const regionStores = stores.byRegion.get(prefix.toUpperCase());
-  if (regionStores && regionStores.length > 0) {
-    return { target_scope: 'multi_store', target_store_ids: regionStores };
+  const suffix = name.trim().match(/\s(FL|GA|ALL)$/i)?.[1] ?? '';
+  for (const token of [prefix, suffix]) {
+    if (!token) continue;
+    const regionStores = stores.byRegion.get(token.toUpperCase());
+    if (regionStores && regionStores.length > 0) {
+      return { target_scope: 'multi_store', target_store_ids: regionStores };
+    }
   }
 
   return { target_scope: 'all_stores', target_store_ids: [] };
@@ -551,7 +560,7 @@ Deno.serve(async (req) => {
        넣은 값을 덮어쓸 위험은 없다. */
     const { data: existing, error: existingError } = await admin
       .from('campaigns')
-      .select('external_campaign_id, budget_planned, budget_daily')
+      .select('external_campaign_id, budget_planned, budget_daily, target_store_ids')
       .in('external_campaign_id', rows.map((r) => r.external_campaign_id));
 
     if (existingError) {
@@ -568,6 +577,14 @@ Deno.serve(async (req) => {
         // 비어 있는 예산만 채운다(0/null이 "값 없음" — 화면도 0을 예산 없음으로 읽는다).
         if (!current.budget_planned && row.budget_planned) patch.budget_planned = row.budget_planned;
         if (current.budget_daily == null && row.budget_daily != null) patch.budget_daily = row.budget_daily;
+        /* 매장도 같은 원칙 — 비어 있을 때만 채운다. 이름 규칙이 좋아지면(예: 지역
+           접미사 인식) 이미 들어와 있는 캠페인이 그 혜택을 못 받는 문제가 예산과
+           똑같이 생긴다. 사용자가 지정한 매장 목록은 비어 있지 않으므로 덮이지 않고,
+           새 규칙이 매칭에 실패하면 row도 빈 배열이라 아무 일도 일어나지 않는다. */
+        if ((current.target_store_ids ?? []).length === 0 && row.target_store_ids.length > 0) {
+          patch.target_store_ids = row.target_store_ids;
+          patch.target_scope = row.target_scope;
+        }
 
         const { error: updateError } = await admin
           .from('campaigns')
