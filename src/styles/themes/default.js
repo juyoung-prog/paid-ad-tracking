@@ -523,12 +523,18 @@ const components = {
         /* 선택 상태도 accent다. 이 override가 없으면 MUI 기본값(회색
            action.selected 배경 + text.primary)으로 렌더돼서, 탭·레일·메뉴가 전부
            accent로 "선택됨"을 말하는 화면에서 세그먼트 필터만 회색으로 갈린다 —
-           앱에서 유일하게 파랑 단일화를 벗어난 컨트롤이었다(감사로 발견).
-           레퍼런스(influencer tracking dashboard)의 Tier 필터 칩도 같은 문법이다:
-           accent 글자 + accent 테두리 + 옅은 accent 배경. */
+           앱에서 유일하게 파랑 단일화를 벗어난 컨트롤이었다(감사로 발견). */
+        // 비선택 글자색도 레퍼런스와 맞춘다 — MUI 기본은 action.active(0.54)라
+        // 레퍼런스의 text.secondary(0.6)보다 한 톤 옅게 나온다.
+        color: palette.text.secondary,
+        /* 선택은 "틴트 + 파랑 글자"까지다. borderColor는 주지 않는다 —
+           레퍼런스 코드에는 borderColor: accent.main이 있지만 그 칩은
+           variant="filled"라 MUI가 테두리를 지우므로 화면에는 안 나온다.
+           우리 ToggleButton은 테두리가 항상 있어서 같은 값을 주면 진한 파란
+           상자가 그려져 레퍼런스보다 훨씬 무겁게 보인다(실화면 비교로 발견).
+           그룹의 회색 테두리는 그대로 두고 채움과 글자로만 "켜짐"을 말한다. */
         '&.Mui-selected': {
           color: palette.accent.main,
-          borderColor: palette.accent.main,
           backgroundColor: palette.accent.tint,
         },
         '@media (hover: hover)': {
