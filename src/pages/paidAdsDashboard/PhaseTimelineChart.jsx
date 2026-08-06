@@ -14,6 +14,28 @@ import { shortDate } from './paidAdsPageUtils';
  * @param {{ totalDaily: number|null, totalBudget: number }} phase
  * @returns {string} 예: "$120/day · $3,600" — 둘 다 없으면 빈 문자열
  */
+/** 축 눈금 라벨이 겹치지 않는 최소 간격(타임라인 폭 대비 %) */
+const MIN_TICK_GAP_PCT = 4;
+
+/** 막대 높이. 이름이 막대 밖으로 나가면서 안에는 숫자 한 줄만 남아 낮아졌다. */
+const BAR_HEIGHT = 24;
+
+/** 이름 줄 높이 — 막대는 이 아래에 놓인다. */
+const NAME_HEIGHT = 20;
+
+/**
+ * 타임라인 양 끝에 붙은 라벨이 차트 밖으로 잘리지 않도록 정렬 기준을 바꾼다.
+ * 감싸는 Box의 여백은 고정인데 라벨 길이는 가변이라, 끝에 가까우면 안쪽으로 눕힌다.
+ *
+ * @param {number} pct - 왼쪽에서의 위치(%)
+ * @returns {string} CSS transform 값
+ */
+function edgeAwareShift(pct) {
+  if (pct < 12) return 'none';
+  if (pct > 88) return 'translateX(-100%)';
+  return 'translateX(-50%)';
+}
+
 function formatPhaseBudget(phase) {
   const parts = [];
   if (phase.totalDaily) parts.push(`$${phase.totalDaily.toLocaleString('en-US')}/day`);
@@ -34,7 +56,17 @@ function formatPhaseBudget(phase) {
  * 문법으로 말하면 둘을 머릿속에서 다시 맞춰야 한다 — 시간 축 하나로 통일하고,
  * 탭별로 다른 정보는 막대 라벨 뒤에 덧붙인다(barSuffix).
  *
- * 마일스톤(수직 점선 + 라벨)은 각 phase의 시작일을 자동으로 표시한다.
+ * 각 phase의 시작일에는 수직 점선을 긋고, 그 날짜를 **축 눈금으로** 적는다.
+ * 예전엔 점선 위에 phase 이름을 단 라벨을 띄웠는데, 바로 아래 막대가 같은
+ * 이름을 다시 말하고 있어서 정보량이 0이었다(게다가 길어서 잘렸고, 회색 배경
+ * + 라운딩 때문에 누를 수 있는 Chip처럼 보였다 — 거짓 어포던스). 라벨을 걷고
+ * 날짜만 축으로 내리면 같은 자리에서 "언제"라는 새 정보가 생긴다. 축이 양 끝
+ * 두 개뿐일 때 중간 막대의 시점을 눈대중으로 재야 했던 것도 같이 풀린다.
+ *
+ * 이름은 막대 **밖 위**에 둔다. 막대 안에 넣으면 좁은 막대에서 잘려서 "이게
+ * 무슨 단계인지" 자체를 잃는다("Instagram post: CO…"). 밖으로 빼면 폭과 무관하게
+ * 항상 온전하고, 굵기가 다른 두 단(이름 / 숫자)으로 갈려 한 줄에 몰린 긴
+ * 문자열보다 훨씬 빨리 읽힌다. 대신 막대 높이를 줄여(24px) 늘어난 줄을 상쇄한다.
  *
  * 접근성: 시각 전용 구성(절대위치 + %)이라 표/목록 같은 의미 구조가 없다.
  * 스크린리더에 억지 구조를 씌우기보다 이 블록을 aria-hidden으로 숨기고, 같은
@@ -61,14 +93,22 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
 
   /* 마일스톤 = 각 phase의 시작일(실사용 확인 완료 — 종료일 기준은 이벤트마다
      의미가 달라 일반화하기 어렵고, 시작일은 "다음 단계로 넘어가는 시점"이라는
-     뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 마커 하나에 이름을
-     같이 묶어 표시한다(같은 x 위치에 마커가 겹치지 않도록). */
-  const milestoneMap = new Map();
-  phases.forEach((p) => {
-    if (!milestoneMap.has(p.startDate)) milestoneMap.set(p.startDate, []);
-    milestoneMap.get(p.startDate).push(p.name);
-  });
-  const milestones = [...milestoneMap.entries()].map(([date, names]) => ({ date, label: names.join(', ') }));
+     뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 점선 하나로 합친다. */
+  const milestoneDates = [...new Set(phases.map((p) => p.startDate))].sort();
+
+  /* 축 눈금 = 타임라인 양 끝 + 마일스톤 날짜. 날짜가 서로 너무 가까우면 라벨이
+     겹치므로 최소 간격 미만은 버린다 — 양 끝은 축의 범위를 말하므로 예외 없이
+     남기고, 중간 눈금만 앞 눈금과 끝 눈금 양쪽으로 간격을 확인한다. */
+  const axisTicks = [...new Set([timelineStart, ...milestoneDates, timelineEnd])]
+    .sort()
+    .reduce((kept, date) => {
+      const pct = timelinePct(date);
+      if (kept.length === 0) return [{ date, pct }];
+      if (date === timelineEnd) return [...kept, { date, pct }];
+      const tooCloseToPrev = pct - kept[kept.length - 1].pct < MIN_TICK_GAP_PCT;
+      const tooCloseToEnd = 100 - pct < MIN_TICK_GAP_PCT;
+      return tooCloseToPrev || tooCloseToEnd ? kept : [...kept, { date, pct }];
+    }, []);
 
   return (
     /* 바깥 Box(px)는 실제 여백을 만들고, 안쪽 Box(position:relative)는 패딩 없이
@@ -77,120 +117,109 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
        padding과 absolute 자식을 같이 두면 padding이 % 계산에 반영되지 않는다
        (실제로 확인한 버그 — 마일스톤 라벨이 padding을 줬는데도 화면 밖으로
        잘렸었다). 두 겹으로 나눠야 바깥 padding이 안쪽 %기준 폭 자체를 줄인다. */
-    <Box aria-hidden="true" sx={{ px: 12, pt: 9, pb: 3, ...sx }}>
+    <Box aria-hidden="true" sx={{ px: 12, pt: 2, pb: 3, ...sx }}>
+      {/* 막대 영역과 축을 형제로 나눈다 — 마일스톤 점선을 top:0/bottom:0으로
+          "막대 영역 전체"에 정확히 걸기 위해서다. 예전처럼 축까지 한 relative
+          안에 두면 점선 끝을 픽셀로 빼줘야 하고, 축 여백을 건드릴 때마다 어긋난다.
+          두 Box의 폭이 같으므로 %기준은 그대로 공유된다. */}
       <Box sx={{ position: 'relative' }}>
-        {/* 마일스톤 — top을 인덱스 짝/홀로 번갈아 배치(stagger)하는 이유:
-            phase 시작일이 며칠 안 되게 가까우면(예: 7/16과 7/20) 라벨 두 개가
-            겹쳐 보이는 문제가 실제로 있었다. */}
-        {milestones.map((m, i) => {
-          const pct = timelinePct(m.date);
-          const text = `${m.label} (${shortDate(m.date)})`;
-          /* 라벨은 점선 기준 가운데 정렬이 기본이다. 그런데 타임라인 양 끝의
-             마일스톤은 라벨 절반이 차트 바깥으로 나가 잘렸다 — 감싸는 Box의
-             여백(px:12 = 96px)은 고정인데 라벨 길이는 가변이기 때문이다.
-             끝에 가까우면 정렬 기준을 바꿔 안쪽으로 눕힌다. */
-          const labelShift = pct < 12
-            ? 'none'
-            : pct > 88
-              ? 'translateX(-100%)'
-              : 'translateX(-50%)';
+        {/* 마일스톤 — 점선만 긋는다. 날짜는 아래 축이 말한다. */}
+        {milestoneDates.map((date) => (
+          <Box
+            key={date}
+            sx={{
+              position: 'absolute',
+              left: `${timelinePct(date)}%`,
+              top: 0,
+              bottom: 0,
+              borderLeft: '2px dashed',
+              borderColor: 'divider',
+            }}
+          />
+        ))}
+
+        {phases.map((p) => {
+          const left = timelinePct(p.startDate);
+          const width = Math.max(timelinePct(p.endDate) - left, 1.5);
+          /* 플랫폼 표기는 이름과 한 덩어리다 — 둘 다 "이 막대가 무엇인가"를
+             말하고, 막대 안의 숫자들은 전부 이 플랫폼(들) 기준이다. */
+          const heading = [p.name, p.platformLabel].filter(Boolean).join(' · ');
+          const barText = [
+            `${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
+            formatPhaseBudget(p),
+            barSuffix?.(p),
+          ].filter(Boolean).join(' · ');
           return (
-            <Box
-              key={m.date}
-              sx={{
-                position: 'absolute',
-                left: `${pct}%`,
-                top: 24,
-                bottom: 24,
-                borderLeft: '2px dashed',
-                borderColor: 'divider',
-              }}
-            >
+            <Box key={p.key} sx={{ position: 'relative', height: NAME_HEIGHT + BAR_HEIGHT, mb: 1 }}>
+              {/* 이름은 막대 왼쪽 끝에 맞춘다. 막대가 오른쪽 끝에서 시작하면
+                  이름이 차트 밖으로 나가므로 그때만 막대 오른쪽 끝 기준으로
+                  눕힌다(축 눈금과 같은 규칙). 잘림 방지가 목적이라 폭 제한과
+                  말줄임은 두지 않는다 — 넘치면 바깥 여백(px:12)으로 흐른다. */}
+              {/* body2(14px) + 굵기로 막대 안 caption(12px)과 두 단을 만든다 —
+                  한 줄에 몰려 한 굵기로 흐르던 예전 라벨이 안 읽혔던 이유가
+                  위계 부재였다. NAME_HEIGHT(20)는 body2의 줄높이와 맞춘 값. */}
               <Typography
-                variant="caption"
-                // 정렬을 바꿔도 이름이 여럿 붙으면 여전히 길다. 폭을 캡으로 막고
-                // 넘치면 말줄임 — 전체 문자열은 title로 남긴다(차트는 aria-hidden
-                // 이고 정확한 값은 아래 표가 갖는다).
-                title={text}
+                variant="body2"
                 sx={{
                   position: 'absolute',
-                  top: i % 2 === 0 ? -28 : -52,
-                  left: 0,
-                  transform: labelShift,
-                  display: 'block',
-                  maxWidth: 240,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  top: 0,
+                  left: left > 60 ? `${left + width}%` : `${left}%`,
+                  transform: left > 60 ? 'translateX(-100%)' : 'none',
                   whiteSpace: 'nowrap',
-                  bgcolor: 'surface.muted',
-                  color: 'text.secondary',
                   fontWeight: 600,
-                  px: 1,
-                  py: 0.25,
-                  // 마일스톤 라벨은 Chip/Badge 역할 → control radius.
-                  borderRadius: `${theme.shape.radius.control}px`,
+                  color: 'text.primary',
                 }}
               >
-                {text}
+                {heading}
               </Typography>
+              <Box
+                // 막대가 좁으면 숫자가 잘린다 — 전체 문자열을 title로 남긴다.
+                title={`${heading} · ${barText}`}
+                sx={{
+                  position: 'absolute',
+                  top: NAME_HEIGHT,
+                  left: `${left}%`,
+                  width: `${width}%`,
+                  height: BAR_HEIGHT,
+                  bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
+                  border: '1px solid',
+                  borderColor: 'primary.main',
+                  // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할
+                  borderRadius: `${theme.shape.radius.container}px`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  px: 1,
+                  overflow: 'hidden',
+                }}
+              >
+                <Typography variant="caption" noWrap sx={{ color: 'text.primary' }}>
+                  {barText}
+                </Typography>
+              </Box>
             </Box>
           );
         })}
+      </Box>
 
-        {/* pt:3(margin 아님)은 마일스톤 라벨(가까운 stagger 단계, top:-28)과
-            겹치지 않기 위한 여백 — margin-top을 쓰면 이 Box가 부모와 마진이
-            겹쳐서(margin collapsing) 여백이 안쪽이 아니라 부모 전체를 밀어버린다
-            (그러면 마일스톤도 같이 내려가 간격이 그대로인 버그 — 실측으로 발견). */}
-        <Box sx={{ pt: 3 }}>
-          {phases.map((p) => {
-            const left = timelinePct(p.startDate);
-            const width = Math.max(timelinePct(p.endDate) - left, 1.5);
-            const budget = formatPhaseBudget(p);
-            const suffix = barSuffix?.(p);
-            /* 플랫폼 표기는 이름 바로 뒤 — 뒤쪽에 붙이면 좁은 막대에서 가장 먼저
-               잘려나가는데, 이건 "이 막대가 무엇인가"를 말하는 정보라 잘리면 안
-               된다. 앞에 두면 뒤의 숫자들이 전부 "이 플랫폼(들) 기준"이라는 것도
-               읽는 순서대로 성립한다. */
-            const label = [
-              [p.name, p.platformLabel].filter(Boolean).join(' · '),
-              `${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
-              budget,
-              suffix,
-            ].filter(Boolean).join(' · ');
-            return (
-              <Box key={p.key} sx={{ position: 'relative', height: 36, mb: 1 }}>
-                <Box
-                  // 막대가 좁으면 라벨이 잘린다 — 전체 문자열을 title로 남긴다.
-                  title={label}
-                  sx={{
-                    position: 'absolute',
-                    left: `${left}%`,
-                    width: `${width}%`,
-                    height: '100%',
-                    bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
-                    border: '1px solid',
-                    borderColor: 'primary.main',
-                    // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할
-                    borderRadius: `${theme.shape.radius.container}px`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 1,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Typography variant="caption" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>
-                    {label}
-                  </Typography>
-                </Box>
-              </Box>
-            );
-          })}
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="caption" color="text.secondary">{shortDate(timelineStart)}</Typography>
-          <Typography variant="caption" color="text.secondary">{shortDate(timelineEnd)}</Typography>
-        </Box>
+      {/* 축 — 양 끝 + 마일스톤 날짜. 절대위치라 눈금이 실제 시점 위에 선다
+          (space-between으로 늘어놓으면 위치가 데이터와 무관해진다). */}
+      <Box sx={{ position: 'relative', height: 28, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+        {axisTicks.map((tick) => (
+          <Typography
+            key={tick.date}
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              position: 'absolute',
+              top: 8,
+              left: `${tick.pct}%`,
+              transform: edgeAwareShift(tick.pct),
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {shortDate(tick.date)}
+          </Typography>
+        ))}
       </Box>
     </Box>
   );
