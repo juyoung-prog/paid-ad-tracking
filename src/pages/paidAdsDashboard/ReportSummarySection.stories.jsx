@@ -6,36 +6,83 @@ import { PLATFORM, GOAL, TARGET_SCOPE } from '../../data/schema';
 
 /**
  * Gantt 타임라인은 Event(campaignGroup)를 골라야 나타나는데, mockCampaigns에는
- * campaignGroup이 하나도 없어서 그 경로가 스토리에서 한 번도 실행되지 않았다.
- * 실제로 마일스톤 라벨이 차트 밖으로 잘리는 버그가 이 사각지대에서 살아남았다.
+ * campaignGroup이 하나도 없어서 그 경로가 스토리에서 한 번도 실행되지 않는다.
  *
- * 아래 데이터는 그 경로를 재현하기 위한 것이고, 특히 **양 끝의 긴 라벨**을 노린다:
- * 라벨은 같은 날 시작하는 캠페인 이름을 모두 이어붙이므로 타임라인 시작/끝에서
- * 쉽게 차트 밖으로 넘친다.
+ * 아래 데이터는 그 경로를 재현하면서, **실계정에서 실제로 터졌던 네 가지**를
+ * 한 화면에 몰아넣는다. 넷 다 목데이터가 너무 깔끔해서 놓쳤던 것들이다.
+ *
+ * 1. 같은 단계인데 플랫폼마다 이름의 구분자 공백이 다르다 — 사람이 Meta와
+ *    TikTok 광고 관리자에서 따로 이름을 짓기 때문이다. campaignNameKey()가
+ *    이걸 흡수해 한 막대로 합쳐야 한다("Grand Opening"과 "Now Open" 쌍).
+ * 2. Meta가 게시물 부스팅을 캠페인으로 만들 때 캡션 앞부분을 잘라 이름으로
+ *    쓴다 — 이름 안에 `타입: 내용` 꼴과 이모지·줄바꿈·말줄임표가 들어온다.
+ *    타임라인은 콜론 앞을 굵게 떼어 계획 캠페인과 구분해야 한다.
+ * 3. 마지막 phase가 타임라인 끝에서 하루만 도는 경우 — 막대 이름이 차트
+ *    오른쪽 밖으로 나가지 않고 막대 오른쪽 끝 기준으로 눕어야 한다.
+ * 4. 시작일이 며칠 안 되게 붙은 phase — 축 눈금이 겹치지 않게 걸러져야 한다.
  */
-const groupedCampaigns = [
-  ['g-1', 'G10_Coming Soon_0617~0707 — Instagram post: COMING SOON TO UNION CITY, GA', '2026-06-17', '2026-07-07', 1200],
-  ['g-2', 'G10_Now Open_0706~0831', '2026-07-06', '2026-08-31', 2400],
-  ['g-3', 'G10_Grand Opening_0706~0801', '2026-07-06', '2026-08-01', 1800],
-  ['g-4', 'G10_1_Month Deals_0710~0831', '2026-07-10', '2026-08-31', 900],
-  ['g-5', 'G10_Final Week Push — last-week concentrated spend across all stores', '2026-08-31', '2026-08-31', 600],
-].map(([id, name, startDate, endDate, budgetPlanned]) => ({
+const PHASES = [
+  // [id, name, platform, 시작, 종료, 총예산, 일일예산]
+  ['g-1a', 'G10_Coming Soon_0617~0707', PLATFORM.TIKTOK, '2026-06-17', '2026-07-07', 1200, null],
+  ['g-1b', 'G10_Coming Soon_0617~0707', PLATFORM.META, '2026-06-17', '2026-07-07', 900, 40],
+  // 부스팅 게시물 — 콜론 접두사 + 이모지 + 줄바꿈이 이름에 그대로 들어온 형태
+  ['g-2', 'Instagram post: 🌟 COMING SOON TO UNION CITY, GA ✨\n🤩Don’t miss...', PLATFORM.META, '2026-06-17', '2026-06-24', 0, 10],
+  // 같은 단계인데 Meta 쪽 이름에만 공백이 더 있다 → 한 막대로 합쳐져야 한다
+  ['g-3a', 'G10_Grand Opening_0706~0801', PLATFORM.TIKTOK, '2026-07-06', '2026-08-01', 1800, null],
+  ['g-3b', 'G10_Grand Opening _0706 ~ 0801', PLATFORM.META, '2026-07-06', '2026-08-01', 1500, 30],
+  ['g-4a', 'G10_Now Open_0706~0831', PLATFORM.TIKTOK, '2026-07-06', '2026-08-31', 2400, null],
+  ['g-4b', 'G10_Now Open_0706 ~0831', PLATFORM.META, '2026-07-06', '2026-08-31', 2000, 25],
+  // 7/6과 나흘 차이 — 축 눈금 최소 간격 판정에 걸리는 자리
+  ['g-5', 'G10_1_Month Deals_0710~0831', PLATFORM.TIKTOK, '2026-07-10', '2026-08-31', 900, null],
+  // 타임라인 맨 끝에서 하루짜리 — 이름이 오른쪽으로 넘치면 안 된다
+  ['g-6', 'G10_Final Week Push — last-week concentrated spend across all stores', PLATFORM.META, '2026-08-31', '2026-08-31', 600, 600],
+];
+
+const groupedCampaigns = PHASES.map(([id, name, platform, startDate, endDate, budgetPlanned, budgetDaily]) => ({
   id,
   name,
   campaignGroup: 'G10 Opening',
-  platform: PLATFORM.TIKTOK,
-  accountId: 'tiktok-unified',
+  platform,
+  accountId: platform === PLATFORM.META ? 'meta-bm' : 'tiktok-unified',
   targetScope: TARGET_SCOPE.ALL_STORES,
   targetStoreIds: [],
   startDate,
   endDate,
   budgetPlanned,
+  budgetDaily,
   goal: GOAL.TRAFFIC,
   manualStatus: null,
   creativeUrl: '',
   createdAt: '2026-06-01T09:00:00Z',
   updatedAt: '2026-07-20T09:00:00Z',
 }));
+
+/**
+ * 막대에 `Spend $X`가 붙는 경로를 살리기 위한 성과 기록. 예전 스토리는 빈
+ * 배열을 넘겨서 barSuffix가 항상 null이었고, 그래서 지출 표기가 스토리에서
+ * 한 번도 렌더되지 않았다.
+ *
+ * 부스팅 게시물(g-2)에는 일부러 기록을 주지 않는다 — 실계정에도 성과가 없는
+ * 캠페인이 섞여 있고, 그때 막대가 '—' 없이 예산까지만 말하는지 봐야 한다.
+ */
+const groupedPerformance = groupedCampaigns
+  .filter((c) => c.id !== 'g-2')
+  .map((c, i) => ({
+    id: `perf-${c.id}`,
+    campaignId: c.id,
+    impressions: 120000 + i * 18000,
+    reach: 60000 + i * 9000,
+    clicks: 1400 + i * 130,
+    spend: Math.round(c.budgetPlanned * 0.72 * 100) / 100,
+    videoPlays: 70000 + i * 11000,
+    avgWatchSeconds: 2.0,
+    follows: 4 + i,
+    profileVisits: 200 + i * 40,
+    hookViews: 6000 + i * 900,
+    heldViews: 900 + i * 120,
+    engagements: null,
+    conversions: null,
+  }));
 
 export default {
   title: 'Paid Ads Dashboard/Section/ReportSummarySection',
@@ -71,17 +118,28 @@ export const Default = {
 };
 
 /**
- * Event(G10 Opening)를 고른 상태 — Plan 탭의 Gantt 타임라인과 마일스톤 라벨이 나온다.
- * 확인 포인트: 타임라인 **양 끝**의 긴 라벨이 차트 밖으로 잘리지 않는지.
- * 시작 근처 라벨은 점선에서 오른쪽으로, 끝 근처 라벨은 왼쪽으로 눕고,
- * 그래도 길면 240px에서 말줄임된다(전체 문자열은 title로 남는다).
+ * Event(G10 Opening)를 고른 상태 — 두 탭이 공유하는 Gantt 타임라인이 나온다.
+ * 캠페인 9건이 들어가지만 phase는 **6개**로 합쳐져야 정상이다.
+ *
+ * 확인 포인트:
+ * - 플랫폼별로 이름의 공백이 다른 세 쌍(Coming Soon·Grand Opening·Now Open)이
+ *   각각 한 막대로 합쳐지고, 이름 뒤에 `Meta + TikTok`이 붙는가
+ * - 부스팅 게시물 줄만 `Instagram post`가 굵고 뒤 캡션은 보통 굵기인가
+ *   (이름 안의 줄바꿈이 한 줄로 접히는지도 같이 본다)
+ * - 막대 안이 `기간 · $일일예산/day · $총예산 · Spend $X` 순인가.
+ *   성과가 없는 부스팅 게시물 막대는 Spend 없이 끝나야 한다
+ * - 축 눈금이 `6/17 · 7/6 · 7/10 · 8/31`인가 — 7/6과 7/10은 붙어 있지만
+ *   최소 간격을 넘어 둘 다 남고, 양 끝은 예외 없이 남는다
+ * - 마지막 하루짜리 phase(8/31)의 긴 이름이 차트 오른쪽으로 넘치지 않는가
+ * - 타임라인 시작(6/17)에는 세로 점선이 없는가 — 축 원점과 겹치는 점선은
+ *   구간 경계가 아니라 y축처럼 읽혀서 긋지 않는다
  */
 export const EventTimeline = {
   name: 'Event Timeline (Gantt)',
   render: () => (
     <MemoryRouter>
       <Box>
-        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={[]} />
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} />
       </Box>
     </MemoryRouter>
   ),
