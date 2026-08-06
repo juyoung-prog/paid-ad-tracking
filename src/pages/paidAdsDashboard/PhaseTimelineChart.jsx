@@ -42,7 +42,7 @@ function formatPhaseBudget(phase) {
  * 보낸다.
  *
  * Props:
- * @param {Array<{key: string, name: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number, fillAlpha: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required] (key는 정규화된 묶음 키, name은 표시용 원본 이름)
+ * @param {Array<{key: string, name: string, platformLabel: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number, fillAlpha: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required] (key는 정규화된 묶음 키, name은 표시용 원본 이름, platformLabel은 이 막대가 덮는 플랫폼)
  * @param {function} barSuffix - 막대 라벨 끝에 덧붙일 문자열을 돌려주는 함수 (phase) => string|null [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
@@ -147,8 +147,13 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
             const width = Math.max(timelinePct(p.endDate) - left, 1.5);
             const budget = formatPhaseBudget(p);
             const suffix = barSuffix?.(p);
+            /* 플랫폼 표기는 이름 바로 뒤 — 뒤쪽에 붙이면 좁은 막대에서 가장 먼저
+               잘려나가는데, 이건 "이 막대가 무엇인가"를 말하는 정보라 잘리면 안
+               된다. 앞에 두면 뒤의 숫자들이 전부 "이 플랫폼(들) 기준"이라는 것도
+               읽는 순서대로 성립한다. */
             const label = [
-              `${p.name} · ${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
+              [p.name, p.platformLabel].filter(Boolean).join(' · '),
+              `${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
               budget,
               suffix,
             ].filter(Boolean).join(' · ');

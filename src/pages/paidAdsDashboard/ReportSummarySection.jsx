@@ -114,6 +114,15 @@ function buildPhaseTimeline(campaigns) {
       const dailyValues = group.map((c) => c.budgetDaily).filter((v) => v != null);
       const totalDaily = dailyValues.length > 0 ? dailyValues.reduce((a, b) => a + b, 0) : null;
       const days = Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
+      /* 이 막대가 어느 플랫폼을 덮는지. 합쳐진 막대의 숫자가 두 플랫폼 합계라는
+         사실이 화면에 없으면 한 캠페인 지출로 오독된다. 동시에, phase에 캠페인이
+         하나뿐일 때는 "이게 Meta냐 TikTok이냐"에 답한다 — 원래 신고("ALL일 때
+         구분이 안 간다")의 나머지 절반이다. 순서는 PLATFORM_LABEL 선언 순서로
+         고정한다(데이터 순서를 따르면 동기화 순서에 따라 표기가 흔들린다). */
+      const platformLabel = Object.keys(PLATFORM_LABEL)
+        .filter((p) => byPlatform[p])
+        .map((p) => PLATFORM_LABEL[p])
+        .join(' + ');
       return {
         key,
         name,
@@ -121,6 +130,7 @@ function buildPhaseTimeline(campaigns) {
         endDate,
         days,
         byPlatform,
+        platformLabel,
         totalBudget,
         totalDaily,
       };
