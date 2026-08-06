@@ -75,10 +75,12 @@ function SlidingHighlightMenu({
             border: 'none',
             backgroundColor: 'transparent',
             zIndex: 1,
+            // 포커스는 앱 공통 문법 — 1px accent + 옅은 ring(inset).
             '&:focus-visible': {
-              outline: '2px solid',
-              outlineColor: 'primary.main',
-              outlineOffset: -2,
+              outline: '1px solid',
+              outlineColor: 'accent.main',
+              outlineOffset: -1,
+              boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
             },
           } }
         >
@@ -96,13 +98,13 @@ function SlidingHighlightMenu({
                     ? { right: -1, top: 0, width: 2, height: '100%' }
                     : { bottom: -1, left: 0, width: '100%', height: 2 }
                   ),
-                  backgroundColor: '#000',
+                  backgroundColor: 'text.primary',
                 }
                 : {
                   position: 'absolute',
                   inset: 0,
                   backgroundColor: 'rgba(0, 0, 0, 0.06)',
-                  borderRadius: '4px',
+                  borderRadius: (theme) => `${theme.shape.radius.control}px`,
                 }
               }
             />

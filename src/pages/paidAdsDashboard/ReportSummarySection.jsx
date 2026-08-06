@@ -694,7 +694,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
               : [
                   { label: 'Campaigns', value: summary.totalCampaigns },
                   { label: 'Total Spend', value: `$${summary.totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                  { label: 'Avg. CPM', value: summary.avgCPM != null ? `$${summary.avgCPM.toFixed(2)}` : '—', sub: 'across reported campaigns' },
+                  { label: 'Avg. CPM', value: summary.avgCPM != null ? `$${summary.avgCPM.toFixed(2)}` : EMPTY_CELL, sub: 'across reported campaigns' },
                 ]
           }
           sx={{ minWidth: 0, flex: '1 1 auto' }}
@@ -1030,7 +1030,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                         {shortDate(c.startDate)}–{shortDate(c.endDate)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {c.budgetDaily != null ? `$${c.budgetDaily.toLocaleString('en-US')}/day` : '—'}
+                        {c.budgetDaily != null ? `$${c.budgetDaily.toLocaleString('en-US')}/day` : EMPTY_CELL}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {fmtBudget(c.budgetPlanned)}
@@ -1165,7 +1165,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                         variant="body2"
                         sx={{ width: 96, flexShrink: 0, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
                       >
-                        {value != null ? metric.format(value) : '—'}
+                        {metric.format(value)}
                       </Typography>
                     </Box>
                   );

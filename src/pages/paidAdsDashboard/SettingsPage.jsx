@@ -210,7 +210,7 @@ export function SettingsPage() {
                   color={ isExpired ? 'error' : 'primary' }
                   href={ startUrl(target) }
                   disabled={ isLoading }
-                  sx={ { flexShrink: 0 } }
+                  sx={ { flexShrink: 0, boxShadow: 'none' } }
                 >
                   { isConnected ? 'Reconnect' : 'Connect' }
                 </Button>

@@ -93,7 +93,7 @@ export function LoginPage() {
             fullWidth
           />
 
-          <Button type="submit" variant="contained" size="large" disabled={ isSubmitting } fullWidth>
+          <Button type="submit" variant="contained" size="large" disabled={ isSubmitting } fullWidth sx={ { boxShadow: 'none' } }>
             { isSubmitting ? 'Signing in…' : 'Sign in' }
           </Button>
         </Stack>

@@ -296,7 +296,7 @@ export function MoodboardCard({
           left: 8,
           px: 1.5,
           py: 0.5,
-          borderRadius: '4px',
+          borderRadius: (theme) => `${theme.shape.radius.control}px`,
           bgcolor: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(4px)',
         }}
@@ -333,8 +333,13 @@ export function MoodboardCard({
         // 표현했었다 — border를 되살리고 hover에선 색만 진하게 바꿔서
         // (translateY+shadow 없이) border만으로 위계를 만든다(디자인 시스템
         // 감사로 발견).
+        // 강조색은 accent 하나로(팔레트 자기 선언).
+        // @media (hover:hover) 가드는 여기 걸지 않는다 — 이 hover 블록은 색만
+        // 바꾸는 게 아니라 액션 버튼 노출(opacity 0→1)까지 겸하고 있어서,
+        // 가드를 씌우면 터치 기기에서 버튼에 영영 접근할 수 없게 된다.
+        // (터치의 hover 잔상은 색이 남는 정도라 접근 불가보다 가볍다.)
         '&:hover': {
-          borderColor: 'primary.main',
+          borderColor: 'accent.main',
           '& .moodboard-actions': {
             opacity: 1,
           },

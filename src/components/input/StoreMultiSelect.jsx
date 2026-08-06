@@ -138,7 +138,7 @@ export function StoreMultiSelect({
             ) : (
               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                 {selected.map((id) => (
-                  <Chip key={id} label={id} size="small" sx={{ borderRadius: '4px' }} />
+                  <Chip key={id} label={id} size="small" sx={{ borderRadius: (theme) => `${theme.shape.radius.control}px` }} />
                 ))}
               </Box>
             )

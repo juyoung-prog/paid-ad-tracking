@@ -106,8 +106,12 @@ function RailRow({ icon, label, to, isActive = false }) {
           duration: 180,
           easing: theme.transitions.easing.easeOut,
         }),
-        '&:hover': {
-          backgroundColor: isActive ? theme.palette.accent.tintHover : theme.palette.action.hover,
+        // hover는 마우스가 있는 기기에서만 — 가드가 없으면 터치에서 탭한 뒤
+        // 배경이 눌어붙는다(같은 파일의 레일 펼침은 이미 이 가드를 쓴다).
+        '@media (hover: hover)': {
+          '&:hover': {
+            backgroundColor: isActive ? theme.palette.accent.tintHover : theme.palette.action.hover,
+          },
         },
         /* 아이콘 크기는 호출부가 아니라 여기서 한 번에 정한다.
            16px인 건 취향이 아니라 정렬 때문이다 — 행 좌측 여백이 20px(레일 10 +
@@ -193,7 +197,9 @@ export function PaidAdsRail({ sx }) {
           '&:hover, &:focus-within': {
             width: EXPANDED_WIDTH,
             backgroundColor: 'background.paper',
-            boxShadow: '4px 0 12px rgba(0, 0, 0, 0.04)',
+            // 테마의 그림자 철학은 "offset 없이 blur만"이라 x-offset 값을 직접 쓰지 않는다.
+            // 펼친 레일이 본문 위에 떠 있다는 신호는 customShadows 토큰으로 준다.
+            boxShadow: theme.customShadows.sm,
             [`& .${WIDTH_CLASS}`]: { width: EXPANDED_ROW_WIDTH },
             [`& .${LABEL_CLASS}`]: { opacity: 1 },
           },

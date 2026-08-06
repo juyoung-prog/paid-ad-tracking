@@ -520,6 +520,20 @@ const components = {
       root: {
         borderRadius: shape.radius.control,
         textTransform: 'none',
+        /* 선택 상태도 accent다. 이 override가 없으면 MUI 기본값(회색
+           action.selected 배경 + text.primary)으로 렌더돼서, 탭·레일·메뉴가 전부
+           accent로 "선택됨"을 말하는 화면에서 세그먼트 필터만 회색으로 갈린다 —
+           앱에서 유일하게 파랑 단일화를 벗어난 컨트롤이었다(감사로 발견).
+           레퍼런스(influencer tracking dashboard)의 Tier 필터 칩도 같은 문법이다:
+           accent 글자 + accent 테두리 + 옅은 accent 배경. */
+        '&.Mui-selected': {
+          color: palette.accent.main,
+          borderColor: palette.accent.main,
+          backgroundColor: palette.accent.tint,
+        },
+        '@media (hover: hover)': {
+          '&.Mui-selected:hover': { backgroundColor: palette.accent.tintHover },
+        },
       },
     },
   },
@@ -564,9 +578,11 @@ const components = {
   MuiTableRow: {
     styleOverrides: {
       root: {
-        // 인터랙티브 행 hover — 클릭 가능한 행에 cursor pointer 적용 시 함께 사용
+        // 인터랙티브 행 hover — 클릭 가능한 행에 cursor pointer 적용 시 함께 사용.
+        // 값은 팔레트의 action.hover를 그대로 쓴다 — 예전엔 0.03 리터럴이라
+        // 시스템에 hover 회색이 두 개(0.03/0.04)였다.
         '&.MuiTableRow-hover:hover': {
-          backgroundColor: 'rgba(0, 0, 0, 0.03)',
+          backgroundColor: palette.action.hover,
         },
       },
     },
@@ -584,11 +600,29 @@ const components = {
 // ============================================================
 // Theme 생성
 // ============================================================
+/**
+ * MUI elevation 배열(0~24)을 customShadows로 채운다.
+ *
+ * 이걸 비워두면 sx={{ boxShadow: 2 }} 같은 숫자 단축형이 MUI 기본 Material
+ * 엘리베이션(y-offset 있는 3중 그림자)으로 렌더된다 — "offset 없이 blur만"이라는
+ * 이 테마의 그림자 철학이 숫자 하나로 뚫리는 구멍이고, 실제로 TagInput·ImageCard가
+ * 그 경로로 offset 그림자를 쓰고 있었다(감사로 발견). 배열을 채우면 어떤 표기를
+ * 쓰든 같은 철학이 적용된다.
+ */
+const shadows = [
+  customShadows.none,
+  ...Array(6).fill(customShadows.sm),
+  ...Array(6).fill(customShadows.md),
+  ...Array(6).fill(customShadows.lg),
+  ...Array(6).fill(customShadows.xl),
+];
+
 const defaultTheme = createTheme({
   palette,
   typography,
   spacing,
   shape,
+  shadows,
   breakpoints,
   zIndex,
   transitions,

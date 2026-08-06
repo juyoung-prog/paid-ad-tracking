@@ -123,7 +123,9 @@ const CardContainer = forwardRef(function CardContainer({
       // — 바로 위 borderColor 변경이 이미 hover 강조를 전달하므로 shadow 없이도
       // 충분하다(border만으로 위계를 만든다는 원칙, 디자인 시스템 감사로 발견).
       outlined: {
-        borderColor: 'primary.main',
+        // 선택·활성·hover 강조는 전부 accent 하나에서 나온다(팔레트 자기 선언).
+        // primary.main(#0000FF)은 브랜드 색으로만 남는다.
+        borderColor: 'accent.main',
       },
       // elevation 변형의 hover도 임의 rgba 대신 테마 토큰(customShadows.lg)으로
       // 한 단계 더 진하게 — base(sm)보다 무거운 승인된 tier를 쓴다.
@@ -146,10 +148,14 @@ const CardContainer = forwardRef(function CardContainer({
       '&:active': {
         transform: 'scale(0.98)',
       },
+      // 포커스는 앱 공통 문법 — 1px accent 테두리 + 옅은 ring(inset).
+      // 2px 순수 파랑 아웃라인은 레이아웃이 1px 흔들리고 컨트롤이 콘텐츠보다
+      // 강해 보여서 폐기한 옛 패턴이다(테마 accent 주석 참고).
       '&:focus-visible': {
-        outline: '2px solid',
-        outlineColor: 'primary.main',
-        outlineOffset: 2,
+        outline: '1px solid',
+        outlineColor: 'accent.main',
+        outlineOffset: -1,
+        boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
       },
     };
   };
@@ -176,7 +182,7 @@ const CardContainer = forwardRef(function CardContainer({
     // 전달되고 있어서, "0 0 0 2px" 링 그림자는 순수 중복이었다(디자인 시스템
     // 감사로 발견) — 제거.
     return {
-      borderColor: 'primary.main',
+      borderColor: 'accent.main',
       '&::before': {
         content: '""',
         position: 'absolute',
@@ -184,7 +190,7 @@ const CardContainer = forwardRef(function CardContainer({
         left: 0,
         right: 0,
         height: 3,
-        backgroundColor: 'primary.main',
+        backgroundColor: 'accent.main',
       },
     };
   };

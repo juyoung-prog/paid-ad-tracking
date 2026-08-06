@@ -158,7 +158,7 @@ export function TagInput({
       minHeight: currentSize.minHeight,
       px: currentSize.px,
       py: 1,
-      borderRadius: '4px',
+      borderRadius: (theme) => `${theme.shape.radius.control}px`,
       cursor: isDisabled ? 'not-allowed' : 'text',
       opacity: isDisabled ? 0.5 : 1,
       transition: 'all 0.2s ease',
@@ -176,16 +176,14 @@ export function TagInput({
       ...base,
       backgroundColor: 'background.paper',
       border: '1px solid',
-      borderColor: isFocused ? 'primary.main' : 'divider',
-      // 포커스 강조는 shadow 링 대신 outline으로 — outline은 box 레이아웃에
-      // 영향을 안 줘서(border-width처럼 크기가 안 밀림) CardContainer 등 이
-      // 코드베이스의 다른 focus-visible 패턴과도 일치한다(디자인 시스템 감사로
-      // 발견 — border+spacing+radius만으로 위계를 만드는 원칙).
-      outline: isFocused ? '2px solid' : 'none',
-      outlineColor: 'primary.light',
-      outlineOffset: 1,
+      // 포커스는 앱 공통 문법 — 테두리 두께는 1px 그대로 두고 옅은 accent 링으로
+      // 알린다(테마 MuiOutlinedInput과 동일). 예전 주석은 "다른 focus 패턴과
+      // 일치한다"고 적었지만 실제로는 반대였다: AlertBanner·CampaignTable·KpiBar·
+      // StoreTable 등은 전부 이 1px+ring 문법이고 여기만 2px 순수 파랑이었다.
+      borderColor: isFocused ? 'accent.main' : 'divider',
+      boxShadow: isFocused ? (theme) => `0 0 0 3px ${theme.palette.accent.ring}` : 'none',
       '&:hover': {
-        borderColor: isFocused ? 'primary.main' : 'text.secondary',
+        borderColor: isFocused ? 'accent.main' : 'text.secondary',
       },
     };
   };
@@ -269,11 +267,11 @@ export function TagInput({
           sx={{
             mt: 0.5,
             p: 1,
-            borderRadius: '4px',
+            borderRadius: (theme) => `${theme.shape.radius.control}px`,
             border: '1px solid',
             borderColor: 'divider',
             backgroundColor: 'background.paper',
-            boxShadow: 2,
+            boxShadow: (theme) => theme.customShadows.md,
           }}
         >
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>

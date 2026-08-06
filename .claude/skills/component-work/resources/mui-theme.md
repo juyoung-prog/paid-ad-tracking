@@ -93,6 +93,39 @@ raw CSS-in-JS라 숫자를 그대로 써도 된다 (예: 아래 `MuiChip`, `MuiO
 | **6px** (`radius.container`) | 하나의 분석 단위로 스캔되어야 하는 카드형 컨테이너(예: KPI 카드, 차트/테이블 컨테이너, 참조 카드) | 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.container}px` `` |
 | **50%** | Avatar | MUI 기본값, 손대지 않음 |
 
+### 선택 상태 색 — accent 하나
+
+`palette.accent`(#0000B2)가 **활성·선택·포커스**를 전부 담당한다. `primary.main`(#0000FF)은
+브랜드 색으로만 남는다. "선택됨"을 표현하는 컨트롤은 예외 없이 accent를 쓴다 — 테마에
+override가 있는 것(MuiTabs·MuiTab·MuiToggleButton·MuiMenuItem·MuiButton)과, 컴포넌트
+로컬 sx로 그리는 것(CardContainer·NavMenu·FilterBar 칩·CarouselIndicator 등) 모두.
+
+MUI 내장 `color="primary"` prop은 이 규칙을 우회한다(Chip·Button 등) — 선택 상태에는
+쓰지 말고 sx로 accent 토큰을 직접 지정한다.
+
+### 포커스 — 1px accent + ring
+
+두께는 비포커스와 같게 1px로 두고 옅은 `accent.ring` 번짐으로만 알린다. 굵기를 바꾸면
+레이아웃이 1px 흔들리고, 순수 파랑 2px는 컨트롤이 콘텐츠보다 강해 보인다.
+
+```jsx
+'&:focus-visible': {
+  outline: '1px solid',
+  outlineColor: 'accent.main',
+  outlineOffset: -1,
+  boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+}
+```
+
+스크롤 컨테이너 안(KpiBar 등)에서는 바깥으로 그리면 잘리므로 `outlineOffset: -1` + inset을
+쓴다. 요소 바깥에 여백이 있는 경우에만 양수 offset + 바깥 ring을 쓴다.
+
+### 그림자 — 숫자 단축형도 안전하다
+
+`theme.shadows` 배열(0~24)을 `customShadows`로 채워두었다. `boxShadow: 2` 같은 숫자
+표기도 offset 없는 blur-only 그림자로 렌더된다 — 예전엔 이 경로로 MUI 기본 Material
+엘리베이션(y-offset 3중 그림자)이 섞여 들어왔다.
+
 Shadow는 이 시스템에 포함하지 않는다 — 위계는 border + spacing + radius로만 만들고,
 box-shadow를 추가로 얹지 않는다.
 

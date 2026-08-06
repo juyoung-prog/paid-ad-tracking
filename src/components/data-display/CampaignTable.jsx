@@ -313,7 +313,7 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                     variant={statusMeta.variant}
                     sx={{
                       ...(statusMeta.variant === 'filled'
-                        ? { backgroundColor: statusMeta.color, color: '#fff' }
+                        ? { backgroundColor: statusMeta.color, color: 'common.white' }
                         : { borderColor: statusMeta.color, color: statusMeta.color }),
                     }}
                   />

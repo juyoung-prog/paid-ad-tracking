@@ -76,7 +76,7 @@ export function SearchBar({
       display: 'flex',
       alignItems: 'center',
       height: currentSize.height,
-      borderRadius: '4px',
+      borderRadius: (theme) => `${theme.shape.radius.control}px`,
       transition: 'all 0.2s ease',
     };
 
@@ -96,7 +96,7 @@ export function SearchBar({
           ...base,
           backgroundColor: 'transparent',
           borderBottom: '2px solid',
-          borderColor: isFocused ? 'primary.main' : 'divider',
+          borderColor: isFocused ? 'accent.main' : 'divider',
           borderRadius: 0,
           '&:hover': {
             borderColor: 'text.secondary',
@@ -105,20 +105,18 @@ export function SearchBar({
 
       case 'outlined':
       default:
-        // 포커스 강조는 shadow 링 대신 outline으로 — outline은 box 레이아웃에
-        // 영향을 안 줘서 TagInput 등 이 코드베이스의 다른 focus-visible 패턴과도
-        // 일치한다(디자인 시스템 감사로 발견 — border+spacing+radius만으로
-        // 위계를 만드는 원칙).
+        // 포커스는 앱 공통 문법 — 테두리는 1px 그대로 두고 옅은 accent 링으로
+        // 알린다(테마 MuiOutlinedInput과 동일). 예전 주석은 "TagInput 등과
+        // 일치한다"고 적었지만 실제로는 둘 다 옛 2px 패턴에 남아 있던 것이라
+        // 양쪽을 함께 표준으로 옮겼다.
         return {
           ...base,
           backgroundColor: 'background.paper',
           border: '1px solid',
-          borderColor: isFocused ? 'primary.main' : 'divider',
-          outline: isFocused ? '2px solid' : 'none',
-          outlineColor: 'primary.light',
-          outlineOffset: 1,
+          borderColor: isFocused ? 'accent.main' : 'divider',
+          boxShadow: isFocused ? (theme) => `0 0 0 3px ${theme.palette.accent.ring}` : 'none',
           '&:hover': {
-            borderColor: isFocused ? 'primary.main' : 'text.secondary',
+            borderColor: isFocused ? 'accent.main' : 'text.secondary',
           },
         };
     }
@@ -174,7 +172,7 @@ export function SearchBar({
         onClick={handleSearchClick}
         sx={{
           ml: 0.5,
-          color: isFocused ? 'primary.main' : 'text.secondary',
+          color: isFocused ? 'accent.main' : 'text.secondary',
         }}
         aria-label="search"
       >

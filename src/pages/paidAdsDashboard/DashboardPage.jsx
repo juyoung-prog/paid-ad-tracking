@@ -1,4 +1,5 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { alpha } from '@mui/material/styles';
 import { Link as RouterLink, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Badge from '@mui/material/Badge';
@@ -843,7 +844,8 @@ export function DashboardPage() {
                 // 버튼 *안에* 들어가는 미세 요소 → inlay radius
                 borderRadius: `${theme.shape.radius.inlay}px`,
                 border: '1px solid',
-                borderColor: 'rgba(255,255,255,0.5)',
+                // 흰색을 직접 쓰지 않고 버튼 대비색에서 파생시킨다(반투명 contrastText 토큰이 없어 alpha로 만든다).
+                borderColor: alpha(theme.palette.primary.contrastText, 0.5),
                 opacity: 0.85,
               })}
             >

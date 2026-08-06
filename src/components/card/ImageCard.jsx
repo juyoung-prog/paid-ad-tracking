@@ -76,7 +76,7 @@ export function ImageCard({
         }}
         sx={{
           bgcolor: 'background.paper',
-          boxShadow: 1,
+          boxShadow: (theme) => theme.customShadows.sm,
           '&:hover': { bgcolor: 'white' },
         }}
       >

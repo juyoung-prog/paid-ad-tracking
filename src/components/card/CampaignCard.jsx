@@ -99,7 +99,7 @@ export function CampaignCard({
             flexShrink: 0,
             ml: 1,
             ...(statusMeta.variant === 'filled'
-              ? { backgroundColor: statusMeta.color, color: '#fff' }
+              ? { backgroundColor: statusMeta.color, color: 'common.white' }
               : { borderColor: statusMeta.color, color: statusMeta.color }),
           }}
         />

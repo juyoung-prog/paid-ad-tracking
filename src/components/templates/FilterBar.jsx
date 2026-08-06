@@ -369,13 +369,20 @@ export function FilterBar({
                   label={`#${tag}`}
                   onClick={() => handleTagClick(tag)}
                   variant={isSelected ? 'filled' : 'outlined'}
-                  color={isSelected ? 'primary' : 'default'}
                   sx={{
                     fontWeight: isSelected ? 600 : 400,
                     cursor: 'pointer',
                     transition: 'all 0.15s ease',
+                    // "선택됨"은 accent 하나로 — 아래 활성 필터 칩과 같은 문법.
+                    // 예전엔 이 칩만 MUI 내장 color="primary"(#0000FF)라, 같은
+                    // 패널 안에서 선택 상태를 두 가지 파랑으로 말하고 있었다.
+                    ...(isSelected && {
+                      backgroundColor: 'accent.tint',
+                      color: 'accent.main',
+                      borderColor: 'accent.main',
+                    }),
                     '&:hover': {
-                      backgroundColor: isSelected ? 'primary.dark' : 'action.hover',
+                      backgroundColor: isSelected ? 'accent.tintHover' : 'action.hover',
                     },
                   }}
                 />

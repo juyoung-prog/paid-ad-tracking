@@ -132,9 +132,11 @@ const Indicator = forwardRef(function Indicator({
         opacity: 1,
       } : {},
       '&:focus-visible': {
-        outline: '2px solid',
-        outlineColor: activeColor,
+        // 포커스는 앱 공통 문법 — 1px accent + 옅은 ring.
+        outline: '1px solid',
+        outlineColor: 'accent.main',
         outlineOffset: 2,
+        boxShadow: (theme) => `0 0 0 3px ${theme.palette.accent.ring}`,
       },
     };
   };

@@ -37,7 +37,7 @@ export function CarouselIndicator({
   type = 'dot',
   direction = 'horizontal',
   size = 'md',
-  activeColor = 'primary.main',
+  activeColor = 'accent.main',
   inactiveColor = 'grey.400',
   gap = 1,
   onClick,

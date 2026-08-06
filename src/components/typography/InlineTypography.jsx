@@ -224,7 +224,7 @@ export function InlineImage({
         width: sizeValue,
         height: sizeValue,
         mx: '0.2em',
-        borderRadius: circle ? '50%' : rounded ? '4px' : 0,
+        borderRadius: circle ? '50%' : rounded ? (theme) => `${theme.shape.radius.control}px` : 0,
         overflow: 'hidden',
         transition: hover ? 'transform 0.2s ease-out' : 'none',
         '&:hover': hover ? {

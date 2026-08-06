@@ -97,7 +97,7 @@ const NavMenu = forwardRef(function NavMenu({
       fontSize: sizeStyle.fontSize,
       fontWeight: isActive ? 600 : 400,
       textDecoration: 'none',
-      borderRadius: variant === 'pills' ? '999px' : '4px',
+      borderRadius: variant === 'pills' ? '999px' : (theme) => `${theme.shape.radius.control}px`,
       cursor: isDisabled ? 'not-allowed' : 'pointer',
       opacity: isDisabled ? 0.5 : 1,
       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -115,23 +115,23 @@ const NavMenu = forwardRef(function NavMenu({
     switch (variant) {
       case 'pills':
         return {
-          backgroundColor: isActive ? 'primary.main' : 'transparent',
-          color: isActive ? 'primary.contrastText' : 'text.primary',
+          backgroundColor: isActive ? 'accent.main' : 'transparent',
+          color: isActive ? 'common.white' : 'text.primary',
           '&:hover': {
-            backgroundColor: isActive ? 'primary.dark' : 'action.hover',
+            backgroundColor: isActive ? 'accent.dark' : 'action.hover',
           },
         };
 
       case 'underline':
         return {
           backgroundColor: 'transparent',
-          color: isActive ? 'primary.main' : 'text.secondary',
+          color: isActive ? 'accent.main' : 'text.secondary',
           borderBottom: '2px solid',
-          borderColor: isActive ? 'primary.main' : 'transparent',
+          borderColor: isActive ? 'accent.main' : 'transparent',
           borderRadius: 0,
           '&:hover': {
-            color: 'primary.main',
-            borderColor: isActive ? 'primary.main' : 'grey.300',
+            color: 'accent.main',
+            borderColor: isActive ? 'accent.main' : 'grey.300',
           },
         };
 
@@ -139,7 +139,7 @@ const NavMenu = forwardRef(function NavMenu({
       default:
         return {
           backgroundColor: isActive ? 'action.selected' : 'transparent',
-          color: isActive ? 'primary.main' : 'text.primary',
+          color: isActive ? 'accent.main' : 'text.primary',
           '&:hover': {
             backgroundColor: isActive ? 'action.selected' : 'action.hover',
           },

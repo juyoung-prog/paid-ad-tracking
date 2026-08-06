@@ -185,7 +185,7 @@ export function FileDropzone({
         sx={{
           position: 'relative',
           height: variantHeight[variant],
-          borderRadius: '4px',
+          borderRadius: (theme) => `${theme.shape.radius.control}px`,
           overflow: 'hidden',
           border: '2px solid',
           borderColor: isComplete ? 'success.main' : 'divider',
@@ -245,7 +245,7 @@ export function FileDropzone({
               color: 'white',
               px: 1.5,
               py: 0.5,
-              borderRadius: '4px',
+              borderRadius: (theme) => `${theme.shape.radius.control}px`,
             }}
           >
             <CheckCircleIcon fontSize="small" />
@@ -320,7 +320,7 @@ export function FileDropzone({
       onDrop={handleDrop}
       sx={{
         height: variantHeight[variant],
-        borderRadius: '4px',
+        borderRadius: (theme) => `${theme.shape.radius.control}px`,
         border: '2px dashed',
         borderColor: error ? 'error.main' : isDragActive ? 'accent.main' : 'divider',
         backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
