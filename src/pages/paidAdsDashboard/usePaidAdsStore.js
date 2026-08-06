@@ -167,7 +167,10 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     const { error: deleteError } = await supabase.from('campaigns').delete().eq('id', campaignId);
     if (deleteError) {
       setError(deleteError.message);
-      return;
+      // 다른 쓰기 함수의 null과 같은 계약 — falsy면 실패. 호출부가 이 값으로
+      // 성공 스낵바/실패 스낵바를 가른다(결과 확인 없이 무조건 "deleted"를
+      // 띄우면 거짓 성공이 된다).
+      return false;
     }
     // performance_records는 FK가 on delete cascade라 DB가 알아서 지운다.
     // 로컬 상태에서도 같이 털어야 화면에 고아 레코드가 남지 않는다.
@@ -176,6 +179,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       campaigns: prev.campaigns.filter((c) => c.id !== campaignId),
       performanceRecords: prev.performanceRecords.filter((p) => p.campaignId !== campaignId),
     }));
+    return true;
   }, []);
 
   const addStore = useCallback(async (store) => {

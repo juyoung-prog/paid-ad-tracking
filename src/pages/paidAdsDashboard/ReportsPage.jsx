@@ -13,7 +13,15 @@ import { ReportSummarySection } from './ReportSummarySection';
  * 한다(여기서 py를 얹으면 sticky 툴바가 스크롤 컨테이너 상단에 안 붙는다).
  */
 export function ReportsPage() {
-  const { campaigns, performanceRecords } = usePaidAdsStore();
+  const { campaigns, performanceRecords, isLoading, error, refresh } = usePaidAdsStore();
 
-  return <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />;
+  return (
+    <ReportSummarySection
+      campaigns={campaigns}
+      performanceRecords={performanceRecords}
+      isLoading={isLoading}
+      error={error}
+      onRetry={refresh}
+    />
+  );
 }

@@ -11,14 +11,15 @@ const RECENT_LIMIT = 20;
  * 그날 데이터가 통째로 비는데, 기록을 화면에 보여주지 않으면 실패했다는 사실
  * 자체를 알 방법이 없다(실제로 엣지 게이트웨이의 산발적 500을 세 번 관측했다).
  *
+ * @param {boolean} isEnabled - false면 조회하지 않는다(Storybook처럼 백엔드 없이 렌더할 때) [Optional, 기본값: true]
  * @returns {{ runs: object[], lastSuccessAt: string|null, recentFailures: object[], isLoading: boolean, error: string|null, refresh: function }}
  *
  * Example usage:
  * const { lastSuccessAt, recentFailures } = useSyncRuns();
  */
-export function useSyncRuns() {
+export function useSyncRuns(isEnabled = true) {
   const [runs, setRuns] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(isEnabled);
   const [error, setError] = useState(null);
 
   // 조회만 하고 상태는 건드리지 않는다 — effect 본문의 동기 setState를 피하기 위함
@@ -57,18 +58,20 @@ export function useSyncRuns() {
   }, []);
 
   const refresh = useCallback(async () => {
+    if (!isEnabled) return;
     setIsLoading(true);
     applyResult(await fetchRuns());
-  }, [fetchRuns, applyResult]);
+  }, [isEnabled, fetchRuns, applyResult]);
 
   useEffect(() => {
+    if (!isEnabled) return undefined;
     let isCancelled = false;
     (async () => {
       const result = await fetchRuns();
       if (!isCancelled) applyResult(result);
     })();
     return () => { isCancelled = true; };
-  }, [fetchRuns, applyResult]);
+  }, [isEnabled, fetchRuns, applyResult]);
 
   const lastSuccessAt = runs.find((r) => r.status === 'success')?.checkedAt ?? null;
 

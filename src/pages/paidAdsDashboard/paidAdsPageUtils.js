@@ -89,3 +89,67 @@ export function generateId(prefix) {
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `${prefix}-${random}`;
 }
+
+/**
+ * 캠페인 이름에서 대상 매장 코드를 추론한다.
+ *
+ * 이 계정의 네이밍은 "G10_...", "BF2_...", "Reach_BF2_2MonthsDeals"처럼 매장
+ * 코드를 이름에 담는다. 같은 규칙이 이미 서버(sync-campaigns의 resolveStoreId)에
+ * 있어서 동기화된 캠페인은 매장이 자동으로 붙는데, 사람이 폼에서 직접 등록할
+ * 때만 그 규칙이 없어 매번 손으로 골라야 했다 — 규칙을 옮겨온다.
+ *
+ * 정확히 일치할 때만 매장을 붙인다. 비슷한 이름에 억지로 맞추면 성과가 조용히
+ * 엉뚱한 매장에 귀속되고, 그건 빈 값보다 나쁘다(사용자가 틀린 걸 못 알아챈다).
+ * 코드가 이름 중간에 오는 경우는 앞뒤가 영숫자가 아닐 때만 인정해서, "BF2"가
+ * 다른 단어의 일부로 우연히 걸리는 것을 막는다.
+ *
+ * @param {string} name - 캠페인 이름
+ * @param {Array<{id: string, name: string}>} stores - 매장 목록
+ * @returns {string|null} 매장 코드. 못 찾으면 null(추측하지 않는다)
+ */
+export function inferStoreIdFromName(name, stores) {
+  if (!name || !stores?.length) return null;
+
+  const prefix = name.split('_')[0]?.trim() ?? '';
+  if (stores.some((s) => s.id === prefix)) return prefix;
+
+  for (const store of stores) {
+    // 매장 코드는 Stores 화면에서 자유 입력이라 정규식 특수문자가 들어올 수 있다.
+    // 이스케이프하지 않으면 "G(1" 같은 코드 하나가 캠페인 이름을 타이핑하는 순간
+    // SyntaxError("Unterminated group")로 등록 폼을 통째로 죽인다(재현 확인).
+    const escapedId = store.id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`(^|[^A-Za-z0-9])${escapedId}([^A-Za-z0-9]|$)`, 'i').test(name)) return store.id;
+  }
+
+  // 코드 없이 매장명만 쓴 캠페인도 있다("Beauty Master Florida Mall Now Open").
+  // 4글자 미만 이름은 우연 일치가 너무 쉬워 제외한다.
+  const lower = name.toLowerCase();
+  for (const store of stores) {
+    const storeName = (store.name ?? '').toLowerCase();
+    if (storeName.length >= 4 && lower.includes(storeName)) return store.id;
+  }
+  return null;
+}
+
+/**
+ * 플랫폼 광고 관리자에서 이 캠페인을 여는 링크.
+ *
+ * 동기화는 creative_url(실제 게시물 링크)을 채우지 않는다 — 캠페인 하나에 광고
+ * 소재가 여러 개라 "그 캠페인의 광고 링크" 하나가 존재하지 않기 때문이다(Meta의
+ * preview_shareable_link는 광고 단위라 아무거나 고르면 틀린 링크가 된다). 대신
+ * 캠페인 자체를 여는 링크는 저장된 외부 id로 결정론적으로 만들 수 있다.
+ *
+ * TikTok은 캠페인 단위 딥링크가 안정적으로 구성되지 않아 지원하지 않는다 —
+ * 광고주 계정 화면까지만 열리는 링크를 "이 캠페인 열기"로 내보내면 거짓말이 된다.
+ *
+ * @param {object} campaign - externalCampaignId, platform을 가진 캠페인
+ * @param {object} account - externalAccountId를 가진 광고 계정
+ * @returns {string|null}
+ */
+export function adsManagerUrl(campaign, account) {
+  if (campaign?.platform !== 'meta') return null;
+  if (!campaign?.externalCampaignId || !account?.externalAccountId) return null;
+  // Meta 계정 id는 "act_123..." 형태로 오는데 act 파라미터는 숫자만 받는다.
+  const accountId = String(account.externalAccountId).replace(/^act_/, '');
+  return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(accountId)}&selected_campaign_ids=${encodeURIComponent(campaign.externalCampaignId)}`;
+}

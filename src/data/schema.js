@@ -60,6 +60,12 @@ export const ALERT_TYPE = Object.freeze({
   ENDING_SOON: 'ending_soon',
   BUDGET_PACING: 'budget_pacing',
   OVERLAP_TARGET: 'overlap_target',
+  // 한 번 삭제됐던 유형의 재도입 — 예전엔 PerformanceForm의 reportedAt 필드를
+  // 트리거 근거로 썼는데 그 필드가 사라지면서 알림도 같이 지웠다. 하지만
+  // 트리거에 reportedAt이 필요 없다: "종료됐는데 성과 레코드 자체가 없다"가
+  // 곧 미보고다. 이 앱의 존재 이유(종료 후 성과 기록 → 보고)를 리마인드하는
+  // 유일한 장치라 성과 레코드 부재 기준으로 되살린다.
+  MISSING_PERFORMANCE: 'missing_performance',
   NEW_STORE_REMINDER: 'new_store_reminder',
 });
 
@@ -149,6 +155,52 @@ export const ALERT_TYPE = Object.freeze({
  * @param {Date} [today] - 기준 시각 [Optional, 기본값: new Date()]
  * @returns {'planned'|'active'|'ended'}
  */
+/**
+ * 날짜 문자열을 **로컬 자정**으로 정규화한다.
+ *
+ * 'YYYY-MM-DD'를 new Date()에 그대로 넣으면 UTC 자정으로 파싱되는데, 이 앱의
+ * today는 로컬 자정(startOfToday)이다. 둘을 그대로 빼면 UTC+ 지역(예: KST)에서
+ * 하루가 밀린다 — 어제 끝난 캠페인에 "ended today"가 붙고, 30일 창이 31일이
+ * 되며, 종료 당일에는 알림이 아예 안 뜬다. 이 저장소는 toLocalISODate에서
+ * 이미 같은 종류의 버그를 한 번 고친 적이 있다.
+ *
+ * ISO datetime(updatedAt 등)도 같은 규칙으로 그 날의 0시로 내린다 — "며칠 전"을
+ * 셀 때 시:분은 의미가 없고, 남겨두면 오늘 벌어진 일이 -1일로 계산된다.
+ *
+ * @param {string} value - 'YYYY-MM-DD' 또는 ISO datetime
+ * @returns {Date}
+ */
+export function toLocalDayStart(value) {
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  }
+  const parsed = new Date(value);
+  return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+}
+
+/** 두 날짜의 일수 차이(오늘 기준 과거면 양수). 둘 다 로컬 자정으로 맞춘 뒤 센다. */
+export function daysSince(value, today) {
+  return Math.round((toLocalDayStart(today) - toLocalDayStart(value)) / 86400000);
+}
+
+/**
+ * 캠페인이 실제로 끝난 날. 조기 종료는 그 시점을 따로 저장하지 않아서 updatedAt을
+ * 근사치로 쓰는데, updatedAt은 **모든 수정에서 갱신**된다(campaignToRow). 그대로
+ * 쓰면 1년 전 조기 종료한 캠페인의 Event 태그만 채워 저장해도 "오늘 끝난 것"이
+ * 되어 미보고 알림이 부활하고 Recently Ended 목록에 다시 뜬다. 계획 종료일로
+ * 상한을 걸어, 계획 종료일이 이미 지난 캠페인은 편집해도 시계가 리셋되지 않게 한다.
+ *
+ * @param {Campaign} campaign
+ * @returns {string} 종료 기준일
+ */
+export function effectiveEndDate(campaign) {
+  if (campaign.manualStatus !== MANUAL_STATUS.ENDED_EARLY || !campaign.updatedAt) return campaign.endDate;
+  return toLocalDayStart(campaign.updatedAt) < toLocalDayStart(campaign.endDate)
+    ? campaign.updatedAt
+    : campaign.endDate;
+}
+
 export function getComputedStatus(campaign, today = new Date()) {
   const start = new Date(campaign.startDate);
   const end = new Date(campaign.endDate);
@@ -399,6 +451,29 @@ export function shouldTriggerOverlapAlert(campaignA, campaignB) {
 // (같은 규칙을 두 곳에서 다른 숫자로 중복 정의하지 않기 위함).
 export const ENDING_SOON_THRESHOLD_DAYS = 3;
 export const BUDGET_PACING_THRESHOLD = 0.15;
+/**
+ * missing_performance 알림의 시간 창(일). 종료 후 이 기간 안에만 알림을 만든다 —
+ * 창 없이 전 기간을 검사하면 도구 도입 이전의 오래된 종료 캠페인 수십 건이
+ * 한꺼번에 error로 떠서 알림 전체가 노이즈가 된다. 대시보드의 Recently Ended
+ * 뷰(14일)보다 넓게 잡아, 뷰에서 사라진 뒤에도 알림으로는 한동안 남게 한다.
+ */
+export const MISSING_PERFORMANCE_WINDOW_DAYS = 30;
+
+/**
+ * 성과 레코드에 실제 값이 하나라도 있는지. spend는 rowToPerformanceRecord가
+ * `?? 0`으로 정규화하므로 "0이 아닌 값"으로 봐야 빈 레코드와 구분된다.
+ * @param {PerformanceRecord} record
+ * @returns {boolean}
+ */
+export function hasAnyMetricValue(record) {
+  if (!record) return false;
+  const METRIC_KEYS = [
+    'impressions', 'reach', 'clicks', 'spend', 'videoPlays', 'hookViews', 'heldViews',
+    'avgWatchSeconds', 'likes', 'comments', 'shares', 'follows', 'profileVisits',
+    'engagements', 'conversions',
+  ];
+  return METRIC_KEYS.some((key) => record[key] != null && record[key] !== 0 && record[key] !== '');
+}
 
 // 알림 유형별 색상(error/warning) — AlertBanner·CampaignTable의 alertBadges가
 // 전부 이 하나만 참조한다(예전엔 파일마다 따로 하드코딩해서 하나만 고치면
@@ -407,6 +482,8 @@ export const BUDGET_PACING_THRESHOLD = 0.15;
 // 알림보다 실무 관점에서 더 급하다 — 지금 이 순간에도 돈이 계속 나가고 있다.
 export const ALERT_SEVERITY = {
   [ALERT_TYPE.BUDGET_PACING]: 'error',
+  // 03-visual-direction의 긴급도 체계 그대로 — 보고 자체가 막히는 상태라 error로 격상
+  [ALERT_TYPE.MISSING_PERFORMANCE]: 'error',
   [ALERT_TYPE.ENDING_SOON]: 'warning',
   [ALERT_TYPE.OVERLAP_TARGET]: 'warning',
 };
@@ -417,8 +494,11 @@ export const ALERT_SEVERITY = {
 // 손실이 다른 warning급 알림보다 급함).
 const ALERT_SEVERITY_RANK = {
   [ALERT_TYPE.BUDGET_PACING]: 0,
-  [ALERT_TYPE.ENDING_SOON]: 1,
-  [ALERT_TYPE.OVERLAP_TARGET]: 2,
+  // 같은 error라도 budget_pacing 다음 — 저긴 지금도 돈이 나가는 중이고, 이건
+  // 이미 끝난 캠페인의 기록 문제라 실시간성이 없다.
+  [ALERT_TYPE.MISSING_PERFORMANCE]: 1,
+  [ALERT_TYPE.ENDING_SOON]: 2,
+  [ALERT_TYPE.OVERLAP_TARGET]: 3,
 };
 
 /**
@@ -488,6 +568,27 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
             message: `${campaign.name} — budget is pacing ahead of schedule (${Math.round(budgetUsedRatio * 100)}% spent / ${Math.round(timeElapsedRatio * 100)}% elapsed)`,
           });
         }
+      }
+    }
+
+    if (status === MANUAL_STATUS.ENDED_EARLY || status === CAMPAIGN_STATUS.ENDED) {
+      // 성과 미보고 판정 — 값이 하나도 없으면 미보고다. "레코드 존재"만으로
+      // 판정하면, 빈 Performance 폼을 저장하는 것만으로 error 등급 알림이
+      // 사라진다(전 필드 null + spend 0인 행이 생긴다). 기록이 없다는 사실이
+      // 어디에도 안 남으므로 존재가 아니라 내용을 본다.
+      const hasPerformance = record != null && hasAnyMetricValue(record);
+      // 조기 종료는 계획 종료일이 아직 미래일 수 있어 effectiveEndDate가 실제
+      // 종료 시점(상한 적용)을 돌려준다. 날짜 차이는 양쪽을 로컬 자정으로 맞춰 센다.
+      const daysSinceEnd = daysSince(effectiveEndDate(campaign), today);
+      if (!hasPerformance && daysSinceEnd >= 0 && daysSinceEnd <= MISSING_PERFORMANCE_WINDOW_DAYS) {
+        alerts.push({
+          id: `alert-missing-perf-${campaign.id}`,
+          campaignId: campaign.id,
+          type: ALERT_TYPE.MISSING_PERFORMANCE,
+          triggeredAt: today.toISOString(),
+          resolvedAt: null,
+          message: `${campaign.name} — ended ${daysSinceEnd === 0 ? 'today' : `${daysSinceEnd}d ago`} with no performance data — enter results to complete reporting`,
+        });
       }
     }
   });

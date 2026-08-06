@@ -28,7 +28,11 @@ import { MOCK_TODAY } from './paidAdsPageUtils';
 export function createMockPaidAdsStore(overrides = {}) {
   const campaigns = overrides.campaigns ?? mockCampaigns;
   const performanceRecords = overrides.performanceRecords ?? mockPerformanceRecords;
-  const noop = async () => null;
+  // 실스토어의 쓰기 함수는 "성공하면 저장된 값, 실패하면 null/false"를 돌려주고
+  // 호출부(DashboardPage 등)가 그 값으로 성공/실패 스낵바를 가른다. 목 스텁이
+  // null을 돌려주면 Storybook에서 모든 저장이 실패로 보이므로, 상태는 바꾸지
+  // 않되 "성공한 것처럼" 마지막 인자(patch/record) 또는 true를 에코한다.
+  const noop = async (first, second) => second ?? first ?? true;
 
   return {
     stores: mockStores,
