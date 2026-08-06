@@ -393,6 +393,38 @@ export function getStoreBreakdown(stores, campaigns) {
 }
 
 /**
+ * 캠페인 이름을 "같은 단계인가"를 판정하기 위한 키로 정규화한다.
+ *
+ * 이 계정의 이름은 사람이 플랫폼별 광고 관리자에서 각각 손으로 짓는다. 그래서
+ * 같은 단계인데도 구분자 주변 공백이 미묘하게 달라진다 — 실제 G10 Opening에서:
+ *
+ *   TikTok: G10_Grand Opening_0706~0801      Meta: G10_Grand Opening _0706 ~ 0801
+ *   TikTok: G10_Now Open_0706~0831           Meta: G10_Now Open_0706 ~0831
+ *   TikTok: G10_1_Month Deals_0710~0831      Meta: G10_ 1 Month Deals_0710~0831
+ *
+ * 이름을 그대로 비교하면 이 세 쌍이 각각 다른 phase로 갈라져서, "같은 단계는
+ * 플랫폼이 달라도 한 막대로 합친다"는 설계가 무력화된다(타임라인에 같은 단계가
+ * 두 줄씩, 어느 쪽이 Meta인지 표시도 없이 나왔다 — 실사용 신고).
+ *
+ * `_`는 공백과 같은 구분자로 취급한다. 위 세 번째 쌍처럼 사람이 `_`와 공백을
+ * 서로 바꿔 쓰기 때문에, 공백만 정리해서는 합쳐지지 않는다.
+ *
+ * 단어 자체는 건드리지 않는다 — "Sale"과 "Game"처럼 진짜로 다른 단계는 그대로
+ * 갈라져 있어야 한다. 흡수하는 것은 구분자·대소문자 흔들림뿐이다.
+ *
+ * @param {string} name - 캠페인 이름
+ * @returns {string} 비교 전용 키(화면 표시에는 쓰지 않는다 — 원본 이름을 쓴다)
+ */
+export function campaignNameKey(name) {
+  return (name ?? '')
+    .toLowerCase()
+    .replace(/_/g, ' ')          // `_`와 공백을 같은 구분자로
+    .replace(/\s*([~-])\s*/g, '$1') // 기간 구분자 주변 공백 제거: "0706 ~ 0801" → "0706~0801"
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
  * 캠페인을 하나의 마케팅 이니셔티브로 묶는 그룹 키. campaignGroup이 있으면 그걸,
  * 없으면 name을 그대로 쓴다 — CampaignTable의 형제 판단, FilterBar의 Campaign
  * Group 드롭다운, DashboardPage의 그룹 합계, overlap_target 억제까지 전부 이

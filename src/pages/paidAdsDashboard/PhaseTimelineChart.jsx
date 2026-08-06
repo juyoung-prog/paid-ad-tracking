@@ -42,7 +42,7 @@ function formatPhaseBudget(phase) {
  * 보낸다.
  *
  * Props:
- * @param {Array<{name: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number, fillAlpha: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required]
+ * @param {Array<{key: string, name: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number, fillAlpha: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required] (key는 정규화된 묶음 키, name은 표시용 원본 이름)
  * @param {function} barSuffix - 막대 라벨 끝에 덧붙일 문자열을 돌려주는 함수 (phase) => string|null [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
@@ -153,7 +153,7 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
               suffix,
             ].filter(Boolean).join(' · ');
             return (
-              <Box key={p.name} sx={{ position: 'relative', height: 36, mb: 1 }}>
+              <Box key={p.key} sx={{ position: 'relative', height: 36, mb: 1 }}>
                 <Box
                   // 막대가 좁으면 라벨이 잘린다 — 전체 문자열을 title로 남긴다.
                   title={label}

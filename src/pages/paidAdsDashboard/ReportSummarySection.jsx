@@ -23,7 +23,7 @@ import { ScrollArea } from '../../components/container/ScrollArea';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, campaignGroupKey, PLATFORM, GOAL } from '../../data/schema';
+import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 const PLATFORM_LABEL = {
@@ -89,14 +89,19 @@ function phaseFillAlpha(index, total) {
 // 나뉘어 있어도 하나의 phase로 취급한다(실사용 피드백: 플랫폼별로 행이
 // 중복돼 보이는 게 불편했음). 기간은 두 플랫폼의 시작일 중 이른 날짜~
 // 종료일 중 늦은 날짜로 합친다(보통 동일하지만, 혹시 다르더라도 안전).
+//
+// 묶음 키는 이름 그대로가 아니라 campaignNameKey()다 — 플랫폼마다 사람이 따로
+// 이름을 지어서 구분자 공백이 흔들린다(schema.js의 함수 주석에 실제 사례).
+// 표시는 그 그룹에서 처음 만난 원본 이름을 쓴다.
 function buildPhaseTimeline(campaigns) {
   const byName = new Map();
   campaigns.forEach((c) => {
-    if (!byName.has(c.name)) byName.set(c.name, []);
-    byName.get(c.name).push(c);
+    const key = campaignNameKey(c.name);
+    if (!byName.has(key)) byName.set(key, { name: c.name, group: [] });
+    byName.get(key).group.push(c);
   });
   return [...byName.entries()]
-    .map(([name, group]) => {
+    .map(([key, { name, group }]) => {
       const startDate = group.reduce((min, c) => (c.startDate < min ? c.startDate : min), group[0].startDate);
       const endDate = group.reduce((max, c) => (c.endDate > max ? c.endDate : max), group[0].endDate);
       const byPlatform = {};
@@ -112,6 +117,7 @@ function buildPhaseTimeline(campaigns) {
       const totalDaily = dailyValues.length > 0 ? dailyValues.reduce((a, b) => a + b, 0) : null;
       const days = Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
       return {
+        key,
         name,
         startDate,
         endDate,
@@ -383,8 +389,9 @@ const PHASE_METRICS = [
 function buildPhasePerformance(campaigns, rowByCampaignId) {
   const byName = new Map();
   campaigns.forEach((c) => {
-    if (!byName.has(c.name)) byName.set(c.name, { name: c.name, startDate: c.startDate, rows: [] });
-    const phase = byName.get(c.name);
+    const key = campaignNameKey(c.name);
+    if (!byName.has(key)) byName.set(key, { key, name: c.name, startDate: c.startDate, rows: [] });
+    const phase = byName.get(key);
     if (c.startDate < phase.startDate) phase.startDate = c.startDate;
     const row = rowByCampaignId.get(c.id);
     if (row) phase.rows.push(row);
@@ -400,6 +407,7 @@ function buildPhasePerformance(campaigns, rowByCampaignId) {
       const impressions = sum(phase.rows, 'impressions');
       const hookViews = sum(phase.rows, 'hookViews');
       return {
+        key: phase.key,
         name: phase.name,
         startDate: phase.startDate,
         spend: sum(phase.rows, 'spend'),
@@ -623,11 +631,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
 
   // Plan 탭이 Event를 골랐을 때만 타임라인을 그리는 것과 같은 조건이다 —
   // 여러 Event가 섞인 상태에서 phase 막대를 그리면 서로 무관한 캠페인이 한 축에 놓인다.
-  // 막대 라벨이 phase 이름으로 지표를 찾으므로 Map으로 만들어 둔다.
-  const performanceByPhaseName = useMemo(() => {
+  // 막대 라벨이 phase 키로 지표를 찾으므로 Map으로 만들어 둔다. 키는 표시 이름이
+  // 아니라 campaignNameKey() — 두 빌더가 같은 정규화를 쓰므로 항상 짝이 맞는다.
+  const performanceByPhaseKey = useMemo(() => {
     if (!activeCampaignGroup) return new Map();
     const rowByCampaignId = new Map(goalRows.map((r) => [r.campaignId, r]));
-    return new Map(buildPhasePerformance(filteredCampaigns, rowByCampaignId).map((p) => [p.name, p]));
+    return new Map(buildPhasePerformance(filteredCampaigns, rowByCampaignId).map((p) => [p.key, p]));
   }, [activeCampaignGroup, filteredCampaigns, goalRows]);
 
   // Plan 탭 — 지금 필터에 걸린 캠페인 전체 기준(Event 선택 여부와 무관).
@@ -820,7 +829,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                 </TableHead>
                 <TableBody>
                   {phases.map((p) => (
-                    <TableRow key={p.name}>
+                    <TableRow key={p.key}>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           {/* 위 Gantt 막대와 같은 램프를 쓴다 — 표의 점과 막대가 다른 색이면
@@ -985,7 +994,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                 phases={phases}
                 barSuffix={(phase) => {
                   const metric = PHASE_METRICS.find((m) => m.key === phaseMetric) ?? PHASE_METRICS[0];
-                  const value = performanceByPhaseName.get(phase.name)?.[metric.key];
+                  const value = performanceByPhaseKey.get(phase.key)?.[metric.key];
                   // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에
                   // 의미 없는 기호가 매달려 라벨만 길어진다.
                   return value != null ? `${metric.label} ${metric.format(value)}` : null;
