@@ -8,8 +8,6 @@ import LinearProgress from '@mui/material/LinearProgress';
 import Skeleton from '@mui/material/Skeleton';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -367,24 +365,15 @@ const STICKY_CAMPAIGN_SX = {
 
 
 /**
- * Performance 탭에서 Event를 골랐을 때 쓸 수 있는 비교 지표.
- * 한 번에 하나만 그린다 — 축이 다른 두 지표를 한 그래프에 겹치면(이중 축)
- * 어느 막대가 어느 축인지 알 수 없고, 축 범위만 바꿔도 결론이 뒤집힌다.
- */
-const PHASE_METRICS = [
-  { key: 'spend', label: 'Spend', format: fmtCurrency },
-  { key: 'impressions', label: 'Impressions', format: fmtNumber },
-  { key: 'follows', label: 'Follows', format: fmtNumber },
-  { key: 'hookRate', label: 'Hook Rate', format: fmtPercent },
-];
-
-/**
- * 같은 이름의 캠페인(= 한 phase)을 플랫폼 구분 없이 합쳐 지표를 낸다.
- * buildPhaseTimeline과 같은 묶음 기준을 써서 Plan 탭과 같은 순서·같은 단위로 읽힌다.
+ * 같은 phase에 속한 캠페인의 실제 지출을 플랫폼 구분 없이 합친다.
+ * buildPhaseTimeline과 같은 묶음 기준(campaignNameKey)을 써서 Plan 탭과 같은
+ * 순서·같은 단위로 읽힌다.
  *
- * hookRate는 캠페인별 비율을 평균 내지 않는다 — 노출이 100인 캠페인의 50%와
- * 노출이 100만인 캠페인의 1%를 평균 내면 25.5%라는 존재하지 않는 숫자가 나온다.
- * 분자(hookViews)와 분모(impressions)를 각각 합친 뒤 다시 나눈다.
+ * 지출 하나만 낸다. 예전엔 Impressions·Follows·Hook Rate까지 계산해 두고 막대에
+ * 무엇을 붙일지 사용자가 고르게 했는데, 고를 이유가 없는 선택이었다 — 이 차트가
+ * 답하는 질문은 "각 단계가 언제, 얼마짜리였나"이고 그 옆에 놓일 수 있는 실적은
+ * 예산과 같은 단위인 지출뿐이다. 노출·팔로우·훅률은 축이 달라서 예산 옆에 붙여도
+ * 비교가 안 되고, 정작 그 지표들은 바로 아래 goal별 표가 캠페인 단위로 다 보여준다.
  */
 function buildPhasePerformance(campaigns, rowByCampaignId) {
   const byName = new Map();
@@ -397,23 +386,14 @@ function buildPhasePerformance(campaigns, rowByCampaignId) {
     if (row) phase.rows.push(row);
   });
 
-  const sum = (rows, key) => {
-    const values = rows.map((r) => r[key]).filter((v) => v != null);
-    return values.length > 0 ? values.reduce((a, b) => a + b, 0) : null;
-  };
-
   return [...byName.values()]
     .map((phase) => {
-      const impressions = sum(phase.rows, 'impressions');
-      const hookViews = sum(phase.rows, 'hookViews');
+      const spends = phase.rows.map((r) => r.spend).filter((v) => v != null);
       return {
         key: phase.key,
         name: phase.name,
         startDate: phase.startDate,
-        spend: sum(phase.rows, 'spend'),
-        impressions,
-        follows: sum(phase.rows, 'follows'),
-        hookRate: impressions ? (hookViews ?? 0) / impressions : null,
+        spend: spends.length > 0 ? spends.reduce((a, b) => a + b, 0) : null,
       };
     })
     .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
@@ -577,7 +557,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
   const [reportTab, setReportTab] = useState(() => loadLastReportView()?.reportTab ?? 'performance');
   const [groupValues, setGroupValues] = useState(() => loadLastReportView()?.groupValues ?? { platform: '', campaignGroup: '' });
   const [dateRange, setDateRange] = useState(() => loadLastReportView()?.dateRange ?? { start: '', end: '' });
-  const [phaseMetric, setPhaseMetric] = useState('spend');
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
@@ -962,42 +941,30 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
           {/* Event 타임라인 — Plan 탭과 **같은 차트**다(PhaseTimelineChart).
               예전엔 여기만 별도의 "지표별 비교 막대"(이름 | 막대 | 값)를 그려서,
               같은 Event를 골라도 탭을 옮기면 완전히 다른 그림이 나왔다(실사용
-              피드백). 시간 축 하나로 통일하고, 이 탭에서만 필요한 성과 지표는
-              막대 라벨 뒤에 덧붙인다 — 막대 길이는 양쪽 다 "기간"을 뜻하므로
-              탭을 오갈 때 읽는 규칙이 바뀌지 않는다. */}
+              피드백). 시간 축 하나로 통일하고, 이 탭에서만 필요한 실적은 막대
+              라벨 뒤에 덧붙인다 — 막대 길이는 양쪽 다 "기간"을 뜻하므로 탭을
+              오갈 때 읽는 규칙이 바뀌지 않는다.
+
+              덧붙이는 값은 지출로 고정한다. 지표 선택기(Spend·Impressions·
+              Follows·Hook Rate)를 뒀다가 뺐다 — 예산 옆에 놓을 수 있는 건 같은
+              단위인 지출뿐이고, 나머지 지표는 바로 아래 goal별 표가 캠페인
+              단위로 이미 다 보여준다. */}
           {phases.length > 0 && (
             <Box sx={{ mb: 4 }}>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-                <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
-                  Event timeline{' '}
-                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                    — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} ·{' '}
-                    {PHASE_METRICS.find((m) => m.key === phaseMetric)?.label} on each bar
-                  </Typography>
+              <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+                Event timeline{' '}
+                <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                  — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · Spend on each bar
                 </Typography>
-                <ToggleButtonGroup
-                  size="small"
-                  exclusive
-                  value={phaseMetric}
-                  onChange={(_, next) => { if (next) setPhaseMetric(next); }}
-                  aria-label="Metric to show on each bar"
-                >
-                  {PHASE_METRICS.map((m) => (
-                    <ToggleButton key={m.key} value={m.key} sx={{ textTransform: 'none', px: 1.5 }}>
-                      {m.label}
-                    </ToggleButton>
-                  ))}
-                </ToggleButtonGroup>
-              </Box>
+              </Typography>
 
               <PhaseTimelineChart
                 phases={phases}
                 barSuffix={(phase) => {
-                  const metric = PHASE_METRICS.find((m) => m.key === phaseMetric) ?? PHASE_METRICS[0];
-                  const value = performanceByPhaseKey.get(phase.key)?.[metric.key];
+                  const spend = performanceByPhaseKey.get(phase.key)?.spend;
                   // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에
                   // 의미 없는 기호가 매달려 라벨만 길어진다.
-                  return value != null ? `${metric.label} ${metric.format(value)}` : null;
+                  return spend != null ? `Spend ${fmtCurrency(spend)}` : null;
                 }}
               />
             </Box>
