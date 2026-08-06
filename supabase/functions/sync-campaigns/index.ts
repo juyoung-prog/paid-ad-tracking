@@ -316,6 +316,73 @@ async function fetchTikTokCampaigns(accessToken: string, advertiserId: string): 
   return { items: all, errorMessage: null };
 }
 
+
+/**
+ * 광고그룹 예산을 캠페인별로 합산한다.
+ *
+ * TikTok은 캠페인 레벨을 BUDGET_MODE_INFINITE로 두고 **실제 예산을 광고그룹에
+ * 거는 게 일반적**이다. 이 계정이 정확히 그렇다 — 동기화 후 확인해 보니 TikTok
+ * 캠페인 31건 중 캠페인 레벨 일일 예산을 가진 건 0건이었다. 캠페인만 읽으면
+ * 예산 칸이 영원히 비므로 한 단계 아래를 한 번 더 읽는다.
+ *
+ * 모드별로 따로 더한다 — 일일과 총액은 단위가 달라서 섞으면 뜻이 사라진다.
+ * 삭제된 광고그룹은 뺀다: 지난 예산이 현재 계획에 합산되면 실제보다 크게 보인다.
+ *
+ * @returns campaign_id → { daily, total }. 값이 없는 쪽은 null.
+ */
+async function fetchTikTokAdGroupBudgets(
+  accessToken: string,
+  advertiserId: string
+): Promise<{ byCampaign: Map<string, { daily: number | null; total: number | null }>; errorMessage: string | null }> {
+  const byCampaign = new Map<string, { daily: number | null; total: number | null }>();
+
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const url = new URL('https://business-api.tiktok.com/open_api/v1.3/adgroup/get/');
+    url.searchParams.set('advertiser_id', advertiserId);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('page_size', '1000');
+
+    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const json = await res.json();
+
+    if (json?.code !== 0) {
+      // 캠페인은 이미 받아온 상태다 — 여기서 실패해도 동기화를 통째로 접지 않고
+      // "예산만 못 채운" 상태로 진행한다(부분 성공이 전체 실패보다 낫다).
+      console.error('TikTok adgroup/get 실패', { page, code: json?.code, message: json?.message });
+
+      /* 40001(권한 부족)은 "고장"이 아니라 "아직 허용되지 않은 기능"이다.
+         이걸 errors에 넣으면 함수가 207을 돌려주고, check_sync_runs()가 207을
+         실패로 기록해(00000000000009 마이그레이션) 설정 화면 경고와 대시보드
+         "Sync failed" 배지가 매일 뜬다 — TikTok 스코프 심사가 끝날 때까지
+         며칠간 계속. 실제로 실패한 건 없고 캠페인은 정상 저장된다.
+         승인되면 같은 코드가 그대로 값을 채우기 시작하므로 켜고 끄는 설정도
+         필요 없다. 다른 코드(네트워크·레이트리밋 등)는 진짜 실패라 그대로 올린다. */
+      if (json?.code === 40001) {
+        return { byCampaign, errorMessage: null };
+      }
+      return { byCampaign, errorMessage: `TikTok adgroup/get 실패 (code ${json?.code}) — ${json?.message}` };
+    }
+
+    for (const ag of json?.data?.list ?? []) {
+      const status = String(ag?.secondary_status ?? ag?.operation_status ?? '');
+      if (status.includes('DELETE')) continue;
+
+      const campaignId = String(ag?.campaign_id ?? '');
+      const amount = Number(ag?.budget ?? 0);
+      if (!campaignId || !amount) continue;
+
+      const acc = byCampaign.get(campaignId) ?? { daily: null, total: null };
+      if (ag?.budget_mode === 'BUDGET_MODE_DAY') acc.daily = (acc.daily ?? 0) + amount;
+      else if (ag?.budget_mode === 'BUDGET_MODE_TOTAL') acc.total = (acc.total ?? 0) + amount;
+      byCampaign.set(campaignId, acc);
+    }
+
+    const totalPage = json?.data?.page_info?.total_page ?? 1;
+    if (page >= totalPage) break;
+  }
+  return { byCampaign, errorMessage: null };
+}
+
 /** TikTok objective → 우리 goal enum. 모르는 값은 traffic으로 둔다. */
 function mapTikTokGoal(objective: string | undefined) {
   switch (objective) {
@@ -340,14 +407,28 @@ function mapTikTokGoal(objective: string | undefined) {
  * INFINITE(또는 0)는 캠페인 레벨에 예산이 없다는 뜻이고, 그 계정은 대개 광고그룹에
  * 예산을 걸어둔다 — 여기서는 값이 없다고만 기록하고 추측하지 않는다.
  */
-function mapTikTokBudget(item: any): Pick<CampaignRow, 'budget_planned' | 'budget_daily'> {
+function mapTikTokBudget(
+  item: any,
+  adGroupBudget?: { daily: number | null; total: number | null }
+): Pick<CampaignRow, 'budget_planned' | 'budget_daily'> {
   const amount = Number(item.budget ?? 0);
-  if (!amount) return { budget_planned: 0, budget_daily: null };
-  if (item.budget_mode === 'BUDGET_MODE_DAY') return { budget_planned: 0, budget_daily: amount };
-  return { budget_planned: amount, budget_daily: null };
+  if (amount) {
+    if (item.budget_mode === 'BUDGET_MODE_DAY') return { budget_planned: 0, budget_daily: amount };
+    return { budget_planned: amount, budget_daily: null };
+  }
+  // 캠페인 레벨에 예산이 없으면(INFINITE) 광고그룹 합계로 대체한다.
+  return {
+    budget_planned: adGroupBudget?.total ?? 0,
+    budget_daily: adGroupBudget?.daily ?? null,
+  };
 }
 
-function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
+function mapTikTokCampaign(
+  item: any,
+  base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
+  stores: StoreIndex,
+  adGroupBudgets?: Map<string, { daily: number | null; total: number | null }>
+): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
   const range =
     parseRangeFromName(item.campaign_name ?? '', createdAt) ??
@@ -369,7 +450,7 @@ function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'plat
     // TikTok은 금액 하나(budget)에 모드(budget_mode)를 따로 준다 — 모드를 안 보면
     // 일일 예산을 총액 칸에 넣게 된다(예전 버그). BUDGET_MODE_INFINITE면 budget이
     // 0으로 오는데, 그건 보통 캠페인이 아니라 광고그룹에 예산을 건 계정이다.
-    ...mapTikTokBudget(item),
+    ...mapTikTokBudget(item, adGroupBudgets?.get(String(item.campaign_id))),
     goal: mapTikTokGoal(item.objective),
   };
 }
@@ -443,8 +524,21 @@ Deno.serve(async (req) => {
     if (fetched.errorMessage) errors.push(`${key}: ${fetched.errorMessage}`);
     const raw = fetched.items;
 
+    /* TikTok은 예산이 캠페인이 아니라 광고그룹에 걸려 있는 경우가 일반적이라
+       한 단계 아래를 한 번 더 읽는다(fetchTikTokAdGroupBudgets 주석 참고).
+       캠페인이 0건이면 합산할 대상도 없으므로 호출을 아낀다 — 계정당 호출이
+       한 세트 늘어나는 변경이라 불필요한 경우를 먼저 걷어낸다. */
+    let adGroupBudgets: Map<string, { daily: number | null; total: number | null }> | undefined;
+    if (conn.platform === 'tiktok' && raw.length > 0) {
+      const adGroups = await fetchTikTokAdGroupBudgets(conn.access_token, externalAccountId);
+      if (adGroups.errorMessage) errors.push(`${key}: ${adGroups.errorMessage}`);
+      adGroupBudgets = adGroups.byCampaign;
+    }
+
     const rows: CampaignRow[] = raw.map((item: any) =>
-      conn.platform === 'meta' ? mapMetaCampaign(item, base, stores) : mapTikTokCampaign(item, base, stores)
+      conn.platform === 'meta'
+        ? mapMetaCampaign(item, base, stores)
+        : mapTikTokCampaign(item, base, stores, adGroupBudgets)
     );
     if (rows.length === 0) continue;
 
