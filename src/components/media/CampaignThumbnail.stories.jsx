@@ -26,6 +26,11 @@ export default {
 자리표시자에도 적용된다), 플랫폼은 바로 옆 Platform 컬럼이 글자로 이미 말한다.
 platform prop은 색이 아니라 접근성 이름에 쓴다 — 스크린리더는 옆 컬럼을 함께
 읽어주지 않는다.
+
+프레임은 정사각형이다. 한때 9:16 세로형이었는데("소재는 대부분 Reels/Stories"라는
+추정), 동기화가 실제로 가져오는 Meta 소재 썸네일이 정사각형(320x320)이라 세로
+프레임에서 좌우가 44% 잘렸다. 게다가 높이 40일 때 폭이 22px라 "소재를 알아본다"는
+목적 자체가 성립하지 않았다(실사용 신고). 소스 형식에 맞춰 정사각형으로 되돌렸다.
         `,
       },
     },
@@ -38,7 +43,7 @@ platform prop은 색이 아니라 접근성 이름에 쓴다 — 스크린리더
       options: [PLATFORM.META, PLATFORM.TIKTOK],
       description: '대체 표시의 접근성 이름에 포함 (색상에는 영향 없음)',
     },
-    size: { control: { type: 'number', min: 24, max: 96 }, description: '세로 길이(px) — 9:16 세로 비율, 가로폭은 자동 계산' },
+    size: { control: { type: 'number', min: 24, max: 96 }, description: '한 변의 길이(px) — 정사각형' },
   },
 };
 
@@ -47,7 +52,6 @@ export const Default = {
     thumbnailUrl: placeholderSvg(120, 120),
     name: 'Summer Sale Traffic',
     platform: PLATFORM.META,
-    size: 40,
   },
 };
 
@@ -67,15 +71,14 @@ export const BrokenUrl = {
     thumbnailUrl: 'https://example.invalid/not-a-real-image.jpg',
     name: 'Holiday Conversion FL',
     platform: PLATFORM.META,
-    size: 40,
   },
 };
 
-/** 크기 비교 — 리스트 행(40px)과 Drawer 상세(64px)에서 쓰는 크기 */
+/** 크기 비교 — 리스트 행(48px, 기본값)과 Drawer 상세(64px)에서 쓰는 크기 */
 export const Sizes = {
   render: () => (
     <Stack direction="row" spacing={3} alignItems="flex-end">
-      {[32, 40, 64].map((size) => (
+      {[32, 48, 64].map((size) => (
         <Stack key={size} spacing={1} alignItems="center">
           <CampaignThumbnail name="Ending Soon Campaign" platform={PLATFORM.META} size={size} />
           <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>

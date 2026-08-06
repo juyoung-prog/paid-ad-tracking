@@ -36,20 +36,24 @@ function getInitials(name = '') {
  * @param {string|null} thumbnailUrl - 소재 미리보기 이미지 URL [Optional]
  * @param {string} name - 캠페인명 (대체 표시 이니셜/alt 텍스트 생성에 사용) [Required]
  * @param {string} platform - PLATFORM.META | PLATFORM.TIKTOK. 대체 표시의 접근성 이름에 포함된다 [Optional]
- * @param {number} size - 세로 길이(px). Meta/TikTok 캠페인 소재는 대부분 Reels/Stories(9:16 세로형)라
- *   정사각형이 아니라 9:16 세로 비율로 렌더링한다 — 가로폭은 이 값에서 자동 계산됨 [Optional, 기본값: 40]
+ * @param {number} size - 한 변의 길이(px). 정사각형이다 [Optional, 기본값: 48]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={48} />
+ * <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} />
  */
-export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 40, sx }) {
+export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 48, sx }) {
   // hasError를 단순 boolean으로 두면, 한 번 실패한 뒤 thumbnailUrl이 유효한
   // 값으로 바뀌어도(예: URL 수정 직후) 계속 이니셜로 고정되는 버그가 생긴다.
   // 실패했던 URL 자체를 기억해서, 그 값이 바뀌면 다시 이미지 로드를 시도한다.
   const [erroredUrl, setErroredUrl] = useState(null);
   const showImage = Boolean(thumbnailUrl) && thumbnailUrl !== erroredUrl;
-  const width = Math.round(size * (9 / 16));
+  /* 한때 9:16 세로형이었다. "소재는 대부분 Reels/Stories"라는 추정이었는데,
+     실제로 동기화가 가져오는 Meta 소재 썸네일은 정사각형(320x320)이라 세로
+     프레임에 넣으면 좌우가 44% 잘려나갔다. 게다가 높이 40일 때 폭이 22px밖에
+     안 돼서 "소재를 알아본다"는 이 컴포넌트의 목적 자체가 성립하지 않았다
+     (실사용 신고 — 썸네일이 너무 작다). 소스 형식에 맞춰 정사각형으로 둔다. */
+  const width = size;
 
   if (showImage) {
     return (

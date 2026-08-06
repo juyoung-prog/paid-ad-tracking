@@ -152,6 +152,7 @@ type CampaignRow = {
   budget_planned: number;
   budget_daily: number | null;
   goal: string;
+  thumbnail_url: string | null;
 };
 
 function toISODate(value: Date) {
@@ -244,6 +245,59 @@ async function fetchMetaCampaigns(accessToken: string, externalAccountId: string
   return { items: all, errorMessage: null };
 }
 
+/**
+ * 캠페인별 소재 썸네일을 계정 단위로 한 번에 읽는다.
+ *
+ * 왜 필요한가: 화면의 캠페인 목록은 소재 썸네일로 캠페인을 구분하는데, 실계정
+ * 170건 중 썸네일이 있는 건 2건(사람이 직접 올린 것)뿐이었다. 이름이
+ * "G10_Now Open_0706~0831"과 "G10_Grand Opening _0706 ~ 0801"처럼 서로 거의
+ * 같아서 글자로 구분하는 비용이 큰데, 정작 가장 빠른 단서인 소재 이미지가
+ * 비어 있었다.
+ *
+ * 왜 캠페인 단위가 아니라 계정 단위로 읽는가: 캠페인마다 광고를 따로 조회하면
+ * 139건 × 2회 = 278회가 된다. 계정의 /ads를 한 번 페이지네이션하면 응답에
+ * campaign_id가 같이 오므로 호출 한 세트로 끝난다.
+ *
+ * 크기 지정이 까다롭다: 최상위 쿼리 파라미터로 thumbnail_width를 줘도 중첩
+ * 확장(creative{...})에는 안 먹어서 64x64가 온다. 필드 자체에 파라미터를 붙인
+ * `creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url}` 형태여야
+ * 320x320이 온다(실측으로 확인 — 64px짜리를 48px 타일에 쓰면 2배 화면에서
+ * 뭉갠다).
+ *
+ * 캠페인 하나에 광고가 여러 개면 먼저 만난 것을 쓴다. "그 캠페인의 대표 소재"가
+ * 하나로 정해지지 않는 건 creative_url을 채우지 않기로 한 것과 같은 사정인데,
+ * 링크와 썸네일은 성격이 다르다 — 틀린 링크는 사람을 엉뚱한 곳으로 보내지만,
+ * 같은 캠페인의 아무 소재나 보여주는 건 "이게 뭐였지"를 떠올리는 데 그대로
+ * 쓸모가 있다.
+ *
+ * 실패해도 errorMessage를 남기지 않는다 — 썸네일은 부가 정보라, 이것 때문에
+ * 동기화 전체가 "실패"로 표시되면 예산·성과가 멀쩡히 들어왔는데도 사용자가
+ * 잘못된 신호를 받는다.
+ */
+async function fetchMetaThumbnails(accessToken: string, externalAccountId: string): Promise<Map<string, string>> {
+  const byCampaign = new Map<string, string>();
+  const fields = 'campaign_id,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url}';
+  let url: string | null =
+    `https://graph.facebook.com/v19.0/act_${externalAccountId}/ads?fields=${fields}&limit=200&access_token=${accessToken}`;
+
+  for (let page = 0; url && page < MAX_PAGES; page += 1) {
+    const res: Response = await fetch(url);
+    const json: any = await res.json();
+    if (json?.error) {
+      console.error('Meta 썸네일 조회 실패(무시하고 계속)', json.error);
+      return byCampaign;
+    }
+    for (const ad of json.data ?? []) {
+      const thumb = ad?.creative?.thumbnail_url;
+      const campaignId = ad?.campaign_id != null ? String(ad.campaign_id) : null;
+      // 먼저 만난 광고의 소재를 쓴다 — 이후 광고로 덮지 않는다.
+      if (thumb && campaignId && !byCampaign.has(campaignId)) byCampaign.set(campaignId, thumb);
+    }
+    url = json.paging?.next ?? null;
+  }
+  return byCampaign;
+}
+
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
 function mapMetaGoal(objective: string | undefined) {
   switch (objective) {
@@ -266,7 +320,12 @@ function mapMetaGoal(objective: string | undefined) {
   }
 }
 
-function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
+function mapMetaCampaign(
+  item: any,
+  base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
+  stores: StoreIndex,
+  thumbnails?: Map<string, string>,
+): CampaignRow {
   const createdAt = new Date(item.created_time ?? Date.now());
   // Meta의 status는 ACTIVE/PAUSED/ARCHIVED/DELETED.
   const fallback = fallbackRange(createdAt, item.status === 'ACTIVE', new Date(item.updated_time ?? item.created_time ?? Date.now()));
@@ -287,6 +346,7 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
     budget_planned: Number(item.lifetime_budget ?? 0) / 100,
     budget_daily: item.daily_budget != null ? Number(item.daily_budget) / 100 : null,
     goal: mapMetaGoal(item.objective),
+    thumbnail_url: thumbnails?.get(String(item.id)) ?? null,
   };
 }
 
@@ -461,6 +521,9 @@ function mapTikTokCampaign(
     // 0으로 오는데, 그건 보통 캠페인이 아니라 광고그룹에 예산을 건 계정이다.
     ...mapTikTokBudget(item, adGroupBudgets?.get(String(item.campaign_id))),
     goal: mapTikTokGoal(item.objective),
+    // TikTok 소재 썸네일은 아직 안 가져온다 — Meta와 달리 캠페인에서 소재까지
+    // 내려가는 경로가 별도 권한을 요구해서, Ad Group 권한 심사와 함께 정리한다.
+    thumbnail_url: null,
   };
 }
 
@@ -544,9 +607,16 @@ Deno.serve(async (req) => {
       adGroupBudgets = adGroups.byCampaign;
     }
 
+    /* 소재 썸네일도 한 단계 아래(광고)에 있어서 한 번 더 읽는다. 예산과 같은
+       이유로 캠페인이 0건이면 호출을 아낀다. */
+    let thumbnails: Map<string, string> | undefined;
+    if (conn.platform === 'meta' && raw.length > 0) {
+      thumbnails = await fetchMetaThumbnails(conn.access_token, externalAccountId);
+    }
+
     const rows: CampaignRow[] = raw.map((item: any) =>
       conn.platform === 'meta'
-        ? mapMetaCampaign(item, base, stores)
+        ? mapMetaCampaign(item, base, stores, thumbnails)
         : mapTikTokCampaign(item, base, stores, adGroupBudgets)
     );
     if (rows.length === 0) continue;
@@ -560,7 +630,7 @@ Deno.serve(async (req) => {
        넣은 값을 덮어쓸 위험은 없다. */
     const { data: existing, error: existingError } = await admin
       .from('campaigns')
-      .select('external_campaign_id, budget_planned, budget_daily, target_store_ids')
+      .select('external_campaign_id, budget_planned, budget_daily, target_store_ids, thumbnail_url')
       .in('external_campaign_id', rows.map((r) => r.external_campaign_id));
 
     if (existingError) {
@@ -585,6 +655,15 @@ Deno.serve(async (req) => {
           patch.target_store_ids = row.target_store_ids;
           patch.target_scope = row.target_scope;
         }
+        /* 썸네일은 "비어 있을 때만"이 아니라 "우리가 채운 것이면 매번" 갱신한다.
+           Meta CDN 링크에는 만료 파라미터(oe=)가 붙어 있어서, 한 번 채우고 다시
+           안 건드리면 언젠가 전부 깨진 이미지가 된다.
+
+           사용자가 직접 올린 썸네일은 base64 data URI로 저장되므로(실데이터
+           확인 — 1MB 안팎) 그것만 보호하면 된다. 별도 컬럼(thumbnail_source)을
+           두는 것보다 가볍고, 저장 형식이 실제로 갈려 있어 판정이 흔들리지 않는다. */
+        const isUserUploaded = String(current.thumbnail_url ?? '').startsWith('data:');
+        if (!isUserUploaded && row.thumbnail_url) patch.thumbnail_url = row.thumbnail_url;
 
         const { error: updateError } = await admin
           .from('campaigns')

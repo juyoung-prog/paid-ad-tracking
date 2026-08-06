@@ -163,7 +163,9 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
           >
             {/* 소재 썸네일 — thumbnailUrl이 없으면 CampaignThumbnail이 자체적으로
                 플랫폼색 이니셜로 대체하므로 항상 뭔가 시각적으로 보인다 */}
-            <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={40} />
+            {/* 크기는 컴포넌트 기본값(48)을 쓴다 — 옆 텍스트 블록이 이름(24px) +
+                메타(20px)로 이미 그만한 높이라 행이 두꺼워지지 않는다. */}
+            <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} />
 
             {/* 좌측 — 캠페인명(Hero) + 메타(플랫폼·계정·타겟) */}
             <Box sx={{ minWidth: 0, flex: 1 }}>
