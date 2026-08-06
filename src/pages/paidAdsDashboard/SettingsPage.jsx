@@ -26,6 +26,9 @@ const CONNECT_TARGETS = [
   { accountId: 'meta-fl', platform: 'meta', region: 'FL', label: 'Meta — Florida' },
 ];
 
+/** 플랫폼 표기는 한 곳에서만 정한다 — 원본 값('tiktok')을 그대로 쓰면 브랜드 표기와 어긋난다. */
+const PLATFORM_LABEL = { meta: 'Meta', tiktok: 'TikTok' };
+
 const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 /** OAuth 시작 URL. 브라우저를 통째로 보내야 한다 — fetch로 부르면 리다이렉트를 따라갈 수 없다. */
@@ -90,8 +93,19 @@ export function SettingsPage() {
   const accountById = new Map(adAccounts.map((a) => [a.id, a]));
   const connectionByAccountId = new Map(connections.map((c) => [c.accountId, c]));
 
+  /* 화면에 그릴 계정 목록 = 고정 연결 대상 + DB에 있는 그 밖의 계정.
+     CONNECT_TARGETS만 그리면, 나중에 추가된 광고 계정이 실제로 동기화되고 있는데도
+     이 화면에는 아예 안 나온다 — 연결 상태도 만료일도 볼 수 없고 재연결도 못 한다
+     (실제로 meta-bm 계정을 붙였더니 캠페인 33건이 들어오는데 화면에는 없었다).
+     "무엇을 연결할 수 있는가"는 고정 구성이 맞지만, "무엇이 연결돼 있는가"는
+     DB가 진실이다. */
+  const extraTargets = adAccounts
+    .filter((a) => !CONNECT_TARGETS.some((t) => t.accountId === a.id))
+    .map((a) => ({ accountId: a.id, platform: a.platform, region: a.region, label: a.label }));
+  const connectTargets = [...CONNECT_TARGETS, ...extraTargets];
+
   // 만료됐거나 곧 만료되는 연결. 상단 경고와 목록 칩이 같은 판정을 쓰도록 여기서 한 번 계산한다.
-  const expiringConnections = CONNECT_TARGETS.map((target) => {
+  const expiringConnections = connectTargets.map((target) => {
     const connection = connectionByAccountId.get(target.accountId);
     const { remainingDays, isExpired } = getExpiry(connection?.expiresAt);
     return {
@@ -155,7 +169,7 @@ export function SettingsPage() {
 
       <Paper elevation={ 0 } sx={ { border: 1, borderColor: 'divider' } }>
         <Stack divider={ <Divider /> }>
-          { CONNECT_TARGETS.map((target) => {
+          { connectTargets.map((target) => {
             const account = accountById.get(target.accountId);
             const connection = connectionByAccountId.get(target.accountId);
             const isConnected = Boolean(connection);
@@ -172,6 +186,10 @@ export function SettingsPage() {
                 <Box sx={ { flexGrow: 1, minWidth: 0 } }>
                   <Stack direction="row" spacing={ 1 } sx={ { alignItems: 'center', mb: 0.5 } }>
                     <Typography variant="subtitle1">{ account?.label ?? target.label }</Typography>
+                    {/* 플랫폼은 칩으로 못 박는다 — 라벨은 플랫폼이 연결 후 내려주는
+                        계정명으로 덮이는데(예: TikTok이 'BeautyMaster03140808'을 준다)
+                        거기엔 플랫폼 표시가 없어서 어느 플랫폼 계정인지 알 수 없었다. */}
+                    <Chip size="small" variant="outlined" label={ PLATFORM_LABEL[target.platform] ?? target.platform } />
                     <Chip
                       size="small"
                       label={ isConnected ? 'Connected' : 'Not connected' }
