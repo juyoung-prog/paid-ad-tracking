@@ -141,6 +141,7 @@ type CampaignRow = {
   start_date: string;
   end_date: string;
   budget_planned: number;
+  budget_daily: number | null;
   goal: string;
 };
 
@@ -210,7 +211,10 @@ function fallbackRange(createdAt: Date, isRunning: boolean, lastModifiedAt?: Dat
  * 한 페이지만 읽으면 계정에 캠페인이 많을 때 뒤쪽이 조용히 사라진다.
  */
 async function fetchMetaCampaigns(accessToken: string, externalAccountId: string): Promise<FetchResult> {
-  const fields = 'id,name,status,objective,start_time,stop_time,created_time,updated_time,lifetime_budget';
+  // daily_budget을 함께 받는다. 예전엔 lifetime_budget만 요청해서, 일일 예산으로
+  // 돌리는 캠페인(Meta에서 흔한 설정)은 lifetime이 비어 있어 예산이 0으로 저장됐다 —
+  // 화면의 예산 칸이 통째로 '—'로 뜨는 원인이었다(실데이터 확인).
+  const fields = 'id,name,status,objective,start_time,stop_time,created_time,updated_time,lifetime_budget,daily_budget';
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/campaigns?fields=${fields}&limit=200&access_token=${accessToken}`;
   const all: any[] = [];
@@ -269,7 +273,10 @@ function mapMetaCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platfo
     ...resolveTarget(item.name ?? '', stores),
     start_date: startDate,
     end_date: endDate < startDate ? startDate : endDate,
-    budget_planned: Number(item.lifetime_budget ?? 0) / 100, // Meta는 최소 화폐 단위(센트)로 준다
+    // Meta는 금액을 최소 화폐 단위(센트)로 준다. 두 예산은 서로 대체재가 아니라
+    // 설정 방식이 다른 값이라 각자 자리에 넣는다 — 캠페인은 둘 중 하나만 갖는다.
+    budget_planned: Number(item.lifetime_budget ?? 0) / 100,
+    budget_daily: item.daily_budget != null ? Number(item.daily_budget) / 100 : null,
     goal: mapMetaGoal(item.objective),
   };
 }
@@ -325,6 +332,21 @@ function mapTikTokGoal(objective: string | undefined) {
   }
 }
 
+/**
+ * TikTok 예산을 모드에 맞는 칸으로 보낸다.
+ *
+ * budget 하나에 budget_mode가 따로 오는 구조라, 모드를 보지 않으면 일일 예산이
+ * 총 예산으로 저장된다("하루 5만원"이 "총 5만원"이 되어 pacing 계산까지 틀어진다).
+ * INFINITE(또는 0)는 캠페인 레벨에 예산이 없다는 뜻이고, 그 계정은 대개 광고그룹에
+ * 예산을 걸어둔다 — 여기서는 값이 없다고만 기록하고 추측하지 않는다.
+ */
+function mapTikTokBudget(item: any): Pick<CampaignRow, 'budget_planned' | 'budget_daily'> {
+  const amount = Number(item.budget ?? 0);
+  if (!amount) return { budget_planned: 0, budget_daily: null };
+  if (item.budget_mode === 'BUDGET_MODE_DAY') return { budget_planned: 0, budget_daily: amount };
+  return { budget_planned: amount, budget_daily: null };
+}
+
 function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>, stores: StoreIndex): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
   const range =
@@ -344,8 +366,10 @@ function mapTikTokCampaign(item: any, base: Pick<CampaignRow, 'owner_id' | 'plat
     ...resolveTarget(item.campaign_name ?? '', stores),
     start_date: range.startDate,
     end_date: range.endDate,
-    // BUDGET_MODE_INFINITE면 budget이 0으로 온다. 계획 예산은 사용자가 넣는 값이다.
-    budget_planned: Number(item.budget ?? 0),
+    // TikTok은 금액 하나(budget)에 모드(budget_mode)를 따로 준다 — 모드를 안 보면
+    // 일일 예산을 총액 칸에 넣게 된다(예전 버그). BUDGET_MODE_INFINITE면 budget이
+    // 0으로 오는데, 그건 보통 캠페인이 아니라 광고그룹에 예산을 건 계정이다.
+    ...mapTikTokBudget(item),
     goal: mapTikTokGoal(item.objective),
   };
 }
@@ -424,25 +448,36 @@ Deno.serve(async (req) => {
     );
     if (rows.length === 0) continue;
 
-    // 이미 있는 캠페인은 이름만 갱신한다. 전체 upsert로 덮으면 사용자가 화면에서
-    // 채운 기간·타겟·예산·목표가 매일 동기화 때마다 기본값으로 되돌아간다.
+    /* 이미 있는 캠페인은 이름만 갱신한다. 전체 upsert로 덮으면 사용자가 화면에서
+       채운 기간·타겟·예산·목표가 매일 동기화 때마다 기본값으로 되돌아간다.
+       예외는 예산 한 가지다 — **저장된 값이 비어 있을 때만** 채운다. 예산 매핑이
+       불완전하던 시절(Meta는 lifetime_budget만 요청, TikTok은 budget_mode를 안 봄)
+       동기화된 캠페인은 전부 0/null로 들어와 있어서, 매퍼만 고치면 신규 캠페인만
+       값을 갖고 기존 것은 영원히 '—'로 남는다. 비어 있는 칸만 채우므로 사용자가
+       넣은 값을 덮어쓸 위험은 없다. */
     const { data: existing, error: existingError } = await admin
       .from('campaigns')
-      .select('external_campaign_id')
+      .select('external_campaign_id, budget_planned, budget_daily')
       .in('external_campaign_id', rows.map((r) => r.external_campaign_id));
 
     if (existingError) {
       errors.push(`${key}: 기존 캠페인 조회 실패 — ${existingError.message}`);
       continue;
     }
-    const existingIds = new Set((existing ?? []).map((c) => c.external_campaign_id));
+    const existingById = new Map((existing ?? []).map((c) => [c.external_campaign_id, c]));
 
     for (const row of rows) {
       // 한 건이 실패해도 나머지는 계속한다 — 부분 성공이 전체 실패보다 낫다.
-      if (existingIds.has(row.external_campaign_id)) {
+      const current = existingById.get(row.external_campaign_id);
+      if (current) {
+        const patch: Record<string, unknown> = { name: row.name, updated_at: new Date().toISOString() };
+        // 비어 있는 예산만 채운다(0/null이 "값 없음" — 화면도 0을 예산 없음으로 읽는다).
+        if (!current.budget_planned && row.budget_planned) patch.budget_planned = row.budget_planned;
+        if (current.budget_daily == null && row.budget_daily != null) patch.budget_daily = row.budget_daily;
+
         const { error: updateError } = await admin
           .from('campaigns')
-          .update({ name: row.name, updated_at: new Date().toISOString() })
+          .update(patch)
           .eq('external_campaign_id', row.external_campaign_id);
 
         if (updateError) {
