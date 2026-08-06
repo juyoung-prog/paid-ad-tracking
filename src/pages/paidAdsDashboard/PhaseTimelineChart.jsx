@@ -93,8 +93,15 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
 
   /* 마일스톤 = 각 phase의 시작일(실사용 확인 완료 — 종료일 기준은 이벤트마다
      의미가 달라 일반화하기 어렵고, 시작일은 "다음 단계로 넘어가는 시점"이라는
-     뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 점선 하나로 합친다. */
-  const milestoneDates = [...new Set(phases.map((p) => p.startDate))].sort();
+     뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 점선 하나로 합친다.
+
+     타임라인 양 끝과 겹치는 점선은 긋지 않는다 — 첫 phase의 시작일은 곧 축의
+     원점이라 그 자리의 세로 점선이 "구간 경계"가 아니라 차트의 왼쪽 테두리(혹은
+     y축)처럼 읽힌다. 이 차트에는 y축이 없으므로 없는 축을 암시하게 된다. 날짜
+     자체는 축 눈금이 그대로 말한다. */
+  const milestoneDates = [...new Set(phases.map((p) => p.startDate))]
+    .filter((date) => date !== timelineStart && date !== timelineEnd)
+    .sort();
 
   /* 축 눈금 = 타임라인 양 끝 + 마일스톤 날짜. 날짜가 서로 너무 가까우면 라벨이
      겹치므로 최소 간격 미만은 버린다 — 양 끝은 축의 범위를 말하므로 예외 없이
