@@ -316,4 +316,15 @@ export const mockAlerts = [
     resolvedAt: null,
     message: 'Georgia Traffic Push B — Georgia Traffic Push A와 같은 매장·목표로 기간이 겹칩니다',
   },
+  // missing_performance 재도입에 맞춘 샘플 — AlertBanner 스토리가 고긴급 3종을
+  // 전부 커버하도록. 실런타임에서는 generateAlerts()가 "종료 + 성과 레코드
+  // 부재 + 종료 후 30일 이내" 조건으로 생성한다.
+  {
+    id: 'alert-05',
+    campaignId: 'camp-04',
+    type: ALERT_TYPE.MISSING_PERFORMANCE,
+    triggeredAt: '2026-07-20T00:00:00Z',
+    resolvedAt: null,
+    message: 'Spring Grand Opening — ended 5d ago with no performance data — enter results to complete reporting',
+  },
 ];

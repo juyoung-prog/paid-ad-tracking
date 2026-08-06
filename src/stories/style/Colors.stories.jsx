@@ -185,6 +185,8 @@ export const Docs = {
         info: theme.palette.info,
         text: theme.palette.text,
         background: theme.palette.background,
+        accent: theme.palette.accent,
+        surface: theme.palette.surface,
         divider: theme.palette.divider,
       },
     };
@@ -203,6 +205,17 @@ export const Docs = {
       { token: 'text.secondary', value: theme.palette.text.secondary, description: '보조 텍스트, 캡션' },
       { token: 'background.default', value: theme.palette.background.default, description: '페이지 배경' },
       { token: 'background.paper', value: theme.palette.background.paper, description: '카드, 모달 배경' },
+      // 상호작용 액센트 — 활성·선택·포커스가 전부 이 한 값에서 나온다.
+      // primary.main(#0000FF)은 채도 100%라 목록이 주인공인 화면에서 컨트롤이
+      // 가장 강한 요소가 돼버려서, "선택됨"의 기준색은 한 단 낮은 이 값이다.
+      { token: 'accent.main', value: theme.palette.accent.main, description: '활성·선택·포커스 단일 액센트 (내비 활성, 탭 밑줄)' },
+      { token: 'accent.tint', value: theme.palette.accent.tint, description: '선택 배경 — 채우지 않고 옅게 깐다' },
+      { token: 'accent.tintHover', value: theme.palette.accent.tintHover, description: '선택 배경의 hover' },
+      { token: 'accent.ring', value: theme.palette.accent.ring, description: '포커스 외곽 링 (테두리 1px 유지 + 번짐)' },
+      // 면 위계 — grey.50/100을 날것으로 쓰면 무엇이 배경이고 무엇이 트랙인지
+      // 코드만 봐서는 구분되지 않는다. 이름으로 역할을 고정한다.
+      { token: 'surface.sunken', value: theme.palette.surface.sunken, description: '한 단 낮은 면 (레일 배경, 정보 스트립)' },
+      { token: 'surface.muted', value: theme.palette.surface.muted, description: '무채색 채움 (차트 트랙, 라벨 배경)' },
       { token: 'divider', value: theme.palette.divider, description: '구분선, 보더' },
     ];
 
@@ -302,7 +315,18 @@ export const Docs = {
 <Box sx={{
   backgroundColor: 'primary.main',
   '&:hover': { backgroundColor: 'primary.dark' }
-}} />` }
+}} />
+
+// 활성/선택 상태 — primary가 아니라 accent를 쓴다
+<Box sx={{
+  backgroundColor: 'accent.tint',
+  color: 'accent.main',
+  '&:hover': { backgroundColor: 'accent.tintHover' }
+}} />
+
+// 면 위계 — grey.50/100 대신 역할 이름으로
+<Box sx={{ backgroundColor: 'surface.sunken' }} />  // 한 단 낮은 면
+<Box sx={{ backgroundColor: 'surface.muted' }} />   // 차트 트랙, 라벨 배경` }
           </Box>
 
           {/* Vibe Coding Prompt */}
@@ -334,7 +358,12 @@ hover 시 primary.dark로 변경되도록 해줘."
 선택된 상태의 카드를 만들어줘."
 
 "error.main 색상으로 삭제 버튼을 만들고,
-hover 시 error.dark로 어두워지게 해줘."` }
+hover 시 error.dark로 어두워지게 해줘."
+
+"내비 항목의 활성 상태를 accent.tint 배경 + accent.main 글자로 만들어줘.
+primary.main은 쓰지 마 — 선택 상태의 기준색은 accent야."
+
+"사이드바 배경은 grey.50 대신 surface.sunken을 써줘."` }
           </Box>
         </PageContainer>
       </>
@@ -531,7 +560,11 @@ export const Usage = {
             mb: 4,
           } }
         >
-{ `<Button variant="contained" color="primary">Primary</Button>
+{ `// 주의: color="primary" 버튼의 실제 표면색은 primary.main(#0000FF)이 아니라
+// accent.main(#0000B2)이다 — 테마의 MuiButton override가 "선택·상호작용은 accent
+// 하나로"라는 규칙을 버튼에도 적용한다(Overview/Visual Direction의 토큰 변경표 참고).
+// primary.main은 브랜드 색으로 팔레트에 그대로 남아 있다.
+<Button variant="contained" color="primary">Primary</Button>
 <Button variant="contained" color="error">Error</Button>
 <Button variant="contained" color="success">Success</Button>` }
         </Box>

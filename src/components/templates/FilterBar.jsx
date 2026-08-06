@@ -282,7 +282,9 @@ export function FilterBar({
               display: 'flex',
               border: '1px solid',
               borderColor: 'divider',
-              borderRadius: '4px',
+              // 상호작용 컨트롤 → control radius. 안쪽 세그먼트는 0 유지 —
+              // overflow:hidden인 이 컨테이너가 바깥 모서리를 잘라준다.
+              borderRadius: (theme) => `${theme.shape.radius.control}px`,
               overflow: 'hidden',
             }}
           >
@@ -297,7 +299,8 @@ export function FilterBar({
               sx={{
                 borderRadius: 0,
                 bgcolor: viewMode === 'grid' ? 'action.selected' : 'transparent',
-                color: viewMode === 'grid' ? 'primary.main' : 'text.secondary',
+                // "선택됨"은 accent — 파랑 단일화(테마 accent 주석) 적용
+                color: viewMode === 'grid' ? 'accent.main' : 'text.secondary',
               }}
             >
               <GridViewIcon fontSize="small" />
@@ -310,7 +313,7 @@ export function FilterBar({
               sx={{
                 borderRadius: 0,
                 bgcolor: viewMode === 'list' ? 'action.selected' : 'transparent',
-                color: viewMode === 'list' ? 'primary.main' : 'text.secondary',
+                color: viewMode === 'list' ? 'accent.main' : 'text.secondary',
               }}
             >
               <ViewListIcon fontSize="small" />
@@ -325,7 +328,7 @@ export function FilterBar({
           sx={{
             mt: 2,
             p: 2,
-            borderRadius: '4px',
+            borderRadius: (theme) => `${theme.shape.radius.control}px`,
             border: '1px solid',
             borderColor: 'divider',
             bgcolor: 'background.default',
@@ -406,12 +409,16 @@ export function FilterBar({
                 deleteIcon={<CloseIcon sx={{ fontSize: 14 }} />}
                 sx={{
                   fontWeight: 500,
-                  bgcolor: 'primary.lighter',
-                  color: 'primary.dark',
+                  // primary.lighter는 팔레트에 존재하지 않는 키였다(무효 CSS로
+                  // 조용히 투명 배경) — 선택 상태 배경은 accent.tint가 정답.
+                  bgcolor: 'accent.tint',
+                  color: 'accent.main',
                   '& .MuiChip-deleteIcon': {
-                    color: 'primary.main',
+                    color: 'accent.main',
+                    // base와 같은 값(primary.dark = #0000B2)을 주면 hover 피드백이
+                    // 시각적으로 0이 된다 — 한 단 더 어두운 accent.dark를 쓴다.
                     '&:hover': {
-                      color: 'primary.dark',
+                      color: 'accent.dark',
                     },
                   },
                 }}

@@ -28,10 +28,18 @@ function Interactive() {
       <StoreListSection
         stores={stores}
         campaigns={mockCampaigns}
-        onAddStore={(store) => setStores((prev) => [...prev, store])}
-        onUpdateStore={(storeId, patch) =>
-          setStores((prev) => prev.map((s) => (s.id === storeId ? { ...s, ...patch } : s)))
-        }
+        // 저장 핸들러는 성공 시 저장된 값을 돌려줘야 한다 — StoreListSection이
+        // 반환값으로 성공/실패를 가른다(실스토어의 addStore/updateStore가 실패 시
+        // null을 주는 계약). setStores(...)는 undefined라서, 그대로 두면 매장이
+        // 실제로 추가되는데도 "Save failed"가 뜬다.
+        onAddStore={(store) => {
+          setStores((prev) => [...prev, store]);
+          return store;
+        }}
+        onUpdateStore={(storeId, patch) => {
+          setStores((prev) => prev.map((s) => (s.id === storeId ? { ...s, ...patch } : s)));
+          return { id: storeId, ...patch };
+        }}
       />
     </Box>
   );

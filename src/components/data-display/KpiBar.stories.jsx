@@ -23,7 +23,7 @@ KPI 숫자 요약 바. label/value 배열을 받는 범용 컴포넌트로, Dash
 - 항목 간 구분선으로 시각적으로 분리
 - 숫자는 tabular-nums로 자릿수 변화에도 레이아웃 고정
 - isAlert 항목은 error 컬러로 강조
-- sub로 값 아래 부가 설명 추가 가능(예: "across reported campaigns")
+- sub로 값 아래 부가 설명 추가 가능(예: "across reported campaigns") — sub 줄은 없어도 항상 자리를 예약해, sub 있는 항목이 생기고 사라질 때(탭 전환 등) 바 높이가 흔들리지 않는다
         `,
       },
     },

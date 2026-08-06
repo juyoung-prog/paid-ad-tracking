@@ -89,7 +89,7 @@ export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) 
         { title }
       </Typography>
       <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1.5 } }>
-        플랫폼에서 자동 수집된 값입니다. 직접 수정할 수 없습니다.
+        Collected automatically from the platform. Not editable here.
       </Typography>
 
       {/* Hook Rate의 기준이 플랫폼마다 다르다는 걸 숨기면, 같은 이름의 숫자를
@@ -97,8 +97,8 @@ export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) 
           (Meta는 2초 연속 시청 지표가 이 계정에서 값이 하나도 안 와 p25만 쓸 수 있다.) */}
       { hasHookRate && (
         <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1.5 } }>
-          Hook Rate 기준이 플랫폼마다 다릅니다 — TikTok은 2초 시청, Meta는 영상의 25% 시청.
-          플랫폼 간 직접 비교는 피하세요.
+          Hook Rate is defined differently per platform — TikTok counts a 2-second view,
+          Meta counts 25% of the video. Avoid comparing the two directly.
         </Typography>
       ) }
 

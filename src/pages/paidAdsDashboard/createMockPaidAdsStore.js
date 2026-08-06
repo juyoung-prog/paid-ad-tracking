@@ -5,7 +5,7 @@ import {
   mockCampaigns,
   mockPerformanceRecords,
 } from '../../data/paidAdsMockData';
-import { TODAY } from './paidAdsPageUtils';
+import { MOCK_TODAY } from './paidAdsPageUtils';
 
 /**
  * createMockPaidAdsStore
@@ -28,14 +28,22 @@ import { TODAY } from './paidAdsPageUtils';
 export function createMockPaidAdsStore(overrides = {}) {
   const campaigns = overrides.campaigns ?? mockCampaigns;
   const performanceRecords = overrides.performanceRecords ?? mockPerformanceRecords;
-  const noop = async () => null;
+  // 실스토어의 쓰기 함수는 "성공하면 저장된 값, 실패하면 null/false"를 돌려주고
+  // 호출부(DashboardPage 등)가 그 값으로 성공/실패 스낵바를 가른다. 목 스텁이
+  // null을 돌려주면 Storybook에서 모든 저장이 실패로 보이므로, 상태는 바꾸지
+  // 않되 "성공한 것처럼" 마지막 인자(patch/record) 또는 true를 에코한다.
+  const noop = async (first, second) => second ?? first ?? true;
 
   return {
     stores: mockStores,
     adAccounts: mockAdAccounts,
     campaigns,
     performanceRecords,
-    alerts: generateAlerts(campaigns, performanceRecords, TODAY),
+    alerts: generateAlerts(campaigns, performanceRecords, MOCK_TODAY),
+    /* 목 스토어의 "오늘"은 실시간이 아니라 시나리오 기준일이다 — 목데이터의
+       알림·상태(D-3, 최근 종료 등)가 전부 이 날짜 기준으로 설계돼 있어서,
+       실제 시각을 쓰면 시간이 지날수록 스토리가 "전부 끝난 캠페인"이 된다. */
+    today: MOCK_TODAY,
     isLoading: false,
     error: null,
     refresh: noop,

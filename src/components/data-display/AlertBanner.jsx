@@ -11,7 +11,12 @@ import { ALERT_SEVERITY, ALERT_TYPE } from '../../data/schema';
 // overlap_target(저긴급)은 카드 인라인 표시로만 처리하고, new_store_reminder는
 // 캠페인에 종속된 알림이 아니라서 애초에 Alert 시스템 밖(/stores 안내 문구)이다.
 // 둘 다 이 컴포넌트에서는 의도적으로 제외한다 — 알림 피로 방지.
-const BANNERABLE_TYPES = new Set([ALERT_TYPE.ENDING_SOON, ALERT_TYPE.BUDGET_PACING]);
+// missing_performance는 재도입 — 한때 트리거 근거(reportedAt 필드)가 사라지며
+// 유형째 삭제했는데, schema.js가 "종료 + 성과 레코드 부재"라는 필드 없는
+// 근거로 다시 생성한다(레코드가 저장되는 순간 자연 해제되므로 "영원히 미보고로
+// 고정"되던 예전 고장은 재발하지 않는다). Visual Direction의 원래 분류대로
+// 고긴급(error)이라 배너 대상이다.
+const BANNERABLE_TYPES = new Set([ALERT_TYPE.ENDING_SOON, ALERT_TYPE.BUDGET_PACING, ALERT_TYPE.MISSING_PERFORMANCE]);
 
 const SEVERITY_COLOR = {
   warning: 'warning.main',
@@ -97,10 +102,21 @@ export function AlertBanner({ alerts, onAlertClick, onDismiss, sx }) {
                 borderLeft: '3px solid',
                 borderColor: color,
                 backgroundColor: 'grey.50',
+                // 상태 표시 배너 — mui-theme.md 역할표의 4px 행(Alert 배너)과
+                // 같은 분류. DashboardPage의 Event 요약 스트립과 같은 값.
+                borderRadius: (theme) => `${theme.shape.radius.control}px`,
                 cursor: onAlertClick ? 'pointer' : 'default',
                 ...(onAlertClick && {
                   '&:hover': { backgroundColor: 'action.hover' },
-                  '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
+                  // 포커스는 앱 공통 문법(테마 MuiOutlinedInput과 동일) — 1px
+                  // accent 테두리 + 옅은 ring. 2px 순수 primary 아웃라인은 같은
+                  // 앱 안에서 포커스가 두 가지 시각 언어를 갖게 했다.
+                  '&:focus-visible': {
+                    outline: '1px solid',
+                    outlineColor: 'accent.main',
+                    outlineOffset: -1,
+                    boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                  },
                 }),
               }}
             >

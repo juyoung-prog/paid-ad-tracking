@@ -192,7 +192,7 @@ export const Doc = {
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600, verticalAlign: 'top' }}>재사용 후보 컴포넌트</TableCell>
-                <TableCell>KpiBar → 현황 요약, StoreBreakdown → 매장별 분해, InfluencerFilterBar 패턴 → 필터 바, SyncStatusBar → 갱신 상태, AppShell/StickyAsideCenterLayout → 2컬럼 레이아웃</TableCell>
+                <TableCell>KpiBar → 현황 요약, StoreBreakdown → 매장별 분해, InfluencerFilterBar 패턴 → 필터 바, SyncStatusBar → 갱신 상태. (계획 당시 AppShell/StickyAsideCenterLayout → 2컬럼 구상은 이후 좌측 아이콘 레일 셸(PaidAdsRail) + 단일 컬럼으로 교체됨)</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600, verticalAlign: 'top' }}>적용 방식</TableCell>

@@ -1,5 +1,6 @@
 import { PageContainer } from '../../components/layout/PageContainer';
 import { usePaidAdsStore } from './usePaidAdsStore';
+import { PAGE_GUTTER_X } from './paidAdsPageUtils';
 import { StoreListSection } from './StoreListSection';
 
 /**
@@ -10,11 +11,19 @@ import { StoreListSection } from './StoreListSection';
  * (같은 store를 공유하므로). 타이틀+네비는 PaidAdsShell(글로벌 셸)이 그린다.
  */
 export function StoresPage() {
-  const { stores, campaigns, addStore, updateStore } = usePaidAdsStore();
+  const { stores, campaigns, isLoading, error, refresh, addStore, updateStore } = usePaidAdsStore();
 
   return (
-    <PageContainer maxWidth={false} sx={{ py: 3 }}>
-      <StoreListSection stores={stores} campaigns={campaigns} onAddStore={addStore} onUpdateStore={updateStore} />
+    <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
+      <StoreListSection
+        stores={stores}
+        campaigns={campaigns}
+        onAddStore={addStore}
+        onUpdateStore={updateStore}
+        isLoading={isLoading}
+        loadError={error}
+        onRetry={refresh}
+      />
     </PageContainer>
   );
 }

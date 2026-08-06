@@ -51,7 +51,7 @@ export function LoginPage() {
         display: 'grid',
         placeItems: 'center',
         p: 2,
-        backgroundColor: 'grey.50',
+        backgroundColor: 'surface.sunken',
       } }
     >
       <Paper
@@ -64,14 +64,14 @@ export function LoginPage() {
           <Box>
             <Typography variant="h5" component="h1">Paid Ads Tracking</Typography>
             <Typography variant="body2" color="text.secondary">
-              계속하려면 로그인하세요.
+              Sign in to continue.
             </Typography>
           </Box>
 
           { errorMessage && <Alert severity="error">{ errorMessage }</Alert> }
 
           <TextField
-            label="이메일"
+            label="Email"
             type="email"
             value={ email }
             onChange={ (e) => setEmail(e.target.value) }
@@ -80,7 +80,7 @@ export function LoginPage() {
             fullWidth
           />
           <TextField
-            label="비밀번호"
+            label="Password"
             type="password"
             value={ password }
             onChange={ (e) => setPassword(e.target.value) }
@@ -90,7 +90,7 @@ export function LoginPage() {
           />
 
           <Button type="submit" variant="contained" size="large" disabled={ isSubmitting } fullWidth>
-            { isSubmitting ? '로그인 중…' : '로그인' }
+            { isSubmitting ? 'Signing in…' : 'Sign in' }
           </Button>
         </Stack>
       </Paper>

@@ -5,9 +5,10 @@
  * 피그마의 Design Tokens / Variables와 동일한 역할입니다.
  *
  * ## 핵심 철학
- * - **Flat by default**: shape.borderRadius 0 — Button/Card/Paper 등 구조 표면은 각짐
- * - **Role-based radius**: 전역 shape을 올리지 않고 Input/Select/Chip(4px),
- *   분석·참조 카드형 컨테이너(6px) 등 역할 단위로만 예외를 둠 (resources/mui-theme.md 참고)
+ * - **Flat by default**: shape.borderRadius 0 — Card/Paper/Dialog 등 구조 표면은 각짐
+ * - **Role-based radius**: 전역 shape을 올리지 않고 상호작용 컨트롤
+ *   (Button/Input/Select/Chip, 4px)·분석·참조 카드형 컨테이너(6px) 등 역할
+ *   단위로만 예외를 둠 (resources/mui-theme.md 참고)
  * - **Dimmed Shadow**: offset 없이 blur만 사용하는 은은한 그림자
  * - **Pure White**: 깔끔한 흰색 배경
  * - **Brand Blue**: Primary 색상 #0000FF
@@ -74,6 +75,48 @@ const palette = {
   background: {
     default: '#FFFFFF',
     paper: '#FFFFFF',
+  },
+
+  /**
+   * 상호작용 액센트 — 활성·선택·포커스가 모두 이 한 값에서 나온다.
+   * (design-handoff 상속: influencer tracking dashboard의 flat-SaaS 리뉴얼 결정)
+   *
+   * 자리마다 파랑이 다르면 안 된다. 칩 테두리·내비 배경·메뉴 선택이 #0000FF고
+   * 탭 밑줄·활성 글자가 #0000B2면 같은 "선택됨"인데 색이 두 개인 셈이다.
+   *
+   * 기준을 낮은 쪽(#0000B2)으로 잡는다. primary.main은 채도 100%라 화면에서
+   * 가장 강한 요소가 되는데, 목록이 주인공인 화면에서 컨트롤이 그 자리를
+   * 가져가면 안 된다. 브랜드 색 자체는 primary에 그대로 남는다.
+   */
+  accent: {
+    main: '#0000B2',
+    /** 채운 표면(contained 버튼)의 hover — main보다 한 단 어둡게 */
+    dark: '#000080',
+    /** 선택 배경 — 채우지 않고 옅게 깐다 */
+    tint: 'rgba(0, 0, 178, 0.08)',
+    /** 선택 배경 hover */
+    tintHover: 'rgba(0, 0, 178, 0.14)',
+    /**
+     * 포커스 외곽 링 — 테두리는 1px로 두고 번짐으로만 알린다.
+     * 굵기를 바꾸면 레이아웃이 1px 흔들리므로 두께는 비포커스와 같게 유지한다.
+     * 0.18은 링이 테두리만큼 도드라져 컨트롤이 목록보다 강해 보였다.
+     */
+    ring: 'rgba(0, 0, 178, 0.09)',
+  },
+
+  /**
+   * 면(surface) 위계.
+   * background.default/paper가 둘 다 흰색이라 "한 단 낮은 면"을 표현할 토큰이 없었고,
+   * 그 결과 grey.50/100이 날것으로 흩어져 무엇이 사이드바고 무엇이 아바타인지
+   * 코드만 봐서는 구분되지 않았다. 이름으로 역할을 고정한다.
+   *
+   * hover/selected는 여기 두지 않는다 — action.hover/selected는 반투명이라
+   * 어떤 면 위에 올려도 합성되지만, 불투명한 grey는 흰 배경에서만 맞다.
+   */
+  surface: {
+    default: '#FFFFFF',
+    sunken: grey[50],
+    muted: grey[100],
   },
 
   // 구분선
@@ -244,6 +287,26 @@ const spacing = 8; // 기본 단위: 8px
 // ============================================================
 const shape = {
   borderRadius: 0, // Sharp corners (0px)
+
+  /**
+   * 역할별 radius — 전역 shape.borderRadius(0)는 그대로 두고 역할 단위로만 예외를 둔다.
+   *
+   * 이 값들은 원래 화면마다 '4px' / '6px' 문자열로 흩어져 있었고, 그 옆에는
+   * "숫자 4를 쓰면 shape.borderRadius(0)와 곱해져 0이 된다"는 같은 경고 주석이
+   * 반복해서 붙어 있었다. 같은 주석이 여러 파일에 복사된다는 건 토큰이 없다는
+   * 신호다. 이름을 붙여 여기 모은다.
+   *
+   * sx에서는 숫자로 쓰면 곱셈 규칙에 걸리므로 반드시 px 문자열로 넘긴다:
+   *   sx={theme => ({ borderRadius: `${theme.shape.radius.control}px` })}
+   */
+  radius: {
+    /** 버튼·입력·셀렉트·칩 등 상호작용 컨트롤. MuiButton/MuiOutlinedInput/MuiChip이 쓰는 값과 같다 */
+    control: 4,
+    /** 분석·참조용 카드형 컨테이너 (구조 표면인 Card/Paper는 여전히 0) */
+    container: 6,
+    /** 컨트롤 *안에* 들어가는 미세 요소 — 버튼 안 단축키 힌트 키캡 등 */
+    inlay: 3,
+  },
 };
 
 // ============================================================
@@ -347,10 +410,45 @@ const components = {
     // Paid Ads 쪽 버튼들은 각 파일에서 개별적으로 sx={{ boxShadow: 'none' }}
     // 을 다시 붙이는 방식으로 되돌렸다 — 범위가 넓은 디자인 시스템 차원의
     // "그림자 없는 버튼" 결정은 여기서 임의로 내리지 않는다.
+    //
+    // 색은 그림자와 달리 여기(전역)서 정한다 — 파랑 단일화(accent 주석 참고)를
+    // 탭/레일/메뉴/포커스에 적용하고 나니 primary 버튼(#0000FF)만 남은 유일한
+    // 100% 채도 파랑이 됐는데, #0000B2 옆의 #0000FF는 "CTA라서 더 강한 색"으로
+    // 읽히기보다 미묘하게 어긋난 같은 색으로 읽힌다(실사용 피드백 — "버튼은 왜
+    // 아직 #0000FF인가"). 브랜드 색 자체는 palette.primary에 그대로 남고,
+    // 버튼이라는 상호작용 컨트롤의 표면색만 accent로 내린다.
+    //
+    // radius도 같은 재분류다 — 핸드오프는 버튼을 구조 표면(Card/Paper)과 묶어
+    // 0으로 뒀는데, 이 프로젝트의 역할 기반 radius 원칙은 클릭 가능한 상호작용
+    // 객체를 control(4px)로 분류해 왔다(레일 내비 행·KPI 포커스가 그 근거로
+    // 이미 4px). 버튼은 가장 상호작용적인 객체인데 혼자 표면 취급이라, 4px
+    // 입력 필드 바로 옆 0px Save 버튼처럼 한 폼 안에 모서리 문법이 두 개였다.
+    // 각진 인상 자체는 Card/Paper/Dialog(여전히 0)가 담당하므로 유지된다.
     styleOverrides: {
       root: {
-        borderRadius: 0,
+        borderRadius: shape.radius.control,
         textTransform: 'none',
+      },
+      // hover는 MUI가 그러듯 마우스가 있는 기기에서만 켠다 — 가드가 없으면
+      // 터치에서 탭한 뒤 hover 상태가 눌어붙어 색이 남는다.
+      containedPrimary: {
+        backgroundColor: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.dark },
+        },
+      },
+      outlinedPrimary: {
+        color: palette.accent.main,
+        borderColor: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.tint, borderColor: palette.accent.main },
+        },
+      },
+      textPrimary: {
+        color: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.tint },
+        },
       },
     },
   },
@@ -369,6 +467,29 @@ const components = {
     styleOverrides: {
       root: {
         borderRadius: 4,
+        /* MUI 기본 포커스는 테두리를 2px로 굵히고 순수 파랑을 쓴다.
+           굵기가 바뀌면 레이아웃이 1px 흔들리고, 컨트롤이 목록보다 강해진다.
+           두께는 1px로 두고 바깥에 옅은 링을 둘러 상태를 알린다. */
+        '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+          borderWidth: 1,
+          borderColor: palette.accent.main,
+        },
+        '&.Mui-focused': {
+          boxShadow: `0 0 0 3px ${palette.accent.ring}`,
+        },
+      },
+    },
+  },
+  MuiMenuItem: {
+    styleOverrides: {
+      root: {
+        // MUI 기본값은 alpha(primary.main, 0.08) — 순수 파랑 틴트라 연보라로 보인다.
+        // 앱의 다른 "선택됨"과 같은 액센트를 쓴다.
+        '&.Mui-selected': { backgroundColor: palette.accent.tint },
+        '&.Mui-selected:hover': { backgroundColor: palette.accent.tintHover },
+        // 메뉴가 열리면 선택 항목에 포커스가 얹힌다. 이 조합을 빼두면
+        // MUI가 selectedOpacity+focusOpacity를 순수 파랑으로 다시 계산한다.
+        '&.Mui-selected.Mui-focusVisible': { backgroundColor: palette.accent.tintHover },
       },
     },
   },
@@ -376,6 +497,67 @@ const components = {
     styleOverrides: {
       root: {
         borderRadius: 4,
+      },
+      // compact 모드: small 사이즈 패딩 축소 (운영 툴 정보 밀도 기준)
+      sizeSmall: {
+        height: 20,
+        fontSize: '0.6875rem', // 11px
+      },
+      labelSmall: {
+        paddingLeft: 6,
+        paddingRight: 6,
+      },
+    },
+  },
+  // Button과 같은 재분류 — 토글(세그먼트 컨트롤)·알림 배너·스켈레톤은 전부
+  // 상호작용 컨트롤 내지 컨트롤 크기의 상태 표시라 control radius를 받는다
+  // (mui-theme.md 역할표의 4px 행). 전역 shape(0)에 기대던 시절엔 이들이
+  // 조용히 각져 있었다 — Alert는 역할표가 4px로 명시하고도 override가 없어
+  // 각진 채였고, Skeleton(rounded)은 shape.borderRadius(0)를 그대로 곱해
+  // "rounded"라는 이름과 달리 각졌다.
+  MuiToggleButton: {
+    styleOverrides: {
+      root: {
+        borderRadius: shape.radius.control,
+        textTransform: 'none',
+      },
+    },
+  },
+  MuiAlert: {
+    styleOverrides: {
+      root: {
+        borderRadius: shape.radius.control,
+      },
+    },
+  },
+  MuiSkeleton: {
+    styleOverrides: {
+      rounded: {
+        borderRadius: shape.radius.control,
+      },
+    },
+  },
+  // 탭도 accent 단일화의 적용 대상 — 팔레트 주석("탭 밑줄·활성 글자가 #0000B2고
+  // 다른 곳이 #0000FF면 같은 '선택됨'인데 색이 두 개")이 정확히 이 컴포넌트를
+  // 지목하는데, override가 없어서 MUI 기본값(primary.main, 채도 100% 파랑)으로
+  // 렌더되고 있었다 — 한 화면 안에서 좌측 레일의 "현재 페이지"(accent)와 본문
+  // 탭의 "현재 탭"(primary)이 서로 다른 파랑인 상태. 선언만 하고 집행하지 않은
+  // 규칙은 없는 규칙과 같다.
+  // primary 변형에만 건다. 처음엔 indicator/Mui-selected 전체에 걸었는데, 그러면
+  // indicatorColor="secondary"·textColor="inherit"까지 덮어써서 그 prop들이 앱
+  // 전체에서 죽은 컨트롤이 된다(Tabs.stories의 Secondary 예시가 Primary와 똑같이
+  // 렌더됐다). 어두운 AppBar 위의 inherit 탭이 남색 글자가 되는 문제도 같은 원인.
+  MuiTabs: {
+    styleOverrides: {
+      indicator: {
+        '&.MuiTabs-indicatorColorPrimary': { backgroundColor: palette.accent.main },
+      },
+    },
+  },
+  MuiTab: {
+    styleOverrides: {
+      root: {
+        '&.MuiTab-textColorPrimary.Mui-selected': { color: palette.accent.main },
       },
     },
   },

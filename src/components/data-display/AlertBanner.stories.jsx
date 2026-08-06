@@ -15,12 +15,14 @@ export default {
         component: `
 ## AlertBanner
 
-종료 임박(ending_soon)·예산 pacing(budget_pacing)만 상단 배너로 노출한다.
-overlap_target(저긴급)과 new_store_reminder(Alert 시스템 밖)는 컴포넌트
-내부에서 자동으로 걸러진다 — 알림 피로를 만들지 않기 위한 설계. 성과 미보고
-(missing_performance) 알림 유형은 삭제됨 — PerformanceForm의 Recorded/
-Reported Date 필드가 없어지면서 이 알림을 트리거하던 근거(reportedAt) 자체가
-사라져 함께 제거했다.
+종료 임박(ending_soon)·예산 pacing(budget_pacing)·성과 미보고
+(missing_performance)를 고긴급으로 노출한다. overlap_target(저긴급)과
+new_store_reminder(Alert 시스템 밖)는 컴포넌트 내부에서 자동으로 걸러진다 —
+알림 피로를 만들지 않기 위한 설계. missing_performance는 한 번 삭제됐다가
+재도입됨 — 예전엔 reportedAt 필드가 트리거 근거였는데 그 필드가 사라지며
+유형째 지웠다. 지금은 schema.js가 "종료 + 성과 레코드 부재"를 근거로 다시
+생성한다(레코드가 저장되면 자연 해제되므로 예전처럼 영원히 미보고로 고정되지
+않고, 종료 후 30일 창 안에서만 발생해 오래된 캠페인이 쏟아지지도 않는다).
 
 ### 기능
 - 알림 유형별 컬러+아이콘 매핑(schema.js의 ALERT_SEVERITY 하나만 참조 — budget_pacing이 error, ending_soon이 warning: 활성 캠페인이 실시간으로 예산을 초과 집행 중인 게 실무상 더 급하다는 피드백으로 이렇게 배치함). 색만으로 구분하면 색맹 사용자가 못 갈라서 아이콘도 같이 붙임
