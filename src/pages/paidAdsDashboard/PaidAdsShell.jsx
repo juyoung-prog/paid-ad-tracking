@@ -1,6 +1,8 @@
 import { Outlet } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { PaidAdsRail, RAIL_WIDTH } from './PaidAdsRail';
+import { PAID_ADS_FONT_SX } from './paidAdsPageUtils';
+
 
 /**
  * PaidAdsShell
@@ -29,6 +31,7 @@ export function PaidAdsShell() {
         position: 'relative',
         isolation: 'isolate',
         backgroundColor: 'background.default',
+        ...PAID_ADS_FONT_SX,
       } }
     >
       {/* 레일 자리 확보 — 레일이 펼쳐져도 본문이 밀리지 않게 흐름에 폭만 남긴다 */}

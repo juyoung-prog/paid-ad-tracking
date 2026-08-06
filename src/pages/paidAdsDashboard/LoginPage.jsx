@@ -8,6 +8,7 @@ import Button from '@mui/material/Button';
 import Alert from '@mui/material/Alert';
 
 import { supabase } from '../../lib/supabase';
+import { PAID_ADS_FONT_SX } from './paidAdsPageUtils';
 
 /**
  * LoginPage
@@ -52,6 +53,9 @@ export function LoginPage() {
         placeItems: 'center',
         p: 2,
         backgroundColor: 'surface.sunken',
+        // 로그인은 셸 밖(인증 전)에 렌더돼서 셸의 서체 규칙을 못 받는다 —
+        // 사용자가 처음 보는 화면이라 여기만 다른 서체면 첫인상부터 어긋난다.
+        ...PAID_ADS_FONT_SX,
       } }
     >
       <Paper

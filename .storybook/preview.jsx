@@ -2,6 +2,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import '@fontsource-variable/outfit';
+import '@fontsource-variable/inter';
 import { defaultTheme } from '../src/styles/themes';
 
 // Google Fonts 로드 (Material Symbols)

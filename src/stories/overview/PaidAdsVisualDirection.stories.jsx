@@ -171,16 +171,31 @@ export const Doc = {
           <Table size="small">
             <TableBody>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, width: '20%' }}>헤더 타이틀</TableCell>
-                <TableCell>Outfit Variable (영문) / Pretendard Variable (한글)</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '20%' }}>Paid Ads 화면 전체</TableCell>
+                <TableCell>
+                  Inter Variable → Pretendard Variable → sans-serif.
+                  레퍼런스(influencer tracking dashboard)의 SaasShell이 쓰는 SAAS_FONT와 같은 스택을
+                  PaidAdsShell·LoginPage에 그대로 적용한다 — 제목까지 한 서체로 통일하려고
+                  안쪽 MUI 텍스트 요소에 fontFamily: inherit를 강제하는 것도 동일하다.
+                </TableCell>
               </TableRow>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600 }}>본문 전체</TableCell>
-                <TableCell>Pretendard Variable</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>한글</TableCell>
+                <TableCell>
+                  Inter에는 한글 글리프가 없어 스택 뒤로 넘어간다. Pretendard는 레퍼런스와
+                  마찬가지로 셀프 호스팅하지 않는다 — 우리만 번들하면 오히려 레퍼런스와 다르게 보인다.
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>전역 테마(그 외 화면·스토리)</TableCell>
+                <TableCell>
+                  제목 Outfit Variable / 본문 Pretendard Variable — 손대지 않았다.
+                  레퍼런스도 전역 테마는 그대로 두고 SaaS 셸에서만 덮어쓴다.
+                </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>KPI·예산·성과 숫자</TableCell>
-                <TableCell>Pretendard Variable — font-variant-numeric: tabular-nums</TableCell>
+                <TableCell>font-variant-numeric: tabular-nums (theme h4·h5)</TableCell>
               </TableRow>
             </TableBody>
           </Table>

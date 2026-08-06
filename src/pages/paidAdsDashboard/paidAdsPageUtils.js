@@ -153,3 +153,38 @@ export function adsManagerUrl(campaign, account) {
   const accountId = String(account.externalAccountId).replace(/^act_/, '');
   return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(accountId)}&selected_campaign_ids=${encodeURIComponent(campaign.externalCampaignId)}`;
 }
+
+/**
+ * 이 화면군의 서체 규칙 — influencer tracking dashboard(레퍼런스)의 SAAS_FONT와
+ * 같은 스택이다.
+ *
+ * 전역 테마는 본문 Pretendard / 제목 Outfit을 선언하지만, 레퍼런스의 SaaS 화면은
+ * 셸에서 이 스택으로 덮어써 화면 전체를 Inter로 통일한다. "같은 회사 툴군처럼
+ * 보이기"가 이 프로젝트의 1순위 목표라 그 override까지 그대로 가져온다. 전역
+ * 테마를 바꾸지 않는 것도 레퍼런스와 같다 — 다른 컴포넌트 스토리들은 프로젝트
+ * 기본 서체를 계속 쓴다.
+ *
+ * Pretendard는 레퍼런스와 마찬가지로 셀프 호스팅하지 않는다. Inter에는 한글
+ * 글리프가 없어 한글은 스택 뒤로 넘어가는데, 여기서 Pretendard를 우리만 번들하면
+ * 오히려 레퍼런스와 다르게 보인다(레퍼런스는 OS 폰트로 떨어진다).
+ *
+ * 셸(PaidAdsShell)과 로그인(LoginPage)이 함께 쓴다 — 로그인은 인증 전이라 셸
+ * 밖에 렌더되는데, 사용자가 처음 보는 화면이라 여기만 다른 서체면 첫인상부터
+ * 어긋난다.
+ */
+const PAID_ADS_FONT = '"Inter Variable", Inter, "Pretendard Variable", Pretendard, sans-serif';
+
+export const PAID_ADS_FONT_SX = {
+  fontFamily: PAID_ADS_FONT,
+  /* 테마의 h1~h6·subtitle은 fontFamily(Outfit)를 직접 들고 있어서 루트에 폰트를
+     걸어도 상속을 받지 않는다. 레퍼런스(SaasShell)와 동일하게 안쪽 모든 텍스트
+     요소에 상속을 강제해 화면 전체를 한 서체로 통일한다 — 이걸 빼면 제목만
+     Outfit, 나머지는 Inter로 갈려서 레퍼런스와 달라진다. */
+  '& .MuiTypography-root, & .MuiButton-root, & .MuiChip-root, & .MuiTableCell-root, & .MuiInputBase-root, & .MuiAvatar-root': {
+    fontFamily: 'inherit',
+  },
+  // 폼 요소는 font-family를 상속하지 않고 UA 기본값(Arial 등)을 쓴다. 이걸 빼면
+  // 위의 inherit 규칙이 역효과를 낸다 — 버튼 안의 Typography가 셸 폰트가 아니라
+  // 버튼의 Arial을 물려받는다(레퍼런스가 겪은 문제).
+  '& button, & input, & select, & textarea, & optgroup': { fontFamily: 'inherit' },
+};

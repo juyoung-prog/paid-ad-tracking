@@ -5,6 +5,10 @@ import { createRoot } from 'react-dom/client'
 // OS 기본 서체)으로 폴백한다 — Storybook(.storybook/preview.jsx)에는 이미
 // 있었는데 실제 앱 진입점에는 빠져 있었다.
 import '@fontsource-variable/outfit'
+// Paid Ads 화면은 influencer tracking dashboard와 같은 서체를 쓴다 —
+// 레퍼런스의 SaasShell이 셸 루트에 Inter를 걸고 그 안의 모든 텍스트 요소에
+// 상속을 강제하므로(PaidAdsShell도 동일), 그 폰트 파일이 실제로 필요하다.
+import '@fontsource-variable/inter'
 import './index.css'
 import App from './App.jsx'
 

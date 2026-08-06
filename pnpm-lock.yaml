@@ -14,6 +14,9 @@ importers:
       '@emotion/styled':
         specifier: ^11.14.1
         version: 11.14.1(@emotion/react@11.14.0(@types/react@19.2.7)(react@19.2.0))(@types/react@19.2.7)(react@19.2.0)
+      '@fontsource-variable/inter':
+        specifier: ^5.3.0
+        version: 5.3.0
       '@fontsource-variable/material-symbols-outlined':
         specifier: ^5.2.30
         version: 5.2.30
@@ -467,6 +470,9 @@ packages:
   '@eslint/plugin-kit@0.4.1':
     resolution: {integrity: sha512-43/qtrDUokr7LJqoF2c3+RInu/t4zfrpYdoSDfYyhg52rwLV6TnOvdG4fXm7IkSB3wErkcmJS9iEhjVtOSEjjA==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@fontsource-variable/inter@5.3.0':
+    resolution: {integrity: sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==}
 
   '@fontsource-variable/material-symbols-outlined@5.2.30':
     resolution: {integrity: sha512-BjSx7nqvISJs2Pjd8sBH583AnD4k6dD4Em7AVISoLXzbX3PIFWAE2GPm13LlCys8u8idkyUd62L8yn6ts6DdbA==}
@@ -2558,6 +2564,8 @@ snapshots:
     dependencies:
       '@eslint/core': 0.17.0
       levn: 0.4.1
+
+  '@fontsource-variable/inter@5.3.0': {}
 
   '@fontsource-variable/material-symbols-outlined@5.2.30': {}
 
