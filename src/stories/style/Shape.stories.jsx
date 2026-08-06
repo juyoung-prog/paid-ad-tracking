@@ -36,13 +36,13 @@ function ShapeDocs() {
         token: 'shape.borderRadius',
         value: `${theme.shape.borderRadius}px`,
         radius: theme.shape.borderRadius,
-        description: '전역 기본 — Flat by default. Button/Card/Paper 같은 구조 표면은 각지게 유지',
+        description: '전역 기본 — Flat by default. Card/Paper/Dialog 같은 구조 표면은 각지게 유지',
       },
       {
         token: 'shape.radius.control',
         value: `${theme.shape.radius.control}px`,
         radius: theme.shape.radius.control,
-        description: '상호작용 컨트롤 — 입력·셀렉트·칩·내비 행. MuiOutlinedInput/MuiChip 오버라이드와 같은 값',
+        description: '상호작용 컨트롤 — 버튼·입력·셀렉트·칩·내비 행. MuiButton/MuiOutlinedInput/MuiChip 오버라이드와 같은 값',
       },
       {
         token: 'shape.radius.container',
@@ -141,7 +141,8 @@ function ShapeDocs() {
 <Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.container}px\` })} />  // 차트 막대·참조 카드
 <Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.inlay}px\` })} />      // 버튼 안 키캡
 
-// 구조 표면(Card/Paper/Button)은 토큰을 덮지 않는다 — 전역 0(각짐)이 의도다.
+// 구조 표면(Card/Paper/Dialog)은 토큰을 덮지 않는다 — 전역 0(각짐)이 의도다.
+// Button은 상호작용 컨트롤로 재분류되어 테마 MuiButton이 control(4px)을 쓴다.
 // 원형은 radius 역할이 아니므로 그대로 '50%'를 쓴다.
 <Box sx={{ borderRadius: '50%' }} />` }
           </Box>

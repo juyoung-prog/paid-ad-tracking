@@ -267,6 +267,14 @@ const tokenChanges = [
   { path: 'components.MuiChip.styleOverrides.root.borderRadius', before: '4', after: '변경 없음 (이미 동일)', target: '—' },
   { path: 'components.MuiDrawer.styleOverrides.paper.width', before: '미설정', after: '440', target: '캠페인 상세/성과 입력 Drawer' },
   { path: 'components.MuiTableRow.styleOverrides', before: '미설정', after: 'hover 시 rgba(0,0,0,0.03) 배경', target: 'StoreBreakdown, /reports 테이블' },
+  // 아래는 "파랑 단일화" 이후 추가된 항목들 — 선택·상호작용 색을 accent 하나로
+  // 모으고, 상호작용 컨트롤의 radius를 표면(0)에서 분리한 결과다.
+  { path: 'palette.accent (main/dark/tint/tintHover/ring)', before: '미설정', after: '#0000B2 / #000080 / 8%·14% 틴트 / 9% 링', target: '선택·활성·포커스 전반. primary.main(#0000FF)은 브랜드 색으로만 남음' },
+  { path: 'components.MuiButton.styleOverrides.root.borderRadius', before: '0', after: 'shape.radius.control (4px)', target: '버튼을 구조 표면이 아니라 상호작용 컨트롤로 재분류' },
+  { path: 'components.MuiButton contained/outlined/textPrimary', before: 'primary.main (#0000FF)', after: 'accent.main (#0000B2), hover는 accent.dark — @media (hover:hover) 가드', target: '앱 전체 primary 버튼' },
+  { path: 'components.MuiTabs.indicator / MuiTab.Mui-selected', before: '미설정(MUI 기본 primary)', after: 'accent.main — indicatorColorPrimary/textColorPrimary 한정', target: 'Dashboard 상태 탭, Reports Plan/Performance 탭' },
+  { path: 'components.MuiToggleButton / MuiAlert / MuiSkeleton', before: '미설정', after: 'borderRadius: shape.radius.control (4px)', target: '세그먼트 필터, 오류·경고 배너, 로딩 스켈레톤' },
+  { path: 'shape.radius (control/container/inlay)', before: '미설정', after: '4 / 6 / 3', target: '역할별 radius 토큰 — Style/Shape 스토리 참고' },
 ];
 
 /** 컬러 팔레트 및 변경 토큰 */
@@ -363,7 +371,10 @@ export const ColorAndTokens = {
         </Table>
       </TableContainer>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        primary.main, secondary.main, shape.borderRadius, shadows, spacing — 모두 이 프로젝트 기본값 유지. 새로 발명한 토큰은 없음.
+        secondary.main, shape.borderRadius(전역 0), shadows, spacing — 기본값 유지.
+        primary.main(#0000FF)은 값 자체는 그대로지만 이제 브랜드 색으로만 쓰이고, 선택·활성·포커스는
+        새로 만든 accent(#0000B2)가 담당한다. 역할별 radius(shape.radius)도 이 프로젝트에서 추가한 토큰이다 —
+        위 표의 하단 항목 참고.
       </Typography>
     </PageContainer>
   ),
