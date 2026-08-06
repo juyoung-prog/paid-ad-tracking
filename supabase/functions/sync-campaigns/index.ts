@@ -441,7 +441,7 @@ async function fetchTikTokAdGroupBudgets(
       if (!campaignId || !amount) continue;
 
       const acc = byCampaign.get(campaignId) ?? { daily: null, total: null };
-      if (ag?.budget_mode === 'BUDGET_MODE_DAY') acc.daily = (acc.daily ?? 0) + amount;
+      if (isDailyBudgetMode(ag?.budget_mode)) acc.daily = (acc.daily ?? 0) + amount;
       else if (ag?.budget_mode === 'BUDGET_MODE_TOTAL') acc.total = (acc.total ?? 0) + amount;
       byCampaign.set(campaignId, acc);
     }
@@ -476,13 +476,31 @@ function mapTikTokGoal(objective: string | undefined) {
  * INFINITE(또는 0)는 캠페인 레벨에 예산이 없다는 뜻이고, 그 계정은 대개 광고그룹에
  * 예산을 걸어둔다 — 여기서는 값이 없다고만 기록하고 추측하지 않는다.
  */
+/**
+ * 이 budget_mode가 "하루치 금액"을 뜻하는가.
+ *
+ * 예전엔 BUDGET_MODE_DAY만 일일로 봤고 나머지는 전부 총액으로 떨어뜨렸다. 그런데
+ * 이 계정이 실제로 쓰는 값은 **BUDGET_MODE_DYNAMIC_DAILY_BUDGET**이다(캠페인 31건
+ * 중 14건, 광고그룹 34건 중 17건). 이름 그대로 일일 예산인데(날마다 소진량이
+ * 유동적일 뿐 금액 자체는 하루 기준) catch-all로 떨어져서 총예산 칸에 저장됐다 —
+ * 화면의 "$50"이 사실 "$50/day"였다. 값이 없는 것보다 나쁜, 조용히 틀린 값이다.
+ *
+ * 이 매핑은 TikTok 권한(scope)이 막혀 있던 동안 작성돼서 실제 응답으로 검증된 적이
+ * 없었다. 권한이 열리자마자 드러난 것이라, 모드 이름을 하드코딩으로 나열하는 대신
+ * "DAILY가 들어간 모드는 일일"로 폭을 넓혀 앞으로 늘어날 변종도 받아낸다.
+ */
+function isDailyBudgetMode(mode: unknown): boolean {
+  const value = String(mode ?? '');
+  return value === 'BUDGET_MODE_DAY' || value.includes('DAILY');
+}
+
 function mapTikTokBudget(
   item: any,
   adGroupBudget?: { daily: number | null; total: number | null }
 ): Pick<CampaignRow, 'budget_planned' | 'budget_daily'> {
   const amount = Number(item.budget ?? 0);
   if (amount) {
-    if (item.budget_mode === 'BUDGET_MODE_DAY') return { budget_planned: 0, budget_daily: amount };
+    if (isDailyBudgetMode(item.budget_mode)) return { budget_planned: 0, budget_daily: amount };
     return { budget_planned: amount, budget_daily: null };
   }
   // 캠페인 레벨에 예산이 없으면(INFINITE) 광고그룹 합계로 대체한다.
@@ -644,6 +662,21 @@ Deno.serve(async (req) => {
       const current = existingById.get(row.external_campaign_id);
       if (current) {
         const patch: Record<string, unknown> = { name: row.name, updated_at: new Date().toISOString() };
+        /* 예전 오매핑으로 **일일 예산이 총예산 칸에 들어간** 행을 되돌린다.
+           "비어 있을 때만 채운다"로는 손이 닿지 않는다 — 칸이 비어 있지 않고,
+           틀린 값으로 차 있기 때문이다.
+
+           조건을 좁게 잡는다: 플랫폼이 지금 일일 예산이라고 말하고, 저장된
+           일일 칸은 비어 있으며, 저장된 총예산이 그 일일 금액과 **정확히** 같을
+           때만. 이 셋이 동시에 성립하는 건 우리가 일일 금액을 총액 칸에 넣었을
+           때뿐이라, 사용자가 직접 넣은 총예산을 건드릴 위험이 없다(실데이터
+           14건 전부 이 지문과 일치, 그 외 0건인 것을 확인하고 넣은 규칙). */
+        const isMisfiledDailyBudget =
+          row.budget_daily != null &&
+          current.budget_daily == null &&
+          Number(current.budget_planned) === Number(row.budget_daily);
+        if (isMisfiledDailyBudget) patch.budget_planned = 0;
+
         // 비어 있는 예산만 채운다(0/null이 "값 없음" — 화면도 0을 예산 없음으로 읽는다).
         if (!current.budget_planned && row.budget_planned) patch.budget_planned = row.budget_planned;
         if (current.budget_daily == null && row.budget_daily != null) patch.budget_daily = row.budget_daily;
