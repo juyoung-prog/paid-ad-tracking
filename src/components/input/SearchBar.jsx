@@ -229,10 +229,12 @@ export function SearchBar({
           onClick={onFilterToggle}
           sx={{
             mr: 0.5,
-            color: isFilterActive ? 'primary.main' : 'text.secondary',
-            backgroundColor: isFilterActive ? 'primary.lighter' : 'transparent',
+            // primary.lighter는 팔레트에 없는 키라 무효 CSS로 떨어졌다 — 필터가
+            // 활성인데 배경이 아예 안 깔리고 hover에서만 형광 파랑이 튀었다.
+            color: isFilterActive ? 'accent.main' : 'text.secondary',
+            backgroundColor: isFilterActive ? 'accent.tint' : 'transparent',
             '&:hover': {
-              backgroundColor: isFilterActive ? 'primary.light' : 'action.hover',
+              backgroundColor: isFilterActive ? 'accent.tintHover' : 'action.hover',
             },
           }}
           aria-label="toggle filter"

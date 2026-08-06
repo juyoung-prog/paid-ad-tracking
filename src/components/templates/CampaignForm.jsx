@@ -402,9 +402,10 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
                 cursor: 'pointer',
                 border: '2px dashed',
                 borderColor: 'divider',
-                borderRadius: '4px',
+                borderRadius: (theme) => `${theme.shape.radius.control}px`,
                 outline: 'none',
-                '&:hover, &:focus-visible': { borderColor: 'primary.main', backgroundColor: 'action.hover' },
+                // hover/focus 강조는 accent — 파랑 단일화(테마 accent 주석) 적용
+                '&:hover, &:focus-visible': { borderColor: 'accent.main', backgroundColor: 'action.hover' },
               }}
             >
               <UploadFileIcon sx={{ fontSize: 32, color: 'text.secondary', mb: 1 }} />

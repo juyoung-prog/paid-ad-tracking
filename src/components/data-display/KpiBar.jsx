@@ -36,6 +36,13 @@ import Typography from '@mui/material/Typography';
  * />
  */
 export function KpiBar({ items, sx }) {
+  // sub 줄 자리 예약은 **이 바에 sub를 쓰는 항목이 하나라도 있을 때만** 한다.
+  // 무조건 예약하면 sub가 전혀 없는 화면(Dashboard 툴바)에도 22px짜리 빈 줄이
+  // 영구히 붙고, separator 구분선이 그만큼 커진 박스 기준으로 중앙 정렬돼
+  // 숫자열과 광학적으로 어긋난다. 탭 전환 시 높이가 흔들리던 문제는 같은 바
+  // 안에서만 생기므로 이 조건으로 충분하다.
+  const reservesSubLine = items.some((item) => item.sub);
+
   return (
     // 항목이 줄바꿈되면 라벨이 두 줄로 꺾여 못생겨 보이므로(각 항목에
     // flexShrink:0 + whiteSpace:nowrap 적용) 대신 화면이 정말 좁으면 줄바꿈이
@@ -73,9 +80,21 @@ export function KpiBar({ items, sx }) {
               flexShrink: 0,
               ...(item.onClick && {
                 cursor: 'pointer',
-                borderRadius: '4px',
+                // 클릭 가능한 인터랙션 객체 → control radius (하드 '4px' 토큰화)
+                borderRadius: (theme) => `${theme.shape.radius.control}px`,
                 '&:hover': { opacity: 0.7 },
-                '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+                // 포커스는 앱 공통 문법(테마 MuiOutlinedInput과 동일) — 1px
+                // accent 테두리 + 옅은 ring. CampaignTable 행과 같은 규칙.
+                // 바깥이 아니라 **안쪽**으로 그린다: 이 바의 루트가 overflowX:auto라
+                // (가로 스크롤 대비) 상하좌우가 모두 클리핑되는 스크롤 컨테이너다.
+                // offset을 양수로 주면 첫 항목의 좌측과 모든 항목의 상·하단이 잘리고
+                // 포커스할 때마다 불필요한 스크롤 점프가 생긴다.
+                '&:focus-visible': {
+                  outline: '1px solid',
+                  outlineColor: 'accent.main',
+                  outlineOffset: -1,
+                  boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                },
               }),
             }}
           >
@@ -112,9 +131,16 @@ export function KpiBar({ items, sx }) {
             >
               {item.value}
             </Typography>
-            {item.sub && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, whiteSpace: 'nowrap' }}>
-                {item.sub}
+            {/* sub 줄은 이 바에 sub를 쓰는 항목이 있을 때만 자리를 잡는다 —
+                한 항목만 sub가 있어도 나머지가 같은 높이를 유지해야, 탭 전환처럼
+                항목 구성이 바뀔 때 sticky 툴바 높이가 널뛰지 않는다. */}
+            {reservesSubLine && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, whiteSpace: 'nowrap', visibility: item.sub ? 'visible' : 'hidden' }}
+              >
+                {item.sub || ' '}
               </Typography>
             )}
           </Box>

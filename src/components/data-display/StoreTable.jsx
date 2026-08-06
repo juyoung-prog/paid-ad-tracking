@@ -90,7 +90,12 @@ export function StoreTable({ stores, campaignCounts, onRowClick, sx }) {
                   onRowClick
                     ? {
                         cursor: 'pointer',
-                        '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
+                        '&:focus-visible': {
+                          outline: '1px solid',
+                          outlineColor: 'accent.main',
+                          outlineOffset: -1,
+                          boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                        },
                       }
                     : undefined
                 }

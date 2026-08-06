@@ -224,13 +224,13 @@ export function DateRangeField({ value, onChange, error, helperText, label, sx }
                     height: 32,
                     borderRadius: isEndpoint ? '50%' : 0,
                     backgroundColor: isEndpoint
-                      ? 'primary.main'
+                      ? 'accent.main'
                       : inRange
-                        ? (theme) => alpha(theme.palette.primary.main, 0.12)
+                        ? (theme) => alpha(theme.palette.accent.main, 0.12)
                         : 'transparent',
                     color: isEndpoint ? 'primary.contrastText' : cell.inMonth ? 'text.primary' : 'text.disabled',
                     fontWeight: isEndpoint ? 700 : 400,
-                    '&:hover': { backgroundColor: isEndpoint ? 'primary.dark' : 'action.hover' },
+                    '&:hover': { backgroundColor: isEndpoint ? 'accent.dark' : 'action.hover' },
                   }}
                 >
                   {cell.day}

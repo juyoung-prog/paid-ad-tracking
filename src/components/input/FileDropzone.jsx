@@ -322,7 +322,7 @@ export function FileDropzone({
         height: variantHeight[variant],
         borderRadius: '4px',
         border: '2px dashed',
-        borderColor: error ? 'error.main' : isDragActive ? 'primary.main' : 'divider',
+        borderColor: error ? 'error.main' : isDragActive ? 'accent.main' : 'divider',
         backgroundColor: isDragActive ? 'action.hover' : 'background.paper',
         display: 'flex',
         flexDirection: 'column',
@@ -332,7 +332,7 @@ export function FileDropzone({
         cursor: 'pointer',
         transition: 'all 0.2s ease',
         '&:hover': {
-          borderColor: error ? 'error.main' : 'primary.main',
+          borderColor: error ? 'error.main' : 'accent.main',
           backgroundColor: 'action.hover',
         },
         ...sx,
@@ -355,7 +355,7 @@ export function FileDropzone({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          bgcolor: isDragActive ? 'primary.main' : 'action.selected',
+          bgcolor: isDragActive ? 'accent.main' : 'action.selected',
           color: isDragActive ? 'white' : 'text.secondary',
           transition: 'all 0.2s ease',
         }}
@@ -374,7 +374,7 @@ export function FileDropzone({
             variant="body1"
             sx={{
               fontWeight: 600,
-              color: isDragActive ? 'primary.main' : 'text.primary',
+              color: isDragActive ? 'accent.main' : 'text.primary',
             }}
           >
             {isDragActive ? 'Drop your file here' : 'Drag & drop or click to upload'}

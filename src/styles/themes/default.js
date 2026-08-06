@@ -5,9 +5,10 @@
  * 피그마의 Design Tokens / Variables와 동일한 역할입니다.
  *
  * ## 핵심 철학
- * - **Flat by default**: shape.borderRadius 0 — Button/Card/Paper 등 구조 표면은 각짐
- * - **Role-based radius**: 전역 shape을 올리지 않고 Input/Select/Chip(4px),
- *   분석·참조 카드형 컨테이너(6px) 등 역할 단위로만 예외를 둠 (resources/mui-theme.md 참고)
+ * - **Flat by default**: shape.borderRadius 0 — Card/Paper/Dialog 등 구조 표면은 각짐
+ * - **Role-based radius**: 전역 shape을 올리지 않고 상호작용 컨트롤
+ *   (Button/Input/Select/Chip, 4px)·분석·참조 카드형 컨테이너(6px) 등 역할
+ *   단위로만 예외를 둠 (resources/mui-theme.md 참고)
  * - **Dimmed Shadow**: offset 없이 blur만 사용하는 은은한 그림자
  * - **Pure White**: 깔끔한 흰색 배경
  * - **Brand Blue**: Primary 색상 #0000FF
@@ -89,6 +90,8 @@ const palette = {
    */
   accent: {
     main: '#0000B2',
+    /** 채운 표면(contained 버튼)의 hover — main보다 한 단 어둡게 */
+    dark: '#000080',
     /** 선택 배경 — 채우지 않고 옅게 깐다 */
     tint: 'rgba(0, 0, 178, 0.08)',
     /** 선택 배경 hover */
@@ -297,7 +300,7 @@ const shape = {
    *   sx={theme => ({ borderRadius: `${theme.shape.radius.control}px` })}
    */
   radius: {
-    /** 입력·셀렉트·칩 등 상호작용 컨트롤. MuiOutlinedInput/MuiChip이 쓰는 값과 같다 */
+    /** 버튼·입력·셀렉트·칩 등 상호작용 컨트롤. MuiButton/MuiOutlinedInput/MuiChip이 쓰는 값과 같다 */
     control: 4,
     /** 분석·참조용 카드형 컨테이너 (구조 표면인 Card/Paper는 여전히 0) */
     container: 6,
@@ -407,10 +410,45 @@ const components = {
     // Paid Ads 쪽 버튼들은 각 파일에서 개별적으로 sx={{ boxShadow: 'none' }}
     // 을 다시 붙이는 방식으로 되돌렸다 — 범위가 넓은 디자인 시스템 차원의
     // "그림자 없는 버튼" 결정은 여기서 임의로 내리지 않는다.
+    //
+    // 색은 그림자와 달리 여기(전역)서 정한다 — 파랑 단일화(accent 주석 참고)를
+    // 탭/레일/메뉴/포커스에 적용하고 나니 primary 버튼(#0000FF)만 남은 유일한
+    // 100% 채도 파랑이 됐는데, #0000B2 옆의 #0000FF는 "CTA라서 더 강한 색"으로
+    // 읽히기보다 미묘하게 어긋난 같은 색으로 읽힌다(실사용 피드백 — "버튼은 왜
+    // 아직 #0000FF인가"). 브랜드 색 자체는 palette.primary에 그대로 남고,
+    // 버튼이라는 상호작용 컨트롤의 표면색만 accent로 내린다.
+    //
+    // radius도 같은 재분류다 — 핸드오프는 버튼을 구조 표면(Card/Paper)과 묶어
+    // 0으로 뒀는데, 이 프로젝트의 역할 기반 radius 원칙은 클릭 가능한 상호작용
+    // 객체를 control(4px)로 분류해 왔다(레일 내비 행·KPI 포커스가 그 근거로
+    // 이미 4px). 버튼은 가장 상호작용적인 객체인데 혼자 표면 취급이라, 4px
+    // 입력 필드 바로 옆 0px Save 버튼처럼 한 폼 안에 모서리 문법이 두 개였다.
+    // 각진 인상 자체는 Card/Paper/Dialog(여전히 0)가 담당하므로 유지된다.
     styleOverrides: {
       root: {
-        borderRadius: 0,
+        borderRadius: shape.radius.control,
         textTransform: 'none',
+      },
+      // hover는 MUI가 그러듯 마우스가 있는 기기에서만 켠다 — 가드가 없으면
+      // 터치에서 탭한 뒤 hover 상태가 눌어붙어 색이 남는다.
+      containedPrimary: {
+        backgroundColor: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.dark },
+        },
+      },
+      outlinedPrimary: {
+        color: palette.accent.main,
+        borderColor: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.tint, borderColor: palette.accent.main },
+        },
+      },
+      textPrimary: {
+        color: palette.accent.main,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.accent.tint },
+        },
       },
     },
   },
@@ -468,6 +506,58 @@ const components = {
       labelSmall: {
         paddingLeft: 6,
         paddingRight: 6,
+      },
+    },
+  },
+  // Button과 같은 재분류 — 토글(세그먼트 컨트롤)·알림 배너·스켈레톤은 전부
+  // 상호작용 컨트롤 내지 컨트롤 크기의 상태 표시라 control radius를 받는다
+  // (mui-theme.md 역할표의 4px 행). 전역 shape(0)에 기대던 시절엔 이들이
+  // 조용히 각져 있었다 — Alert는 역할표가 4px로 명시하고도 override가 없어
+  // 각진 채였고, Skeleton(rounded)은 shape.borderRadius(0)를 그대로 곱해
+  // "rounded"라는 이름과 달리 각졌다.
+  MuiToggleButton: {
+    styleOverrides: {
+      root: {
+        borderRadius: shape.radius.control,
+        textTransform: 'none',
+      },
+    },
+  },
+  MuiAlert: {
+    styleOverrides: {
+      root: {
+        borderRadius: shape.radius.control,
+      },
+    },
+  },
+  MuiSkeleton: {
+    styleOverrides: {
+      rounded: {
+        borderRadius: shape.radius.control,
+      },
+    },
+  },
+  // 탭도 accent 단일화의 적용 대상 — 팔레트 주석("탭 밑줄·활성 글자가 #0000B2고
+  // 다른 곳이 #0000FF면 같은 '선택됨'인데 색이 두 개")이 정확히 이 컴포넌트를
+  // 지목하는데, override가 없어서 MUI 기본값(primary.main, 채도 100% 파랑)으로
+  // 렌더되고 있었다 — 한 화면 안에서 좌측 레일의 "현재 페이지"(accent)와 본문
+  // 탭의 "현재 탭"(primary)이 서로 다른 파랑인 상태. 선언만 하고 집행하지 않은
+  // 규칙은 없는 규칙과 같다.
+  // primary 변형에만 건다. 처음엔 indicator/Mui-selected 전체에 걸었는데, 그러면
+  // indicatorColor="secondary"·textColor="inherit"까지 덮어써서 그 prop들이 앱
+  // 전체에서 죽은 컨트롤이 된다(Tabs.stories의 Secondary 예시가 Primary와 똑같이
+  // 렌더됐다). 어두운 AppBar 위의 inherit 탭이 남색 글자가 되는 문제도 같은 원인.
+  MuiTabs: {
+    styleOverrides: {
+      indicator: {
+        '&.MuiTabs-indicatorColorPrimary': { backgroundColor: palette.accent.main },
+      },
+    },
+  },
+  MuiTab: {
+    styleOverrides: {
+      root: {
+        '&.MuiTab-textColorPrimary.Mui-selected': { color: palette.accent.main },
       },
     },
   },

@@ -16,9 +16,16 @@ export default {
 ## CampaignThumbnail
 
 캠페인 소재 미리보기 썸네일. thumbnailUrl이 있으면 실제 이미지를 보여주고,
-없거나(신규 캠페인) 이미지 로드에 실패하면(끊긴 링크) 플랫폼색 배경 +
+없거나(신규 캠페인) 이미지 로드에 실패하면(끊긴 링크) 중립 배경 +
 캠페인명 이니셜로 자동 대체한다 — 광고 목록에서 캠페인은 항상 뭔가 시각적으로
 보여야 하므로 대체 표시는 선택 사항이 아니라 항상 보장되는 fallback이다.
+
+대체 표시는 한때 플랫폼 원색(Meta=primary #0000FF, TikTok=secondary)으로 채웠는데
+중립 톤으로 바꿨다. 이미지가 없을 때 뜨는 자리표시자에 채도 100% 파랑이 깔리면
+목록에서 가장 강한 요소가 되고("컨트롤이 목록보다 강하면 안 된다"는 테마 원칙은
+자리표시자에도 적용된다), 플랫폼은 바로 옆 Platform 컬럼이 글자로 이미 말한다.
+platform prop은 색이 아니라 접근성 이름에 쓴다 — 스크린리더는 옆 컬럼을 함께
+읽어주지 않는다.
         `,
       },
     },
@@ -29,7 +36,7 @@ export default {
     platform: {
       control: 'select',
       options: [PLATFORM.META, PLATFORM.TIKTOK],
-      description: '대체 표시 배경색 결정',
+      description: '대체 표시의 접근성 이름에 포함 (색상에는 영향 없음)',
     },
     size: { control: { type: 'number', min: 24, max: 96 }, description: '세로 길이(px) — 9:16 세로 비율, 가로폭은 자동 계산' },
   },
@@ -44,7 +51,7 @@ export const Default = {
   },
 };
 
-/** thumbnailUrl이 없는 캠페인 — 플랫폼별 배경색 + 이니셜로 대체 표시된다 */
+/** thumbnailUrl이 없는 캠페인 — 중립 배경 + 이니셜로 대체 표시된다(플랫폼과 무관하게 동일) */
 export const NoThumbnail = {
   render: () => (
     <Stack direction="row" spacing={2} alignItems="center">

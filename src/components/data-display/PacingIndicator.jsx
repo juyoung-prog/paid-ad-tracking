@@ -78,12 +78,15 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
             )}
           </Typography>
         </Box>
+        {/* 막대 라운딩 = inlay(3px) — 6px 높이의 절반이라 풀 필(pill)이 된다.
+            각진 0은 Reports의 Budget by Platform 막대와 함께 라운딩 체계에서
+            혼자 남은 예외였다(아래 두 막대 + Reports 쪽도 동일 값). */}
         <LinearProgress
           variant="determinate"
           value={budgetUsedRatio != null ? Math.min(budgetUsedRatio, 1) * 100 : 0}
           sx={{
             height: 6,
-            borderRadius: 0,
+            borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
             backgroundColor: 'grey.100',
             '& .MuiLinearProgress-bar': { backgroundColor: pacing.color },
           }}
@@ -102,7 +105,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           value={timeElapsedRatio != null ? Math.min(timeElapsedRatio, 1) * 100 : 0}
           sx={{
             height: 6,
-            borderRadius: 0,
+            borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
             backgroundColor: 'grey.100',
             '& .MuiLinearProgress-bar': { backgroundColor: 'grey.500' },
           }}
@@ -125,7 +128,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
             value={dailyBudgetRatio != null ? Math.min(dailyBudgetRatio, 1) * 100 : 0}
             sx={{
               height: 6,
-              borderRadius: 0,
+              borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
               backgroundColor: 'grey.100',
               '& .MuiLinearProgress-bar': { backgroundColor: pacing.color },
             }}

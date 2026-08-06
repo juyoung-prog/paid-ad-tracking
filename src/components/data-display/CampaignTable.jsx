@@ -149,7 +149,15 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
               cursor: onRowClick ? 'pointer' : 'default',
               ...(onRowClick && {
                 '&:hover': { backgroundColor: 'action.hover' },
-                '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: -2 },
+                // 포커스는 앱 공통 문법(테마 MuiOutlinedInput과 동일) — 1px
+                // accent 테두리 + 옅은 ring. 2px 순수 primary 아웃라인은 입력
+                // 컨트롤의 은은한 남색 번짐과 다른 두 번째 포커스 언어였다.
+                '&:focus-visible': {
+                  outline: '1px solid',
+                  outlineColor: 'accent.main',
+                  outlineOffset: -1,
+                  boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                },
               }),
             }}
           >
@@ -173,7 +181,7 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                       size="small"
                       aria-label={`View Ad — ${row.name}`}
                       onClick={(event) => event.stopPropagation()}
-                      sx={{ color: 'text.secondary', '&:hover': { color: 'primary.main' } }}
+                      sx={{ color: 'text.secondary', '&:hover': { color: 'accent.main' } }}
                     >
                       <OpenInNewIcon sx={{ fontSize: 16 }} />
                     </IconButton>
