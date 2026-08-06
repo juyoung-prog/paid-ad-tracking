@@ -14,6 +14,44 @@ import { shortDate } from './paidAdsPageUtils';
  * @param {{ totalDaily: number|null, totalBudget: number }} phase
  * @returns {string} 예: "$120/day · $3,600" — 둘 다 없으면 빈 문자열
  */
+/**
+ * 이름 앞의 타입 접두사를 떼는 패턴 — `Instagram post: <캡션>`의 `Instagram post`.
+ *
+ * 이 계정 이름의 절반 이상(170건 중 98건)이 `타입: 내용` 꼴이다. 게시물 부스팅을
+ * 캠페인으로 만들 때 Meta가 캡션 앞부분을 잘라 이름으로 쓰기 때문인데, 그래서
+ * 이름 안에 이모지·줄바꿈·말줄임표가 그대로 들어온다.
+ *
+ * 이걸 데이터에서 걷어내려던 두 안(타임라인에서 제외 / 겹치는 phase에 흡수)은
+ * 실측으로 폐기했다 — 부스팅 게시물이 전체 지출의 24.1%($24,747)를 차지해서
+ * 빼면 차트 합계가 헤더 KPI와 어긋나고, "다른 phase에 완전히 포함"되는 건 93건
+ * 중 1건뿐이라 흡수 규칙은 성립하지 않는다. 문제는 이것들이 **거기 있는 것**이
+ * 아니라 계획 캠페인과 **똑같아 보이는 것**이었다. 그래서 표시 계층에서 굵기만
+ * 나눈다 — 정보는 하나도 안 지우고, Meta가 준 이름도 그대로 둔다(DB에서 고치면
+ * Ads Manager에서 같은 캠페인을 못 찾는다).
+ *
+ * 접두사를 24자로 제한하는 이유: 콜론이 타입 구분이 아니라 문장 부호로 쓰인
+ * 이름("Come see us at the mall: this weekend")에서 절반이 굵어지는 걸 막는다.
+ * 실데이터의 최장 접두사는 14자('Instagram post')다.
+ *
+ * 뒷부분을 `.` 대신 `[\s\S]`로 받는 이유: 캡션에 줄바꿈이 그대로 들어온 이름이
+ * 19건 있는데("🍁🍁 Hey, Bm customers 🍁🍁\n🤩Don't..."), `.`은 개행을 못 먹어서
+ * 그 19건만 조용히 분리에 실패했다(실측으로 발견). 접두사 쪽은 반대로 개행을
+ * 막는다 — 개행을 넘어간 덩어리는 타입 이름일 수 없다.
+ */
+const NAME_PREFIX_PATTERN = /^([^:\n]{1,24}):\s*([\s\S]+)$/;
+
+/**
+ * 이름을 `타입 접두사`와 `나머지`로 나눈다. 접두사가 없으면 이름 전체를 접두사로
+ * 돌려준다 — 호출부가 "접두사는 굵게"만 지키면 두 경우가 같은 코드로 처리된다.
+ *
+ * @param {string} name - 캠페인 이름
+ * @returns {{prefix: string, rest: string}}
+ */
+function splitNamePrefix(name) {
+  const match = (name ?? '').match(NAME_PREFIX_PATTERN);
+  return match ? { prefix: match[1], rest: match[2] } : { prefix: name ?? '', rest: '' };
+}
+
 /** 축 눈금 라벨이 겹치지 않는 최소 간격(타임라인 폭 대비 %) */
 const MIN_TICK_GAP_PCT = 4;
 
@@ -150,6 +188,7 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
           const width = Math.max(timelinePct(p.endDate) - left, 1.5);
           /* 플랫폼 표기는 이름과 한 덩어리다 — 둘 다 "이 막대가 무엇인가"를
              말하고, 막대 안의 숫자들은 전부 이 플랫폼(들) 기준이다. */
+          const { prefix, rest } = splitNamePrefix(p.name);
           const heading = [p.name, p.platformLabel].filter(Boolean).join(' · ');
           const barText = [
             `${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
@@ -164,7 +203,12 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
                   말줄임은 두지 않는다 — 넘치면 바깥 여백(px:12)으로 흐른다. */}
               {/* body2(14px) + 굵기로 막대 안 caption(12px)과 두 단을 만든다 —
                   한 줄에 몰려 한 굵기로 흐르던 예전 라벨이 안 읽혔던 이유가
-                  위계 부재였다. NAME_HEIGHT(20)는 body2의 줄높이와 맞춘 값. */}
+                  위계 부재였다. NAME_HEIGHT(20)는 body2의 줄높이와 맞춘 값.
+
+                  줄 안에서 다시 굵기를 나눈다: 굵은 건 "이게 무엇인가"(타입
+                  접두사, 없으면 이름 전체), 보통 굵기는 "그중 어느 것인가"(캡션
+                  조각)와 플랫폼이다. 부스팅 게시물끼리 굵은 접두사를 공유하므로
+                  세지 않아도 한 무리로 묶여 보인다. */}
               <Typography
                 variant="body2"
                 sx={{
@@ -173,11 +217,13 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
                   left: left > 60 ? `${left + width}%` : `${left}%`,
                   transform: left > 60 ? 'translateX(-100%)' : 'none',
                   whiteSpace: 'nowrap',
-                  fontWeight: 600,
+                  fontWeight: 400,
                   color: 'text.primary',
                 }}
               >
-                {heading}
+                <Box component="span" sx={{ fontWeight: 600 }}>{prefix}</Box>
+                {rest && ` · ${rest}`}
+                {p.platformLabel && ` · ${p.platformLabel}`}
               </Typography>
               <Box
                 // 막대가 좁으면 숫자가 잘린다 — 전체 문자열을 title로 남긴다.
