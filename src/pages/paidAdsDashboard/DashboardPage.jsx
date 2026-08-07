@@ -1067,6 +1067,42 @@ export function DashboardPage() {
                   ].filter((s) => s.rows.length > 0)
                 : [];
 
+          /* 이 탭엔 없는데 다른 탭엔 있는 경우 — 어디에 있는지 말해준다.
+             예전엔 "No campaigns match the current filters."만 띄웠는데, 사용자가
+             G09 Opening을 골랐다가 아무것도 안 나오자 "뭔가 잘못됐나" 했다가
+             옆의 Ended(5) 배지를 스스로 발견하고 "내가 실수했구나"로 넘어갔다
+             (실사용 신고). 시스템은 이유를 정확히 알고 있었다 — 그 캠페인들이
+             전부 종료됐다는 것. 알면서 말하지 않으면 사용자가 자기 탓을 한다.
+
+             탭 배지는 이미 필터를 반영하므로 여기 쓰는 숫자와 도착지의 숫자가
+             일치한다(이 화면의 "클릭한 숫자와 도착한 행 수는 같다" 원칙). */
+          if (campaignRows.length === 0) {
+            const elsewhere = [
+              { tab: 'active', label: 'Active', count: activeCount },
+              { tab: 'planned', label: 'Planned', count: plannedCount },
+              { tab: 'ended', label: 'Ended', count: endedCount },
+            ].filter((t) => t.tab !== tab && t.count > 0);
+
+            return (
+              <Box sx={{ py: 4 }}>
+                <Typography variant="body2" color="text.secondary">
+                  {elsewhere.length === 0
+                    ? 'No campaigns match the current filters.'
+                    : `Nothing here matches the current filters — but there ${elsewhere.length === 1 && elsewhere[0].count === 1 ? 'is' : 'are'} matches in other tabs.`}
+                </Typography>
+                {elsewhere.length > 0 && (
+                  <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                    {elsewhere.map((t) => (
+                      <Button key={t.tab} size="small" variant="outlined" onClick={() => setTab(t.tab)} sx={{ boxShadow: 'none' }}>
+                        {`${t.label} (${t.count})`}
+                      </Button>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            );
+          }
+
           if (sections.length === 0) {
             return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
           }
