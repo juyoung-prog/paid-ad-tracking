@@ -292,10 +292,12 @@ function fmtSeconds(value) {
 const CREATIVE_VIDEO_COLUMNS = [
   metricColumn('Video Plays', (r) => r.videoPlays, fmtNumber, { width: 112, note: NOTE.videoPlays }),
   // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
-  metricColumn('Hook Rate', (r) => r.hookRate, fmtPercent, { width: 104, note: NOTE.hookRate, hasBenchmark: true, isPlatformSpecific: true }),
-  metricColumn('Hold Rate', (r) => r.holdRate, fmtPercent, { width: 104, note: NOTE.holdRate, hasBenchmark: true, isPlatformSpecific: true }),
+  /* 폭 104 → 124. 헤더에 기준선(`med 21.89%`)이 붙으면서 104px로는 라벨·ⓘ·
+     기준선이 세 줄로 쪼개졌다(실화면 12-12). 기준선이 들어갈 자리를 준다. */
+  metricColumn('Hook Rate', (r) => r.hookRate, fmtPercent, { width: 124, note: NOTE.hookRate, hasBenchmark: true, isPlatformSpecific: true }),
+  metricColumn('Hold Rate', (r) => r.holdRate, fmtPercent, { width: 124, note: NOTE.holdRate, hasBenchmark: true, isPlatformSpecific: true }),
   metricColumn('Held Views', (r) => r.heldViews, fmtNumber, { width: 108, note: NOTE.heldViews }),
-  metricColumn('Avg Watch', (r) => r.avgWatchSeconds, fmtSeconds, { width: 108, note: NOTE.avgWatch, hasBenchmark: true }),
+  metricColumn('Avg Watch', (r) => r.avgWatchSeconds, fmtSeconds, { width: 116, note: NOTE.avgWatch, hasBenchmark: true }),
 ];
 
 const CREATIVE_ENGAGEMENT_COLUMNS = [
@@ -1235,7 +1237,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   {
                     label: 'Avg. CPM',
                     value: summary.avgCPM != null ? money(summary.avgCPM) : EMPTY_CELL,
-                    sub: 'across reported campaigns',
+                    /* 모집단과 계산 방식을 밝힌다. 이 값은 **전체 캠페인의 평균**
+                       인데, 바로 아래 goal별 표의 헤더에는 **그 표만의 중앙값**이
+                       붙는다(Awareness med $2.68). 같은 화면에 3배 차이나는 두
+                       CPM이 놓이는데 무엇이 다른지 화면이 말하지 않으면 둘 중
+                       하나가 틀린 것으로 읽힌다(실화면 12-11). */
+                    sub: `mean across ${summary.totalCampaigns} campaigns · tables below show each goal's median`,
                     delta: cpmDelta,
                   },
                 ]
@@ -1690,7 +1697,19 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                               <Typography
                                 variant="caption"
                                 component="div"
-                                sx={{ fontWeight: 400, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+                                /* 이 줄이 쪼개지면 "med"와 값이 다른 줄에 놓여
+                                   헤더가 세 줄이 된다(실화면 12-12). */
+                                sx={{
+                                  fontWeight: 400,
+                                  color: 'text.secondary',
+                                  fontVariantNumeric: 'tabular-nums',
+                                  whiteSpace: 'nowrap',
+                                }}
+                                /* 무엇의 중앙값인지 밝힌다 — 이 표 **전체**가
+                                   기준이라 지금 페이지에 보이는 15행만 보면
+                                   기준선이 틀린 것처럼 보인다(Traffic 표에서
+                                   보이는 행 대부분이 CTR 0%인데 med는 1.57%). */
+                                title={`Median across all ${rowsForGoal.length} campaigns in this table, not just this page`}
                               >
                                 {`med ${column.format(median)}`}
                               </Typography>

@@ -102,13 +102,22 @@ export function percent(ratio, { digits = 0 } = {}) {
 }
 
 /**
- * 초 단위 시간(평균 시청 시간 등). 소수 2자리 — 영상 지표는 0.1초 차이가
- * 의미를 갖는 자리라 반올림하지 않는다.
- * seconds(2.4)  // '2.40s'
+ * 초 단위 시간(평균 시청 시간 등).
+ *
+ * 소수 **1자리**까지만 쓰고, 정수면 소수점을 아예 떼어낸다. 2자리 고정이었을 때
+ * Meta 행이 전부 `2.00s`·`11.00s`로 찍혔는데, 그건 Meta가 캠페인 레벨 평균
+ * 시청 시간을 **정수 초로만** 주기 때문이다(TikTok은 `2.96s`처럼 실수를 준다).
+ * `2.00s`는 있지도 않은 백분의 일 초 정밀도를 주장하는 표기고, 같은 열에서
+ * TikTok의 진짜 소수와 섞이면 어느 쪽이 실측인지 구분이 안 된다.
+ *
+ * seconds(2)     // '2s'
+ * seconds(2.96)  // '3s'      ← 1자리 반올림 후 정수면 소수점을 뗀다
+ * seconds(1.14)  // '1.1s'
  */
 export function seconds(value) {
   if (isBlank(value)) return EMPTY;
-  return `${Number(value).toFixed(2)}s`;
+  const rounded = Math.round(Number(value) * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}s`;
 }
 
 // ============================================================
