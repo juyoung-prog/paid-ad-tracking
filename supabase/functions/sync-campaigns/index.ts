@@ -399,6 +399,103 @@ async function fetchTikTokCampaigns(accessToken: string, advertiserId: string): 
  *
  * @returns campaign_id → { daily, total }. 값이 없는 쪽은 null.
  */
+/**
+ * TikTok 페이지네이션 GET 한 벌 — campaign/adgroup/ad/file 조회가 전부 같은
+ * 모양(page/page_size, body의 code, page_info.total_page)이라 여기로 모은다.
+ * 실패하면 지금까지 모은 것만 돌려주고 조용히 멈춘다(호출부가 부가 정보 용도일 때
+ * 동기화 전체를 실패로 만들지 않기 위해 — Meta 썸네일과 같은 원칙).
+ */
+async function fetchTikTokPages(path: string, accessToken: string, advertiserId: string): Promise<any[]> {
+  const all: any[] = [];
+  for (let page = 1; page <= MAX_PAGES; page += 1) {
+    const url = new URL(`https://business-api.tiktok.com/open_api/v1.3/${path}/`);
+    url.searchParams.set('advertiser_id', advertiserId);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('page_size', '100');
+    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const json = await res.json();
+    if (json?.code !== 0) {
+      console.error(`TikTok ${path} 조회 실패(무시하고 계속)`, { page, code: json?.code, message: json?.message });
+      return all;
+    }
+    all.push(...(json?.data?.list ?? []));
+    const totalPage = json?.data?.page_info?.total_page ?? 1;
+    if (page >= totalPage) break;
+  }
+  return all;
+}
+
+/**
+ * 캠페인별 소재 썸네일. Meta(fetchMetaThumbnails)와 목적은 같은데 경로가 다르다 —
+ * TikTok은 썸네일 주소를 광고에 직접 실어주지 않아서, 광고가 어떤 **종류**의
+ * 소재를 쓰는지에 따라 다른 곳에서 해석해야 한다(전부 실계정 응답으로 확인):
+ *
+ * - Spark Ads(이 계정 31캠페인 중 30): 업로드 소재가 아니라 TikTok **게시물**을
+ *   광고로 쓴다. 광고에는 tiktok_item_id만 있고 소재 라이브러리에는 아무것도
+ *   없다. Business API 쪽 조회(/identity/video/info/)는 또 다른 권한(TikTok
+ *   Accounts)이 필요해서, 게시물 썸네일은 **공개 oEmbed**로 얻는다 — 인증이
+ *   필요 없고 게시물이 공개인 한 항상 동작한다(Spark Ads는 공개 게시물만 광고로
+ *   쓸 수 있으므로 전제가 성립한다). URL의 사용자명 자리는 아무 값이나 받아줘서
+ *   `@_`로 둔다.
+ * - 업로드 영상(1캠페인): video_id → /file/video/ad/search/의 poster_url.
+ * - 업로드 이미지(현재 0건이지만 방어): image_ids → /file/image/ad/search/.
+ *
+ * 캠페인 하나에 광고가 여럿이면 먼저 만난 것을 쓴다(Meta와 같은 이유 — 링크와
+ * 달리 썸네일은 "그 캠페인의 아무 소재"라도 알아보는 데 그대로 쓸모가 있다).
+ * 여기서 얻는 CDN 주소도 서명 만료가 있어서 Meta와 같은 갱신 규칙을 탄다
+ * (data: URI가 아닌 저장값은 매 동기화마다 덮는다).
+ */
+async function fetchTikTokThumbnails(accessToken: string, advertiserId: string): Promise<Map<string, string>> {
+  const byCampaign = new Map<string, string>();
+  const ads = await fetchTikTokPages('ad/get', accessToken, advertiserId);
+  if (ads.length === 0) return byCampaign;
+
+  // 캠페인별 첫 광고의 소재 단서만 남긴다 — 뒤 광고로 덮지 않는다.
+  const clueByCampaign = new Map<string, { videoId?: string; imageId?: string; itemId?: string }>();
+  for (const ad of ads) {
+    const campaignId = String(ad?.campaign_id ?? '');
+    if (!campaignId || clueByCampaign.has(campaignId)) continue;
+    if (ad?.video_id) clueByCampaign.set(campaignId, { videoId: String(ad.video_id) });
+    else if ((ad?.image_ids ?? []).length) clueByCampaign.set(campaignId, { imageId: String(ad.image_ids[0]) });
+    else if (ad?.tiktok_item_id) clueByCampaign.set(campaignId, { itemId: String(ad.tiktok_item_id) });
+  }
+
+  // 업로드 소재는 라이브러리를 통째로 읽어 id → 주소 맵을 만든다. 개별 info
+  // 조회보다 호출이 적고(이 계정은 영상 4건), 단서에 없는 소재는 그냥 남는다.
+  const needVideos = [...clueByCampaign.values()].some((c) => c.videoId);
+  const needImages = [...clueByCampaign.values()].some((c) => c.imageId);
+  const videoPoster = new Map<string, string>();
+  const imageUrl = new Map<string, string>();
+  if (needVideos) {
+    for (const v of await fetchTikTokPages('file/video/ad/search', accessToken, advertiserId)) {
+      if (v?.video_id && (v?.poster_url || v?.video_cover_url)) videoPoster.set(String(v.video_id), v.poster_url ?? v.video_cover_url);
+    }
+  }
+  if (needImages) {
+    for (const img of await fetchTikTokPages('file/image/ad/search', accessToken, advertiserId)) {
+      if (img?.image_id && img?.image_url) imageUrl.set(String(img.image_id), img.image_url);
+    }
+  }
+
+  for (const [campaignId, clue] of clueByCampaign) {
+    if (clue.videoId && videoPoster.has(clue.videoId)) {
+      byCampaign.set(campaignId, videoPoster.get(clue.videoId)!);
+    } else if (clue.imageId && imageUrl.has(clue.imageId)) {
+      byCampaign.set(campaignId, imageUrl.get(clue.imageId)!);
+    } else if (clue.itemId) {
+      try {
+        const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(`https://www.tiktok.com/@_/video/${clue.itemId}`)}`);
+        const json = await res.json();
+        if (json?.thumbnail_url) byCampaign.set(campaignId, json.thumbnail_url);
+      } catch (err) {
+        // 게시물이 비공개/삭제됐거나 oEmbed가 막힌 경우 — 그 캠페인만 이니셜로 남는다.
+        console.error('TikTok oEmbed 실패(무시하고 계속)', { itemId: clue.itemId, err: String(err) });
+      }
+    }
+  }
+  return byCampaign;
+}
+
 async function fetchTikTokAdGroupBudgets(
   accessToken: string,
   advertiserId: string
@@ -514,7 +611,8 @@ function mapTikTokCampaign(
   item: any,
   base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
   stores: StoreIndex,
-  adGroupBudgets?: Map<string, { daily: number | null; total: number | null }>
+  adGroupBudgets?: Map<string, { daily: number | null; total: number | null }>,
+  thumbnails?: Map<string, string>,
 ): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
   const range =
@@ -539,9 +637,7 @@ function mapTikTokCampaign(
     // 0으로 오는데, 그건 보통 캠페인이 아니라 광고그룹에 예산을 건 계정이다.
     ...mapTikTokBudget(item, adGroupBudgets?.get(String(item.campaign_id))),
     goal: mapTikTokGoal(item.objective),
-    // TikTok 소재 썸네일은 아직 안 가져온다 — Meta와 달리 캠페인에서 소재까지
-    // 내려가는 경로가 별도 권한을 요구해서, Ad Group 권한 심사와 함께 정리한다.
-    thumbnail_url: null,
+    thumbnail_url: thumbnails?.get(String(item.campaign_id)) ?? null,
   };
 }
 
@@ -628,14 +724,17 @@ Deno.serve(async (req) => {
     /* 소재 썸네일도 한 단계 아래(광고)에 있어서 한 번 더 읽는다. 예산과 같은
        이유로 캠페인이 0건이면 호출을 아낀다. */
     let thumbnails: Map<string, string> | undefined;
-    if (conn.platform === 'meta' && raw.length > 0) {
-      thumbnails = await fetchMetaThumbnails(conn.access_token, externalAccountId);
+    if (raw.length > 0) {
+      thumbnails =
+        conn.platform === 'meta'
+          ? await fetchMetaThumbnails(conn.access_token, externalAccountId)
+          : await fetchTikTokThumbnails(conn.access_token, externalAccountId);
     }
 
     const rows: CampaignRow[] = raw.map((item: any) =>
       conn.platform === 'meta'
         ? mapMetaCampaign(item, base, stores, thumbnails)
-        : mapTikTokCampaign(item, base, stores, adGroupBudgets)
+        : mapTikTokCampaign(item, base, stores, adGroupBudgets, thumbnails)
     );
     if (rows.length === 0) continue;
 
