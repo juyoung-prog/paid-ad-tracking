@@ -1613,14 +1613,19 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
             { key: 'social', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
           ].filter((g) => g.columns.length > 0);
           const dataColumns = columnGroups.flatMap((g) => g.columns.map((col, colIndex) => ({ ...col, group: g.key, isGroupStart: colIndex === 0 })));
-          /* 컬럼 폭의 합. 표는 이 폭에 딱 맞춘다 — 늘리지 않는다.
+          /* 컬럼 폭의 합 = 표의 **최소** 폭. 화면이 이보다 넓으면 컬럼들이 남는
+             폭을 나눠 갖고, 좁으면 여기서부터 가로 스크롤이 걸린다.
 
-             예전엔 width:100%로 늘리고 colgroup 마지막에 폭 미지정 여백 열을 하나
-             둬서 남는 폭을 흡수하게 했다. goal 표마다 컬럼 수가 달라도 오른쪽
-             끝선을 공유하게 하려던 장치였는데, 그 근거였던 그룹 경계 정렬이
-             그룹 라벨 행과 함께 사라졌다. 남은 건 **마지막 컬럼 너머로 370px쯤
-             이어지는 빈 행 구분선**뿐이었다 — 컬럼이 더 있어야 할 것처럼 보인다
-             (실화면 12-22·12-23). 표를 콘텐츠 폭으로 두면 그 꼬리가 사라진다. */
+             이 자리를 두 번 고쳤다. 원래는 `width:100%` + 폭 미지정 여백 열이었다 —
+             goal 표마다 컬럼 수가 달라도 오른쪽 끝선을 공유하게 해서 그룹 경계를
+             맞추려던 장치다. 그룹 라벨 행을 걷어내며 맞출 대상이 사라지자 **마지막
+             컬럼 너머로 이어지는 빈 행 구분선**만 남았고(12-22·12-23), 그래서 표를
+             콘텐츠 폭(`width: tableWidth`)으로 고정했다.
+
+             그건 방향이 틀렸다. 선은 사라졌지만 그 자리에 흰 여백이 그대로 남아
+             오히려 더 비어 보였다(실사용 신고). 없애야 할 건 선이 아니라 **빈 공간
+             자체**였다. 여백 열 없이 `width:100%`를 주면 남는 폭을 진짜 컬럼들이
+             나눠 가져서 빈 자리가 생기지 않는다. */
           const tableWidth = COLUMN_WIDTH.campaign + COLUMN_WIDTH.platform + dataColumns.reduce((sum, c) => sum + c.width, 0);
           // 성과 레코드가 아예 없는 캠페인 — 전 컬럼이 '—'로 채워진 행이 된다.
           const isRowEmpty = (r) => dataColumns.every((col) => col.cell(r) === EMPTY_CELL);
@@ -1677,7 +1682,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                     정한다. 콘텐츠 기반(auto)이면 캠페인 이름 길이 같은 표별 사정에
                     따라 같은 컬럼도 폭이 달라져, goal 표를 세로로 훑을 때 그룹
                     구분선이 섹션마다 밀린다. */}
-                <Table size="small" sx={{ tableLayout: 'fixed', width: tableWidth }}>
+                {/* width:100% + minWidth — 남는 폭을 **컬럼들이 나눠 갖는다.**
+                    table-layout:fixed에서 지정 폭의 합이 표 폭보다 작으면 브라우저가
+                    남은 폭을 지정 폭에 비례해 각 컬럼에 나눠준다. colgroup의 px 값은
+                    이제 절대 폭이 아니라 **비율의 기준**이자 좁을 때의 하한선이다. */}
+                <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
                   <colgroup>
                     <col style={{ width: COLUMN_WIDTH.campaign }} />
                     <col style={{ width: COLUMN_WIDTH.platform }} />
