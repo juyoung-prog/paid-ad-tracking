@@ -29,6 +29,7 @@ import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtil
 import { money, moneyWhole, count, percent, seconds } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
+import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -248,26 +249,27 @@ function goalExtraColumns(goalValue) {
   switch (goalValue) {
     case GOAL.AWARENESS:
       return [
-        metricColumn('Impressions', (r) => r.impressions, fmtNumber, { note: NOTE.impressions }),
-        metricColumn('Reach', (r) => r.reach, fmtNumber, { note: NOTE.reach }),
-        metricColumn('CPM', (r) => r.cpm, fmtCurrency, { note: NOTE.cpm, hasBenchmark: true }),
+        /* Reach는 뺐다 — Impressions와 강하게 붙어 다니는 값이고, 둘의 비(빈도)를
+           이 표에서 직접 쓰는 판단이 없다. 상세 패널에는 그대로 남는다. */
+        metricColumn('Impressions', (r) => r.impressions, fmtNumber, { width: 140, note: NOTE.impressions }),
+        metricColumn('CPM', (r) => r.cpm, fmtCurrency, { width: 104, note: NOTE.cpm, hasBenchmark: true }),
       ];
     case GOAL.TRAFFIC:
       return [
-        metricColumn('Clicks', (r) => r.clicks, fmtNumber, { note: NOTE.clicks }),
-        metricColumn('CTR', (r) => r.ctr, fmtPercent, { note: NOTE.ctr, hasBenchmark: true }),
-        metricColumn('CPC', (r) => r.cpc, fmtCurrency, { note: NOTE.cpc, hasBenchmark: true }),
+        metricColumn('Clicks', (r) => r.clicks, fmtNumber, { width: 104, note: NOTE.clicks }),
+        metricColumn('CTR', (r) => r.ctr, fmtPercent, { width: 104, note: NOTE.ctr, hasBenchmark: true }),
+        metricColumn('CPC', (r) => r.cpc, fmtCurrency, { width: 104, note: NOTE.cpc, hasBenchmark: true }),
       ];
     case GOAL.ENGAGEMENT:
       return [
-        metricColumn('Engagements', (r) => r.engagements, fmtNumber, { note: NOTE.engagements }),
-        metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { note: NOTE.engagementRate, hasBenchmark: true }),
+        metricColumn('Engagements', (r) => r.engagements, fmtNumber, { width: 140, note: NOTE.engagements }),
+        metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { width: 128, note: NOTE.engagementRate, hasBenchmark: true }),
       ];
     case GOAL.CONVERSION:
     case GOAL.STORE_VISIT:
       return [
-        metricColumn('Conversions', (r) => r.conversions, fmtNumber, { note: NOTE.conversions }),
-        metricColumn('CPA', (r) => r.cpa, fmtCurrency, { note: NOTE.cpa, hasBenchmark: true }),
+        metricColumn('Conversions', (r) => r.conversions, fmtNumber, { width: 140, note: NOTE.conversions }),
+        metricColumn('CPA', (r) => r.cpa, fmtCurrency, { width: 104, note: NOTE.cpa, hasBenchmark: true }),
       ];
     default:
       return [];
@@ -291,8 +293,11 @@ const fmtSeconds = seconds;
 // width는 라벨이 한 줄에 들어가는 최소치로 잡은 고정값이다 — 표마다 auto로
 // 맞추면 goal 표끼리 같은 컬럼의 폭이 달라져서, 세로로 훑을 때 그룹 구분선이
 // 섹션마다 지그재그로 밀린다(실화면 스크린샷 리뷰로 발견).
+/* Plays(총 재생수)는 뺐다 — 영상 광고에서는 Impressions와 사실상 같은 축이라
+   같은 표에 절대 숫자를 하나 더 얹을 뿐이었다. 소재가 얼마나 붙잡았는지는
+   Hook·Hold·Watch가 비율로 말하고, 완전 시청 **건수**는 Completed가 남는다.
+   빠진 값은 캠페인 상세 패널(PlatformMetricList)에 그대로 있다. */
 const CREATIVE_VIDEO_COLUMNS = [
-  metricColumn('Plays', (r) => r.videoPlays, fmtNumber, { width: 96, note: `Video plays. ${NOTE.videoPlays}` }),
   // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
   /* 폭 104 → 124. 헤더에 기준선(`med 21.89%`)이 붙으면서 104px로는 라벨·ⓘ·
      기준선이 세 줄로 쪼개졌다(실화면 12-12). 기준선이 들어갈 자리를 준다. */
@@ -342,13 +347,6 @@ const COLUMN_WIDTH = {
   // 깎는 건 앞뒤가 안 맞는다.
   campaign: 360,
   platform: 96,
-  /* goal별 컬럼(Spend·CPM·Impressions…)이 나눠 갖는 총폭.
-     480 → 560. 헤더를 한 줄로 고정(nowrap)하면서, 가장 긴 라벨인
-     `Impressions`(+ⓘ)가 480/4 = 120px 칸을 넘쳐 옆 컬럼을 침범할 수 있게 됐다
-     — table-layout:fixed에서 nowrap은 줄바꿈 대신 넘침이 된다. 라벨과 아이콘이
-     들어갈 자리를 준다(140px). 대신 Video·Engagement 컬럼을 짧은 이름에 맞춰
-     줄였으므로 표 전체 폭은 오히려 줄었다(2012 → 1952). */
-  goalRegion: 560,
 };
 
 /**
@@ -413,7 +411,7 @@ function columnMedian(column, rows) {
 // (CPM/CPC/CPA)를 한 그룹으로 묶는다. 예전엔 비용 지표가 goal 지표들 뒤에
 // 섞여 있었는데(예: Impressions·Reach 다음 CPM), "얼마 썼고 단가가 얼마인가"와
 // "얼마나 잘 됐나"는 서로 다른 질문이라 그룹으로 가른다.
-const SPEND_COLUMN = metricColumn('Spend', (r) => r.spend, fmtCurrency, { note: NOTE.spend });
+const SPEND_COLUMN = metricColumn('Spend', (r) => r.spend, fmtCurrency, { width: 128, note: NOTE.spend });
 const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA']);
 
 /*
@@ -1027,6 +1025,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
+  /* 상세를 볼 캠페인. **id만** 들고 있는다 — 객체를 담아두면 동기화로 목록이
+     갱신됐을 때 패널만 옛 값을 계속 보여준다. */
+  const [detailCampaignId, setDetailCampaignId] = useState(null);
 
   /* 탭·필터를 URL과 묶는다 — Dashboard와 같은 규칙. 이 화면이 특히 중요한 게,
      "G10 Opening 성과"를 동료에게 보여주려면 지금까지는 링크가 아니라 조작
@@ -1046,6 +1047,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
     },
     { storageKey: REPORT_VIEW_STORAGE_KEY },
   );
+
+  const detailCampaign = detailCampaignId
+    ? campaigns.find((c) => c.id === detailCampaignId) ?? null
+    : null;
 
   /* Event 드롭다운 옵션 = **이벤트로 유도된 그룹만**.
      예전엔 "이름이 같은 캠페인이 2건 이상"도 옵션으로 올렸다. 그 규칙은 사람이
@@ -1324,6 +1329,17 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
         <BackendErrorBanner error={ error } onRetry={ onRetry } sx={{ mb: 2 }} />
       )}
 
+      {/* 읽기 전용 상세 — Reports를 떠나지 않는다. 열려 있을 때만 마운트해서
+          닫았다 열면 항상 새 값으로 그린다(CampaignDetailPanel 주석 참고). */}
+      {detailCampaign && (
+        <CampaignDetailPanel
+          campaign={detailCampaign}
+          performance={performanceRecords.find((r) => r.campaignId === detailCampaign.id)}
+          onClose={() => setDetailCampaignId(null)}
+          onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
+        />
+      )}
+
       {isLoading && (
         <Box aria-label="Loading report" role="status">
           {[0, 1, 2, 3, 4].map((i) => (
@@ -1471,7 +1487,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                 </TableHead>
                 <TableBody>
                   {planCampaigns.map((c) => (
-                    <TableRow key={c.id} hover onClick={() => navigate(`/dashboard?campaign=${c.id}`)} sx={{ cursor: 'pointer' }}>
+                    <TableRow key={c.id} hover onClick={() => setDetailCampaignId(c.id)} sx={{ cursor: 'pointer' }}>
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{c.name}</TableCell>
                       <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                         {shortDate(c.startDate)}–{shortDate(c.endDate)}
@@ -1583,15 +1599,16 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           const goalCols = goalExtraColumns(value);
           const costCols = keep([SPEND_COLUMN, ...goalCols.filter((c) => COST_METRIC_HEADERS.has(c.header))]);
           const perfCols = keep(goalCols.filter((c) => !COST_METRIC_HEADERS.has(c.header)));
-          // 영역 합계(goalRegion)를 남은 컬럼 수로 나눠 개별 폭을 만든다 — 컬럼이
-          // 몇 개든 영역 총폭이 같아서 뒤따르는 그룹 경계가 표끼리 어긋나지 않는다.
-          const goalColWidth = COLUMN_WIDTH.goalRegion / Math.max(costCols.length + perfCols.length, 1);
-          const sized = (columns) => columns.map((c) => ({ ...c, width: goalColWidth }));
+          /* goal 컬럼도 이제 자기 폭을 직접 갖는다. 예전엔 영역 총폭(goalRegion
+             560)을 컬럼 수로 나눠 썼는데, 그러면 컬럼이 적은 표(Awareness는 3개)
+             에서 각 컬럼이 187px까지 부풀어 `CPM $2.34` 하나가 그 폭을 다 차지했다.
+             총폭 고정은 그룹 경계를 표끼리 맞추려던 장치인데, 그룹 라벨 행을
+             걷어낸 지금은 맞출 대상이 없다 — 낭비만 남았다. */
           /* label은 없다 — 그룹 헤더 행을 걷어내서 그릴 자리가 없다. 그룹은
              이제 **컬럼 순서와 경계선**으로만 남는다(위 COLUMN_WIDTH 주석). */
           const columnGroups = [
-            { key: 'cost', columns: sized(costCols) },
-            { key: 'perf', columns: sized(perfCols) },
+            { key: 'cost', columns: costCols },
+            { key: 'perf', columns: perfCols },
             { key: 'video', columns: keep(CREATIVE_VIDEO_COLUMNS) },
             { key: 'social', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
           ].filter((g) => g.columns.length > 0);
@@ -1696,7 +1713,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   </TableHead>
                   <TableBody>
                     {visibleRows.map((r) => (
-                      <TableRow key={r.campaignId} hover onClick={() => navigate(`/dashboard?campaign=${r.campaignId}`)} sx={{ cursor: 'pointer' }}>
+                      <TableRow key={r.campaignId} hover onClick={() => setDetailCampaignId(r.campaignId)} sx={{ cursor: 'pointer' }}>
                         {/* 폭이 고정이라 아주 긴 캠페인명은 잘린다 — 전체 이름은 title로 남긴다 */}
                         <TableCell
                           title={r.name}
