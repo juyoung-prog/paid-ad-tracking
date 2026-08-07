@@ -51,6 +51,13 @@ export function rowToAdAccount(row) {
     region: row.region,
     label: row.label,
     externalAccountId: row.external_account_id ?? null,
+    /* 청구 상태. 캠페인 지출을 더해서는 나오지 않는 값이라 플랫폼에서 직접
+       읽어 저장한다(sync-campaigns의 syncMetaBilling). 없으면 null —
+       0으로 바꾸지 않는다: "미납액 0"과 "아직 못 읽었다"는 전혀 다른 상태다. */
+    balanceDue: row.balance_due != null ? Number(row.balance_due) : null,
+    balanceAvailable: row.balance_available != null ? Number(row.balance_available) : null,
+    balanceSyncedAt: row.balance_synced_at ?? null,
+    invoiceThreshold: row.invoice_threshold != null ? Number(row.invoice_threshold) : null,
   };
 }
 

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { alpha } from '@mui/material/styles';
-import { Link as RouterLink, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
@@ -233,6 +233,7 @@ export function DashboardPage() {
   // 쓰기 진행 중 재진입 가드 — 저장/삭제가 도는 동안 같은 요청이 두 번 나가는 것을 막는다.
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   // Save 버튼들이 아무 피드백 없이 조용히 저장만 해서 "저장이 안 된 줄 알았다"는
   // 혼란을 일으켰다 — 저장 성공 시 스낵바로 명시적으로 알린다.
   const { notify, SnackbarComponent } = useSnackbar();
@@ -429,7 +430,17 @@ export function DashboardPage() {
     sub,
     onClick: value > 0 ? () => setTab(target) : undefined,
   });
+  /* 캠페인 단위 고긴급 알림. Needs Attention KPI와 Action Required 그룹이 이걸
+     쓴다 — 둘 다 "행"으로 이어지는 자리라, 클릭한 숫자와 도착한 행 수가 맞아야
+     한다는 이 화면의 원칙이 여기 걸려 있다. */
   const highSeverityAlerts = alerts.filter((a) => HIGH_SEVERITY_TYPES.includes(a.type));
+
+  /* 벨은 다르다. 계정 단위 알림(청구 문턱)은 캠페인 행이 없어서 KPI에 넣으면
+     "1을 눌렀는데 해당하는 행이 없는" 상태가 된다. 대신 벨에는 넣는다 — 어딘가
+     한 곳에서는 반드시 보여야 하고, 벨은 목록이 아니라 알림함이라 행이 없어도
+     된다. 클릭하면 캠페인 드로어가 아니라 Settings로 보낸다. */
+  const accountAlerts = alerts.filter((a) => a.accountId && !a.campaignId);
+  const bellAlerts = [...highSeverityAlerts, ...accountAlerts];
 
   /* 4차 — 첫 자리를 "손댈 것이 있나"로 바꾼다. Starting Soon은 이 계정에서
      사실상 항상 0인데(광고를 미리 등록하지 않고 플랫폼에서 만든 뒤 동기화되는
@@ -818,7 +829,7 @@ export function DashboardPage() {
             onClick={(event) => setBellAnchorEl(event.currentTarget)}
             aria-label="Show alerts"
           >
-            <Badge badgeContent={highSeverityAlerts.length} color="error">
+            <Badge badgeContent={bellAlerts.length} color="error">
               <NotificationsOutlinedIcon fontSize="small" />
             </Badge>
           </IconButton>
@@ -840,7 +851,14 @@ export function DashboardPage() {
               ) : (
                 // 벨이 유일한 알림 진입점이다 — 대시보드 상단 배너는 벨 배지와
                 // 정확히 같은 개수를 중복 노출해서 없앴다.
-                <AlertBanner alerts={highSeverityAlerts} onAlertClick={(alert) => openCampaignDrawer(alert.campaignId)} />
+                <AlertBanner
+                  alerts={bellAlerts}
+                  onAlertClick={(alert) => {
+                    // 계정 알림은 열 드로어가 없다 — 그 계정을 손볼 수 있는 곳으로 보낸다.
+                    if (!alert.campaignId) { navigate('/settings'); return; }
+                    openCampaignDrawer(alert.campaignId);
+                  }}
+                />
               )}
             </Box>
           </Popover>

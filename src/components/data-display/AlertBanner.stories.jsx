@@ -86,6 +86,33 @@ export const NoResults = {
 };
 
 /**
+ * invoice_due — 이 앱에서 유일하게 **계정**에 붙는 알림.
+ *
+ * 다른 알림은 전부 캠페인 단위인데, 미납액은 그 계정의 모든 캠페인이 함께 만든
+ * 값이라 캠페인 지출을 아무리 더해도 나오지 않는다(Meta는 문턱에 닿을 때마다
+ * 청구하고 누적을 0으로 되돌리는데 우리는 그 리셋을 볼 수 없다). 그래서
+ * 플랫폼이 주는 balance를 그대로 읽어 쓴다.
+ *
+ * 확인 포인트: campaignId가 null이라 클릭하면 캠페인 드로어가 아니라 Settings로
+ * 가야 한다. 그리고 Needs Attention KPI에는 **안 들어간다** — 그 숫자는 클릭하면
+ * 행으로 이어지는 자리인데 계정 알림은 해당하는 행이 없다. 벨에만 들어간다.
+ */
+export const InvoiceDue = {
+  args: {
+    alerts: [
+      {
+        id: 'a1',
+        campaignId: null,
+        accountId: 'meta-bm',
+        type: 'invoice_due',
+        message: 'Meta — Beauty Master — $387.52 of the $400 billing threshold — an invoice is due soon',
+        resolvedAt: null,
+      },
+    ],
+  },
+};
+
+/**
  * overlap_target·new_store_reminder는 섞여 들어와도 자동으로 걸러짐
  */
 export const FiltersLowPriorityTypes = {

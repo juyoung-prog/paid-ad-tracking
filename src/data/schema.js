@@ -67,6 +67,7 @@ export const ALERT_TYPE = Object.freeze({
   // 유일한 장치라 성과 레코드 부재 기준으로 되살린다.
   MISSING_PERFORMANCE: 'missing_performance',
   NO_RESULTS: 'no_results',
+  INVOICE_DUE: 'invoice_due',
   NEW_STORE_REMINDER: 'new_store_reminder',
 });
 
@@ -579,6 +580,8 @@ export const ALERT_SEVERITY = {
   // 03-visual-direction의 긴급도 체계 그대로 — 보고 자체가 막히는 상태라 error로 격상
   [ALERT_TYPE.MISSING_PERFORMANCE]: 'error',
   [ALERT_TYPE.NO_RESULTS]: 'error',
+  // 돈이 실제로 청구되는 건이라 놓치면 회계가 밀린다.
+  [ALERT_TYPE.INVOICE_DUE]: 'warning',
   [ALERT_TYPE.ENDING_SOON]: 'warning',
   [ALERT_TYPE.OVERLAP_TARGET]: 'warning',
 };
@@ -595,8 +598,9 @@ const ALERT_SEVERITY_RANK = {
   // 실시간성은 같지만 초과 집행이 더 즉각적인 손실이다.
   [ALERT_TYPE.NO_RESULTS]: 1,
   [ALERT_TYPE.MISSING_PERFORMANCE]: 2,
-  [ALERT_TYPE.ENDING_SOON]: 3,
-  [ALERT_TYPE.OVERLAP_TARGET]: 4,
+  [ALERT_TYPE.INVOICE_DUE]: 3,
+  [ALERT_TYPE.ENDING_SOON]: 4,
+  [ALERT_TYPE.OVERLAP_TARGET]: 5,
 };
 
 /**
@@ -640,8 +644,37 @@ export function goalResultMetric(campaign, record) {
  * @param {Date} [today] - 기준 시각 [Optional, 기본값: new Date()]
  * @returns {Alert[]}
  */
-export function generateAlerts(campaigns, performanceRecords, today = new Date()) {
+/**
+ * 청구 문턱까지 남은 비율이 이 값 이하면 "곧 인보이스" 로 본다.
+ * 문턱에 닿은 뒤 알리면 이미 청구가 끝나 인보이스를 놓친 상태다.
+ */
+export const INVOICE_WARNING_RATIO = 0.85;
+
+export function generateAlerts(campaigns, performanceRecords, today = new Date(), adAccounts = []) {
   const alerts = [];
+
+  /* 계정 단위 알림. 이 앱의 다른 알림은 전부 캠페인에 붙는데 이건 광고 계정에
+     붙는다 — 미납액은 그 계정의 모든 캠페인이 함께 만든 값이라 캠페인 지출을
+     아무리 더해도 나오지 않는다(Meta는 문턱에 닿을 때마다 청구하고 누적을
+     0으로 되돌리는데 우리는 그 리셋을 볼 수 없다). 그래서 플랫폼이 주는
+     balance를 그대로 읽어 쓴다.
+
+     문턱을 모르면(invoice_threshold null) 아무 말도 하지 않는다 — 플랫폼이
+     문턱을 API로 알려주지 않아 사람이 넣어야 하는 값이고, 없는 걸 기본값으로
+     지어내면 "곧 청구됩니다"가 근거 없는 경고가 된다. */
+  adAccounts.forEach((account) => {
+    if (account.balanceDue == null || !account.invoiceThreshold) return;
+    if (account.balanceDue < account.invoiceThreshold * INVOICE_WARNING_RATIO) return;
+    alerts.push({
+      id: `alert-invoice-${account.id}`,
+      campaignId: null,
+      accountId: account.id,
+      type: ALERT_TYPE.INVOICE_DUE,
+      triggeredAt: today.toISOString(),
+      resolvedAt: null,
+      message: `${account.label} — $${account.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })} of the $${account.invoiceThreshold.toLocaleString('en-US')} billing threshold — an invoice is due soon`,
+    });
+  });
 
   campaigns.forEach((campaign) => {
     const status = getEffectiveStatus(campaign, today);

@@ -262,7 +262,8 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
    */
   const today = useMemo(() => startOfToday(), []);
 
-  const alerts = generateAlerts(state.campaigns, state.performanceRecords, today);
+  // adAccounts까지 넘긴다 — 계정 단위 알림(청구 문턱)이 여기서 나온다.
+  const alerts = generateAlerts(state.campaigns, state.performanceRecords, today, state.adAccounts);
 
   return {
     stores: state.stores,

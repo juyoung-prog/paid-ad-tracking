@@ -14,6 +14,7 @@ import { usePaidAdsStore } from './usePaidAdsStore';
 import { useConnections } from './useConnections';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X } from './paidAdsPageUtils';
+import { INVOICE_WARNING_RATIO } from '../../data/schema';
 
 /**
  * 연결 가능한 광고 계정 목록. ad_accounts 테이블은 "연결이 끝난 뒤에" 채워지므로
@@ -178,6 +179,12 @@ export function SettingsPage() {
             const connection = connectionByAccountId.get(target.accountId);
             const isConnected = Boolean(connection);
             const { remainingDays, isExpired } = getExpiry(connection?.expiresAt);
+            /* 문턱을 모르면 판단하지 않는다 — 플랫폼이 문턱을 API로 주지 않아
+               사람이 넣는 값이고, 없는 걸 지어내면 근거 없는 경고가 된다. */
+            const isInvoiceDue =
+              account?.balanceDue != null &&
+              account?.invoiceThreshold > 0 &&
+              account.balanceDue >= account.invoiceThreshold * INVOICE_WARNING_RATIO;
             const isExpiringSoon = !isExpired && remainingDays !== null && remainingDays <= EXPIRY_WARNING_DAYS;
 
             return (
@@ -222,6 +229,21 @@ export function SettingsPage() {
                     <Typography variant="caption" color="text.secondary" component="div">
                       { `Connected ${formatDateTime(connection.connectedAt)}` }
                       { connection.expiresAt && ` · Expires ${formatDateTime(connection.expiresAt)}` }
+                    </Typography>
+                  ) }
+
+                  {/* 청구 상태 — 캠페인 지출을 더해서는 나오지 않는 계정 단위 값이라
+                      플랫폼에서 직접 읽어온다. 값이 없으면 줄 자체를 안 그린다
+                      ("$0 청구 예정"으로 읽히면 안 된다). */}
+                  { account?.balanceDue != null && (
+                    <Typography
+                      variant="caption"
+                      component="div"
+                      sx={ { color: isInvoiceDue ? 'warning.main' : 'text.secondary', fontWeight: isInvoiceDue ? 600 : 400 } }
+                    >
+                      { `Amount due $${account.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+                      { account.invoiceThreshold ? ` of $${account.invoiceThreshold.toLocaleString('en-US')} threshold` : '' }
+                      { isInvoiceDue ? ' — invoice due soon' : '' }
                     </Typography>
                   ) }
                 </Box>

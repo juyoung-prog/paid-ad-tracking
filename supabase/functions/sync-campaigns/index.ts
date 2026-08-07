@@ -314,6 +314,40 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
   return byCampaign;
 }
 
+/**
+ * 광고 계정의 청구 상태를 읽어 ad_accounts에 저장한다.
+ *
+ * 캠페인 지출을 아무리 더해도 이 값은 안 나온다. Meta는 문턱에 도달할 때마다
+ * 청구하고 누적을 0으로 되돌리는데 우리는 그 리셋을 볼 수 없어서 "이번 청구
+ * 이후 얼마"를 계산할 수 없다 — 플랫폼이 act_{id}.balance로 직접 알려주므로
+ * 읽어오기만 한다(실측: $0.00 / $85.81 / $387.52).
+ *
+ * balance는 화폐 최소 단위(센트)로 오므로 여기서 한 번만 USD로 바꾼다.
+ * 실패해도 errorMessage를 만들지 않는다 — 캠페인 동기화가 본체이고 이건 부가
+ * 정보라, 이것 때문에 전체가 "실패"로 표시되면 잘못된 신호가 된다.
+ *
+ * TikTok(/advertiser/info/)은 별도 권한(Ad Account Information)이 필요해 아직
+ * 열려 있지 않다. 권한이 승인되면 여기에 같은 방식으로 추가한다.
+ */
+async function syncMetaBilling(admin: any, accessToken: string, accountId: string, externalAccountId: string) {
+  try {
+    const res = await fetchWithTimeout(
+      `https://graph.facebook.com/v19.0/act_${externalAccountId}?fields=balance,currency&access_token=${accessToken}`,
+    );
+    const json: any = await res.json();
+    if (json?.error || json?.balance == null) {
+      console.error('Meta 잔액 조회 실패(무시하고 계속)', { accountId, error: json?.error?.message });
+      return;
+    }
+    await admin
+      .from('ad_accounts')
+      .update({ balance_due: Number(json.balance) / 100, balance_synced_at: new Date().toISOString() })
+      .eq('id', accountId);
+  } catch (err) {
+    console.error('Meta 잔액 조회 예외(무시하고 계속)', { accountId, err: String(err) });
+  }
+}
+
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
 function mapMetaGoal(objective: string | undefined) {
   switch (objective) {
@@ -758,6 +792,11 @@ Deno.serve(async (req) => {
 
     /* 소재 썸네일도 한 단계 아래(광고)에 있어서 한 번 더 읽는다. 예산과 같은
        이유로 캠페인이 0건이면 호출을 아낀다. */
+    // 청구 상태는 캠페인 수와 무관하게 계정마다 한 번씩 읽는다.
+    if (conn.platform === 'meta') {
+      await syncMetaBilling(admin, conn.access_token, conn.account_id, externalAccountId);
+    }
+
     let thumbnails: Map<string, string> | undefined;
     if (raw.length > 0) {
       thumbnails =
