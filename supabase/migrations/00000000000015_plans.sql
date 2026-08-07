@@ -12,7 +12,10 @@
 -- 키라 새 매칭 규칙을 만들지 않는다.
 create table plans (
   id uuid primary key default gen_random_uuid(),
-  owner_id uuid not null references auth.users(id) on delete cascade,
+  -- default auth.uid() — 다른 테이블과 같은 규칙이다. 클라이언트가 소유자를
+  -- 주장하는 경로를 만들지 않는다(00000000000016에서 뒤늦게 붙였고, 새로 세팅할
+  -- 때 같은 실수가 반복되지 않도록 여기에도 적어둔다).
+  owner_id uuid not null references auth.users(id) on delete cascade default auth.uid(),
   -- 이벤트 이름. campaigns.campaign_group과 같은 값을 쓴다(대조 키).
   name text not null,
   notes text,

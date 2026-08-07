@@ -149,7 +149,15 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       : await supabase.from('plans').insert(payload).select().single();
 
     if (planRes.error) {
-      setError(planRes.error.message);
+      /* 같은 이벤트 이름으로 두 번 만들면 unique(owner_id, name)에 걸린다.
+         DB 메시지("duplicate key value violates unique constraint …")는 사용자가
+         뭘 해야 하는지 말해주지 않으므로, 할 일을 그대로 적는다. 계획은 이벤트당
+         하나여야 한다 — 이름이 실제 집행과의 대조 키라 둘이면 어느 쪽과 맞출지
+         정할 수 없다. */
+      const isDuplicateName = planRes.error.code === '23505';
+      setError(isDuplicateName
+        ? `A plan for "${payload.name}" already exists — open it from the plan list to edit instead.`
+        : planRes.error.message);
       return null;
     }
     const planId = planRes.data.id;
