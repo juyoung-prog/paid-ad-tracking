@@ -356,7 +356,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
                   <Button
                     size="small"
                     variant="outlined"
-                    startIcon={<CloseIcon sx={{ fontSize: 16 }} />}
+                    startIcon={<CloseIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
                     onClick={() => onChange('thumbnailUrl', '')}
                     sx={{ textTransform: 'none' }}
                   >

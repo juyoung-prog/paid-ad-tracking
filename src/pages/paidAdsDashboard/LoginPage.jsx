@@ -93,7 +93,10 @@ export function LoginPage() {
             fullWidth
           />
 
-          <Button type="submit" variant="contained" size="large" disabled={ isSubmitting } fullWidth sx={ { boxShadow: 'none' } }>
+          {/* 버튼 높이는 32(small) / 40(default) 두 단계뿐이다. large(48)는 앱에서
+              여기 한 곳만 쓰던 세 번째 단계라 없앴다 — 폼 제출 버튼은 default,
+              툴바·표 안은 small이라는 규칙으로 정리한다. */}
+          <Button type="submit" variant="contained" disabled={ isSubmitting } fullWidth sx={ { boxShadow: 'none' } }>
             { isSubmitting ? 'Signing in…' : 'Sign in' }
           </Button>
         </Stack>

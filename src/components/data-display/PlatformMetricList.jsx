@@ -3,18 +3,12 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
 import { calcHookRate, calcHoldRate } from '../../data/schema';
+import { count, percent, seconds } from '../../utils/format';
 
-function fmtNumber(value) {
-  return value.toLocaleString('en-US');
-}
-
-function fmtSeconds(value) {
-  return `${value.toFixed(2)}s`;
-}
-
-function fmtPercent(value) {
-  return `${(value * 100).toFixed(2)}%`;
-}
+// 표기는 utils/format.js에서만 정한다 (PerformanceReportTable과 같은 규칙).
+const fmtNumber = count;
+const fmtSeconds = seconds;
+const fmtPercent = (value) => percent(value, { digits: 2 });
 
 /**
  * 표시할 지표와 순서. 영상 지표(재생 → 완전 시청 → 평균 시청)를 먼저,
@@ -83,8 +77,8 @@ export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) 
   return (
     <Box sx={ sx }>
       <Typography
-        variant="overline"
-        sx={ { display: 'block', mb: 1, fontWeight: 700, color: 'text.primary', letterSpacing: '0.08em' } }
+        variant="label"
+        sx={ { display: 'block', mb: 1, color: 'text.primary' } }
       >
         { title }
       </Typography>

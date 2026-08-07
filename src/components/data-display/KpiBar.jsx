@@ -20,7 +20,7 @@ import Typography from '@mui/material/Typography';
  * 있지 않다.
  *
  * Props:
- * @param {Array<{ label: string, value: number|string, sub?: string, isAlert?: boolean, separator?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 "across reported campaigns"처럼 값 아래 붙는 부가 설명(선택). separator:true면 앞에 세로 구분선(1px)을 두어 알림성 항목처럼 나머지와 분리한다(Influencer 레퍼런스의 ALERTS 앞 구분선과 동일). onClick이 있는 항목만 클릭 가능해진다 [Required]
+ * @param {Array<{ label: string, value: number|string, sub?: string, delta?: {text: string, direction?: 'up'|'down'|'flat', tone?: 'good'|'bad'|'neutral'}, isAlert?: boolean, separator?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 "across reported campaigns"처럼 값 아래 붙는 부가 설명(선택). delta는 비교 기준 한 줄로, **실제로 계산 가능한 비교가 있을 때만** 넘긴다(없으면 생략 — 지어내지 않는다). separator:true면 앞에 세로 구분선(1px)을 두어 알림성 항목처럼 나머지와 분리한다(Influencer 레퍼런스의 ALERTS 앞 구분선과 동일). onClick이 있는 항목만 클릭 가능해진다 [Required]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
@@ -30,7 +30,7 @@ import Typography from '@mui/material/Typography';
  *     { label: '예정', value: 2 },
  *     { label: '종료', value: 8 },
  *     { label: '미보고', value: 1, isAlert: true, onClick: () => filterMissingReport() },
- *     { label: '집행 예산', value: '$8,200' },
+ *     { label: '집행 예산', value: '$8,200', delta: { text: '계획의 62%', tone: 'neutral' } },
  *     { label: '평균 CPM', value: '$8.39', sub: '성과 보고된 캠페인 기준' },
  *   ]}
  * />
@@ -102,35 +102,63 @@ export function KpiBar({ items, sx }) {
                 레퍼런스 이미지로 확인한 배치. 이전엔 숫자 옆에 나란히 뒀는데
                 (03-visual-direction.md의 글로 된 스펙만 보고 추정한 배치라
                 실제와 달랐다), 실제 레퍼런스는 라벨-숫자를 세로로 쌓는다.
-                숫자 크기도 문서가 요구한 32px 대신 테마 공유 h4 기본값(24px)을
-                그대로 쓴다 — 실물로 보니 32px는 과했다. */}
+
+                라벨은 테마의 label 토큰(13/600 uppercase)을 쓴다. 예전엔 11px
+                (0.6875rem)을 이 파일에만 박아뒀는데, 그 값은 앱 어디에도 없는
+                고아 크기였다 — 표 컬럼 헤더와 같은 역할(값 위의 이름표)이니
+                같은 토큰을 쓴다. */}
             <Typography
-              variant="caption"
+              variant="label"
               component="span"
               sx={{
                 display: 'block',
-                fontSize: '0.6875rem',
-                fontWeight: 400,
-                lineHeight: 1.4,
-                letterSpacing: '0.04em',
-                textTransform: 'uppercase',
                 whiteSpace: 'nowrap',
                 color: item.isAlert ? 'error.main' : 'text.secondary',
               }}
             >
               {item.label}
             </Typography>
+            {/* 값은 display 토큰(28px). 예전엔 h4(24px)였는데, 그건 "문서가
+                요구한 32px는 과하다"는 판단으로 고른 공유 스케일의 근사값이었지
+                이 자리를 위해 정한 값이 아니었다 — $93,276.65가 옆 목록의
+                16px 캠페인명에 눌렸다. 32와 24 사이를 이 역할의 값으로 고정한다. */}
             <Typography
-              variant="h4"
+              variant="display"
               component="span"
               sx={{
-                lineHeight: 1.2,
                 whiteSpace: 'nowrap',
                 color: item.isAlert ? 'error.main' : 'text.primary',
               }}
             >
               {item.value}
             </Typography>
+            {/* 비교 기준 — "$8.63"만으로는 그게 좋은지 나쁜지 화면이 답하지
+                못한다. 다만 이 앱의 성과 레코드는 캠페인당 누적 1건이라 시계열이
+                없다: "지난 30일 대비" 같은 기간 비교는 **계산할 수 없다**.
+                그래서 실제로 도출 가능한 비교(계획 대비, 전체 평균 대비)만
+                호출부가 넘기고, 근거가 없으면 아예 넣지 않는다. */}
+            {item.delta && (
+              <Typography
+                variant="caption"
+                component="span"
+                sx={{
+                  mt: 0.25,
+                  whiteSpace: 'nowrap',
+                  fontWeight: 600,
+                  color:
+                    item.delta.tone === 'bad'
+                      ? 'warning.main'
+                      : item.delta.tone === 'good'
+                        ? 'success.main'
+                        : 'text.secondary',
+                }}
+              >
+                {/* 방향을 색이 아니라 기호로도 말한다 — 색만으로 구분하면
+                    색각 이상 사용자에게는 증감이 사라진다. */}
+                {item.delta.direction === 'up' ? '▲ ' : item.delta.direction === 'down' ? '▼ ' : ''}
+                {item.delta.text}
+              </Typography>
+            )}
             {/* sub 줄은 이 바에 sub를 쓰는 항목이 있을 때만 자리를 잡는다 —
                 한 항목만 sub가 있어도 나머지가 같은 높이를 유지해야, 탭 전환처럼
                 항목 구성이 바뀔 때 sticky 툴바 높이가 널뛰지 않는다. */}

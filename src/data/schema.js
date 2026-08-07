@@ -8,6 +8,12 @@
  * 근거 문서: docs/paid-ads-dashboard/ux-flow/02-ux-flow.md (데이터 모델)
  */
 
+// 알림 메시지는 사람이 읽는 문장이라 금액 표기가 들어간다. utils/format.js는
+// 순수 함수만 있는 표기 레이어(React 의존 없음)라 데이터 레이어에서 써도
+// 레이어 분리가 깨지지 않는다 — 이걸 쓰지 않으면 알림 문구의 금액만 화면과
+// 다른 자릿수로 찍힌다.
+import { money, moneyWhole } from '../utils/format';
+
 // ============================================================
 // 1. Enum 상수
 // ============================================================
@@ -712,7 +718,7 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
         type: ALERT_TYPE.BALANCE_LOW,
         triggeredAt: today.toISOString(),
         resolvedAt: null,
-        message: `${account.label} — $${account.balanceAvailable.toLocaleString('en-US', { minimumFractionDigits: 2 })} left, about ${Math.floor(runway)} day${Math.floor(runway) === 1 ? '' : 's'} at the current daily budget — top up before ads stop`,
+        message: `${account.label} — ${money(account.balanceAvailable)} left, about ${Math.floor(runway)} day${Math.floor(runway) === 1 ? '' : 's'} at the current daily budget — top up before ads stop`,
       });
     }
 
@@ -725,7 +731,7 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
       type: ALERT_TYPE.INVOICE_DUE,
       triggeredAt: today.toISOString(),
       resolvedAt: null,
-      message: `${account.label} — $${account.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })} of the $${account.invoiceThreshold.toLocaleString('en-US')} billing threshold — an invoice is due soon`,
+      message: `${account.label} — ${money(account.balanceDue)} of the ${moneyWhole(account.invoiceThreshold)} billing threshold — an invoice is due soon`,
     });
   });
 
@@ -779,7 +785,7 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
             type: ALERT_TYPE.NO_RESULTS,
             triggeredAt: today.toISOString(),
             resolvedAt: null,
-            message: `${campaign.name} — $${record.spend.toLocaleString('en-US')} spent with 0 ${result.label} on a ${campaign.goal} campaign — check targeting or creative`,
+            message: `${campaign.name} — ${money(record.spend)} spent with 0 ${result.label} on a ${campaign.goal} campaign — check targeting or creative`,
           });
         }
 
@@ -795,7 +801,7 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
               type: ALERT_TYPE.BUDGET_PACING,
               triggeredAt: today.toISOString(),
               resolvedAt: null,
-              message: `${campaign.name} — averaging $${Math.round(avgDailySpend)}/day, over the $${campaign.budgetDaily.toLocaleString('en-US')}/day budget`,
+              message: `${campaign.name} — averaging ${moneyWhole(avgDailySpend)}/day, over the ${moneyWhole(campaign.budgetDaily)}/day budget`,
             });
           }
         } else if (

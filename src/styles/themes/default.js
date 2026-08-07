@@ -255,6 +255,57 @@ const typography = {
     letterSpacing: '0.01em',
   },
 
+  /**
+   * ── 역할 토큰 (display / title / label) ──────────────────────────
+   *
+   * h1~h6은 **크기 스케일**이고, 아래 셋은 **역할**이다. 둘을 왜 같이 두나:
+   *
+   * 데이터 화면(Paid Ads)에서 h1~h6을 쓰려니 맞는 칸이 없었다. 실제로 필요한
+   * 건 "KPI 숫자 / 섹션 제목 / 그룹·컬럼 헤더" 세 자리인데, 스케일에서 억지로
+   * 가장 가까운 걸 골라 쓰다 보니 KPI는 h4(24px), 섹션 제목은 subtitle1(16/500),
+   * 그룹 헤더는 overline(12px)로 흩어졌다. 그 결과 **섹션 제목(16/500)과
+   * 본문(16/400)이 크기가 같고 굵기만 100 차이**라 제목으로 스캔되지 않았고,
+   * **구조를 나누는 그룹 헤더가 화면에서 가장 작은 글씨**라 위계가 역전됐다
+   * (실화면 리뷰로 발견).
+   *
+   * 그렇다고 h1~h6의 값을 바꾸지는 않는다 — 이 테마는 Paid Ads 전용이 아니라
+   * 프로젝트 전체 컴포넌트 라이브러리와 Style 스토리가 공유하는 **전역 테마**고,
+   * h1~h3만 26곳에서 쓰인다(전부 Paid Ads 밖). 한 화면군의 사정으로 전역
+   * 스케일을 재배치하면 그 26곳이 조용히 깨진다. 스케일은 그대로 두고 역할
+   * 칸을 새로 판다.
+   */
+
+  /** KPI 값 등 화면에서 가장 큰 숫자. h4(24px)로는 $93,276.65가 존재감이 부족했다 */
+  display: {
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
+    fontWeight: 700,
+    fontSize: '1.75rem',     // 28px
+    lineHeight: 1.2,
+    letterSpacing: '-0.01em',
+    fontVariantNumeric: 'tabular-nums', // 자릿수가 바뀌어도 레이아웃이 흔들리지 않게
+  },
+  /** 섹션 제목. subtitle1(16/500)은 본문(16/400)과 크기가 같아 제목으로 안 읽혔다 */
+  title: {
+    fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
+    fontWeight: 600,
+    fontSize: '1.125rem',    // 18px
+    lineHeight: 1.4,
+    letterSpacing: '0',
+  },
+  /**
+   * 그룹 헤더·컬럼 헤더. overline(12px)은 caption과 같은 크기라 구조를 나누는
+   * 요소가 가장 약한 위계를 갖는 역전이 있었다. 대문자는 유지한다 — 데이터
+   * 테이블 헤더의 관행이고, letterSpacing만 0.08em -> 0.04em으로 좁혀 13px에서
+   * 단어가 흩어지지 않게 한다.
+   */
+  label: {
+    fontSize: '0.8125rem',   // 13px
+    fontWeight: 600,
+    lineHeight: 1.4,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+
   // 기타
   button: {
     fontSize: '0.875rem',    // 14px
@@ -459,6 +510,20 @@ const components = {
       },
     },
   },
+  // 역할 토큰(display/title/label)의 HTML 태그를 지정한다. 이걸 빼면 MUI가
+  // 모르는 variant를 전부 <span>으로 렌더해서, 섹션 제목이 인라인 요소가 되고
+  // 스크린리더에 제목으로 잡히지 않는다.
+  MuiTypography: {
+    defaultProps: {
+      variantMapping: {
+        // KPI 값·그룹 헤더는 '제목'이 아니라 데이터라 블록 요소로만 둔다.
+        display: 'div',
+        label: 'div',
+        // 섹션 제목은 실제 문서 구조라 heading으로 낸다.
+        title: 'h3',
+      },
+    },
+  },
   // Input/Select는 역할별로 4px — shape.borderRadius(전역 0)는 그대로 두고
   // 이 컴포넌트에만 예외를 준다. Button/Card/Paper 같은 구조 표면은 각지고,
   // 입력 컨트롤은 별개의 상호작용 객체로 읽히게 한다. TextField/Select(outlined)
@@ -637,6 +702,45 @@ const defaultTheme = createTheme({
 
 // 커스텀 속성 추가 (타입 확장 없이 접근 가능하도록)
 defaultTheme.customShadows = customShadows;
+
+/**
+ * 콘텐츠 컨테이너 폭.
+ *
+ * 예전엔 화면·컴포넌트마다 maxWidth를 직접 박았다 — 320(7곳)·400·420·600·640·
+ * 720·900으로 일곱 종류가 흩어져 있어서, 같은 앱인데 Settings는 720px로 좁고
+ * Reports 표는 뷰포트 전폭이라 화면마다 캔버스 규칙이 달랐다. 폭도 spacing이나
+ * radius처럼 토큰이어야 한다.
+ *
+ *   sx={(theme) => ({ maxWidth: theme.layout.content.wide })}
+ */
+defaultTheme.layout = {
+  content: {
+    /** 폼·설정처럼 한 줄이 길어지면 안 되는 화면 */
+    narrow: 480,
+    /** 읽기용 문서형 화면 */
+    default: 720,
+    /** 분석 화면 — 차트와 요약이 함께 놓이는 폭 */
+    wide: 1120,
+    /** 표가 주인공이라 폭을 제한하지 않는 화면 */
+    full: 'none',
+  },
+};
+
+/**
+ * 아이콘 크기 세 단계.
+ *
+ * 실측으로 fontSize 12·13·14·16·18 하드코딩에 MUI의 `fontSize="small"`(20px)까지
+ * 여섯 종류가 섞여 있었다. 12와 13은 눈으로 구분되지 않으면서 코드에만 차이가
+ * 남는다 — 그건 시스템이 아니라 잔여물이다.
+ */
+defaultTheme.iconSize = {
+  /** 텍스트 옆에 붙는 인라인 아이콘 (외부 링크, 인디케이터) */
+  inline: 16,
+  /** 컨트롤 안에 들어가는 아이콘 (IconButton, 버튼 startIcon) */
+  control: 20,
+  /** 내비게이션 레일 */
+  nav: 24,
+};
 
 /**
  * 대시보드 스타일 설정 (Default)

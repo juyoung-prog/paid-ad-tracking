@@ -48,6 +48,10 @@ export const Docs = {
         button: theme.typography.button,
         caption: theme.typography.caption,
         overline: theme.typography.overline,
+        // 역할 토큰 — h1~h6이 '크기 스케일'이라면 이 셋은 '역할'이다
+        display: theme.typography.display,
+        title: theme.typography.title,
+        label: theme.typography.label,
       },
     };
 
@@ -66,6 +70,9 @@ export const Docs = {
       { variant: 'button', fontSize: theme.typography.button?.fontSize, fontWeight: theme.typography.button?.fontWeight, usage: '버튼 텍스트' },
       { variant: 'caption', fontSize: theme.typography.caption?.fontSize, fontWeight: theme.typography.caption?.fontWeight, usage: '캡션, 주석' },
       { variant: 'overline', fontSize: theme.typography.overline?.fontSize, fontWeight: theme.typography.overline?.fontWeight, usage: '라벨, 카테고리' },
+      { variant: 'display', fontSize: theme.typography.display?.fontSize, fontWeight: theme.typography.display?.fontWeight, usage: '[역할] KPI 값 등 화면에서 가장 큰 숫자' },
+      { variant: 'title', fontSize: theme.typography.title?.fontSize, fontWeight: theme.typography.title?.fontWeight, usage: '[역할] 섹션 제목' },
+      { variant: 'label', fontSize: theme.typography.label?.fontSize, fontWeight: theme.typography.label?.fontWeight, usage: '[역할] 그룹 헤더·컬럼 헤더' },
     ];
 
     // Font Weight 데이터

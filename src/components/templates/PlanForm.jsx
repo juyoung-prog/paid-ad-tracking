@@ -12,6 +12,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { DateRangeField } from '../input/DateRangeField';
 import { PLATFORM, planItemTotal, planTotal } from '../../data/schema';
+import { moneyWhole } from '../../utils/format';
 
 const PLATFORM_OPTIONS = [
   { value: PLATFORM.META, label: 'Meta' },
@@ -29,10 +30,11 @@ function FieldLabel({ children }) {
   );
 }
 
-/** 금액 표기 — 계획 금액은 소수점이 의미 없어 정수로 반올림해 보여준다. */
-function fmtMoney(amount) {
-  return amount == null ? '—' : `$${Math.round(amount).toLocaleString('en-US')}`;
-}
+/**
+ * 계획 금액은 정수 달러로만 표기한다 — 일일 예산 × 일수라 센트가 구조적으로
+ * 존재하지 않는다. 규칙은 utils/format.js의 moneyWhole이 갖는다.
+ */
+const fmtMoney = moneyWhole;
 
 /**
  * PlanForm 컴포넌트
@@ -116,7 +118,7 @@ export function PlanForm({ values, onChange, onItemsChange, eventOptions = [], e
 
         <Grid size={12}>
           <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="caption" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+            <Typography variant="label" sx={{ color: 'text.secondary' }}>
               Phases
             </Typography>
             {/* 합계는 입력이 아니라 결과다 — 항목을 고칠 때마다 여기서 바로

@@ -7,8 +7,8 @@ import { GOAL } from '../../data/schema';
 function SectionLabel({ children }) {
   return (
     <Typography
-      variant="overline"
-      sx={{ display: 'block', mt: 2, mb: 1, letterSpacing: '0.08em', color: 'text.secondary' }}
+      variant="label"
+      sx={{ display: 'block', mt: 2, mb: 1, color: 'text.secondary' }}
     >
       {children}
     </Typography>

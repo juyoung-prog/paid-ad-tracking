@@ -24,12 +24,30 @@ KPI 숫자 요약 바. label/value 배열을 받는 범용 컴포넌트로, Dash
 - 숫자는 tabular-nums로 자릿수 변화에도 레이아웃 고정
 - isAlert 항목은 error 컬러로 강조
 - sub로 값 아래 부가 설명 추가 가능(예: "across reported campaigns") — sub 줄은 없어도 항상 자리를 예약해, sub 있는 항목이 생기고 사라질 때(탭 전환 등) 바 높이가 흔들리지 않는다
+- delta로 비교 기준 한 줄 추가 가능 — 아래 "왜 delta인가" 참고
+
+### 타이포 역할 토큰
+라벨은 \`label\`(13/600 uppercase), 값은 \`display\`(28/700)를 쓴다. 예전엔
+라벨이 11px, 값이 \`h4\`(24px)였는데 둘 다 이 자리를 위해 정한 값이 아니었다 —
+11px는 앱 어디에도 없는 고아 크기였고, 24px는 공유 스케일에서 가장 가까운 걸
+고른 근사값이라 \`$93,276.65\`가 옆 목록의 16px 캠페인명에 눌렸다.
+
+### 왜 delta인가 (그리고 왜 "지난 30일 대비"가 아닌가)
+\`$8.63\`만 크게 띄우면 화면이 **그게 좋은지 나쁜지에 답하지 못한다.** 그렇다고
+"지난 30일 대비 +12%"를 붙일 수는 없다 — 이 앱의 성과 레코드는 캠페인당 누적
+1건이라 **시계열 축이 아예 없어서 기간 비교를 계산할 수 없다**(schema.js의
+PerformanceRecord). 없는 비교를 지어내지 않고, 실제로 도출되는 것만 넘긴다:
+계획 대비 집행률, 전체 평균 대비 CPM. 근거가 없으면 \`delta\`를 생략한다.
+
+방향은 \`direction\`(▲/▼ 기호)과 \`tone\`(색)으로 나눠 받는다. CPM처럼 **낮을수록
+좋은** 지표는 둘이 반대로 붙기 때문이다 — 색 하나로는 표현할 수 없고, 색만으로
+구분하면 색각 이상 사용자에게는 증감이 사라진다.
         `,
       },
     },
   },
   argTypes: {
-    items: { control: 'object', description: '{ label, value, sub?, isAlert? } 배열' },
+    items: { control: 'object', description: '{ label, value, sub?, delta?, isAlert? } 배열' },
   },
 };
 
@@ -58,6 +76,38 @@ export const WithCurrencyValues = {
       { label: '진행중', value: 6 },
       { label: '집행 예산', value: '$8,200' },
       { label: '계획 예산', value: '$12,000' },
+    ],
+  },
+};
+
+/**
+ * delta — "그래서 이 숫자가 좋은 건가"에 답하는 한 줄. /reports의 Performance
+ * 탭이 쓰는 형태다.
+ *
+ * 확인 포인트:
+ * - **Total Spend**: 계획이 있을 때만 delta가 붙는다. 초과하면 tone이 'bad'로
+ *   바뀌어 warning 색이 된다
+ * - **Avg. CPM**: 낮을수록 좋은 지표라 ▼(내려감)에 'good'이 붙는다 — 방향 기호와
+ *   색이 반대로 가는 유일한 경우다. 문구에 cheaper/pricier를 적어 기호·색을
+ *   못 읽어도 뜻이 통하게 한다
+ * - **Campaigns**: 비교할 근거가 없으므로 delta가 아예 없다. 빈 자리를 만들지
+ *   않는다(값이 없으면 줄을 안 그린다)
+ */
+export const WithDelta = {
+  args: {
+    items: [
+      { label: 'Campaigns', value: 11 },
+      {
+        label: 'Total Spend',
+        value: '$4,614.00',
+        delta: { text: '147% of $3,130 planned', tone: 'bad' },
+      },
+      {
+        label: 'Avg. CPM',
+        value: '$8.63',
+        sub: 'across reported campaigns',
+        delta: { text: '12% cheaper than your average', direction: 'down', tone: 'good' },
+      },
     ],
   },
 };

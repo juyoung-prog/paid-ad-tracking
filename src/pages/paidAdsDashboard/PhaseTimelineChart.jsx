@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
 import { shortDate } from './paidAdsPageUtils';
+import { moneyWhole } from '../../utils/format';
 
 /**
  * phase 막대에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —
@@ -76,8 +77,9 @@ function edgeAwareShift(pct) {
 
 function formatPhaseBudget(phase) {
   const parts = [];
-  if (phase.totalDaily) parts.push(`$${phase.totalDaily.toLocaleString('en-US')}/day`);
-  if (phase.totalBudget > 0) parts.push(`$${phase.totalBudget.toLocaleString('en-US')}`);
+  // 계획 예산이라 정수 표기 (utils/format.js의 moneyWhole 규칙)
+  if (phase.totalDaily) parts.push(`${moneyWhole(phase.totalDaily)}/day`);
+  if (phase.totalBudget > 0) parts.push(moneyWhole(phase.totalBudget));
   return parts.join(' · ');
 }
 

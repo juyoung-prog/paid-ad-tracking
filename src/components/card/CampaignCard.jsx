@@ -5,6 +5,7 @@ import Typography from '@mui/material/Typography';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { CustomCard } from './CustomCard';
 import { TARGET_SCOPE, PLATFORM } from '../../data/schema';
+import { money, moneyWhole, dateRange } from '../../utils/format';
 
 const STATUS_META = {
   planned: { label: 'Planned', color: 'grey.500', variant: 'outlined' },
@@ -18,11 +19,6 @@ const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
   [PLATFORM.TIKTOK]: 'TikTok',
 };
-
-function formatDate(isoDate) {
-  const [, month, day] = isoDate.split('-');
-  return `${month}.${day}`;
-}
 
 function formatStoreLabel(targetScope, targetStoreIds) {
   if (targetScope === TARGET_SCOPE.ALL_STORES) return 'All Stores';
@@ -125,15 +121,15 @@ export function CampaignCard({
 
       <Typography variant="body2" sx={{ mb: alertBadge ? 0.75 : 0 }}>
         <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-          {formatDate(startDate)}–{formatDate(endDate)}
+          {dateRange(startDate, endDate)}
         </Box>
         {'  ·  '}
         <Box component="span" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}>
-          ${budgetPlanned.toLocaleString('en-US')}
+          {moneyWhole(budgetPlanned)}
         </Box>
         {spend != null && (
           <Box component="span" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-            {' '}(spent ${spend.toLocaleString('en-US')})
+            {' '}(spent {money(spend)})
           </Box>
         )}
       </Typography>

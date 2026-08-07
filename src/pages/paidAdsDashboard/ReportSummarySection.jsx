@@ -24,6 +24,7 @@ import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
+import { money, moneyWhole, count, percent } from '../../utils/format';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -66,12 +67,16 @@ const PHASE_FILL_MAX_ALPHA = 0.50;
  *
  * 예전엔 이 자리가 대문자 overline이었고, 그 아래 부속 라벨은 오히려 문장형
  * caption이었다 — 위계가 뒤집혀서 둘 다 같은 급으로 읽혔다. 두 단으로 나눈다:
- * 제목은 문장형 볼드, 부속/분류 라벨만 대문자 overline.
+ * 제목은 문장형 볼드, 부속/분류 라벨만 대문자(label 토큰).
+ *
+ * 크기는 subtitle1(16/500)에서 title 토큰(18/600)으로 올렸다 — subtitle1은
+ * body1(16/400)과 **크기가 같고 굵기만 100 차이**라 제목으로 스캔되지 않았다
+ * (실화면 리뷰). 굵기가 아니라 크기로 제목임을 말한다.
  *
  * 제목 옆에는 범위(개수·합계)를 같은 줄에 붙인다. 캡션 줄을 따로 만들지 않고
  * 제목 한 줄이 "무엇을 몇 개 기준으로 보고 있는지"까지 말하게 한다.
  */
-const SECTION_TITLE_SX = { display: 'block', mb: 1.5, fontWeight: 600, color: 'text.primary' };
+const SECTION_TITLE_SX = { display: 'block', mb: 1.5, color: 'text.primary' };
 
 /** 제목 옆 범위 텍스트 — 제목과 같은 줄, 한 단 약하게 */
 const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
@@ -177,23 +182,14 @@ const EMPTY_CELL = '—';
  */
 function fmtBudget(value) {
   if (!value) return EMPTY_CELL;
-  return `$${value.toLocaleString('en-US')}`;
+  return moneyWhole(value);
 }
 
-function fmtCurrency(value) {
-  if (value == null) return EMPTY_CELL;
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtNumber(value) {
-  if (value == null) return EMPTY_CELL;
-  return value.toLocaleString('en-US');
-}
-
-function fmtPercent(value) {
-  if (value == null) return EMPTY_CELL;
-  return `${(value * 100).toFixed(2)}%`;
-}
+// 표기 규칙 자체는 utils/format.js가 갖는다. 여기 남은 건 이 화면의 '없음'
+// 표기(EMPTY_CELL)와 위 fmtBudget의 "0도 없음으로 본다"는 도메인 판단뿐이다.
+const fmtCurrency = money;
+const fmtNumber = count;
+const fmtPercent = (value) => percent(value, { digits: 2 });
 
 // goal별로 Campaign/Platform/Spend(공통) 다음에 붙는 2~3개 컬럼 — 그 목적에서
 // 실제로 판단 근거가 되는 지표만 고른다(예: Engagement 목표 캠페인에 CTR/CPC를
@@ -310,15 +306,29 @@ const isColumnEmpty = (column, rows) => rows.every((r) => column.cell(r) === EMP
 const SPEND_COLUMN = { header: 'Spend', cell: (r) => fmtCurrency(r.spend) };
 const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA']);
 
-// 그룹 헤더 행 — 눈썹 라벨 + 아주 옅은 배경 띠. 처음엔 배경 없이 라벨만 뒀는데,
-// 그러면 부모(그룹 11px 회색)가 자식(컬럼 헤더 14px 세미볼드)보다 약해서 위계가
-// 뒤집혀 보였다(실화면 리뷰). 띠는 그룹별로 다르게 칠하지 않고 행 전체에 하나만
-// 깐다 — 그룹 구분은 이미 세로 divider가 하고 있어서 색까지 더하면 과하다.
-// borderBottom을 지워 이 띠가 아래 컬럼 헤더 행에 그대로 얹힌 모자처럼 읽히게 한다.
-// surface.sunken(#FAFAFA)으로 시작했는데 흰 배경과 2% 차이라 화면에서 띠가
-// 있는지조차 분간이 안 됐다(실화면 리뷰) — 위계는 라벨 색이 혼자 감당하고 띠는
-// 일을 안 하고 있었다. 한 단 올린다. 색이 아니라 명도만 쓰므로 여전히 조용하다.
-const GROUP_ROW_BG = 'surface.muted';
+/*
+ * 그룹 헤더 행 — 눈썹 라벨 + 관할 범위를 긋는 밑줄.
+ *
+ * 이 자리는 두 번 바뀌었다. 처음엔 배경 없이 라벨만 뒀는데 부모(그룹 라벨)가
+ * 자식(컬럼 헤더 14px 세미볼드)보다 약해 보였고, 그래서 surface.sunken →
+ * surface.muted로 배경 띠를 한 단씩 올렸다.
+ *
+ * 그런데 배경을 올릴수록 다른 문제가 자랐다 — 회색 띠가 채워지니 그 줄이
+ * **아래 헤더 행과 무관한 자기 완결적인 띠**로 보여서, COST/PERFORMANCE/VIDEO/
+ * ENGAGEMENT 줄과 Spend/CPM/... 줄이 각각 독립된 헤더 두 개로 읽혔다(실화면
+ * 리뷰 12-1). 세로 divider는 그룹끼리를 갈라줄 뿐, "이 라벨이 아래 이 컬럼들을
+ * 덮는다"는 부모-자식 관계는 아무것도 말해주지 않았다.
+ *
+ * 배경으로 존재감을 만드는 대신 관계를 직접 그린다: 배경을 걷고, 각 그룹
+ * 라벨 아래에 그 그룹의 colSpan만큼만 밑줄을 긋는다. 밑줄의 **길이 자체가**
+ * 관할 범위라, 라벨이 조용해도(12px secondary) 무엇을 덮는지 한눈에 보인다.
+ * 이게 grouped header의 표준 처방이기도 하다.
+ *
+ * 배경색 상수는 **없애야** 한다. 남겨서 'transparent'를 깔면 아래 셀 스타일
+ * 합성(`{...STICKY_CAMPAIGN_SX, ...GROUP_ROW_CELL_SX}`)에서 뒤쪽이 이겨 고정
+ * Campaign 셀까지 투명해지고, 가로 스크롤 시 그 밑으로 지나가는 숫자가 비쳐
+ * 보인다. 배경을 지정하지 않으면 sticky 셀은 자기 흰 배경을 그대로 유지한다.
+ */
 /**
  * 그룹 행 높이. 라벨이 11px 한 줄뿐이라 기본 셀 패딩을 그대로 두면 컬럼 헤더
  * 행과 높이가 비슷해져 두 줄이 한 덩어리로 뭉친다 — box-sizing으로 패딩까지
@@ -351,17 +361,22 @@ const GROUP_ROW_CELL_SX = {
   boxSizing: 'border-box',
   py: 0,
   borderBottom: 0,
-  backgroundColor: GROUP_ROW_BG,
 };
 const GROUP_LABEL_SX = {
   ...GROUP_ROW_CELL_SX,
-  color: 'text.primary',
-  fontSize: '0.6875rem',
+  /* 조용한 라벨 + 관할 범위 밑줄. 라벨이 컬럼 헤더(14/600 primary)보다 약한 건
+     이제 문제가 아니다 — 부모임을 말하는 건 굵기가 아니라 밑줄의 길이다.
+     크기도 11px(0.6875rem)이라는 앱 어디에도 없던 고아 값에서 스케일의
+     caption(12px)으로 되돌린다. */
+  color: 'text.secondary',
+  fontSize: '0.75rem',
   fontWeight: 600,
-  letterSpacing: '0.08em',
+  letterSpacing: '0.04em',
   textTransform: 'uppercase',
   whiteSpace: 'nowrap',
   lineHeight: 1.4,
+  borderBottom: '1px solid',
+  borderBottomColor: 'divider',
 };
 
 // 그룹 경계 — 배경색 차이 대신 얇은 좌측 divider 하나만 쓴다(flat 시스템에
@@ -509,7 +524,7 @@ function buildPlanPhases(plan) {
 
 /** 계획 금액 표기 — 계획은 소수점이 의미 없어 정수로 반올림한다. */
 function fmtPlanMoney(amount) {
-  return amount == null ? EMPTY_CELL : `$${Math.round(amount).toLocaleString('en-US')}`;
+  return amount == null ? EMPTY_CELL : moneyWhole(amount);
 }
 
 /**
@@ -570,7 +585,7 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
   return (
     <Box sx={{ mb: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-        <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+        <Typography variant="title" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
           Plans{' '}
           <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
             — budgets set before spending, compared against actuals
@@ -721,7 +736,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
   return (
     <Box sx={{ mb: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
-        <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+        <Typography variant="title" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
           Plan{' '}
           <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
             — {plan.items.length} {plan.items.length === 1 ? 'phase' : 'phases'}
@@ -784,7 +799,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
               <TableCell>{PLATFORM_LABEL[item.platform] ?? item.platform}</TableCell>
               <TableCell sx={{ whiteSpace: 'nowrap' }}>{shortDate(item.startDate)}–{shortDate(item.endDate)}</TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                ${item.budgetDaily.toLocaleString('en-US')}
+                {moneyWhole(item.budgetDaily)}
               </TableCell>
               <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtPlanMoney(planItemTotal(item))}</TableCell>
             </TableRow>
@@ -961,6 +976,41 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
     [filteredCampaigns, performanceRecords]
   );
 
+  /**
+   * 필터를 걸지 않은 전체 기준선. KPI의 "그래서 이 숫자가 좋은 건가"에 답하기
+   * 위한 유일한 정직한 비교 대상이다.
+   *
+   * 기간 비교("지난 30일 대비")는 **계산할 수 없다** — 이 앱의 성과 레코드는
+   * 캠페인당 누적 1건이라 시계열 축이 아예 없다(schema.js의 PerformanceRecord).
+   * 없는 비교를 지어내느니 도출 가능한 것만 말한다: 지금 걸러 보고 있는 집합이
+   * 전체 평균보다 비싼가 싼가.
+   */
+  const baselineSummary = useMemo(
+    () => getReportSummary(campaigns, performanceRecords),
+    [campaigns, performanceRecords]
+  );
+
+  /**
+   * Avg. CPM 옆에 붙는 비교. 필터가 실제로 범위를 좁혔을 때만 의미가 있다 —
+   * 안 좁혔으면 비교 대상이 자기 자신이라 항상 0%가 된다.
+   *
+   * CPM은 **낮을수록 좋다**. 방향(▲/▼)과 좋고 나쁨(tone)이 반대로 붙는 지표라
+   * 색만 보고 판단하지 않도록 문구에 cheaper/pricier를 적는다.
+   */
+  const cpmDelta = useMemo(() => {
+    const mine = summary.avgCPM;
+    const base = baselineSummary.avgCPM;
+    if (mine == null || base == null || base === 0) return undefined;
+    if (filteredCampaigns.length === campaigns.length) return undefined;
+    const ratio = mine / base - 1;
+    if (Math.abs(ratio) < 0.01) return { text: 'in line with your average', direction: 'flat', tone: 'neutral' };
+    return {
+      text: `${percent(Math.abs(ratio))} ${ratio > 0 ? 'pricier' : 'cheaper'} than your average`,
+      direction: ratio > 0 ? 'up' : 'down',
+      tone: ratio > 0 ? 'bad' : 'good',
+    };
+  }, [summary.avgCPM, baselineSummary.avgCPM, filteredCampaigns.length, campaigns.length]);
+
   const goalRows = useMemo(
     () => filteredCampaigns.map((c) => getGoalMetricsRow(c, performanceRecords.find((r) => r.campaignId === c.id))),
     [filteredCampaigns, performanceRecords]
@@ -1046,15 +1096,32 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                        거짓 주장이 된다. */
                     value: (() => {
                       const amount = planComparison?.planned ?? summary.totalBudgetPlanned;
-                      return amount != null ? `$${Math.round(amount).toLocaleString('en-US')}` : EMPTY_CELL;
+                      return amount != null ? moneyWhole(amount) : EMPTY_CELL;
                     })(),
                     sub: planComparison?.planned != null ? 'from the saved plan' : undefined,
                   },
                 ]
               : [
                   { label: 'Campaigns', value: summary.totalCampaigns },
-                  { label: 'Total Spend', value: `$${summary.totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` },
-                  { label: 'Avg. CPM', value: summary.avgCPM != null ? `$${summary.avgCPM.toFixed(2)}` : EMPTY_CELL, sub: 'across reported campaigns' },
+                  {
+                    label: 'Total Spend',
+                    value: money(summary.totalSpend),
+                    /* 계획이 있을 때만 붙는다. 계획 없이 "얼마 썼다"만 크게
+                       띄우면 화면이 그 숫자가 많은지 적은지에 답하지 못한다. */
+                    delta:
+                      planComparison?.planned > 0
+                        ? {
+                            text: `${percent(summary.totalSpend / planComparison.planned)} of ${moneyWhole(planComparison.planned)} planned`,
+                            tone: summary.totalSpend > planComparison.planned ? 'bad' : 'neutral',
+                          }
+                        : undefined,
+                  },
+                  {
+                    label: 'Avg. CPM',
+                    value: summary.avgCPM != null ? money(summary.avgCPM) : EMPTY_CELL,
+                    sub: 'across reported campaigns',
+                    delta: cpmDelta,
+                  },
                 ]
           }
           sx={{ minWidth: 0, flex: '1 1 auto' }}
@@ -1186,7 +1253,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
             No campaigns match the current filters.
           </Typography>
         ) : phases.length > 0 ? (
-          <Box>
+          /* Plan 탭은 컬럼이 7개뿐이라 뷰포트 전폭에 늘리면 우측 절반이 비고,
+             같은 탭 그룹의 Performance 표(15컬럼, 가로 스크롤)와 밀도가 극단으로
+             갈렸다(실화면 리뷰 12-9 vs 12-1). 분석 화면 폭 토큰으로 묶는다 —
+             표가 주인공이라 폭을 풀어야 하는 건 Performance 쪽뿐이다. */
+          <Box sx={(theme) => ({ maxWidth: theme.layout.content.wide })}>
             {/* Event 타임라인 — Plan·Performance 두 탭이 같은 컴포넌트를 쓴다
                 (PhaseTimelineChart 주석 참고). 막대에는 기간과 함께 일일 예산·
                 총 예산이 붙는다. */}
@@ -1196,10 +1267,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                 phase가 어느 캠페인 하나에 대응하지 않고 여러 캠페인(플랫폼별)을
                 합친 값이라, 위 Plan 표와 달리 행 클릭으로 캠페인 Drawer에 못
                 보낸다(어느 캠페인을 열지 애매함) — 그래서 클릭 불가로 둔다. */}
-            <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+            <Typography variant="title" sx={SECTION_TITLE_SX}>
               Budget Breakdown{' '}
               <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · ${planTotalBudget.toLocaleString('en-US')} planned
+                — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · {moneyWhole(planTotalBudget)} planned
               </Typography>
             </Typography>
             <TableContainer sx={{ mb: 2, overflowX: 'auto' }}>
@@ -1262,10 +1333,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   <TableRow>
                     <TableCell colSpan={3} sx={{ fontWeight: 700 }}>Total</TableCell>
                     <TableCell />
-                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${phaseMetaTotal.toLocaleString('en-US')}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{moneyWhole(phaseMetaTotal)}</TableCell>
                     <TableCell />
-                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${phaseTikTokTotal.toLocaleString('en-US')}</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${phaseGrandTotal.toLocaleString('en-US')}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{moneyWhole(phaseTikTokTotal)}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{moneyWhole(phaseGrandTotal)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -1291,7 +1362,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                         {shortDate(c.startDate)}–{shortDate(c.endDate)}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {c.budgetDaily != null ? `$${c.budgetDaily.toLocaleString('en-US')}/day` : EMPTY_CELL}
+                        {c.budgetDaily != null ? `${moneyWhole(c.budgetDaily)}/day` : EMPTY_CELL}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {fmtBudget(effectiveBudgetPlanned(c))}
@@ -1310,7 +1381,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                 단순 합산해도 되는 값)만 비율로 보여주고, 일일예산은 위 표에서
                 캠페인별로만 보여준다. */}
             {/* Budget Breakdown 아래 붙는 부속 블록이라 제목이 아니라 눈썹 라벨 */}
-            <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>
+            <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
               Budget by Platform
             </Typography>
             {Object.entries(PLATFORM).map(([, platformValue]) => {
@@ -1322,7 +1393,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
                     <Typography variant="body2" color="text.secondary">{PLATFORM_LABEL[platformValue] ?? platformValue}</Typography>
                     <Typography variant="body2" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                      ${amount.toLocaleString('en-US')} ({Math.round(ratio * 100)}%)
+                      {moneyWhole(amount)} ({percent(ratio)})
                     </Typography>
                   </Box>
                   <LinearProgress
@@ -1361,7 +1432,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
               단위로 이미 다 보여준다. */}
           {phases.length > 0 && (
             <Box sx={{ mb: 4 }}>
-              <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+              <Typography variant="title" sx={SECTION_TITLE_SX}>
                 Event timeline{' '}
                 <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
                   — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · Spend on each bar
@@ -1434,7 +1505,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           const visibleRows = rowsForGoal.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
           return (
             <Box key={value} sx={{ mb: 3 }}>
-              <Typography variant="subtitle1" sx={SECTION_TITLE_SX}>
+              <Typography variant="title" sx={SECTION_TITLE_SX}>
                 {label}{' '}
                 <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
                   — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}

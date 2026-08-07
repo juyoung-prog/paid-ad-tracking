@@ -2,11 +2,7 @@ import Box from '@mui/material/Box';
 import LinearProgress from '@mui/material/LinearProgress';
 import Typography from '@mui/material/Typography';
 import { BUDGET_PACING_THRESHOLD as PACING_THRESHOLD } from '../../data/schema';
-
-function pct(ratio) {
-  if (ratio == null) return '—';
-  return `${Math.round(ratio * 100)}%`;
-}
+import { money, moneyWhole, percent } from '../../utils/format';
 
 function getPacingLabel(diff) {
   if (diff == null) return { text: 'No data', color: 'text.secondary' };
@@ -58,7 +54,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
   return (
     <Box sx={sx}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', mb: 0.75 }}>
-        <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.primary', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <Typography variant="label" sx={{ color: 'text.primary' }}>
           Budget Pacing
         </Typography>
         <Typography variant="caption" sx={{ fontWeight: 600, color: pacing.color }}>
@@ -76,10 +72,10 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
           <Typography variant="caption" color="text.secondary">Budget Spent</Typography>
           <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', color: pacing.color }}>
-            {pct(budgetUsedRatio)}
+            {percent(budgetUsedRatio)}
             {budgetPlanned != null && spend != null && (
               <Box component="span" sx={{ color: 'text.secondary', ml: 0.5 }}>
-                (${spend.toLocaleString('en-US')} / ${budgetPlanned.toLocaleString('en-US')})
+                ({money(spend)} / {moneyWhole(budgetPlanned)})
               </Box>
             )}
           </Typography>
@@ -104,7 +100,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
           <Typography variant="caption" color="text.secondary">Time Elapsed</Typography>
           <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', color: 'text.secondary' }}>
-            {pct(timeElapsedRatio)}
+            {percent(timeElapsedRatio)}
           </Typography>
         </Box>
         <LinearProgress
@@ -124,9 +120,9 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
             <Typography variant="caption" color="text.secondary">Daily Avg</Typography>
             <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', color: pacing.color }}>
-              {avgDailySpend != null ? `$${Math.round(avgDailySpend).toLocaleString('en-US')}/day` : '—'}
+              {avgDailySpend != null ? `${moneyWhole(avgDailySpend)}/day` : '—'}
               <Box component="span" sx={{ color: 'text.secondary', ml: 0.5 }}>
-                (budget ${budgetDaily.toLocaleString('en-US')}/day)
+                (budget {moneyWhole(budgetDaily)}/day)
               </Box>
             </Typography>
           </Box>

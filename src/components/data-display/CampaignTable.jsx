@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -7,13 +6,14 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { TARGET_SCOPE, PLATFORM, campaignGroupKey } from '../../data/schema';
+import { money, moneyWhole, dateRange } from '../../utils/format';
 
 const STATUS_META = {
-  planned: { label: 'Planned', color: 'grey.500', variant: 'outlined' },
-  active: { label: 'Active', color: 'success.main', variant: 'filled' },
-  ended: { label: 'Ended', color: 'grey.400', variant: 'outlined' },
-  ended_early: { label: 'Ended Early', color: 'grey.400', variant: 'outlined' },
-  archived: { label: 'Archived', color: 'grey.400', variant: 'outlined' },
+  planned: { label: 'Planned', color: 'grey.500' },
+  active: { label: 'Active', color: 'success.main' },
+  ended: { label: 'Ended', color: 'grey.400' },
+  ended_early: { label: 'Ended Early', color: 'grey.400' },
+  archived: { label: 'Archived', color: 'grey.400' },
 };
 
 const PLATFORM_LABEL = {
@@ -21,9 +21,35 @@ const PLATFORM_LABEL = {
   [PLATFORM.TIKTOK]: 'TikTok',
 };
 
-function formatDate(isoDate) {
-  const [, month, day] = isoDate.split('-');
-  return `${month}.${day}`;
+/**
+ * 상태 표시 — 점 + 텍스트.
+ *
+ * 예전엔 filled Chip이었다. `Active`가 채도 높은 초록으로 채워져 행마다 반복되니,
+ * **화면에서 가장 강한 시각 요소가 상태 칩**이 됐다(실화면 리뷰). 문제는 그 정보가
+ * 대부분 중복이라는 것이다 — This Period 탭에서는 바로 위 `LIVE (4)` 헤더가 이미
+ * 같은 말을 하고 있었다. 반대로 정작 판단이 필요한 페이스 문구는 회색 12px였다.
+ *
+ * 색이 담은 의미는 유지하되 면적을 줄인다. 8px 점 + 라벨이면 스캔할 때 눈을 끌지
+ * 않으면서, 찾아보면 즉시 읽힌다.
+ */
+function StatusDot({ status }) {
+  const meta = STATUS_META[status] ?? STATUS_META.ended;
+  return (
+    <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+      <Box
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          backgroundColor: meta.color,
+          flexShrink: 0,
+        }}
+      />
+      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+        {meta.label}
+      </Typography>
+    </Box>
+  );
 }
 
 function formatStoreLabel(targetScope, targetStoreIds) {
@@ -43,13 +69,17 @@ function formatStoreLabel(targetScope, targetStoreIds) {
  */
 function formatBudget(row) {
   const parts = [];
+  // 예산은 moneyWhole(정수), 집행은 money(2자리)다. 예산은 사람이 정수 달러로
+  // 정하고 일수를 곱해 만든 값이라 센트가 존재하지 않고, 집행은 플랫폼이 센트
+  // 단위로 청구한 실측값이다. 예전엔 둘 다 옵션 없는 toLocaleString이라 같은
+  // 열에 `$2,261.5`와 `$514.49`가 나란히 찍혔다(utils/format.js 참고).
   if (row.budgetPlanned > 0) {
-    const daily = row.budgetDaily != null ? ` ($${row.budgetDaily.toLocaleString('en-US')}/day)` : '';
-    parts.push(`$${row.budgetPlanned.toLocaleString('en-US')}${daily}`);
+    const daily = row.budgetDaily != null ? ` (${moneyWhole(row.budgetDaily)}/day)` : '';
+    parts.push(`${moneyWhole(row.budgetPlanned)}${daily}`);
   } else if (row.budgetDaily != null) {
-    parts.push(`$${row.budgetDaily.toLocaleString('en-US')}/day`);
+    parts.push(`${moneyWhole(row.budgetDaily)}/day`);
   }
-  if (row.spend != null) parts.push(`$${row.spend.toLocaleString('en-US')} spent`);
+  if (row.spend != null) parts.push(`${money(row.spend)} spent`);
   return parts.join(' · ');
 }
 
@@ -140,13 +170,14 @@ function stripCampaignName(text, name) {
  * Props:
  * @param {Array<{id: string, name: string, campaignGroup?: string|null, platform: string, accountLabel: string, targetScope: string, targetStoreIds: string[], startDate: string, endDate: string, budgetPlanned: number, budgetDaily?: number|null, spend?: number, paceRatio?: number|null, status: string, alertBadges?: Array<{text: string, severity: 'warning'|'error'}>, overlapNote?: string, thumbnailUrl?: string|null, creativeUrl?: string|null}>} rows - 미리 조인된 캠페인 행 배열(현재 탭/필터 적용됨). alertBadges는 캠페인 하나에 고긴급 알림이 동시에 여러 개 걸릴 수 있어 배열이다 [Required]
  * @param {Array<{id: string, name: string, campaignGroup?: string|null, platform: string}>} allCampaigns - 형제 칩 판단용 전체 캠페인 목록(탭/필터 미적용). 생략하면 rows로 대체 [Optional, 기본값: rows]
+ * @param {boolean} isStatusRedundant - 이 목록을 감싼 헤더가 이미 상태를 말하고 있으면 true. 행의 상태 표시를 생략한다 — This Period 탭처럼 `LIVE (4)` 그룹 헤더 아래 모든 행에 `Active`가 반복되면 같은 정보가 두 번 말해지고, 그중 시각적으로 강한 쪽이 중복인 쪽이 된다 [Optional, 기본값: false]
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <CampaignTable rows={campaignRows} allCampaigns={allCampaigns} onRowClick={(id) => openCampaignDrawer(id)} />
  */
-export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
+export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = false, onRowClick, sx }) {
   if (rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 4, ...sx }}>
@@ -158,7 +189,6 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
   return (
     <Box sx={sx}>
       {rows.map((row) => {
-        const statusMeta = STATUS_META[row.status] ?? STATUS_META.ended;
         const alertBadges = row.alertBadges ?? [];
         const hasAlert = alertBadges.length > 0;
         const worstSeverity = alertBadges.some((a) => a.severity === 'error') ? 'error' : 'warning';
@@ -240,7 +270,7 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                       onClick={(event) => event.stopPropagation()}
                       sx={{ color: 'text.secondary', '&:hover': { color: 'accent.main' } }}
                     >
-                      <OpenInNewIcon sx={{ fontSize: 16 }} />
+                      <OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -381,18 +411,14 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                 </Tooltip>
               ) : (
                 <>
-                  <Chip
-                    label={statusMeta.label}
-                    size="small"
-                    variant={statusMeta.variant}
-                    sx={{
-                      ...(statusMeta.variant === 'filled'
-                        ? { backgroundColor: statusMeta.color, color: 'common.white' }
-                        : { borderColor: statusMeta.color, color: statusMeta.color }),
-                    }}
-                  />
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
-                    {[`${formatDate(row.startDate)}–${formatDate(row.endDate)}`, formatBudget(row)]
+                  {/* 감싼 헤더가 이미 상태를 말하면 여기서는 생략한다 */}
+                  {!isStatusRedundant && <StatusDot status={row.status} />}
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: isStatusRedundant ? 0 : 0.5, fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {[dateRange(row.startDate, row.endDate), formatBudget(row)]
                       .filter(Boolean)
                       .join(' · ')}
                     {/* 페이스만 색을 갖는다 — 초과는 지금 돈이 새는 중이라 눈에
@@ -406,10 +432,14 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                           component="span"
                           // 더 좁은 화면에서 줄이 넘치더라도 판단 문구만은 통째로
                           // 넘어가야 한다("on"/"pace"로 쪼개지면 읽히지 않는다).
+                          // 페이스는 이 줄에서 유일하게 **판단**을 담은 조각이라,
+                          // 초과가 아닐 때도 굵기·색으로 raw 숫자와 분리한다.
+                          // 예전엔 정상·미달이 주변 회색 평문과 완전히 같은
+                          // 무게라, 화면에서 가장 중요한 문구가 가장 약했다.
                           sx={{
                             whiteSpace: 'nowrap',
-                            color: pace.isOver ? 'warning.main' : 'text.secondary',
-                            fontWeight: pace.isOver ? 600 : 400,
+                            color: pace.isOver ? 'warning.main' : 'text.primary',
+                            fontWeight: 600,
                           }}
                         >
                           {pace.text}
@@ -421,7 +451,11 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
               )}
             </Box>
 
-            {onRowClick && <ChevronRightIcon sx={{ color: 'text.disabled', flexShrink: 0 }} />}
+            {onRowClick && (
+              <ChevronRightIcon
+                sx={(theme) => ({ fontSize: theme.iconSize.control, color: 'text.disabled', flexShrink: 0 })}
+              />
+            )}
           </Box>
         );
       })}

@@ -5,26 +5,15 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
+import { money, count, percent, seconds } from '../../utils/format';
 
-function fmtCurrency(value) {
-  if (value == null) return '—';
-  return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtNumber(value) {
-  if (value == null) return '—';
-  return value.toLocaleString('en-US');
-}
-
-function fmtPercent(value) {
-  if (value == null) return '—';
-  return `${(value * 100).toFixed(2)}%`;
-}
-
-function fmtSeconds(value) {
-  if (value == null) return '—';
-  return `${value.toFixed(2)}s`;
-}
+// 표기는 utils/format.js 하나에서만 정한다 — 예전엔 이 파일과
+// PlatformMetricList가 각자 같은 이름의 로컬 포맷터를 들고 있었고, 그렇게
+// 복제된 규칙은 한쪽만 고쳐지면서 화면마다 자릿수가 갈렸다.
+const fmtCurrency = money;
+const fmtNumber = count;
+const fmtPercent = (value) => percent(value, { digits: 2 });
+const fmtSeconds = seconds;
 
 // 소재·상호작용 지표. 계산값이 아니라 플랫폼이 준 원본이라 이 컴포넌트는 그대로 그린다.
 // 수기 입력 레코드에는 없는 값이라 '—'가 나오는 게 정상이다.

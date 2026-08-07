@@ -28,14 +28,30 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
 ### 기능
 - 맨 좌측: 소재 썸네일(CampaignThumbnail) — thumbnailUrl 없으면 중립색 이니셜로 자동 대체, 항상 뭔가 보임
 - 좌측: 캠페인명(Hero, bold) + (creativeUrl 있으면) 외부 링크 아이콘("View Ad"), 그 아래 메타 줄은 **칩이 아니라 평문 + 가운뎃점**으로 이어진다 — 플랫폼 · 타겟 · (형제 있거나 campaignGroup 입력됐으면) "{그룹명} (+N)" · (있으면) 중복 타겟팅(warning 색). 예전엔 전부 outlined 칩이라 한 행에 테두리가 5~6개씩 생겨 캠페인명보다 테두리가 먼저 읽혔다
-- 우측: 고긴급 알림이 있으면 알림 텍스트 2줄(여러 개면 Tooltip에 전부), 없으면 캠페인 상태 칩 + 기간·예산 — 칩은 이제 "상태"에만 남는다(StoreTable과 동일 기준)
+- 우측: 고긴급 알림이 있으면 알림 텍스트 2줄(여러 개면 Tooltip에 전부), 없으면 상태 표시(8px 점 + 라벨) + 기간·예산
+- \`isStatusRedundant\`가 true면 상태 표시를 생략한다 — 감싼 그룹 헤더가 이미 상태를 말하는 경우(\`LIVE (4)\` 아래 모든 행이 Active)
 - onRowClick이 있으면 행이 Tab으로 포커스 가능하고 Enter/Space로 활성화됨
+
+### 표기 규칙
+금액·날짜는 \`src/utils/format.js\`에서만 정한다. 예산은 \`moneyWhole\`(정수 —
+사람이 정수 달러로 정하고 일수를 곱한 값이라 센트가 없다), 집행은 \`money\`
+(항상 2자리 — 플랫폼이 센트로 청구한 실측값). 예전엔 옵션 없는
+\`toLocaleString\`이라 같은 열에 \`$2,261.5\`와 \`$514.49\`가 나란히 찍혔다.
+기간은 \`dateRange\` — \`Jul 10 – Aug 31\` 꼴로, 같은 해면 연도를 생략한다.
+
+### 상태 표시가 왜 칩이 아닌가
+예전엔 채도 높은 초록 filled Chip이었다. 행마다 반복되니 **화면에서 가장 강한
+시각 요소가 상태 칩**이 됐는데, This Period 탭에서는 바로 위 \`LIVE (4)\` 헤더가
+이미 같은 말을 하고 있어 대부분 중복이었다. 반대로 정작 판단이 필요한 페이스
+문구는 회색 평문이었다. 색이 담은 의미는 유지하되 면적을 줄이고
+(8px 점 + 라벨), 중복인 자리에서는 아예 뺀다.
         `,
       },
     },
   },
   argTypes: {
     rows: { control: 'object', description: '미리 조인된 캠페인 행 배열' },
+    isStatusRedundant: { control: 'boolean', description: '감싼 헤더가 이미 상태를 말하면 true' },
     onRowClick: { action: 'rowClicked' },
   },
 };
@@ -290,6 +306,69 @@ export const WithSamePlatformGroup = {
       />
     </Box>
   ),
+};
+
+/**
+ * 그룹 헤더가 이미 상태를 말하는 자리 — Dashboard의 This Period 탭이 쓰는 형태다.
+ *
+ * 위아래를 비교해서 보라. 같은 4행인데 위(기본값)는 `Active` 표시가 행마다
+ * 반복되고, 아래(`isStatusRedundant`)는 헤더가 한 번만 말한다. 예전에는 이
+ * 반복이 채도 높은 초록 filled Chip이라 **화면에서 가장 강한 요소가 중복
+ * 정보**였다 — 정작 판단이 필요한 페이스 문구("22% under budget pace")보다
+ * 훨씬 세게 보였다.
+ *
+ * 확인 포인트:
+ * - 아래 표에는 상태 점·라벨이 없고, 기간·예산 줄이 곧바로 우측 상단에 붙는가
+ * - 페이스 문구가 주변 회색 숫자보다 진한가(색이 아니라 굵기로도 구분)
+ * - 상태가 섞인 그룹(Action Required·Other Campaigns)에서는 이 prop을 켜면
+ *   안 된다 — 그 경우 헤더가 상태를 대변하지 못한다
+ */
+export const StatusRedundantUnderGroupHeader = {
+  name: 'Status Redundant (under a group header)',
+  render: (args) => {
+    const liveRows = [
+      {
+        id: 'camp-30',
+        name: 'G10_Now Open_0706~0831',
+        platform: 'meta',
+        targetScope: 'all_stores',
+        targetStoreIds: [],
+        startDate: '2026-07-06',
+        endDate: '2026-08-31',
+        budgetPlanned: 0,
+        budgetDaily: 25,
+        spend: 514.49,
+        paceRatio: 0.78,
+        status: 'active',
+      },
+      {
+        id: 'camp-31',
+        name: 'G10_1 Month Deals_0710~0831',
+        platform: 'tiktok',
+        targetScope: 'all_stores',
+        targetStoreIds: [],
+        startDate: '2026-07-10',
+        endDate: '2026-08-31',
+        budgetPlanned: 900,
+        budgetDaily: 20,
+        spend: 2261.5,
+        paceRatio: 1.34,
+        status: 'active',
+      },
+    ];
+    return (
+      <Box>
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ typography: 'label', color: 'text.primary', mb: 0.5 }}>Default — status shown ({liveRows.length})</Box>
+          <CampaignTable rows={liveRows} onRowClick={args.onRowClick} />
+        </Box>
+        <Box>
+          <Box sx={{ typography: 'label', color: 'text.primary', mb: 0.5 }}>Live ({liveRows.length})</Box>
+          <CampaignTable rows={liveRows} isStatusRedundant onRowClick={args.onRowClick} />
+        </Box>
+      </Box>
+    );
+  },
 };
 
 export const Empty = {

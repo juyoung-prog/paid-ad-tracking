@@ -129,7 +129,7 @@ export function AlertBanner({ alerts, onAlertClick, onDismiss, sx }) {
                 }),
               }}
             >
-              <SeverityIcon sx={{ fontSize: 18, color, flexShrink: 0 }} />
+              <SeverityIcon sx={(theme) => ({ fontSize: theme.iconSize.control, color, flexShrink: 0 })} />
               <Typography variant="body2" sx={{ fontWeight: 500, color, flex: 1 }}>
                 {alert.message}
               </Typography>

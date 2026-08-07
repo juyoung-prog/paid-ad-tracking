@@ -15,6 +15,7 @@ import { useConnections } from './useConnections';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X } from './paidAdsPageUtils';
 import { INVOICE_WARNING_RATIO, BALANCE_RUNWAY_WARNING_DAYS, balanceRunwayDays } from '../../data/schema';
+import { money, moneyWhole, dateTime } from '../../utils/format';
 
 /**
  * 연결 가능한 광고 계정 목록. ad_accounts 테이블은 "연결이 끝난 뒤에" 채워지므로
@@ -42,15 +43,15 @@ function startUrl(target) {
   return `${FUNCTIONS_BASE}/auth-meta-start?account_id=${target.accountId}&region=${target.region}`;
 }
 
+/**
+ * 동기화 시각 표기. 구현은 utils/format.js의 dateTime이 갖는다 — 로케일을
+ * en-US로 고정하는 이유(인자 없는 toLocaleString()이 브라우저 로케일을 타서
+ * 영어 UI 문장 안에 "2026. 8. 4. 오전 9:58"이 섞였다)도 그쪽에 함께 있다.
+ *
+ * 값이 없으면 이 화면은 줄 자체를 안 그리므로 '—'가 아니라 null이 필요하다.
+ */
 function formatDateTime(value) {
-  if (!value) return null;
-  // 로케일을 en-US로 고정한다 — 인자 없는 toLocaleString()은 브라우저 로케일을
-  // 타서 영어 UI 문장 안에 "2026. 8. 4. 오전 9:58" 같은 한글 날짜가 섞였다
-  // (실데이터 스크린샷 리뷰로 발견). LocalizedDateField가 입력을 MM/DD/YYYY로
-  // 고정한 것과 같은 "로케일 무관 표기" 원칙.
-  return new Date(value).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
-  });
+  return value ? dateTime(value) : null;
 }
 
 /**
@@ -150,7 +151,7 @@ export function SettingsPage() {
      여백이 0이라 레일에 딱 붙어 시작했다. box-sizing이 border-box라 maxWidth 720은
      여백을 포함한 값이다(안쪽 폭은 그만큼 좁아지지만 줄길이는 여전히 읽기 좋다). */
   return (
-    <Box sx={ { maxWidth: 720, px: PAGE_GUTTER_X, py: 3 } }>
+    <Box sx={ (theme) => ({ maxWidth: theme.layout.content.default, px: PAGE_GUTTER_X, py: 3 }) }>
       <Stack spacing={ 1 } sx={ { mb: 3 } }>
         <Typography variant="h5" component="h1">Settings</Typography>
         <Typography variant="body2" color="text.secondary">
@@ -200,7 +201,7 @@ export function SettingsPage() {
               >
                 <Box sx={ { flexGrow: 1, minWidth: 0 } }>
                   <Stack direction="row" spacing={ 1 } sx={ { alignItems: 'center', mb: 0.5 } }>
-                    <Typography variant="subtitle1">{ account?.label ?? target.label }</Typography>
+                    <Typography variant="title">{ account?.label ?? target.label }</Typography>
                     {/* 플랫폼은 칩으로 못 박는다 — 라벨은 플랫폼이 연결 후 내려주는
                         계정명으로 덮이는데(예: TikTok이 'BeautyMaster03140808'을 준다)
                         거기엔 플랫폼 표시가 없어서 어느 플랫폼 계정인지 알 수 없었다. */}
@@ -248,7 +249,7 @@ export function SettingsPage() {
                       component="div"
                       sx={ { color: isBalanceLow ? 'error.main' : 'text.secondary', fontWeight: isBalanceLow ? 600 : 400 } }
                     >
-                      { `Balance $${account.balanceAvailable.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+                      { `Balance ${money(account.balanceAvailable)}` }
                       { runway != null ? ` · about ${Math.floor(runway)} day${Math.floor(runway) === 1 ? '' : 's'} left` : '' }
                       { isBalanceLow ? ' — top up soon' : '' }
                     </Typography>
@@ -260,8 +261,8 @@ export function SettingsPage() {
                       component="div"
                       sx={ { color: isInvoiceDue ? 'warning.main' : 'text.secondary', fontWeight: isInvoiceDue ? 600 : 400 } }
                     >
-                      { `Amount due $${account.balanceDue.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
-                      { account.invoiceThreshold ? ` of $${account.invoiceThreshold.toLocaleString('en-US')} threshold` : '' }
+                      { `Amount due ${money(account.balanceDue)}` }
+                      { account.invoiceThreshold ? ` of ${moneyWhole(account.invoiceThreshold)} threshold` : '' }
                       { isInvoiceDue ? ' — invoice due soon' : '' }
                     </Typography>
                   ) }

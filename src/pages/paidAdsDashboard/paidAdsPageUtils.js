@@ -191,9 +191,10 @@ export const PAID_ADS_FONT_SX = {
 
 /**
  * 'YYYY-MM-DD' -> 'M/D'. 차트 축·막대 라벨처럼 폭이 좁은 자리에서 쓴다.
- * ReportSummarySection과 PhaseTimelineChart가 같은 표기를 써야 해서 여기 둔다.
+ *
+ * 구현은 utils/format.js의 dateShort가 갖는다 — 날짜 표기 규칙은 앱 전체에서
+ * 한 곳에서만 정한다(예전엔 화면마다 제각각이라 같은 기간이 `07.10–08.31` /
+ * `7/6–8/1` / `07/10/2026 – 08/31/2026`로 갈렸다). 이 이름은 기존 호출부
+ * (ReportSummarySection·PhaseTimelineChart)를 위해 남긴 별칭이다.
  */
-export function shortDate(iso) {
-  const [, m, d] = iso.split('-');
-  return `${Number(m)}/${Number(d)}`;
-}
+export { dateShort as shortDate } from '../../utils/format';

@@ -400,7 +400,7 @@ export function FilterBar({
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <FilterListIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
+              <FilterListIcon sx={(theme) => ({ fontSize: theme.iconSize.control, color: 'text.secondary' })} />
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Filter by Tags
               </Typography>
@@ -470,7 +470,7 @@ export function FilterBar({
                 label={`#${tag}`}
                 size="small"
                 onDelete={() => handleTagClick(tag)}
-                deleteIcon={<CloseIcon sx={{ fontSize: 14 }} />}
+                deleteIcon={<CloseIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
                 sx={{
                   fontWeight: 500,
                   // primary.lighter는 팔레트에 존재하지 않는 키였다(무효 CSS로
@@ -493,7 +493,7 @@ export function FilterBar({
                 label={`"${searchValue}"`}
                 size="small"
                 onDelete={() => onSearchChange('')}
-                deleteIcon={<CloseIcon sx={{ fontSize: 14 }} />}
+                deleteIcon={<CloseIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
                 sx={{
                   fontWeight: 500,
                   bgcolor: 'grey.200',

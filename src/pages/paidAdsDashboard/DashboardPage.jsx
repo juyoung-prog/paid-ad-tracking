@@ -43,6 +43,7 @@ import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import { supabase } from '../../lib/supabase';
 import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl } from './paidAdsPageUtils';
+import { money, moneyWhole } from '../../utils/format';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
 const TAB_GROUPS = {
@@ -775,7 +776,7 @@ export function DashboardPage() {
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
             <Box sx={{ p: 2, width: 360 }}>
-              <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>
+              <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.secondary' }}>
                 Alerts
               </Typography>
               {/* 판정 대상은 배지와 **같은 배열**이어야 한다. 벨과 KPI를 분리하면서
@@ -946,10 +947,10 @@ export function DashboardPage() {
               <strong>{campaignsInGroup.length}</strong> campaign{campaignsInGroup.length === 1 ? '' : 's'} in "{groupValues.campaignGroup}"
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total planned: <strong>${groupBudgetPlanned.toLocaleString('en-US')}</strong>
+              Total planned: <strong>{moneyWhole(groupBudgetPlanned)}</strong>
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Total spend: <strong>${groupSpend.toLocaleString('en-US')}</strong>
+              Total spend: <strong>{money(groupSpend)}</strong>
             </Typography>
           </Box>
         )}
@@ -1039,21 +1040,32 @@ export function DashboardPage() {
             tab === 'now' ? r.alertBadges.some(isTriageAlert) : r.alertBadges.length > 0
           );
           const restRows = campaignRows.filter((r) => !actionRows.includes(r));
-          const groupHeaderSx = { display: 'block', mb: 0.5, color: 'text.secondary', letterSpacing: '0.08em' };
+          /* 그룹 헤더는 label 토큰(13/600 uppercase) + text.primary다. 예전엔
+             overline(12px) + text.secondary라, **목록을 나누는 구조 요소가
+             화면에서 가장 약한 글씨**였다 — 그 아래 행마다 반복되는 초록
+             `Active` 칩이 헤더보다 훨씬 강했다(실화면 리뷰). 구조가 장식보다
+             세야 한다. */
+          const groupHeaderSx = { display: 'block', mb: 0.5, color: 'text.primary' };
 
           /* Now 탭은 라이프사이클 순서로 4그룹 — 아침에 읽는 순서 그대로다
              (터진 것 → 도는 것 → 곧 시작 → 막 끝나서 성과 입력 남은 것).
              컷오프(7d/14d)는 헤더에 그대로 적는다. 다른 탭은 기존 2그룹
              (Action Required / Other) 유지 — 한 상태만 걸러진 탭에서
              라이프사이클 분할은 전부 같은 그룹이라 의미가 없다. */
+          /* isStatusRedundant — 그룹이 **한 가지 상태만** 담을 때 켠다. 그런
+             그룹에서는 헤더가 이미 상태를 말하므로 행마다 같은 말을 반복하는
+             셈인데, 그 반복이 화면에서 가장 강한 시각 요소였다(채도 높은 초록
+             filled 칩 ×4). Action Required와 Other Campaigns는 상태가 섞여
+             있으므로 끄고 그대로 표시한다. */
           const sections =
             tab === 'now'
               ? [
                   { label: 'Action Required', rows: actionRows },
-                  { label: 'Live', rows: restRows.filter((r) => r.status === 'active') },
+                  { label: 'Live', rows: restRows.filter((r) => r.status === 'active'), isStatusRedundant: true },
                   {
                     label: `Starting Soon (next ${STARTING_SOON_DAYS} days)`,
                     rows: restRows.filter((r) => r.status === 'planned'),
+                    isStatusRedundant: true,
                   },
                   {
                     label: `Recently Ended (last ${RECENTLY_ENDED_DAYS} days)`,
@@ -1104,7 +1116,17 @@ export function DashboardPage() {
           }
 
           if (sections.length === 0) {
-            return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
+            /* 그룹이 없는 경우엔 **탭 자체가** 헤더 역할을 한다 — Active(4) 탭의
+               모든 행이 Active인 건 이미 탭 라벨이 말했다. ended 탭은 'ended'와
+               'ended_early'가 섞이므로 제외한다(라벨이 서로 다르다). */
+            return (
+              <CampaignTable
+                rows={campaignRows}
+                allCampaigns={campaigns}
+                isStatusRedundant={tab === 'active' || tab === 'planned'}
+                onRowClick={openCampaignDrawer}
+              />
+            );
           }
           /* "손댈 게 없다"는 여기가 아니라 상단 KPI(Needs Attention 0 +
              "budget · timing · reporting")가 말한다 — 한때 이 자리에 문장을 띄웠는데
@@ -1112,10 +1134,15 @@ export function DashboardPage() {
              어느 위치에서든 같은 답을 준다. 같은 말을 두 곳에서 하지 않는다. */
           return sections.map((section, i) => (
             <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
-              <Typography variant="overline" sx={groupHeaderSx}>
+              <Typography variant="label" sx={groupHeaderSx}>
                 {section.label} ({section.rows.length})
               </Typography>
-              <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+              <CampaignTable
+                rows={section.rows}
+                allCampaigns={campaigns}
+                isStatusRedundant={Boolean(section.isStatusRedundant)}
+                onRowClick={openCampaignDrawer}
+              />
             </Box>
           ));
         })()}
@@ -1190,7 +1217,7 @@ export function DashboardPage() {
                       target="_blank"
                       rel="noopener noreferrer"
                       size="small"
-                      endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                      endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
                       sx={{ p: 0, minWidth: 0, textTransform: 'none' }}
                     >
                       View Ad
@@ -1205,7 +1232,7 @@ export function DashboardPage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         size="small"
-                        endIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                        endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
                         sx={{ p: 0, minWidth: 0, textTransform: 'none' }}
                       >
                         Open in Ads Manager
@@ -1286,7 +1313,7 @@ export function DashboardPage() {
                   Core Metrics/Video Metrics/Reporting Info(레벨2, SectionLabel) 컴포넌트가
                   둘 다 같은 overline 스타일이라 위계가 안 읽힌다는 피드백으로 레벨1은
                   bold+text.primary로 무게를 올려 구분한다. */}
-              <Typography variant="overline" sx={{ display: 'block', mb: 1, fontWeight: 700, color: 'text.primary', letterSpacing: '0.08em' }}>
+              <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.primary' }}>
                 Campaign Details
               </Typography>
               {/* key={selectedCampaignId} — 리스트의 다른 행이나 알림을 클릭하면
@@ -1345,7 +1372,7 @@ export function DashboardPage() {
             )}
 
             <form onSubmit={(e) => { e.preventDefault(); handleSavePerformance(); }}>
-              <Typography variant="overline" sx={{ display: 'block', mb: 1, fontWeight: 700, color: 'text.primary', letterSpacing: '0.08em' }}>
+              <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.primary' }}>
                 Performance
               </Typography>
               <PerformanceForm
