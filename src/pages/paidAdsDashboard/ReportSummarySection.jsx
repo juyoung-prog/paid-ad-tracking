@@ -475,6 +475,131 @@ function fmtPlanMoney(amount) {
 }
 
 /**
+ * 계획 목록 — Event를 고르지 않았을 때 Plan 탭이 보여주는 것.
+ *
+ * 계획을 만드는 입구가 여기 있어야 한다. 예전엔 Event를 골라야만 계획 UI가
+ * 나왔는데, Event 옵션은 **이미 집행된 캠페인**에서 뽑히므로 아직 안 연 매장의
+ * 계획은 시작할 방법이 아예 없었다(실사용 지적) — "집행 전에 세우는 문서"라는
+ * 전제와 정면으로 어긋난다. 새 계획은 이벤트 선택과 무관하게 언제나 만들 수 있다.
+ */
+function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, onDelete, onOpen }) {
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [values, setValues] = useState({ name: '', notes: '', items: [] });
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    const saved = await onSave?.({
+      name: values.name,
+      notes: values.notes,
+      items: values.items.filter((i) => i.label.trim() && i.startDate && i.endDate && Number(i.budgetDaily) > 0),
+    });
+    setIsSaving(false);
+    if (saved) {
+      setIsCreating(false);
+      setValues({ name: '', notes: '', items: [] });
+      // 저장 직후 그 계획으로 보낸다 — 만들자마자 "그래서 어떻게 됐나"를 볼 수 있어야 한다.
+      onOpen?.(saved.name);
+    }
+  };
+
+  if (isCreating) {
+    return (
+      <Box sx={{ mb: 4, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: (t) => `${t.shape.radius.container}px` }}>
+        <PlanForm
+          values={values}
+          onChange={(field, value) => setValues((v) => ({ ...v, [field]: value }))}
+          onItemsChange={(items) => setValues((v) => ({ ...v, items }))}
+          eventOptions={eventOptions}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+          <Button size="small" onClick={() => setIsCreating(false)}>Cancel</Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleSave}
+            disabled={isSaving || !values.name.trim()}
+            sx={{ boxShadow: 'none' }}
+          >
+            {isSaving ? 'Saving…' : 'Save plan'}
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ mb: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+          Plans{' '}
+          <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+            — budgets set before spending, compared against actuals
+          </Typography>
+        </Typography>
+        <Button size="small" variant="outlined" onClick={() => setIsCreating(true)} sx={{ boxShadow: 'none' }}>
+          New plan
+        </Button>
+      </Box>
+
+      {plans.length === 0 ? (
+        <Typography variant="body2" color="text.secondary">
+          No plans yet. Create one to set a budget before the campaigns run — it does not have to exist in Meta or TikTok yet.
+        </Typography>
+      ) : (
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell sx={{ fontWeight: 600 }}>Event</TableCell>
+              <TableCell sx={{ fontWeight: 600 }} align="right">Phases</TableCell>
+              <TableCell sx={{ fontWeight: 600 }} align="right">Planned</TableCell>
+              <TableCell sx={{ fontWeight: 600 }} align="right">Actual</TableCell>
+              <TableCell sx={{ fontWeight: 600 }} align="right">Difference</TableCell>
+              <TableCell />
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {plans.map((plan) => {
+              const c = planVsActual(plan, campaigns, performanceRecords);
+              const isOver = c.diff != null && c.diff > 0;
+              return (
+                <TableRow
+                  key={plan.id}
+                  hover
+                  onClick={() => onOpen?.(plan.name)}
+                  sx={{ cursor: 'pointer' }}
+                >
+                  <TableCell>{plan.name}</TableCell>
+                  <TableCell align="right">{plan.items.length}</TableCell>
+                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtPlanMoney(c.planned)}</TableCell>
+                  {/* 집행이 아직 없으면 '—'. 0으로 찍으면 "한 푼도 안 썼다"는
+                      주장이 되는데, 실제로는 캠페인이 아직 없는 상태다. */}
+                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {c.campaignCount === 0 ? EMPTY_CELL : fmtPlanMoney(c.actual)}
+                  </TableCell>
+                  <TableCell
+                    align="right"
+                    sx={{ fontVariantNumeric: 'tabular-nums', color: c.diff == null ? 'text.primary' : isOver ? 'warning.main' : 'text.primary' }}
+                  >
+                    {c.diff == null ? EMPTY_CELL : `${c.diff > 0 ? '+' : '−'}${fmtPlanMoney(Math.abs(c.diff))}`}
+                  </TableCell>
+                  <TableCell sx={{ p: 0 }}>
+                    <Button size="small" color="error" onClick={(e) => { e.stopPropagation(); onDelete?.(plan.id); }}>
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      )}
+    </Box>
+  );
+}
+
+/**
  * 이벤트 계획 패널 — 집행 **전에** 세운 예산·일정과, 그 대비 실제 집행.
  *
  * 계획 단계와 실제 캠페인을 한 줄씩 짝지으려 하지 않는다 — 같은 단계를 플랫폼
@@ -749,7 +874,15 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
      전부 "이벤트"로 올라왔다(드롭다운이 캡션 목록으로 뒤덮인 원인의 절반).
      이제 서버가 유도 못 한 이름에는 그룹을 안 붙이므로(resolveEventGroup이 null)
      이 조건 하나로 충분하다 — 유도된 게 없으면 이벤트도 없다. */
-  const campaignGroupOptions = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))]
+  /* 옵션 = 집행된 이벤트 + **계획만 있는 이벤트**.
+     계획은 캠페인이 생기기 전에 세우는 문서라, 캠페인에서만 옵션을 뽑으면 아직
+     안 연 매장의 계획은 만들고도 다시 찾아갈 수 없다(실사용 지적). 계획 이름도
+     같은 목록에 넣어 "계획만 있고 집행은 아직"인 상태를 고를 수 있게 한다. */
+  const campaignGroupOptions = [...new Set([
+    ...campaigns.map((c) => c.campaignGroup).filter(Boolean),
+    ...plans.map((p) => p.name),
+  ])]
+    .sort((a, b) => a.localeCompare(b))
     .map((key) => ({ value: key, label: key }));
 
   /* 저장된 Event 값이 지금 데이터에 없으면 필터를 걸지 않는다. 탭·필터를
@@ -957,15 +1090,31 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
       {/* 집행 전 계획 — 실제 집행(아래 타임라인·Budget Breakdown)과 별개 층이다.
           Event를 골랐을 때만 보여준다: 계획은 이벤트 단위 문서라 "전체" 상태에서는
           어느 계획을 말하는지 정할 수 없다. */}
-      {!isLoading && reportTab === 'plan' && activeCampaignGroup && (
-        <PlanPanel
-          eventName={activeCampaignGroup}
-          plan={plans.find((p) => p.name === activeCampaignGroup) ?? null}
-          eventOptions={campaignGroupOptions.map((o) => o.value)}
-          comparison={planComparison}
-          onSave={onSavePlan}
-          onDelete={onDeletePlan}
-        />
+      {!isLoading && reportTab === 'plan' && (
+        activeCampaignGroup ? (
+          <PlanPanel
+            eventName={activeCampaignGroup}
+            plan={activePlan}
+            eventOptions={campaignGroupOptions.map((o) => o.value)}
+            comparison={planComparison}
+            onSave={onSavePlan}
+            onDelete={onDeletePlan}
+          />
+        ) : (
+          /* Event를 안 골랐을 때 — 계획 목록과 새 계획 만들기.
+             예전엔 Event를 골라야만 계획 UI가 나왔는데, 옵션은 이미 집행된
+             캠페인에서만 뽑히므로 **아직 안 연 매장의 계획은 시작할 방법이
+             없었다**. 계획은 집행 전 문서라는 전제와 정면으로 어긋난다. */
+          <PlanList
+            plans={plans}
+            campaigns={campaigns}
+            performanceRecords={performanceRecords}
+            eventOptions={campaignGroupOptions.map((o) => o.value)}
+            onSave={onSavePlan}
+            onDelete={onDeletePlan}
+            onOpen={(name) => setGroupValues((v) => ({ ...v, campaignGroup: name }))}
+          />
+        )
       )}
 
       {!isLoading && (reportTab === 'plan' ? (
