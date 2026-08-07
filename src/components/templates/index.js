@@ -3,3 +3,4 @@ export { UploadModal } from './UploadModal.jsx';
 export { FilterBar } from './FilterBar.jsx';
 export { CampaignForm } from './CampaignForm.jsx';
 export { PerformanceForm } from './PerformanceForm.jsx';
+export { PlanForm } from './PlanForm.jsx';

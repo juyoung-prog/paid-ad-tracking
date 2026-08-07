@@ -20,8 +20,9 @@ import Typography from '@mui/material/Typography';
 import { ScrollArea } from '../../components/container/ScrollArea';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
+import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, PLATFORM, GOAL } from '../../data/schema';
+import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 const PLATFORM_LABEL = {
@@ -468,6 +469,161 @@ function downloadCsv(csv, filename) {
   URL.revokeObjectURL(url);
 }
 
+/** 계획 금액 표기 — 계획은 소수점이 의미 없어 정수로 반올림한다. */
+function fmtPlanMoney(amount) {
+  return amount == null ? EMPTY_CELL : `$${Math.round(amount).toLocaleString('en-US')}`;
+}
+
+/**
+ * 이벤트 계획 패널 — 집행 **전에** 세운 예산·일정과, 그 대비 실제 집행.
+ *
+ * 계획 단계와 실제 캠페인을 한 줄씩 짝지으려 하지 않는다 — 같은 단계를 플랫폼
+ * 마다 사람이 따로 이름 짓는 게 이 계정의 기본값이라 억지 매칭은 조용히 틀린
+ * 귀속을 만든다(schema.js planVsActual 주석). 총액만 비교하고 단계 목록은 계획
+ * 쪽을 그대로 보여준다 — 어긋남은 숨기지 않는다.
+ */
+function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [values, setValues] = useState({ name: eventName, notes: '', items: [] });
+
+  const startEditing = () => {
+    setValues({
+      name: plan?.name ?? eventName,
+      notes: plan?.notes ?? '',
+      items: (plan?.items ?? []).map((i) => ({ ...i, budgetDaily: String(i.budgetDaily) })),
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    const saved = await onSave?.({
+      id: plan?.id,
+      name: values.name,
+      notes: values.notes,
+      /* 덜 채워진 줄은 저장하지 않는다 — 빈 줄이 계획에 남으면 합계가 조용히
+         틀린다(0으로 세든 빼든 둘 다 사실과 다르다). */
+      items: values.items.filter((i) => i.label.trim() && i.startDate && i.endDate && Number(i.budgetDaily) > 0),
+    });
+    setIsSaving(false);
+    if (saved) setIsEditing(false);
+  };
+
+  if (isEditing) {
+    return (
+      <Box sx={{ mb: 4, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: (t) => `${t.shape.radius.container}px` }}>
+        <PlanForm
+          values={values}
+          onChange={(field, value) => setValues((v) => ({ ...v, [field]: value }))}
+          onItemsChange={(items) => setValues((v) => ({ ...v, items }))}
+          eventOptions={eventOptions}
+        />
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 2 }}>
+          <Button size="small" onClick={() => setIsEditing(false)}>Cancel</Button>
+          <Button
+            size="small"
+            variant="contained"
+            onClick={handleSave}
+            disabled={isSaving || !values.name.trim()}
+            sx={{ boxShadow: 'none' }}
+          >
+            {isSaving ? 'Saving…' : 'Save plan'}
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!plan) {
+    return (
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+        <Typography variant="body2" color="text.secondary">
+          No plan for {eventName} yet — set the intended budget to compare against actual spend.
+        </Typography>
+        <Button size="small" variant="outlined" onClick={startEditing} sx={{ boxShadow: 'none' }}>
+          Create plan
+        </Button>
+      </Box>
+    );
+  }
+
+  const isOver = comparison?.diff != null && comparison.diff > 0;
+  const diffText = comparison?.diff == null
+    ? EMPTY_CELL
+    : `${comparison.diff > 0 ? '+' : '−'}${fmtPlanMoney(Math.abs(comparison.diff))}`;
+
+  return (
+    <Box sx={{ mb: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+        <Typography variant="subtitle1" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+          Plan{' '}
+          <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+            — {plan.items.length} {plan.items.length === 1 ? 'phase' : 'phases'}
+          </Typography>
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button size="small" onClick={startEditing}>Edit</Button>
+          <Button size="small" color="error" onClick={() => onDelete?.(plan.id)}>Delete</Button>
+        </Box>
+      </Box>
+
+      {/* 계획 vs 실제 — 이 패널의 존재 이유다. 계획만 보여주면 "그래서 맞췄나"에
+          답하지 못한다. 실제 기록이 없으면 '—'로 두고 차이도 말하지 않는다
+          (0으로 찍으면 "한 푼도 안 썼다"는 거짓 주장이 된다). */}
+      <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', mb: 2 }}>
+        {[
+          { label: 'Planned', value: fmtPlanMoney(comparison?.planned) },
+          { label: 'Actual', value: fmtPlanMoney(comparison?.actual) },
+          {
+            label: 'Difference',
+            value: diffText,
+            color: comparison?.diff == null ? 'text.primary' : isOver ? 'warning.main' : 'text.primary',
+            sub: comparison?.diffRatio != null
+              ? `${comparison.diffRatio > 0 ? '+' : ''}${Math.round(comparison.diffRatio * 100)}% vs plan`
+              : null,
+          },
+        ].map((item) => (
+          <Box key={item.label}>
+            <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+              {item.label}
+            </Typography>
+            <Typography variant="h6" sx={{ fontVariantNumeric: 'tabular-nums', color: item.color ?? 'text.primary' }}>
+              {item.value}
+            </Typography>
+            {item.sub && <Typography variant="caption" color="text.secondary">{item.sub}</Typography>}
+          </Box>
+        ))}
+      </Box>
+
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 600 }}>Phase</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Platform</TableCell>
+            <TableCell sx={{ fontWeight: 600 }}>Dates</TableCell>
+            <TableCell sx={{ fontWeight: 600 }} align="right">Daily</TableCell>
+            <TableCell sx={{ fontWeight: 600 }} align="right">Planned</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {plan.items.map((item) => (
+            <TableRow key={item.id}>
+              <TableCell>{item.label}</TableCell>
+              <TableCell>{PLATFORM_LABEL[item.platform] ?? item.platform}</TableCell>
+              <TableCell sx={{ whiteSpace: 'nowrap' }}>{shortDate(item.startDate)}–{shortDate(item.endDate)}</TableCell>
+              <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                ${item.budgetDaily.toLocaleString('en-US')}
+              </TableCell>
+              <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtPlanMoney(planItemTotal(item))}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
 /**
  * ReportSummarySection
  *
@@ -561,7 +717,7 @@ function downloadCsv(csv, filename) {
  * Example usage:
  * <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
  */
-export function ReportSummarySection({ campaigns, performanceRecords, isLoading = false, error = null, onRetry, sx }) {
+export function ReportSummarySection({ campaigns, performanceRecords, plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
   const navigate = useNavigate();
   const theme = useTheme();
   /* 기본 탭은 Performance다. 이 화면 이름이 Reports이고, 보고서에 오는 사람의
@@ -640,6 +796,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
     return acc;
   }, {});
   const planTotalBudget = planCampaigns.reduce((sum, c) => sum + (effectiveBudgetPlanned(c) ?? 0), 0);
+
+  /* 계획 vs 실제. 계산은 schema.js가 하고 화면은 그리기만 한다 — 같은 숫자를
+     두 곳에서 따로 계산하면 조용히 갈린다(이 세션에서 계획 예산이 화면마다
+     달랐던 일이 그 예다). */
+  const activePlan = activeCampaignGroup ? plans.find((p) => p.name === activeCampaignGroup) ?? null : null;
+  const planComparison = activePlan ? planVsActual(activePlan, campaigns, performanceRecords) : null;
 
   /* Event를 선택했을 때만 타임라인을 그린다 — 여러 Event가 섞인 상태에서 phase
      막대를 그리면 서로 무관한 캠페인들이 같은 축에 놓여 의미가 없다. Event 없이
@@ -790,6 +952,20 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
             <Skeleton key={i} variant="rounded" height={40} sx={{ mb: 1 }} />
           ))}
         </Box>
+      )}
+
+      {/* 집행 전 계획 — 실제 집행(아래 타임라인·Budget Breakdown)과 별개 층이다.
+          Event를 골랐을 때만 보여준다: 계획은 이벤트 단위 문서라 "전체" 상태에서는
+          어느 계획을 말하는지 정할 수 없다. */}
+      {!isLoading && reportTab === 'plan' && activeCampaignGroup && (
+        <PlanPanel
+          eventName={activeCampaignGroup}
+          plan={plans.find((p) => p.name === activeCampaignGroup) ?? null}
+          eventOptions={campaignGroupOptions.map((o) => o.value)}
+          comparison={planComparison}
+          onSave={onSavePlan}
+          onDelete={onDeletePlan}
+        />
       )}
 
       {!isLoading && (reportTab === 'plan' ? (

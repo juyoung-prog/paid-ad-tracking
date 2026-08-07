@@ -1074,3 +1074,33 @@ export function campaignsForPlan(plan, campaigns) {
   return campaigns.filter((c) => campaignGroupKey(c) === plan.name);
 }
 
+/**
+ * 계획과 실제를 나란히 놓는다. 계획 단계와 실제 캠페인을 **한 줄씩 짝지으려
+ * 하지 않는다** — 같은 단계를 플랫폼마다 사람이 따로 이름 짓는 게 이 계정의
+ * 기본값이라 억지 매칭은 조용히 틀린 귀속을 만든다. 대신 이벤트 총액을 비교하고
+ * 계획 단계 목록과 실제 목록을 각각 그대로 보여준다 — 어긋남은 숨기지 않는다.
+ *
+ * @param {Plan} plan
+ * @param {Campaign[]} campaigns
+ * @param {PerformanceRecord[]} performanceRecords
+ * @returns {{planned: number|null, actual: number|null, diff: number|null, diffRatio: number|null, campaignCount: number}}
+ */
+export function planVsActual(plan, campaigns, performanceRecords) {
+  const planned = planTotal(plan);
+  const matched = campaignsForPlan(plan, campaigns);
+  const spends = matched
+    .map((c) => performanceRecords.find((r) => r.campaignId === c.id)?.spend)
+    .filter((v) => v != null);
+  /* 집행 기록이 하나도 없으면 0이 아니라 null — "아직 한 푼도 안 썼다"와
+     "성과 기록이 아직 안 들어왔다"는 다른 상태다(이 앱의 공통 규칙). */
+  const actual = spends.length > 0 ? spends.reduce((sum, v) => sum + v, 0) : null;
+  const diff = planned != null && actual != null ? actual - planned : null;
+  return {
+    planned,
+    actual,
+    diff,
+    diffRatio: diff != null && planned ? diff / planned : null,
+    campaignCount: matched.length,
+  };
+}
+

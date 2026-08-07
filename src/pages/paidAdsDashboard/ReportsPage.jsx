@@ -13,12 +13,17 @@ import { ReportSummarySection } from './ReportSummarySection';
  * 한다(여기서 py를 얹으면 sticky 툴바가 스크롤 컨테이너 상단에 안 붙는다).
  */
 export function ReportsPage() {
-  const { campaigns, performanceRecords, isLoading, error, refresh } = usePaidAdsStore();
+  // plans/savePlan은 Plan 탭의 계획 편집이 쓴다 — 계획은 캠페인과 별개
+  // 객체라 같은 스토어에서 나란히 내려준다.
+  const { campaigns, performanceRecords, plans, savePlan, deletePlan, isLoading, error, refresh } = usePaidAdsStore();
 
   return (
     <ReportSummarySection
       campaigns={campaigns}
       performanceRecords={performanceRecords}
+      plans={plans}
+      onSavePlan={savePlan}
+      onDeletePlan={deletePlan}
       isLoading={isLoading}
       error={error}
       onRetry={refresh}
