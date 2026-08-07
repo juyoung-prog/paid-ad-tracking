@@ -251,3 +251,68 @@ export const EventTimeline = {
     </MemoryRouter>
   ),
 };
+
+/**
+ * Performance 표의 **행 상태 네 가지**를 한 화면에 모은다. 문서로만 설명하던
+ * 분기를 실제로 그려서, 판정이 바뀌면 여기서 바로 드러나게 한다.
+ *
+ * 확인 포인트:
+ * - `Delivered normally` — 지표가 그대로 그려진다
+ * - `No record at all` — 성과 레코드가 없어 `No performance data yet` 한 칸으로 합쳐진다
+ * - `Never ran` — 레코드는 있지만 지출·노출이 0이라
+ *   `Never delivered — no spend, no impressions`가 된다. 그냥 그리면
+ *   `$0.00 · 0 · 0 · 0s · 0`이 늘어서고 **`Watch 0s`가 "0초를 시청했다고 측정했다"로
+ *   읽힌다** — 실제로는 노출이 0이라 측정할 게 없었다
+ * - `Spent but no impressions` — **접히면 안 된다.** 돈은 나갔는데 노출이 0인 건
+ *   진짜 문제라 숫자가 그대로 보여야 한다. 이 행이 "Never delivered"로 합쳐지면
+ *   가장 중요한 이상 신호가 문장 뒤로 숨는다
+ */
+export const RowStates = {
+  name: 'Row states (delivered / no record / never ran)',
+  render: () => {
+    const base = {
+      campaignGroup: 'Row States',
+      platform: PLATFORM.META,
+      accountId: 'meta-bm',
+      targetScope: TARGET_SCOPE.ALL_STORES,
+      targetStoreIds: [],
+      startDate: '2026-07-01',
+      endDate: '2026-07-31',
+      budgetPlanned: 0,
+      budgetDaily: 20,
+      goal: GOAL.AWARENESS,
+      manualStatus: null,
+      creativeUrl: '',
+      createdAt: '2026-06-01T09:00:00Z',
+      updatedAt: '2026-07-20T09:00:00Z',
+    };
+    const campaigns = [
+      { ...base, id: 'rs-1', name: 'Delivered normally' },
+      { ...base, id: 'rs-2', name: 'No record at all' },
+      { ...base, id: 'rs-3', name: 'Never ran' },
+      { ...base, id: 'rs-4', name: 'Spent but no impressions' },
+    ];
+    const blank = {
+      reach: null, clicks: null, videoPlays: null, hookViews: null, heldViews: null,
+      avgWatchSeconds: null, likes: null, comments: null, shares: null,
+      follows: null, profileVisits: null, engagements: null, conversions: null,
+    };
+    const performanceRecords = [
+      {
+        id: 'p-1', campaignId: 'rs-1', ...blank,
+        impressions: 125877, reach: 59373, spend: 346.79,
+        videoPlays: 74587, hookViews: 8937, heldViews: 766, avgWatchSeconds: 2, likes: 12,
+      },
+      // rs-2에는 레코드를 아예 안 만든다 → "No performance data yet"
+      { id: 'p-3', campaignId: 'rs-3', ...blank, impressions: 0, spend: 0, heldViews: 0, avgWatchSeconds: 0, likes: 0 },
+      { id: 'p-4', campaignId: 'rs-4', ...blank, impressions: 0, spend: 120.5, heldViews: 0, avgWatchSeconds: 0, likes: 0 },
+    ];
+    return (
+      <MemoryRouter>
+        <Box>
+          <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
+        </Box>
+      </MemoryRouter>
+    );
+  },
+};
