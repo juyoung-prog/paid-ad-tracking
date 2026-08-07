@@ -9,6 +9,7 @@ import {
   campaignToRow,
   rowToPerformanceRecord,
   performanceRecordToRow,
+  rowToPlan,
 } from './paidAdsMappers';
 import { startOfToday, toLocalISODate } from './paidAdsPageUtils';
 
@@ -17,6 +18,7 @@ const EMPTY_STATE = {
   adAccounts: [],
   campaigns: [],
   performanceRecords: [],
+  plans: [],
 };
 
 /** performance_records는 캠페인당 여러 행(날짜×source)이지만 화면 모델은 캠페인당 1건이다. */
@@ -75,14 +77,17 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   // effect 본문에서 동기적으로 setState하면 렌더가 연쇄로 도는 것을 막기 위함이다
   // (react-hooks/set-state-in-effect).
   const fetchAll = useCallback(async () => {
-    const [storesRes, accountsRes, campaignsRes, performanceRes] = await Promise.all([
+    const [storesRes, accountsRes, campaignsRes, performanceRes, plansRes, planItemsRes] = await Promise.all([
       supabase.from('stores').select('*').order('id'),
       supabase.from('ad_accounts').select('*').order('id'),
       supabase.from('campaigns').select('*').order('start_date', { ascending: false }),
       supabase.from(LATEST_PERFORMANCE_VIEW).select('*'),
+      supabase.from('plans').select('*').order('name'),
+      supabase.from('plan_items').select('*').order('sort_order'),
     ]);
 
-    const failed = [storesRes, accountsRes, campaignsRes, performanceRes].find((r) => r.error);
+    const failed = [storesRes, accountsRes, campaignsRes, performanceRes, plansRes, planItemsRes]
+      .find((r) => r.error);
     if (failed) return { errorMessage: failed.error.message, data: null };
 
     return {
@@ -92,6 +97,9 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
         adAccounts: (accountsRes.data ?? []).map(rowToAdAccount),
         campaigns: (campaignsRes.data ?? []).map(rowToCampaign),
         performanceRecords: (performanceRes.data ?? []).map(rowToPerformanceRecord),
+        // 계획은 항목과 함께 한 덩어리로 만든다 — 화면이 두 배열을 조인하지
+        // 않도록(조인 로직이 화면마다 갈리면 같은 계획이 다르게 보인다).
+        plans: (plansRes.data ?? []).map((row) => rowToPlan(row, planItemsRes.data ?? [])),
       },
     };
   }, []);
@@ -124,6 +132,77 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
 
     return () => { isCancelled = true; };
   }, [isEnabled, fetchAll, applyResult]);
+
+  /**
+   * 계획을 통째로 저장한다(이름·메모 + 항목 전부). 항목은 지우고 다시 넣는다 —
+   * 개별 행을 추적해 diff하는 것보다 단순하고, 계획은 한 번에 몇 줄 규모라
+   * 그 단순함이 정확성보다 비싸지 않다. 항목이 통째로 바뀌는 편집(순서 변경,
+   * 단계 추가/삭제)이 흔한 것도 이유다.
+   *
+   * plan_items에는 owner_id가 없다 — 부모 plan을 통해 RLS가 걸린다(성과 기록이
+   * 캠페인을 통해 걸리는 것과 같은 패턴).
+   */
+  const savePlan = useCallback(async ({ id, name, notes, items }) => {
+    const payload = { name: name.trim(), notes: notes?.trim() || null, updated_at: new Date().toISOString() };
+    const planRes = id
+      ? await supabase.from('plans').update(payload).eq('id', id).select().single()
+      : await supabase.from('plans').insert(payload).select().single();
+
+    if (planRes.error) {
+      setError(planRes.error.message);
+      return null;
+    }
+    const planId = planRes.data.id;
+
+    // 기존 항목을 비우고 새로 넣는다. 실패하면 항목이 빈 계획이 남는데, 그건
+    // 화면에 "항목 없음"으로 드러나므로 조용한 손실이 아니다.
+    const { error: clearError } = await supabase.from('plan_items').delete().eq('plan_id', planId);
+    if (clearError) {
+      setError(clearError.message);
+      return null;
+    }
+
+    let itemRows = [];
+    if (items.length > 0) {
+      const { data, error: insertError } = await supabase
+        .from('plan_items')
+        .insert(items.map((item, index) => ({
+          plan_id: planId,
+          label: item.label.trim(),
+          platform: item.platform,
+          start_date: item.startDate,
+          end_date: item.endDate,
+          budget_daily: Number(item.budgetDaily),
+          sort_order: index,
+        })))
+        .select();
+      if (insertError) {
+        setError(insertError.message);
+        return null;
+      }
+      itemRows = data ?? [];
+    }
+
+    const saved = rowToPlan(planRes.data, itemRows);
+    setState((prev) => ({
+      ...prev,
+      plans: prev.plans.some((p) => p.id === saved.id)
+        ? prev.plans.map((p) => (p.id === saved.id ? saved : p))
+        : [...prev.plans, saved].sort((a, b) => a.name.localeCompare(b.name)),
+    }));
+    return saved;
+  }, []);
+
+  const deletePlan = useCallback(async (planId) => {
+    // plan_items는 on delete cascade라 따로 지우지 않는다.
+    const { error: deleteError } = await supabase.from('plans').delete().eq('id', planId);
+    if (deleteError) {
+      setError(deleteError.message);
+      return false;
+    }
+    setState((prev) => ({ ...prev, plans: prev.plans.filter((p) => p.id !== planId) }));
+    return true;
+  }, []);
 
   const addCampaign = useCallback(async (campaign) => {
     // 호출자가 만든 id는 버린다 — generateId()는 "camp-<uuid>" 형태라 uuid 컬럼에
@@ -268,6 +347,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   return {
     stores: state.stores,
     campaigns: state.campaigns,
+    plans: state.plans,
     performanceRecords: state.performanceRecords,
     adAccounts: state.adAccounts,
     alerts,
@@ -275,6 +355,8 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     isLoading,
     error,
     refresh,
+    savePlan,
+    deletePlan,
     addCampaign,
     updateCampaign,
     deleteCampaign,

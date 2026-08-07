@@ -204,3 +204,37 @@ export function performanceRecordToRow(record, recordedAt) {
     conversions: record.conversions ?? null,
   };
 }
+
+// ============================================================
+// Plan — 집행 전 계획. 캠페인과 별개 객체다(plans 테이블 주석 참고).
+// ============================================================
+
+export function rowToPlanItem(row) {
+  return {
+    id: row.id,
+    planId: row.plan_id,
+    label: row.label,
+    platform: row.platform,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    // 총액은 저장하지 않는다 — planItemTotal()이 기간을 곱해 구한다.
+    budgetDaily: Number(row.budget_daily),
+    sortOrder: row.sort_order ?? 0,
+  };
+}
+
+/**
+ * plan 행 + 그 하위 item 행들을 하나의 Plan으로 합친다.
+ * items는 sortOrder → 시작일 순으로 정렬해 화면이 정렬 책임을 지지 않게 한다.
+ */
+export function rowToPlan(row, itemRows = []) {
+  return {
+    id: row.id,
+    name: row.name,
+    notes: row.notes ?? null,
+    items: itemRows
+      .filter((i) => i.plan_id === row.id)
+      .map(rowToPlanItem)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.startDate.localeCompare(b.startDate)),
+  };
+}

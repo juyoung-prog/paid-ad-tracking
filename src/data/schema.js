@@ -991,3 +991,86 @@ export function getGoalMetricsRow(campaign, record) {
     holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
 }
+// ============================================================
+// 계획(Plan) — 집행 전에 세우는 예산·일정. 캠페인과 별개 객체다.
+// ============================================================
+
+/**
+ * @typedef {Object} PlanItem
+ * @property {string} id
+ * @property {string} planId
+ * @property {string} label - 단계 이름(예: "Coming Soon"). 사람이 읽기 위한 라벨이고 실제 캠페인 이름과 같을 필요는 없다
+ * @property {'meta'|'tiktok'} platform
+ * @property {string} startDate - ISO 8601 date
+ * @property {string} endDate - ISO 8601 date
+ * @property {number} budgetDaily - 일일 예산(USD). 총액은 저장하지 않고 기간을 곱해 구한다
+ * @property {number} sortOrder
+ */
+
+/**
+ * @typedef {Object} Plan
+ * @property {string} id
+ * @property {string} name - 이벤트 이름. campaigns.campaignGroup과 같은 값을 쓴다(대조 키)
+ * @property {string|null} notes
+ * @property {PlanItem[]} items
+ */
+
+/**
+ * 계획 한 줄의 총액. 일일 예산 × 기간(양 끝 포함)이다.
+ *
+ * 총액을 저장하지 않는 이유는 캠페인 쪽과 같다 — 두 값을 다 저장하면 서로
+ * 어긋났을 때 어느 쪽이 맞는지 알 수 없다. calcAutoBudgetPlanned와 같은 계산을
+ * 쓰므로 계획과 실제가 같은 방식으로 총액을 낸다.
+ *
+ * @param {PlanItem} item
+ * @returns {number|null} 근거가 없으면 null
+ */
+export function planItemTotal(item) {
+  return calcAutoBudgetPlanned(item?.budgetDaily, item?.startDate, item?.endDate)?.amount ?? null;
+}
+
+/**
+ * 계획 전체의 총액. 근거가 하나도 없으면 0이 아니라 null이다
+ * ("계획이 $0"과 "계획을 아직 안 세움"은 다른 상태다 — 이 앱의 공통 규칙).
+ *
+ * @param {Plan} plan
+ * @returns {number|null}
+ */
+export function planTotal(plan) {
+  const amounts = (plan?.items ?? []).map(planItemTotal).filter((v) => v != null);
+  return amounts.length > 0 ? amounts.reduce((sum, v) => sum + v, 0) : null;
+}
+
+/**
+ * 계획의 기간 — 가장 이른 시작일부터 가장 늦은 종료일까지.
+ * 항목이 없으면 null(기간을 지어내지 않는다).
+ *
+ * @param {Plan} plan
+ * @returns {{startDate: string, endDate: string}|null}
+ */
+export function planDateRange(plan) {
+  const items = plan?.items ?? [];
+  if (items.length === 0) return null;
+  return {
+    startDate: items.reduce((min, i) => (i.startDate < min ? i.startDate : min), items[0].startDate),
+    endDate: items.reduce((max, i) => (i.endDate > max ? i.endDate : max), items[0].endDate),
+  };
+}
+
+/**
+ * 계획 이름으로 실제 집행 캠페인을 찾는다.
+ *
+ * 대조 키는 campaignGroupKey — 앱 전체가 이미 쓰는 묶음 기준이라 계획을 위한
+ * 별도 매칭 규칙을 만들지 않는다. 이름이 안 맞으면 "집행 없음"으로 보이는데,
+ * 그건 틀린 게 아니라 **이름을 맞추라는 신호**다(억지로 비슷한 것을 붙이면
+ * 예산이 조용히 엉뚱한 계획에 귀속된다 — 매장 배정에서 이미 세운 원칙).
+ *
+ * @param {Plan} plan
+ * @param {Campaign[]} campaigns
+ * @returns {Campaign[]}
+ */
+export function campaignsForPlan(plan, campaigns) {
+  if (!plan?.name) return [];
+  return campaigns.filter((c) => campaignGroupKey(c) === plan.name);
+}
+
