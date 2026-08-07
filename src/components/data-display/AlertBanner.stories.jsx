@@ -55,6 +55,33 @@ export const Default = {
 };
 
 /**
+ * no_results — 돈은 나가는데 목표 지표가 0인 캠페인.
+ *
+ * 예산 페이싱만 보면 "계획대로 쓰는 중"이라 목록에서 `on budget pace`(회색)로
+ * 표시된다. 실제로는 계획대로 태워서 아무것도 못 얻는 상태라, 그 문구만 보면
+ * 괜찮은 것으로 읽힌다 — 실사용 리뷰에서 Traffic 목표에 클릭 0인 캠페인이
+ * 그렇게 보이던 것이 이 유형을 만든 계기다.
+ *
+ * 확인 포인트: budget_pacing과 같은 error 등급(빨강+ErrorOutline)으로 뜨는가.
+ * **확인된 0에만 발생한다** — 플랫폼이 지표를 아예 안 준 경우(null)는 침묵한다.
+ * 모르는 것을 실패로 단정하면 잘못된 경보가 되고, 반복되면 진짜 경보까지
+ * 무시된다(schema.js generateAlerts 주석 참고).
+ */
+export const NoResults = {
+  args: {
+    alerts: [
+      {
+        id: 'a1',
+        type: 'no_results',
+        message: 'G10_1_Month Deals_0710~0831 — $514.49 spent with 0 clicks on a traffic campaign — check targeting or creative',
+        resolvedAt: null,
+      },
+      { id: 'a2', type: 'budget_pacing', message: 'Summer Sale Traffic — 예산 소진 속도가 빠릅니다', resolvedAt: null },
+    ],
+  },
+};
+
+/**
  * overlap_target·new_store_reminder는 섞여 들어와도 자동으로 걸러짐
  */
 export const FiltersLowPriorityTypes = {
