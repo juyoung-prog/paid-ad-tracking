@@ -68,6 +68,7 @@ export const ALERT_TYPE = Object.freeze({
   MISSING_PERFORMANCE: 'missing_performance',
   NO_RESULTS: 'no_results',
   INVOICE_DUE: 'invoice_due',
+  BALANCE_LOW: 'balance_low',
   NEW_STORE_REMINDER: 'new_store_reminder',
 });
 
@@ -582,6 +583,8 @@ export const ALERT_SEVERITY = {
   [ALERT_TYPE.NO_RESULTS]: 'error',
   // 돈이 실제로 청구되는 건이라 놓치면 회계가 밀린다.
   [ALERT_TYPE.INVOICE_DUE]: 'warning',
+  // 잔액이 바닥나면 광고가 그냥 멈춘다 — 돈이 나가는 것보다 급하다.
+  [ALERT_TYPE.BALANCE_LOW]: 'error',
   [ALERT_TYPE.ENDING_SOON]: 'warning',
   [ALERT_TYPE.OVERLAP_TARGET]: 'warning',
 };
@@ -598,6 +601,7 @@ const ALERT_SEVERITY_RANK = {
   // 실시간성은 같지만 초과 집행이 더 즉각적인 손실이다.
   [ALERT_TYPE.NO_RESULTS]: 1,
   [ALERT_TYPE.MISSING_PERFORMANCE]: 2,
+  [ALERT_TYPE.BALANCE_LOW]: 2,
   [ALERT_TYPE.INVOICE_DUE]: 3,
   [ALERT_TYPE.ENDING_SOON]: 4,
   [ALERT_TYPE.OVERLAP_TARGET]: 5,
@@ -650,6 +654,39 @@ export function goalResultMetric(campaign, record) {
  */
 export const INVOICE_WARNING_RATIO = 0.85;
 
+/**
+ * 선불 잔액이 이 일수 아래로 떨어지면 알린다.
+ *
+ * "$0이 되면 알려달라"가 원래 요청이었는데, 0이 되는 순간은 **광고가 이미 멈춘
+ * 뒤**다. 충전은 사람이 결제해야 하는 일이라 미리 알아야 손쓸 수 있다.
+ * 이 계정은 $500을 채워 하루 $40 안팎을 쓰므로 한 번 충전이 약 12일치다 —
+ * 7일이면 남은 절반쯤에서 알리는 셈이라, 잊고 지나가도 한 번은 눈에 띄고
+ * 매일 켜져 있지도 않다.
+ */
+export const BALANCE_RUNWAY_WARNING_DAYS = 7;
+
+/**
+ * 이 계정의 선불 잔액이 며칠치인가. 하루에 쓰는 돈으로 나눈다.
+ *
+ * 분모는 **진행중 캠페인의 일일 예산 합**이다. 과거 평균 지출이 아니라 앞으로
+ * 나갈 돈이라, "며칠 뒤 멈추나"라는 미래형 질문에 맞는 값이다. 도는 캠페인이
+ * 없으면 나갈 돈도 없어 null을 돌려준다 — 잔액이 적어도 멈출 일이 없으므로
+ * 경고할 이유가 없다(0으로 나눠 Infinity를 만들지도 않는다).
+ *
+ * @param {AdAccount} account
+ * @param {Campaign[]} campaigns - 전체 캠페인(이 계정 것만 골라 쓴다)
+ * @param {Date} today
+ * @returns {number|null} 남은 일수. 판단 근거가 없으면 null
+ */
+export function balanceRunwayDays(account, campaigns, today = new Date()) {
+  if (account?.balanceAvailable == null) return null;
+  const dailyBurn = campaigns
+    .filter((c) => c.accountId === account.id && getEffectiveStatus(c, today) === CAMPAIGN_STATUS.ACTIVE)
+    .reduce((sum, c) => sum + (c.budgetDaily ?? 0), 0);
+  if (!(dailyBurn > 0)) return null;
+  return account.balanceAvailable / dailyBurn;
+}
+
 export function generateAlerts(campaigns, performanceRecords, today = new Date(), adAccounts = []) {
   const alerts = [];
 
@@ -663,6 +700,22 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
      문턱을 API로 알려주지 않아 사람이 넣어야 하는 값이고, 없는 걸 기본값으로
      지어내면 "곧 청구됩니다"가 근거 없는 경고가 된다. */
   adAccounts.forEach((account) => {
+    /* 선불 잔액이 며칠 안 남았다. "$0이 되면"이 아니라 남은 날짜로 알리는 이유는
+       0이 되는 순간이 곧 광고가 멈춘 뒤이기 때문이다 — 충전은 사람이 결제해야
+       하는 일이라 미리 알아야 손쓸 수 있다. */
+    const runway = balanceRunwayDays(account, campaigns, today);
+    if (runway != null && runway <= BALANCE_RUNWAY_WARNING_DAYS) {
+      alerts.push({
+        id: `alert-balance-${account.id}`,
+        campaignId: null,
+        accountId: account.id,
+        type: ALERT_TYPE.BALANCE_LOW,
+        triggeredAt: today.toISOString(),
+        resolvedAt: null,
+        message: `${account.label} — $${account.balanceAvailable.toLocaleString('en-US', { minimumFractionDigits: 2 })} left, about ${Math.floor(runway)} day${Math.floor(runway) === 1 ? '' : 's'} at the current daily budget — top up before ads stop`,
+      });
+    }
+
     if (account.balanceDue == null || !account.invoiceThreshold) return;
     if (account.balanceDue < account.invoiceThreshold * INVOICE_WARNING_RATIO) return;
     alerts.push({

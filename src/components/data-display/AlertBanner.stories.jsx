@@ -113,6 +113,41 @@ export const InvoiceDue = {
 };
 
 /**
+ * balance_low — 선불 잔액이 며칠 안 남음. invoice_due와 함께 계정 단위 알림이다.
+ *
+ * 두 알림은 부호가 반대다: Meta는 "낼 돈"(미납액)이 쌓여서 경고하고, TikTok은
+ * "쓸 돈"(선불 잔액)이 줄어서 경고한다. 같은 balance라는 이름을 쓰지만 한 칸에
+ * 담으면 안 되는 이유다.
+ *
+ * 확인 포인트: 금액만이 아니라 **남은 일수**를 말하는가. "$0이 되면 알림"은
+ * 광고가 이미 멈춘 뒤라 늦다 — 진행중 캠페인의 일일 예산 합으로 나눠 미리
+ * 알린다. 도는 캠페인이 없으면 나갈 돈도 없어 아예 발생하지 않는다.
+ * balance_low는 error(광고가 멈춘다), invoice_due는 warning(돈이 나간다).
+ */
+export const AccountBalance = {
+  args: {
+    alerts: [
+      {
+        id: 'a1',
+        campaignId: null,
+        accountId: 'tiktok-unified',
+        type: 'balance_low',
+        message: 'BeautyMaster03140808 — $220.48 left, about 5 days at the current daily budget — top up before ads stop',
+        resolvedAt: null,
+      },
+      {
+        id: 'a2',
+        campaignId: null,
+        accountId: 'meta-bm',
+        type: 'invoice_due',
+        message: 'Meta — Beauty Master — $387.52 of the $400 billing threshold — an invoice is due soon',
+        resolvedAt: null,
+      },
+    ],
+  },
+};
+
+/**
  * overlap_target·new_store_reminder는 섞여 들어와도 자동으로 걸러짐
  */
 export const FiltersLowPriorityTypes = {

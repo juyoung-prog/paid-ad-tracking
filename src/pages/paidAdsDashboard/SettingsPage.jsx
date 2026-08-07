@@ -14,7 +14,7 @@ import { usePaidAdsStore } from './usePaidAdsStore';
 import { useConnections } from './useConnections';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X } from './paidAdsPageUtils';
-import { INVOICE_WARNING_RATIO } from '../../data/schema';
+import { INVOICE_WARNING_RATIO, BALANCE_RUNWAY_WARNING_DAYS, balanceRunwayDays } from '../../data/schema';
 
 /**
  * 연결 가능한 광고 계정 목록. ad_accounts 테이블은 "연결이 끝난 뒤에" 채워지므로
@@ -90,7 +90,9 @@ const EXPIRY_WARNING_DAYS = 14;
  * <Route path="/settings" element={ <SettingsPage /> } />
  */
 export function SettingsPage() {
-  const { adAccounts, refresh: refreshStore } = usePaidAdsStore();
+  // campaigns·today는 선불 잔액이 며칠치인지 계산하는 데 쓴다(진행중 캠페인의
+  // 일일 예산 합이 분모).
+  const { adAccounts, campaigns, today, refresh: refreshStore } = usePaidAdsStore();
   const { connections, isLoading, error, refresh: refreshConnections } = useConnections();
   const { lastSuccessAt, recentFailures, refresh: refreshRuns } = useSyncRuns();
   const [syncState, setSyncState] = useState({ isRunning: false, message: null, severity: 'info' });
@@ -181,6 +183,8 @@ export function SettingsPage() {
             const { remainingDays, isExpired } = getExpiry(connection?.expiresAt);
             /* 문턱을 모르면 판단하지 않는다 — 플랫폼이 문턱을 API로 주지 않아
                사람이 넣는 값이고, 없는 걸 지어내면 근거 없는 경고가 된다. */
+            const runway = account ? balanceRunwayDays(account, campaigns, today) : null;
+            const isBalanceLow = runway != null && runway <= BALANCE_RUNWAY_WARNING_DAYS;
             const isInvoiceDue =
               account?.balanceDue != null &&
               account?.invoiceThreshold > 0 &&
@@ -235,6 +239,21 @@ export function SettingsPage() {
                   {/* 청구 상태 — 캠페인 지출을 더해서는 나오지 않는 계정 단위 값이라
                       플랫폼에서 직접 읽어온다. 값이 없으면 줄 자체를 안 그린다
                       ("$0 청구 예정"으로 읽히면 안 된다). */}
+                  {/* 선불 잔액(TikTok) — Meta의 미납액과 부호가 반대라 문구도 다르다.
+                      남은 일수를 같이 말한다: 금액만으로는 며칠치인지 알 수 없고,
+                      "$0이 되면"을 기다리면 광고가 멈춘 뒤다. */}
+                  { account?.balanceAvailable != null && (
+                    <Typography
+                      variant="caption"
+                      component="div"
+                      sx={ { color: isBalanceLow ? 'error.main' : 'text.secondary', fontWeight: isBalanceLow ? 600 : 400 } }
+                    >
+                      { `Balance $${account.balanceAvailable.toLocaleString('en-US', { minimumFractionDigits: 2 })}` }
+                      { runway != null ? ` · about ${Math.floor(runway)} day${Math.floor(runway) === 1 ? '' : 's'} left` : '' }
+                      { isBalanceLow ? ' — top up soon' : '' }
+                    </Typography>
+                  ) }
+
                   { account?.balanceDue != null && (
                     <Typography
                       variant="caption"

@@ -348,6 +348,36 @@ async function syncMetaBilling(admin: any, accessToken: string, accountId: strin
   }
 }
 
+/**
+ * TikTok 선불 잔액을 읽어 ad_accounts에 저장한다.
+ *
+ * Meta의 balance와 **의미가 정반대**라 컬럼도 다르다: Meta는 "낼 돈"(미납액),
+ * TikTok은 "쓸 수 있는 돈"(남은 선불 잔액)이다. 같은 이름의 필드를 한 칸에
+ * 담으면 부호가 반대인 두 값이 섞여 조용히 틀린 판단을 만든다.
+ *
+ * 실측: advertiser/info/ → { currency: 'USD', balance: 220.48 }.
+ * Meta처럼 최소 단위(센트)가 아니라 그대로 USD로 온다.
+ */
+async function syncTikTokBilling(admin: any, accessToken: string, accountId: string, advertiserId: string) {
+  try {
+    const url = new URL('https://business-api.tiktok.com/open_api/v1.3/advertiser/info/');
+    url.searchParams.set('advertiser_ids', JSON.stringify([String(advertiserId)]));
+    const res = await fetchWithTimeout(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const json: any = await res.json();
+    const balance = json?.data?.list?.[0]?.balance;
+    if (json?.code !== 0 || balance == null) {
+      console.error('TikTok 잔액 조회 실패(무시하고 계속)', { accountId, code: json?.code, message: json?.message });
+      return;
+    }
+    await admin
+      .from('ad_accounts')
+      .update({ balance_available: Number(balance), balance_synced_at: new Date().toISOString() })
+      .eq('id', accountId);
+  } catch (err) {
+    console.error('TikTok 잔액 조회 예외(무시하고 계속)', { accountId, err: String(err) });
+  }
+}
+
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
 function mapMetaGoal(objective: string | undefined) {
   switch (objective) {
@@ -795,6 +825,8 @@ Deno.serve(async (req) => {
     // 청구 상태는 캠페인 수와 무관하게 계정마다 한 번씩 읽는다.
     if (conn.platform === 'meta') {
       await syncMetaBilling(admin, conn.access_token, conn.account_id, externalAccountId);
+    } else {
+      await syncTikTokBilling(admin, conn.access_token, conn.account_id, externalAccountId);
     }
 
     let thumbnails: Map<string, string> | undefined;
