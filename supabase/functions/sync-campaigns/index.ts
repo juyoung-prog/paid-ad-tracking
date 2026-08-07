@@ -930,7 +930,11 @@ Deno.serve(async (req) => {
        넣은 값을 덮어쓸 위험은 없다. */
     const { data: existing, error: existingError } = await admin
       .from('campaigns')
-      .select('external_campaign_id, name, campaign_group, budget_planned, budget_daily, target_store_ids, thumbnail_url')
+      /* 아래 patch 판정이 읽는 컬럼은 **빠짐없이** 여기 있어야 한다. goal을 빼먹은
+         채 `current.goal === BROKEN_INPUT_GOAL`을 검사했더니 undefined와 비교하는
+         꼴이라 조건이 영원히 거짓이었고, 백필이 조용히 아무 일도 안 했다 —
+         오류도 로그도 없이 "동기화 성공"으로 보고됐다(실배포에서 발견). */
+      .select('external_campaign_id, name, campaign_group, goal, budget_planned, budget_daily, target_store_ids, thumbnail_url')
       .in('external_campaign_id', rows.map((r) => r.external_campaign_id));
 
     if (existingError) {
