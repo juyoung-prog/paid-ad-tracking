@@ -439,8 +439,14 @@ export function DashboardPage() {
      뭘 해야 하나") 중 마지막에 답하는 유일한 숫자이고, 0일 때조차 "확인했고
      이상 없다"는 정보를 준다(아래 all-clear 줄과 짝). 클릭하면 그 캠페인들이
      모인 Now 탭으로 간다. */
+  /* sub는 값에 상관없이 항상 "무엇을 검사한 결과인가"를 말한다. 0일 때는 그것만으로
+     "확인했고 아무것도 안 걸렸다"가 되고(예전엔 목록 위에 따로 문장을 띄웠는데,
+     그 문장은 0일 때만 존재하고 스크롤과 함께 사라지는 반면 이 툴바는 sticky라
+     어느 위치에서든 같은 답을 준다), 0이 아닐 때는 그 숫자가 어느 범위의 문제를
+     세는지 말해준다. 검사 범위는 HIGH_SEVERITY_TYPES 세 가지다 — 예전 문장은
+     "budgets are pacing within range"라고만 해서 나머지 둘을 빠뜨렸다. */
   const kpiItems = [
-    countKpi('Needs Attention', highSeverityAlerts.length, 'now'),
+    countKpi('Needs Attention', highSeverityAlerts.length, 'now', 'budget · timing · reporting'),
     countKpi('Live Now', activeCount, 'active'),
     countKpi('Recently Ended', recentlyEndedCount, 'now', `last ${RECENTLY_ENDED_DAYS} days`),
   ];
@@ -1108,29 +1114,18 @@ export function DashboardPage() {
           if (sections.length === 0) {
             return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
           }
-          /* 손댈 게 없으면 그 사실을 말한다. Action Required 그룹은 비면 통째로
-             사라지는데(위 filter), 그러면 화면에는 아무 흔적도 남지 않아서
-             "문제가 없다"와 "문제를 확인하지 않는다"가 구분되지 않는다 — 사용자
-             입장에서 전혀 다른 두 상태가 같은 화면으로 보인다. 한 줄로 확인 결과를
-             남긴다. Now 탭에서만 띄운다(다른 탭은 트리아지 화면이 아니다). */
-          const showAllClear = tab === 'now' && actionRows.length === 0 && campaignRows.length > 0;
-          return (
-            <>
-              {showAllClear && (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  No campaigns need attention — all live budgets are pacing within range.
-                </Typography>
-              )}
-              {sections.map((section, i) => (
-                <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
-                  <Typography variant="overline" sx={groupHeaderSx}>
-                    {section.label} ({section.rows.length})
-                  </Typography>
-                  <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
-                </Box>
-              ))}
-            </>
-          );
+          /* "손댈 게 없다"는 여기가 아니라 상단 KPI(Needs Attention 0 +
+             "budget · timing · reporting")가 말한다 — 한때 이 자리에 문장을 띄웠는데
+             그 문장은 0일 때만 존재해서 스크롤과 함께 사라지는 반면 툴바는 sticky라
+             어느 위치에서든 같은 답을 준다. 같은 말을 두 곳에서 하지 않는다. */
+          return sections.map((section, i) => (
+            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
+              <Typography variant="overline" sx={groupHeaderSx}>
+                {section.label} ({section.rows.length})
+              </Typography>
+              <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+            </Box>
+          ));
         })()}
       </PageContainer>
 
