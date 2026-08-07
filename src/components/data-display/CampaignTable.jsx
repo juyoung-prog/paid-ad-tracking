@@ -91,6 +91,23 @@ function formatPace(paceRatio) {
 }
 
 /**
+ * 알림 문구에서 맨 앞의 캠페인명을 떼어낸다.
+ *
+ * 알림 메시지는 캠페인명을 품고 있다("G10_Now Open_0706~0831 — $624.09 spent
+ * with 0 clicks ..."). 벨 팝오버·배너에서는 어느 캠페인인지 알려면 그 이름이
+ * 꼭 필요하다. 그런데 이 표의 행에서는 **바로 왼쪽에 같은 이름이 이미 크게**
+ * 있어서, 이름이 우측 폭을 다 먹고 정작 조치를 말하는 뒷부분이 잘렸다
+ * ("... — $514.49 spent with 0 cli…" — 실사용 리뷰로 발견).
+ *
+ * 메시지 자체를 바꾸지는 않는다(팝오버는 이름이 있어야 한다) — 이 자리에서만
+ * 접두사를 떼서, 같은 폭에 "무엇을 해야 하는가"가 들어가게 한다.
+ */
+function stripCampaignName(text, name) {
+  const prefix = `${name} — `;
+  return text.startsWith(prefix) ? text.slice(prefix.length) : text;
+}
+
+/**
  * CampaignTable 컴포넌트
  *
  * Dashboard 캠페인 목록. 실제 Influencer Tracking Dashboard 레퍼런스 이미지
@@ -358,7 +375,7 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                       sx={{ mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
                     >
                       {alertBadges.length > 1 ? `${alertBadges.length} issues · ` : ''}
-                      {alertBadges[0].text}
+                      {stripCampaignName(alertBadges[0].text, row.name)}
                     </Typography>
                   </Box>
                 </Tooltip>
