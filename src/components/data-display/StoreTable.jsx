@@ -1,3 +1,4 @@
+import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -29,12 +30,12 @@ const REGION_LABEL = { GA: 'Georgia', FL: 'Florida' };
  *
  * Props:
  * @param {Store[]} stores - 매장 목록 [Required]
- * @param {Object<string, number>} campaignCounts - storeId별 캠페인 수 { [storeId]: count }. 있을 때만 Campaigns 컬럼 노출 — schema.js의 getStoreBreakdown()로 계산해서 넘긴다(이 컴포넌트는 조인 로직을 갖지 않는다) [Optional]
+ * @param {Object<string, {active: number, total: number}>} campaignCounts - storeId별 캠페인 수 { [storeId]: { active, total } }. 있을 때만 컬럼 노출 — 조인·상태 판정은 호출부(StoreListSection) 책임이고 이 컴포넌트는 받은 숫자만 그린다 [Optional]
  * @param {function} onRowClick - 행 클릭 핸들러 (storeId) => void. 있으면 행이 tabIndex+Enter/Space로 키보드 활성화되고 우측에 chevron이 표시된다(CampaignTable과 동일 패턴) [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <StoreTable stores={stores} campaignCounts={{ G01: 5, G02: 3 }} onRowClick={(id) => openEditStore(id)} />
+ * <StoreTable stores={stores} campaignCounts={{ G01: { active: 1, total: 5 } }} onRowClick={(id) => openEditStore(id)} />
  */
 export function StoreTable({ stores, campaignCounts, onRowClick, sx }) {
   if (stores.length === 0) {
@@ -57,7 +58,11 @@ export function StoreTable({ stores, campaignCounts, onRowClick, sx }) {
             {hasShortCodes && <TableCell sx={{ fontWeight: 600 }}>Legacy Code</TableCell>}
             <TableCell sx={{ fontWeight: 600 }}>Region</TableCell>
             <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-            {campaignCounts && <TableCell sx={{ fontWeight: 600 }} align="right">Campaigns</TableCell>}
+            {/* "Campaigns"만 쓰면 바로 왼쪽 Status의 초록 Active 칩과 눈으로 묶여
+                "지금 도는 광고 수"로 읽힌다 — 실제로는 끝난 것까지 포함한
+                역대 수라 전체 170건 중 166건이 이미 종료된 숫자였다(실사용 신고).
+                컬럼명에 두 값을 다 적어 무엇을 세는지 못 헷갈리게 한다. */}
+            {campaignCounts && <TableCell sx={{ fontWeight: 600 }} align="right">Active / Total</TableCell>}
             {onRowClick && <TableCell sx={{ width: 32 }} />}
           </TableRow>
         </TableHead>
@@ -119,8 +124,17 @@ export function StoreTable({ stores, campaignCounts, onRowClick, sx }) {
                   />
                 </TableCell>
                 {campaignCounts && (
-                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>
-                    {campaignCounts[store.id] ?? 0}
+                  <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {/* 지금 도는 수를 앞·진하게, 역대 수는 뒤·흐리게. 앞의 숫자가
+                        "지금 무슨 일이 일어나는가"에 답하고, 뒤는 맥락으로만 남아
+                        오해를 만들지 않는다. 0도 그대로 쓴다 — 여기서는 "광고를
+                        안 돌리고 있다"는 확인된 사실이라 감출 이유가 없다. */}
+                    <Box component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>
+                      {campaignCounts[store.id]?.active ?? 0}
+                    </Box>
+                    <Box component="span" sx={{ color: 'text.secondary' }}>
+                      {` / ${campaignCounts[store.id]?.total ?? 0}`}
+                    </Box>
                   </TableCell>
                 )}
                 {onRowClick && (

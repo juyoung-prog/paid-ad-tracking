@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Box from '@mui/material/Box';
 import { StoreListSection } from './StoreListSection';
 import { mockStores, mockCampaigns } from '../../data/paidAdsMockData';
+import { MOCK_TODAY } from './paidAdsPageUtils';
 
 export default {
   title: 'Paid Ads Dashboard/Section/StoreListSection',
@@ -28,6 +29,7 @@ function Interactive() {
       <StoreListSection
         stores={stores}
         campaigns={mockCampaigns}
+        today={MOCK_TODAY}
         // 저장 핸들러는 성공 시 저장된 값을 돌려줘야 한다 — StoreListSection이
         // 반환값으로 성공/실패를 가른다(실스토어의 addStore/updateStore가 실패 시
         // null을 주는 계약). setStores(...)는 undefined라서, 그대로 두면 매장이

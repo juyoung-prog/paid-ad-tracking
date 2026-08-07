@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 
 import { StoreTable } from '../../components/data-display/StoreTable';
 import { StoreForm } from '../../components/templates/StoreForm';
-import { REGION, STORE_STATUS, TARGET_SCOPE } from '../../data/schema';
+import { REGION, STORE_STATUS, TARGET_SCOPE, getEffectiveStatus } from '../../data/schema';
 
 const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_STATUS.PLANNED };
 
@@ -35,6 +35,7 @@ const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_ST
  * Props:
  * @param {Store[]} stores - 매장 목록 [Required]
  * @param {Campaign[]} campaigns - 캠페인 목록. 매장별 캠페인 수 계산용 [Required]
+ * @param {Date} today - 진행중 판정 기준일. 스토어가 소유한 시계를 그대로 받는다 [Optional, 기본값: new Date()]
  * @param {function} onAddStore - 매장 추가 핸들러. async, 실패 시 falsy 반환 (store) => saved|null [Required]
  * @param {function} onUpdateStore - 매장 수정 핸들러. async, 실패 시 falsy 반환 (storeId, patch) => saved|null [Required]
  * @param {boolean} isLoading - 데이터 로드 중 여부. true면 표 대신 스켈레톤 [Optional, 기본값: false]
@@ -45,7 +46,7 @@ const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_ST
  * Example usage:
  * <StoreListSection stores={stores} campaigns={campaigns} onAddStore={addStore} onUpdateStore={updateStore} />
  */
-export function StoreListSection({ stores, campaigns, onAddStore, onUpdateStore, isLoading = false, loadError = null, onRetry, sx }) {
+export function StoreListSection({ stores, campaigns, today = new Date(), onAddStore, onUpdateStore, isLoading = false, loadError = null, onRetry, sx }) {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingStoreId, setEditingStoreId] = useState(null);
   const [values, setValues] = useState(emptyStoreValues);
@@ -76,11 +77,27 @@ export function StoreListSection({ stores, campaigns, onAddStore, onUpdateStore,
      공통분은 표 아래 각주로 한 번만 말하고, 컬럼은 매장끼리 실제로 다른 값만
      보여준다. */
   const sharedCampaignCount = campaigns.filter((c) => c.targetScope === TARGET_SCOPE.ALL_STORES).length;
+  /* 지금 도는 수와 역대 수를 함께 넘긴다. 예전엔 역대 수 하나만 보내서, 바로
+     왼쪽 Status의 초록 Active 칩과 눈으로 묶여 "지금 도는 광고 수"로 읽혔다 —
+     전체 170건 중 166건이 이미 끝난 캠페인이라 사실상 98%가 과거 기록인 숫자를
+     현재 상태처럼 보여준 셈이다(실사용 신고).
+
+     대부분의 매장이 active 0으로 나올 것이다(지금 활성 4건이 전부 G10). 휑해
+     보이지만 그게 사실이고, "14개 매장이 지금 광고를 안 돌리고 있다"는 화면에
+     없던 정보다. */
   const campaignCounts = Object.fromEntries(
-    stores.map((store) => [
-      store.id,
-      campaigns.filter((c) => c.targetScope !== TARGET_SCOPE.ALL_STORES && c.targetStoreIds.includes(store.id)).length,
-    ])
+    stores.map((store) => {
+      const forStore = campaigns.filter(
+        (c) => c.targetScope !== TARGET_SCOPE.ALL_STORES && c.targetStoreIds.includes(store.id)
+      );
+      return [
+        store.id,
+        {
+          active: forStore.filter((c) => getEffectiveStatus(c, today) === 'active').length,
+          total: forStore.length,
+        },
+      ];
+    })
   );
 
   // 쓰기 결과를 확인한다 — 스토어의 쓰기 함수는 실패 시 falsy를 돌려주는데,

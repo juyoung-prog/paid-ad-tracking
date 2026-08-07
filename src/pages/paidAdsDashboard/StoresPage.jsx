@@ -11,13 +11,16 @@ import { StoreListSection } from './StoreListSection';
  * (같은 store를 공유하므로). 타이틀+네비는 PaidAdsShell(글로벌 셸)이 그린다.
  */
 export function StoresPage() {
-  const { stores, campaigns, isLoading, error, refresh, addStore, updateStore } = usePaidAdsStore();
+  // today는 스토어가 소유한다(실 스토어=오늘, 목 스토어=고정일) — 캠페인이
+  // 지금 도는 중인지 판정하려면 이 시계를 그대로 내려줘야 한다.
+  const { stores, campaigns, today, isLoading, error, refresh, addStore, updateStore } = usePaidAdsStore();
 
   return (
     <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
       <StoreListSection
         stores={stores}
         campaigns={campaigns}
+        today={today}
         onAddStore={addStore}
         onUpdateStore={updateStore}
         isLoading={isLoading}
