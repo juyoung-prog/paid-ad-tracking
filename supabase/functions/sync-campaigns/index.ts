@@ -48,6 +48,12 @@ type StoreIndex = {
  */
 const OPENING_PHASE = /coming\s*soon|now\s*open|nowopen|grand'?s?\s*opening|grandopening|month\s*deals|monthdeals/i;
 
+/**
+ * 공백·마침표로 쓴 기간 표기. "6.27-7.5", "6.9~7.16", "5.22~6.7" 형태.
+ * isDateToken이 담당하는 "_0617~0707"과 달리 이름 안에 그대로 섞여 들어온다.
+ */
+const DOTTED_DATE_RANGE = /\b\d{1,2}\.\d{1,2}(\s*[~\-–—]\s*\d{1,2}\.\d{1,2})?\b/g;
+
 /** 이름 조각이 기간 표기인지. "0710~0831" / "0402_0410" / "0325" 형태. */
 function isDateToken(token: string) {
   return /^\d{4}([~_-]\d{4})?$/.test(token);
@@ -114,9 +120,28 @@ function resolveEventGroup(name: string, stores: StoreIndex) {
     return true;
   });
 
+  /* 날짜를 뗀다. isDateToken은 "_0617~0707"처럼 밑줄로 끊긴 4자리만 알아서,
+     "1$ Deals 6.27-7.5"처럼 공백·마침표로 쓴 날짜가 그대로 남았다 — 같은 행사가
+     회차마다 다른 이벤트로 갈라졌다(1$ Deals가 3개, 2months Deals가 2개).
+     지역 접미사보다 먼저 뗀다(날짜가 뒤에 붙는 경우가 있다). */
+  const withoutDates = kept.join(' ').replace(DOTTED_DATE_RANGE, ' ');
+
   // 지역 접미사를 뗀다 — "Labor Day FL"/"labor day GA"는 같은 이벤트다.
-  const base = kept.join(' ').replace(/\s+(FL|GA|ALL)$/i, '').replace(/\s+/g, ' ').trim();
-  return base ? normalizeCase(base) : null;
+  const base = withoutDates.replace(/\s+(FL|GA|ALL)$/i, '').replace(/\s+/g, ' ').trim();
+  if (!base) return null;
+
+  /* 아무것도 못 떼어냈으면 그룹을 **유도한 게 아니라 이름을 되풀이한 것**이라
+     null을 돌려준다. 예전엔 이때도 이름을 그대로 그룹으로 삼아서, 부스팅 게시물
+     93건이 각자 하나의 "이벤트"가 됐다 — Reports의 Event 드롭다운이 캡션 목록으로
+     뒤덮여 정작 진짜 이벤트(G10 Opening 등)가 파묻혔다(실사용 신고).
+
+     null이어도 잃는 건 없다: campaignGroupKey가 이름으로 대체하므로 같은 이름의
+     캠페인은 여전히 묶이고, 화면은 2건 이상인 것만 옵션으로 보여준다. 즉 진짜
+     묶임은 남고 혼자짜리 캡션만 사라진다. */
+  const collapsed = name.replace(/\s+/g, ' ').trim();
+  if (base === collapsed) return null;
+
+  return normalizeCase(base);
 }
 
 /**
@@ -853,7 +878,7 @@ Deno.serve(async (req) => {
        넣은 값을 덮어쓸 위험은 없다. */
     const { data: existing, error: existingError } = await admin
       .from('campaigns')
-      .select('external_campaign_id, budget_planned, budget_daily, target_store_ids, thumbnail_url')
+      .select('external_campaign_id, name, campaign_group, budget_planned, budget_daily, target_store_ids, thumbnail_url')
       .in('external_campaign_id', rows.map((r) => r.external_campaign_id));
 
     if (existingError) {
@@ -877,6 +902,20 @@ Deno.serve(async (req) => {
         // 비어 있는 예산만 채운다(0/null이 "값 없음" — 화면도 0을 예산 없음으로 읽는다).
         if (!current.budget_planned && row.budget_planned) patch.budget_planned = row.budget_planned;
         if (current.budget_daily == null && row.budget_daily != null) patch.budget_daily = row.budget_daily;
+        /* 이벤트 그룹은 **서버가 예전에 이름을 그대로 복사해 넣은 행만** 다시
+           계산한다. 판정은 "저장된 그룹이 캠페인 이름과 똑같은가" — 사람이
+           그룹란에 캠페인 전체 이름을 그대로 타이핑할 일은 없으므로, 이 지문은
+           서버가 만든 값에만 걸린다. 사람이 넣은 그룹("G10 Opening" 같은 짧은
+           이름)은 이름과 다르므로 그대로 보존된다.
+
+           이게 필요한 이유: 그룹 규칙을 고쳐도 기존 행은 안 바뀐다(아래 update가
+           원래 그룹을 안 건드린다). 부스팅 게시물 93건이 각자 이벤트로 남아
+           드롭다운을 뒤덮은 채 그대로였을 것이다. 새 규칙이 null을 주면 null로,
+           "1$ Deals"처럼 날짜를 떼어낸 값을 주면 그 값으로 바꾼다. */
+        if (current.campaign_group === current.name) {
+          patch.campaign_group = row.campaign_group;
+        }
+
         /* 매장도 같은 원칙 — 비어 있을 때만 채운다. 이름 규칙이 좋아지면(예: 지역
            접미사 인식) 이미 들어와 있는 캠페인이 그 혜택을 못 받는 문제가 예산과
            똑같이 생긴다. 사용자가 지정한 매장 목록은 비어 있지 않으므로 덮이지 않고,
