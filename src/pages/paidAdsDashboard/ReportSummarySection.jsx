@@ -923,11 +923,20 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
      계획은 캠페인이 생기기 전에 세우는 문서라, 캠페인에서만 옵션을 뽑으면 아직
      안 연 매장의 계획은 만들고도 다시 찾아갈 수 없다(실사용 지적). 계획 이름도
      같은 목록에 넣어 "계획만 있고 집행은 아직"인 상태를 고를 수 있게 한다. */
-  const campaignGroupOptions = [...new Set([
-    ...campaigns.map((c) => c.campaignGroup).filter(Boolean),
-    ...plans.map((p) => p.name),
-  ])]
-    .sort((a, b) => a.localeCompare(b))
+  const executedGroups = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))];
+  /* 순서는 **최근순**이다. campaigns가 start_date 내림차순으로 오므로 Set의
+     삽입 순서가 곧 "그 이벤트의 가장 최근 캠페인" 순이 된다 — 지금 작업 중인
+     이벤트는 보통 최근 것이라 이 순서가 실무에 맞는다.
+
+     한때 알파벳순이었는데(계획 이름을 합치면서 딸려 들어간 정렬), "1$ Deals"·
+     "50%Offdeals Trafp" 같은 게 맨 위를 차지하고 정작 자주 쓰는 "G10 Opening"이
+     한참 아래로 밀렸다(실사용 지적).
+
+     집행이 아직 없는 계획은 맨 위에 둔다 — 정렬 기준이 될 날짜가 아예 없고,
+     Plan 탭에서 찾는 대상이 바로 그것이다. 집행이 있는 계획은 최근순 자리에
+     그대로 둔다(계획이 있다는 이유로 오래된 이벤트를 위로 끌어올리지 않는다). */
+  const planOnlyGroups = plans.map((p) => p.name).filter((name) => !executedGroups.includes(name));
+  const campaignGroupOptions = [...planOnlyGroups, ...executedGroups]
     .map((key) => ({ value: key, label: key }));
 
   /* 저장된 Event 값이 지금 데이터에 없으면 필터를 걸지 않는다. 탭·필터를
