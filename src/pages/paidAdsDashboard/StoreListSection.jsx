@@ -12,6 +12,7 @@ import Typography from '@mui/material/Typography';
 import { StoreTable } from '../../components/data-display/StoreTable';
 import { StoreForm } from '../../components/templates/StoreForm';
 import { REGION, STORE_STATUS, TARGET_SCOPE, getEffectiveStatus } from '../../data/schema';
+import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 
 const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_STATUS.PLANNED };
 
@@ -148,17 +149,7 @@ export function StoreListSection({ stores, campaigns, today = new Date(), onAddS
       {/* Dashboard/Reports와 같은 규칙 — 백엔드 오류는 배너로 드러내고,
           로딩과 "매장 없음"을 구분한다. */}
       {loadError && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          action={onRetry && (
-            <Button color="inherit" size="small" onClick={onRetry}>
-              Retry
-            </Button>
-          )}
-        >
-          Something went wrong talking to the backend — data shown may be incomplete or stale. ({loadError})
-        </Alert>
+        <BackendErrorBanner error={ loadError } onRetry={ onRetry } sx={{ mb: 2 }} />
       )}
 
       {isLoading ? (

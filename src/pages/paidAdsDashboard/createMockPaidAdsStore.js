@@ -52,6 +52,7 @@ export function createMockPaidAdsStore(overrides = {}) {
     refresh: noop,
     addCampaign: noop,
     updateCampaign: noop,
+    bulkSetCampaignGroup: noop,
     deleteCampaign: noop,
     addStore: noop,
     updateStore: noop,

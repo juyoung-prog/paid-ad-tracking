@@ -508,6 +508,109 @@ export function campaignGroupKey(campaign) {
 }
 
 /**
+ * 이름에 들어 있는 매장 코드 토큰(G10, BF3 …).
+ *
+ * 이 계정의 네이밍은 매장 코드를 이름에 담는다(`G10_Grand Opening`,
+ * `BF3_1$ Deals`). 편집 거리만으로 오타를 찾으면 **"G11 Opening"에 "G10
+ * Opening"을 제안**하게 되는데, 그건 오타가 아니라 새로 여는 11호점이다.
+ * 6호점 계획을 세우는 사람에게 "3호점 말씀이신가요?"를 묻는 건 최악의 제안이다.
+ *
+ * 매장 코드가 다르면 나머지가 아무리 닮아도 다른 이벤트다.
+ */
+function storeCodesIn(name) {
+  return new Set((String(name ?? '').match(/\b[A-Za-z]{1,2}\d{1,2}\b/g) ?? []).map((c) => c.toUpperCase()));
+}
+
+/** 두 이름이 같은 매장을 가리키는가. 한쪽에만 코드가 있어도 다른 것으로 본다. */
+function sameStoreCodes(a, b) {
+  const ca = storeCodesIn(a);
+  const cb = storeCodesIn(b);
+  if (ca.size !== cb.size) return false;
+  return [...ca].every((code) => cb.has(code));
+}
+
+/** Levenshtein 편집 거리. 이름이 짧아(수십 자) 단순 DP로 충분하다. */
+function editDistance(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i += 1) {
+    const curr = [i];
+    for (let j = 1; j <= b.length; j += 1) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1),
+      );
+    }
+    prev = curr;
+  }
+  return prev[b.length];
+}
+
+/**
+ * 계획 이름이 기존 Event 중 어느 것을 **의도한 것 같은지** 찾는다.
+ *
+ * ## 왜 필요한가
+ *
+ * 계획과 실제 집행은 `plans.name = campaigns.campaignGroup` 문자열 하나로만
+ * 연결된다. 이름 칸이 자유 입력(freeSolo)인 건 의도한 설계다 — 아직 존재하지
+ * 않는 이벤트를 미리 계획하는 게 이 기능의 핵심이라, 기존 목록에서만 고르게
+ * 하면 기능 자체가 성립하지 않는다.
+ *
+ * 문제는 **틀렸을 때 아무 일도 일어나지 않는다**는 것이다. "G10 Openin"으로
+ * 저장하면 오류도 경고도 없이 그냥 저장되고, 나중에 화면이 "실제 집행 없음"을
+ * 보여준다. 사용자는 계획이 끊어진 걸 모른 채 잘못된 예산 판단을 한다.
+ * 실제 계정에 `50%Off` / `50%Offdeals Reach` / `50%Offdeals Trafp`처럼 서로
+ * 닮은 이름이 이미 존재해서 가정이 아니라 실재하는 위험이다.
+ *
+ * 막지는 않는다. **묻는다.** 이건 오류가 아니라 "이걸 말한 건가요?"다.
+ *
+ * @param {string} name - 사용자가 입력한 계획 이름
+ * @param {string[]} eventNames - 실제 집행 중인 Event 이름 목록
+ * @returns {{kind: 'exact'|'normalized'|'typo'|'new', suggestion: string|null}}
+ *   - `exact`: 그대로 일치한다. 대조가 붙는다
+ *   - `normalized`: 대소문자·구분자만 다르다. 거의 확실히 같은 이벤트다
+ *   - `typo`: 편집 거리가 가까운 이름이 있다. 물어볼 가치가 있다
+ *   - `new`: 닮은 게 없다. 새 이벤트를 미리 계획하는 정상 경로다
+ */
+export function matchEventName(name, eventNames = []) {
+  const trimmed = (name ?? '').trim();
+  if (!trimmed || eventNames.length === 0) return { kind: 'new', suggestion: null };
+
+  if (eventNames.includes(trimmed)) return { kind: 'exact', suggestion: null };
+
+  const key = campaignNameKey(trimmed);
+  const normalized = eventNames.find((n) => campaignNameKey(n) === key);
+  if (normalized) return { kind: 'normalized', suggestion: normalized };
+
+  /* 임계는 길이에 비례시킨다. 고정값(예: 2)으로 두면 짧은 이름에서는 전혀
+     다른 이벤트를 제안하고("G09" vs "G10"은 거리 1이지만 **다른 매장**이다),
+     긴 이름에서는 진짜 오타를 놓친다. 20% 이하 + 최대 3자로 묶고, 아주 짧은
+     이름(8자 미만)은 아예 제안하지 않는다 — 그 길이에서는 거리 1이 오타보다
+     의미 있는 차이일 확률이 높다. */
+  if (trimmed.length < 8) return { kind: 'new', suggestion: null };
+  const limit = Math.min(3, Math.floor(trimmed.length * 0.2));
+  if (limit < 1) return { kind: 'new', suggestion: null };
+
+  let best = null;
+  let bestDistance = Infinity;
+  eventNames.forEach((candidate) => {
+    // 매장이 다르면 후보에서 아예 뺀다 — 편집 거리로는 "G11 Opening"과
+    // "G10 Opening"이 1이지만, 그건 오타가 아니라 새로 여는 매장이다.
+    if (!sameStoreCodes(trimmed, candidate)) return;
+    const distance = editDistance(key, campaignNameKey(candidate));
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = candidate;
+    }
+  });
+
+  return bestDistance <= limit ? { kind: 'typo', suggestion: best } : { kind: 'new', suggestion: null };
+}
+
+/**
  * 두 캠페인의 타겟 매장이 교집합을 가지는지 확인한다.
  * all_stores는 다른 모든 타겟과 교집합이 있는 것으로 간주한다.
  * @param {Campaign} campaignA

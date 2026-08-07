@@ -44,6 +44,9 @@ import { useSyncRuns } from './useSyncRuns';
 import { supabase } from '../../lib/supabase';
 import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl } from './paidAdsPageUtils';
 import { money, moneyWhole } from '../../utils/format';
+import { useViewUrlSync } from './useViewUrlSync';
+import { BulkEventTagDialog } from '../../components/templates/BulkEventTagDialog';
+import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
 const TAB_GROUPS = {
@@ -127,7 +130,9 @@ const emptyCampaignValues = {
 // 그대로 구현하기엔 과하지만("이름 붙여 여러 개 저장"까지는 필요 없음), 매번
 // 빈 화면에서 새로 필터링해야 하는 문제의 대부분은 "마지막으로 보던 화면
 // 기억"만으로 해결된다. 캠페인 등 실제 데이터와는 별도 키로 저장한다.
-const VIEW_STORAGE_KEY = 'paidAdsDashboard:lastView:v1';
+// v2 — 저장 형태가 중첩 객체({tab, groupValues, dateRange})에서 URL과 같은
+// 평평한 맵으로 바뀌었다. 키를 올려 옛 값을 읽다가 undefined가 퍼지는 것을 막는다.
+const VIEW_STORAGE_KEY = 'paidAdsDashboard:lastView:v2';
 
 function loadLastView() {
   if (typeof window === 'undefined') return null;
@@ -206,6 +211,7 @@ export function DashboardPage() {
     alerts,
     today,
     isLoading,
+    bulkSetCampaignGroup,
     error,
     refresh,
     updateCampaign,
@@ -220,9 +226,17 @@ export function DashboardPage() {
   const injectedStore = useContext(PaidAdsStoreContext);
   const { lastSuccessAt, recentFailures } = useSyncRuns(!injectedStore);
 
-  const [tab, setTab] = useState(() => loadLastView()?.tab ?? 'now');
-  const [groupValues, setGroupValues] = useState(() => loadLastView()?.groupValues ?? { platform: '', store: '' });
-  const [dateRange, setDateRange] = useState(() => loadLastView()?.dateRange ?? { start: '', end: '' });
+  /* 초기값은 localStorage에서만 읽는다. URL이 있으면 useViewUrlSync가 마운트
+     직후 덮어쓴다 — 우선순위는 URL > localStorage > 기본값이다. */
+  const [tab, setTab] = useState(() => loadLastView()?.tab || 'now');
+  const [groupValues, setGroupValues] = useState(() => {
+    const saved = loadLastView();
+    return { platform: saved?.platform ?? '', store: saved?.store ?? '', campaignGroup: saved?.event ?? '' };
+  });
+  const [dateRange, setDateRange] = useState(() => {
+    const saved = loadLastView();
+    return { start: saved?.from ?? '', end: saved?.to ?? '' };
+  });
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [editCampaignValues, setEditCampaignValues] = useState(emptyCampaignValues);
   const [performanceValues, setPerformanceValues] = useState({});
@@ -232,6 +246,7 @@ export function DashboardPage() {
   // 같은 톤이지만 별도 state로 둔다: 저건 "닫아도 되나"고 이건 "정말 지워도
   // 되나"라 의미가 달라서 하나로 합치면 조건 분기가 헷갈린다.
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
   // 쓰기 진행 중 재진입 가드 — 저장/삭제가 도는 동안 같은 요청이 두 번 나가는 것을 막는다.
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -340,14 +355,26 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deepLinkCampaignId, isLoading, error, campaigns]);
 
-  // 탭/필터가 바뀔 때마다 저장 — 다음 방문 시 마지막 화면을 그대로 이어서 본다.
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify({ tab, groupValues, dateRange }));
-    } catch {
-      // localStorage 사용 불가 — 조용히 무시, 세션 내 상태는 계속 동작
-    }
-  }, [tab, groupValues, dateRange]);
+  /* 탭·필터를 URL과 묶는다. 뒤로가기로 필터를 되돌리고, 지금 보는 화면을
+     링크로 보낼 수 있게 된다. localStorage 저장도 이 훅이 이어서 한다
+     (링크 없이 다시 들어왔을 때 마지막 화면 복원 — 기존 동작 유지).
+     `campaign`은 Drawer 딥링크라 이 훅이 건드리면 안 된다. */
+  useViewUrlSync(
+    {
+      tab,
+      platform: groupValues.platform ?? '',
+      store: groupValues.store ?? '',
+      event: groupValues.campaignGroup ?? '',
+      from: dateRange.start ?? '',
+      to: dateRange.end ?? '',
+    },
+    (next) => {
+      setTab(next.tab || 'now');
+      setGroupValues((v) => ({ ...v, platform: next.platform, store: next.store, campaignGroup: next.event }));
+      setDateRange({ start: next.from, end: next.to });
+    },
+    { storageKey: VIEW_STORAGE_KEY, keepParams: ['campaign'] },
+  );
 
 
 
@@ -510,6 +537,13 @@ export function DashboardPage() {
      붙이므로(resolveEventGroup이 null) 그룹 유무 하나로 판단한다. */
   const campaignGroupOptions = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))]
     .map((key) => ({ value: key, label: key }));
+
+  /* Event 태그가 없는 캠페인. 필터·탭과 무관하게 **전체**를 센다 — 지금 보고
+     있는 화면에 안 걸린다고 문제가 없는 게 아니다. 아카이브된 것은 뺀다:
+     더 이상 집행하지 않는 캠페인을 태그하라고 재촉할 이유가 없다. */
+  const untaggedCampaigns = campaigns.filter(
+    (c) => !c.campaignGroup && c.manualStatus !== MANUAL_STATUS.ARCHIVED,
+  );
 
   const lastUpdatedAt = campaigns.length
     ? campaigns.reduce((latest, c) => (c.updatedAt > latest ? c.updatedAt : latest), campaigns[0].updatedAt)
@@ -939,6 +973,25 @@ export function DashboardPage() {
             바로 다음에 묻는 질문이다. campaignsInGroup은 탭(상태)과 무관하게
             그룹 전체를 세므로, 지금 Active 탭을 보고 있어도 이미 끝난 단계의
             예산까지 포함한 진짜 전체 합계가 뜬다. */}
+        {/* 태그 없는 캠페인 안내 — 이 일의 트리거는 "새 캠페인이 태그 없이
+            동기화됐다"는 순간이라, 목록 전체를 선택 가능하게 만드는 대신 그
+            순간에만 나타나는 진입점을 둔다(BulkEventTagDialog 주석 참고).
+            Event 태그가 없으면 그 캠페인은 이벤트 요약·계획 대비에서 통째로
+            빠지는데, 지금까지 화면은 그 사실을 어디서도 말하지 않았다. */}
+        {untaggedCampaigns.length > 0 && (
+          <Alert
+            severity="info"
+            sx={{ mb: 2 }}
+            action={
+              <Button color="inherit" size="small" onClick={() => setIsBulkTagOpen(true)}>
+                Tag them
+              </Button>
+            }
+          >
+            {`${untaggedCampaigns.length} campaign${untaggedCampaigns.length === 1 ? ' has' : 's have'} no Event — they are missing from event summaries and plan comparisons.`}
+          </Alert>
+        )}
+
         {/* NO_EVENT는 진짜 그룹이 아니라 "태그 없음" 조회라 합산 요약이 무의미하다 */}
         {groupValues.campaignGroup && groupValues.campaignGroup !== NO_EVENT && (
           // 얕은 배경색의 상태 요약 줄(Alert 배너에 가까운 정보 스트립) → control radius
@@ -961,17 +1014,7 @@ export function DashboardPage() {
             운영 대시보드에서 가장 위험한 무음 실패). 쓰기 실패도 같은 error에
             잡히므로 문구는 조회에 한정하지 않는다. */}
         {error && (
-          <Alert
-            severity="error"
-            sx={{ mb: 2 }}
-            action={
-              <Button color="inherit" size="small" onClick={refresh}>
-                Retry
-              </Button>
-            }
-          >
-            Something went wrong talking to the backend — data shown may be incomplete or stale. ({error})
-          </Alert>
+          <BackendErrorBanner error={ error } onRetry={ refresh } sx={{ mb: 2 }} />
         )}
 
         {/* 로딩과 "결과 없음"을 구분한다 — 로드가 끝나기 전에는 빈 상태 문구
@@ -1147,6 +1190,23 @@ export function DashboardPage() {
           ));
         })()}
       </PageContainer>
+
+      {/* 열려 있을 때만 마운트한다 — 선택 상태 초기화를 effect가 아니라 마운트가
+          담당하게 해서, 닫았다 다시 열었을 때 지난 선택이 남지 않는다. */}
+      {isBulkTagOpen && (
+      <BulkEventTagDialog
+        campaigns={untaggedCampaigns}
+        eventOptions={campaignGroupOptions.map((o) => o.value)}
+        onApply={async (ids, name) => {
+          const taggedCount = await bulkSetCampaignGroup?.(ids, name);
+          if (taggedCount != null) {
+            notify(`Tagged ${taggedCount} campaign${taggedCount === 1 ? '' : 's'} as "${name}".`, 'success');
+          }
+          return taggedCount;
+        }}
+        onClose={() => setIsBulkTagOpen(false)}
+      />
+      )}
 
       {/* 미저장 변경 확인 — New Campaign/Drawer 닫기 두 경로가 공유한다. */}
       <Dialog open={Boolean(discardTarget)} onClose={() => setDiscardTarget(null)} maxWidth="xs" fullWidth>

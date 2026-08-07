@@ -12,6 +12,10 @@ import {
   rowToPlan,
 } from './paidAdsMappers';
 import { startOfToday, toLocalISODate } from './paidAdsPageUtils';
+/* 오류는 스토어 경계에서 사람 문장으로 바꾼다 — 화면마다 DB 메시지를 해석하게
+   두면 어떤 화면은 원문을 그대로 찍는다(실제로 그랬다). 원문은 detail로 함께
+   넘어가므로 지원 요청 때 잃지 않는다. */
+import { describeBackendError, RECOVERY } from '../../utils/backendError';
 
 const EMPTY_STATE = {
   stores: [],
@@ -88,10 +92,15 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
 
     const failed = [storesRes, accountsRes, campaignsRes, performanceRes, plansRes, planItemsRes]
       .find((r) => r.error);
-    if (failed) return { errorMessage: failed.error.message, data: null };
+    if (failed) {
+      return {
+        error: describeBackendError(failed.error, "Couldn't load your data. Try again."),
+        data: null,
+      };
+    }
 
     return {
-      errorMessage: null,
+      error: null,
       data: {
         stores: (storesRes.data ?? []).map(rowToStore),
         adAccounts: (accountsRes.data ?? []).map(rowToAdAccount),
@@ -105,7 +114,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   }, []);
 
   const applyResult = useCallback((result) => {
-    if (result.errorMessage) setError(result.errorMessage);
+    if (result.error) setError(result.error);
     else {
       setError(null);
       setState(result.data);
@@ -156,8 +165,12 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
          정할 수 없다. */
       const isDuplicateName = planRes.error.code === '23505';
       setError(isDuplicateName
-        ? `A plan for "${payload.name}" already exists — open it from the plan list to edit instead.`
-        : planRes.error.message);
+        ? {
+            message: `A plan for "${payload.name}" already exists — open it from the plan list to edit instead.`,
+            recovery: RECOVERY.FIX_INPUT,
+            detail: planRes.error.message,
+          }
+        : describeBackendError(planRes.error, "Couldn't save the plan. Try again."));
       return null;
     }
     const planId = planRes.data.id;
@@ -166,7 +179,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     // 화면에 "항목 없음"으로 드러나므로 조용한 손실이 아니다.
     const { error: clearError } = await supabase.from('plan_items').delete().eq('plan_id', planId);
     if (clearError) {
-      setError(clearError.message);
+      setError(describeBackendError(clearError, "Couldn't replace the plan's phases. Try again."));
       return null;
     }
 
@@ -185,7 +198,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
         })))
         .select();
       if (insertError) {
-        setError(insertError.message);
+        setError(describeBackendError(insertError, "Couldn't save the plan's phases. Try again."));
         return null;
       }
       itemRows = data ?? [];
@@ -205,7 +218,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     // plan_items는 on delete cascade라 따로 지우지 않는다.
     const { error: deleteError } = await supabase.from('plans').delete().eq('id', planId);
     if (deleteError) {
-      setError(deleteError.message);
+      setError(describeBackendError(deleteError, "Couldn't delete the plan. Try again."));
       return false;
     }
     setState((prev) => ({ ...prev, plans: prev.plans.filter((p) => p.id !== planId) }));
@@ -222,7 +235,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       .single();
 
     if (insertError) {
-      setError(insertError.message);
+      setError(describeBackendError(insertError, "Couldn't save your change. Try again."));
       return null;
     }
     const saved = rowToCampaign(data);
@@ -239,7 +252,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       .single();
 
     if (updateError) {
-      setError(updateError.message);
+      setError(describeBackendError(updateError, "Couldn't save your change. Try again."));
       return null;
     }
     const saved = rowToCampaign(data);
@@ -250,10 +263,45 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     return saved;
   }, []);
 
+  /**
+   * 여러 캠페인의 Event 태그를 한 번에 바꾼다.
+   *
+   * Event(campaignGroup)는 이 앱의 핵심 추상화인데, 태깅은 캠페인 하나씩 Drawer를
+   * 열어서 해야 했다 — 캠페인이 170건이고 동기화될 때마다 새 캠페인이 태그 없이
+   * 들어오므로, 이 비용은 한 번이 아니라 **매번 반복된다.** 실제로는 태깅을
+   * 포기하게 되고, 그러면 Event 모델 위에 쌓아 올린 나머지 전부(계획 대비,
+   * 이벤트 요약, 타임라인)가 같이 무너진다.
+   *
+   * 한 번의 UPDATE로 끝낸다 — 행마다 요청을 보내면 중간에 실패했을 때 일부만
+   * 바뀐 상태가 남고, 사용자는 어디까지 됐는지 알 방법이 없다.
+   */
+  const bulkSetCampaignGroup = useCallback(async (campaignIds, campaignGroup) => {
+    if (!campaignIds?.length) return 0;
+    const group = campaignGroup?.trim() || null;
+
+    const { data, error: updateError } = await supabase
+      .from('campaigns')
+      .update({ campaign_group: group, updated_at: new Date().toISOString() })
+      .in('id', campaignIds)
+      .select();
+
+    if (updateError) {
+      setError(describeBackendError(updateError, "Couldn't tag those campaigns. Try again."));
+      return null;
+    }
+
+    const savedById = new Map((data ?? []).map((row) => [row.id, rowToCampaign(row)]));
+    setState((prev) => ({
+      ...prev,
+      campaigns: prev.campaigns.map((c) => savedById.get(c.id) ?? c),
+    }));
+    return savedById.size;
+  }, []);
+
   const deleteCampaign = useCallback(async (campaignId) => {
     const { error: deleteError } = await supabase.from('campaigns').delete().eq('id', campaignId);
     if (deleteError) {
-      setError(deleteError.message);
+      setError(describeBackendError(deleteError, "Couldn't save your change. Try again."));
       // 다른 쓰기 함수의 null과 같은 계약 — falsy면 실패. 호출부가 이 값으로
       // 성공 스낵바/실패 스낵바를 가른다(결과 확인 없이 무조건 "deleted"를
       // 띄우면 거짓 성공이 된다).
@@ -277,7 +325,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       .single();
 
     if (insertError) {
-      setError(insertError.message);
+      setError(describeBackendError(insertError, "Couldn't save your change. Try again."));
       return null;
     }
     const saved = rowToStore(data);
@@ -300,7 +348,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       .single();
 
     if (updateError) {
-      setError(updateError.message);
+      setError(describeBackendError(updateError, "Couldn't save your change. Try again."));
       return null;
     }
     const saved = rowToStore(data);
@@ -323,7 +371,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       .single();
 
     if (upsertError) {
-      setError(upsertError.message);
+      setError(describeBackendError(upsertError, "Couldn't save your change. Try again."));
       return null;
     }
     const saved = rowToPerformanceRecord(data);
@@ -367,6 +415,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     deletePlan,
     addCampaign,
     updateCampaign,
+    bulkSetCampaignGroup,
     deleteCampaign,
     addStore,
     updateStore,

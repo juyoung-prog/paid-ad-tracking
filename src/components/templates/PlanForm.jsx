@@ -1,3 +1,4 @@
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Grid from '@mui/material/Grid';
@@ -11,7 +12,7 @@ import Typography from '@mui/material/Typography';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { DateRangeField } from '../input/DateRangeField';
-import { PLATFORM, planItemTotal, planTotal } from '../../data/schema';
+import { PLATFORM, planItemTotal, planTotal, matchEventName } from '../../data/schema';
 import { moneyWhole } from '../../utils/format';
 
 const PLATFORM_OPTIONS = [
@@ -70,6 +71,39 @@ export function PlanForm({ values, onChange, onItemsChange, eventOptions = [], e
   const items = values.items ?? [];
   const itemErrors = errors.items ?? [];
 
+  /**
+   * 이름이 실제 집행과 붙을지에 대한 안내. 네 경우를 서로 다르게 말한다 —
+   * "붙는다 / 거의 같다 / 오타 같다 / 아직 없는 이벤트다"는 사용자 입장에서
+   * 전혀 다른 상황인데, 예전엔 넷 다 같은 회색 helperText 한 줄이었다.
+   */
+  const nameHint = (() => {
+    const match = matchEventName(values.name, eventOptions);
+    switch (match.kind) {
+      case 'exact':
+        return { helperText: 'Linked — actuals from this event will be compared against the plan', suggestion: null };
+      case 'normalized':
+        return {
+          helperText: 'Must match the campaign Event name for actuals to line up',
+          suggestion: match.suggestion,
+          alertText: `An event named "${match.suggestion}" already exists — only spacing or case differs. Use that spelling so actuals line up.`,
+        };
+      case 'typo':
+        return {
+          helperText: 'Must match the campaign Event name for actuals to line up',
+          suggestion: match.suggestion,
+          alertText: `No campaigns are tagged with this name yet. Did you mean "${match.suggestion}"?`,
+        };
+      default:
+        return {
+          // 새 이벤트는 정상 경로다. 경고가 아니라 사실만 말한다.
+          helperText: values.name?.trim()
+            ? 'No campaigns use this name yet — that is fine for a plan made before launch'
+            : 'Must match the campaign Event name for actuals to line up',
+          suggestion: null,
+        };
+    }
+  })();
+
   const updateItem = (index, field, value) => {
     onItemsChange(items.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
   };
@@ -97,10 +131,28 @@ export function PlanForm({ values, onChange, onItemsChange, eventOptions = [], e
                 size="small"
                 placeholder="e.g. G10 Opening"
                 error={Boolean(errors.name)}
-                helperText={errors.name || 'Must match the campaign Event name for actuals to line up'}
+                helperText={errors.name || nameHint.helperText}
               />
             )}
           />
+          {/* 이름이 기존 Event와 안 맞을 때 **막지 않고 묻는다.**
+              아직 없는 이벤트를 미리 계획하는 건 이 기능의 정상 경로라 오류로
+              처리하면 안 된다. 하지만 오타로 끊어진 계획은 오류도 경고도 없이
+              저장되고, 나중에 "실제 집행 없음"으로만 보여서 사용자가 끊어진 걸
+              모른 채 예산을 판단한다(schema.js matchEventName 주석). */}
+          {nameHint.suggestion && (
+            <Alert
+              severity="warning"
+              sx={{ mt: 1 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => onChange('name', nameHint.suggestion)}>
+                  Use it
+                </Button>
+              }
+            >
+              {nameHint.alertText}
+            </Alert>
+          )}
         </Grid>
 
         <Grid size={12}>

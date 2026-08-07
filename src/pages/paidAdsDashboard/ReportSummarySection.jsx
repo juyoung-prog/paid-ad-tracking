@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { alpha, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Button from '@mui/material/Button';
 import LinearProgress from '@mui/material/LinearProgress';
 import Skeleton from '@mui/material/Skeleton';
@@ -15,6 +16,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
 import { ScrollArea } from '../../components/container/ScrollArea';
@@ -25,6 +27,8 @@ import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent } from '../../utils/format';
+import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
+import { useViewUrlSync } from './useViewUrlSync';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -33,7 +37,8 @@ const PLATFORM_LABEL = {
 
 // Dashboard의 VIEW_STORAGE_KEY와 같은 규칙, 키만 화면별로 분리 — 두 화면의
 // 마지막 뷰가 서로를 덮어쓰면 안 된다.
-const REPORT_VIEW_STORAGE_KEY = 'paidAdsReports:lastView:v1';
+// v2 — Dashboard와 같은 이유로 저장 형태가 평평한 맵으로 바뀌었다.
+const REPORT_VIEW_STORAGE_KEY = 'paidAdsReports:lastView:v2';
 
 function loadLastReportView() {
   if (typeof window === 'undefined') return null;
@@ -191,6 +196,51 @@ const fmtCurrency = money;
 const fmtNumber = count;
 const fmtPercent = (value) => percent(value, { digits: 2 });
 
+/**
+ * 컬럼 정의 헬퍼.
+ *
+ * `cell`(포맷된 문자열)만 갖고 있던 시절엔 이 표로 **중앙값을 계산할 수 없었다** —
+ * 값이 이미 "$8.63" 같은 문자열이라 다시 파싱해야 했다. 원본 숫자(`value`)와
+ * 표기(`format`)를 나눠 두면 셀과 기준선이 같은 정의를 공유한다.
+ *
+ * @param {string} header - 컬럼 라벨
+ * @param {function} value - 행에서 원본 숫자를 꺼낸다. `(row) => number|null`
+ * @param {function} format - 표기. `(number|null) => string`
+ * @param {object} [opts] - width, note(정의 툴팁), hasBenchmark(중앙값 표시 여부)
+ */
+function metricColumn(header, value, format, opts = {}) {
+  return { header, value, format, cell: (r) => format(value(r)), ...opts };
+}
+
+/**
+ * 지표 정의.
+ *
+ * 예전엔 Hook Rate·Hold Rate 둘만 native `title`로 설명이 붙어 있었다. 나머지
+ * 열세 개는 아무 설명이 없었는데, `CPM`·`CTR`·`CPA`는 광고를 매일 다루지 않는
+ * 사람에게 자명하지 않고 **플랫폼마다 정의가 다른 지표가 한 표에 섞여 있다**.
+ * 정의 없이 나란히 놓인 숫자는 비교를 부추기면서 비교의 근거는 주지 않는다.
+ */
+const NOTE = {
+  spend: 'Total charged by the platform for this campaign, all time.',
+  impressions: 'Times the ad was shown, including repeat views by the same person.',
+  reach: 'Unique people who saw the ad at least once.',
+  cpm: 'Cost per 1,000 impressions — spend ÷ impressions × 1,000. Lower is cheaper.',
+  clicks: 'Link clicks. Meta counts link_click, TikTok counts click.',
+  ctr: 'Clicks ÷ impressions.',
+  cpc: 'Spend ÷ clicks. Lower is cheaper.',
+  engagements: 'Likes + comments + shares. Meta reports this as post_engagement.',
+  engagementRate: 'Engagements ÷ impressions.',
+  conversions: 'Actions the platform counted for this campaign objective.',
+  cpa: 'Spend ÷ conversions. Lower is cheaper.',
+  videoPlays: 'Total plays, with no minimum watch time.',
+  hookRate: 'Platform-specific: TikTok counts a 2-second view, Meta counts 25% of the video.',
+  holdRate: 'Share of hook views that watched to completion — based on the platform-specific hook definition.',
+  heldViews: 'Views that reached 100% of the video.',
+  avgWatch: 'Average seconds watched per play.',
+  follows: 'New followers attributed to the campaign. TikTok only — Meta has no campaign-level equivalent.',
+  profileVisits: 'Profile visits from the ad. TikTok only.',
+};
+
 // goal별로 Campaign/Platform/Spend(공통) 다음에 붙는 2~3개 컬럼 — 그 목적에서
 // 실제로 판단 근거가 되는 지표만 고른다(예: Engagement 목표 캠페인에 CTR/CPC를
 // 보여줘봤자 "참여가 잘 됐는지"는 알 수 없다).
@@ -198,26 +248,26 @@ function goalExtraColumns(goalValue) {
   switch (goalValue) {
     case GOAL.AWARENESS:
       return [
-        { header: 'Impressions', cell: (r) => fmtNumber(r.impressions) },
-        { header: 'Reach', cell: (r) => fmtNumber(r.reach) },
-        { header: 'CPM', cell: (r) => fmtCurrency(r.cpm) },
+        metricColumn('Impressions', (r) => r.impressions, fmtNumber, { note: NOTE.impressions }),
+        metricColumn('Reach', (r) => r.reach, fmtNumber, { note: NOTE.reach }),
+        metricColumn('CPM', (r) => r.cpm, fmtCurrency, { note: NOTE.cpm, hasBenchmark: true }),
       ];
     case GOAL.TRAFFIC:
       return [
-        { header: 'Clicks', cell: (r) => fmtNumber(r.clicks) },
-        { header: 'CTR', cell: (r) => fmtPercent(r.ctr) },
-        { header: 'CPC', cell: (r) => fmtCurrency(r.cpc) },
+        metricColumn('Clicks', (r) => r.clicks, fmtNumber, { note: NOTE.clicks }),
+        metricColumn('CTR', (r) => r.ctr, fmtPercent, { note: NOTE.ctr, hasBenchmark: true }),
+        metricColumn('CPC', (r) => r.cpc, fmtCurrency, { note: NOTE.cpc, hasBenchmark: true }),
       ];
     case GOAL.ENGAGEMENT:
       return [
-        { header: 'Engagements', cell: (r) => fmtNumber(r.engagements) },
-        { header: 'Engagement Rate', cell: (r) => fmtPercent(r.engagementRate) },
+        metricColumn('Engagements', (r) => r.engagements, fmtNumber, { note: NOTE.engagements }),
+        metricColumn('Engagement Rate', (r) => r.engagementRate, fmtPercent, { note: NOTE.engagementRate, hasBenchmark: true }),
       ];
     case GOAL.CONVERSION:
     case GOAL.STORE_VISIT:
       return [
-        { header: 'Conversions', cell: (r) => fmtNumber(r.conversions) },
-        { header: 'CPA', cell: (r) => fmtCurrency(r.cpa) },
+        metricColumn('Conversions', (r) => r.conversions, fmtNumber, { note: NOTE.conversions }),
+        metricColumn('CPA', (r) => r.cpa, fmtCurrency, { note: NOTE.cpa, hasBenchmark: true }),
       ];
     default:
       return [];
@@ -240,34 +290,20 @@ function fmtSeconds(value) {
 // 맞추면 goal 표끼리 같은 컬럼의 폭이 달라져서, 세로로 훑을 때 그룹 구분선이
 // 섹션마다 지그재그로 밀린다(실화면 스크린샷 리뷰로 발견).
 const CREATIVE_VIDEO_COLUMNS = [
-  { header: 'Video Plays', width: 112, cell: (r) => fmtNumber(r.videoPlays) },
+  metricColumn('Video Plays', (r) => r.videoPlays, fmtNumber, { width: 112, note: NOTE.videoPlays }),
   // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
-  // 계산 함수(calcHookRate/calcHoldRate)는 진작 있었는데 어느 화면에서도 안 쓰였다.
-  // note는 헤더 title로 붙는다 — 기준이 플랫폼마다 다르다는 사실을 Drawer의
-  // PlatformMetricList만 알려주고 이 표는 침묵하고 있었는데, VIDEO 그룹으로 묶은
-  // 뒤로는 오히려 행 간 비교를 부추기는 배치가 됐다.
-  {
-    header: 'Hook Rate',
-    width: 104,
-    note: 'Platform-specific: TikTok counts a 2-second view, Meta counts 25% of the video.',
-    cell: (r) => fmtPercent(r.hookRate),
-  },
-  {
-    header: 'Hold Rate',
-    width: 104,
-    note: 'Share of hook views that watched to completion — based on the platform-specific hook definition.',
-    cell: (r) => fmtPercent(r.holdRate),
-  },
-  { header: 'Held Views', width: 108, cell: (r) => fmtNumber(r.heldViews) },
-  { header: 'Avg Watch', width: 108, cell: (r) => fmtSeconds(r.avgWatchSeconds) },
+  metricColumn('Hook Rate', (r) => r.hookRate, fmtPercent, { width: 104, note: NOTE.hookRate, hasBenchmark: true, isPlatformSpecific: true }),
+  metricColumn('Hold Rate', (r) => r.holdRate, fmtPercent, { width: 104, note: NOTE.holdRate, hasBenchmark: true, isPlatformSpecific: true }),
+  metricColumn('Held Views', (r) => r.heldViews, fmtNumber, { width: 108, note: NOTE.heldViews }),
+  metricColumn('Avg Watch', (r) => r.avgWatchSeconds, fmtSeconds, { width: 108, note: NOTE.avgWatch, hasBenchmark: true }),
 ];
 
 const CREATIVE_ENGAGEMENT_COLUMNS = [
-  { header: 'Likes', width: 88, cell: (r) => fmtNumber(r.likes) },
-  { header: 'Comments', width: 104, cell: (r) => fmtNumber(r.comments) },
-  { header: 'Shares', width: 88, cell: (r) => fmtNumber(r.shares) },
-  { header: 'Follows', width: 92, cell: (r) => fmtNumber(r.follows) },
-  { header: 'Profile Visits', width: 120, cell: (r) => fmtNumber(r.profileVisits) },
+  metricColumn('Likes', (r) => r.likes, fmtNumber, { width: 88 }),
+  metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 104 }),
+  metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88 }),
+  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 92, note: NOTE.follows }),
+  metricColumn('Profile Visits', (r) => r.profileVisits, fmtNumber, { width: 120, note: NOTE.profileVisits }),
 ];
 
 /**
@@ -299,11 +335,45 @@ const COLUMN_WIDTH = {
  */
 const isColumnEmpty = (column, rows) => rows.every((r) => column.cell(r) === EMPTY_CELL);
 
+/**
+ * 이 표 전체의 중앙값. 컬럼 헤더 아래에 붙어 각 행이 비교될 기준이 된다.
+ *
+ * ## 왜 필요한가
+ *
+ * `Hook Rate 22.4%`가 좋은 건지 나쁜 건지 이 앱은 답을 갖고 있지 않았다.
+ * 벤치마크도, 목표치도, 과거 평균도 저장하지 않으니 15개 컬럼 × 수십 행의
+ * 숫자가 **하나도 판단으로 이어지지 않았다.** 외부 업계 평균은 우리에게 없지만,
+ * **우리 자신의 분포**는 이미 화면에 있는 데이터로 계산된다. "우리 평균보다
+ * 나은가"는 대부분의 실무 판단에 충분하다.
+ *
+ * ## 왜 평균이 아니라 중앙값인가
+ *
+ * 이 계정에는 $10짜리 부스팅 게시물과 $2,000짜리 캠페인이 한 표에 섞여 있다.
+ * 산술평균은 극단값 하나에 끌려가서 "평균"이 어느 캠페인과도 닮지 않게 된다.
+ *
+ * ## 왜 현재 페이지가 아니라 전체 행인가
+ *
+ * 페이지마다 기준선이 달라지면 같은 값이 페이지를 넘길 때 좋아 보였다 나빠
+ * 보였다 한다. 기준은 표 전체(필터가 적용된 goal 집합)에서 한 번만 계산한다.
+ *
+ * @returns {number|null} 값이 있는 행이 3개 미만이면 null — 그 표본으로 "평균"을
+ *   말하면 근거 없는 권위를 주는 셈이다
+ */
+function columnMedian(column, rows) {
+  const values = rows
+    .map((r) => column.value?.(r))
+    .filter((v) => v != null && Number.isFinite(v))
+    .sort((a, b) => a - b);
+  if (values.length < 3) return null;
+  const mid = Math.floor(values.length / 2);
+  return values.length % 2 === 0 ? (values[mid - 1] + values[mid]) / 2 : values[mid];
+}
+
 // Cost 그룹 구성용 — Spend(모든 goal 공통)와, goalExtraColumns 중 비용 지표
 // (CPM/CPC/CPA)를 한 그룹으로 묶는다. 예전엔 비용 지표가 goal 지표들 뒤에
 // 섞여 있었는데(예: Impressions·Reach 다음 CPM), "얼마 썼고 단가가 얼마인가"와
 // "얼마나 잘 됐나"는 서로 다른 질문이라 그룹으로 가른다.
-const SPEND_COLUMN = { header: 'Spend', cell: (r) => fmtCurrency(r.spend) };
+const SPEND_COLUMN = metricColumn('Spend', (r) => r.spend, fmtCurrency, { note: NOTE.spend });
 const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA']);
 
 /*
@@ -623,7 +693,36 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
                   onClick={() => onOpen?.(plan.name)}
                   sx={{ cursor: 'pointer' }}
                 >
-                  <TableCell>{plan.name}</TableCell>
+                  <TableCell>
+                    {plan.name}
+                    {/* 계획이 실제 집행과 **연결되지 않았다는 사실**은 저장
+                        시점의 경고만으로는 부족하다 — 경고를 무시하고 저장할
+                        수도 있고, 나중에 캠페인 쪽 Event 태그가 바뀌어 끊어질
+                        수도 있다. 목록에 상시 표시해서 "실제 $0"이 "안 썼다"가
+                        아니라 "안 붙었다"임을 구분한다. */}
+                    {c.campaignCount === 0 && (
+                      <Tooltip title={`No campaigns are tagged with the Event "${plan.name}". Tag them on the Dashboard, or rename this plan to match.`}>
+                        <Box
+                          component="span"
+                          sx={{
+                            ml: 1,
+                            px: 0.75,
+                            py: 0.25,
+                            typography: 'caption',
+                            fontWeight: 600,
+                            color: 'warning.main',
+                            border: '1px solid',
+                            borderColor: 'warning.main',
+                            borderRadius: (t) => `${t.shape.radius.control}px`,
+                            cursor: 'help',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Not linked
+                        </Box>
+                      </Tooltip>
+                    )}
+                  </TableCell>
                   <TableCell align="right">{plan.items.length}</TableCell>
                   <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{fmtPlanMoney(c.planned)}</TableCell>
                   {/* 집행이 아직 없으면 '—'. 0으로 찍으면 "한 푼도 안 썼다"는
@@ -911,21 +1010,38 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
      답한다. 탭 순서도 같이 뒤집었다: 순서는 Plan-먼저인데 마지막 탭 기억 때문에
      화면은 Performance로 열려서 "내가 왜 여기 있지"가 됐다(실사용 피드백).
      보이는 순서와 열리는 탭이 어긋나면 기억 기능이 오히려 혼란을 만든다. */
-  const [reportTab, setReportTab] = useState(() => loadLastReportView()?.reportTab ?? 'performance');
-  const [groupValues, setGroupValues] = useState(() => loadLastReportView()?.groupValues ?? { platform: '', campaignGroup: '' });
-  const [dateRange, setDateRange] = useState(() => loadLastReportView()?.dateRange ?? { start: '', end: '' });
+  /* 초기값은 localStorage에서만 읽는다 — URL이 있으면 useViewUrlSync가 덮어쓴다. */
+  const [reportTab, setReportTab] = useState(() => loadLastReportView()?.tab || 'performance');
+  const [groupValues, setGroupValues] = useState(() => {
+    const saved = loadLastReportView();
+    return { platform: saved?.platform ?? '', campaignGroup: saved?.event ?? '' };
+  });
+  const [dateRange, setDateRange] = useState(() => {
+    const saved = loadLastReportView();
+    return { start: saved?.from ?? '', end: saved?.to ?? '' };
+  });
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
 
-  // 탭/필터가 바뀔 때마다 저장 — Dashboard의 VIEW_STORAGE_KEY와 같은 규칙.
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(REPORT_VIEW_STORAGE_KEY, JSON.stringify({ reportTab, groupValues, dateRange }));
-    } catch {
-      // localStorage 사용 불가 — 조용히 무시, 세션 내 상태는 계속 동작
-    }
-  }, [reportTab, groupValues, dateRange]);
+  /* 탭·필터를 URL과 묶는다 — Dashboard와 같은 규칙. 이 화면이 특히 중요한 게,
+     "G10 Opening 성과"를 동료에게 보여주려면 지금까지는 링크가 아니라 조작
+     순서를 말로 설명해야 했다. */
+  useViewUrlSync(
+    {
+      tab: reportTab,
+      platform: groupValues.platform ?? '',
+      event: groupValues.campaignGroup ?? '',
+      from: dateRange.start ?? '',
+      to: dateRange.end ?? '',
+    },
+    (next) => {
+      setReportTab(next.tab || 'performance');
+      setGroupValues((v) => ({ ...v, platform: next.platform, campaignGroup: next.event }));
+      setDateRange({ start: next.from, end: next.to });
+    },
+    { storageKey: REPORT_VIEW_STORAGE_KEY },
+  );
 
   /* Event 드롭다운 옵션 = **이벤트로 유도된 그룹만**.
      예전엔 "이름이 같은 캠페인이 2건 이상"도 옵션으로 올렸다. 그 규칙은 사람이
@@ -1196,17 +1312,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           "결과 없음"을 구분한다(로드 전 빈 배열이 "No campaigns match"로
           위장되지 않게). */}
       {error && (
-        <Alert
-          severity="error"
-          sx={{ mb: 2 }}
-          action={onRetry && (
-            <Button color="inherit" size="small" onClick={onRetry}>
-              Retry
-            </Button>
-          )}
-        >
-          Something went wrong talking to the backend — data shown may be incomplete or stale. ({error})
-        </Alert>
+        <BackendErrorBanner error={ error } onRetry={ onRetry } sx={{ mb: 2 }} />
       )}
 
       {isLoading && (
@@ -1492,9 +1598,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           const isRowEmpty = (r) => dataColumns.every((col) => col.cell(r) === EMPTY_CELL);
           /* 플랫폼별 정의가 다른 지표(Hook/Hold Rate)가 이 표에 있고, 실제로 두
              플랫폼이 섞여 있을 때만 경고를 단다 — 한 플랫폼만 있는 표에서는
-             비교 위험이 없어서 각주가 소음이다. 정의 자체는 헤더 title로 항상
-             닿는다(col.note). */
-          const hasPlatformSpecificMetric = dataColumns.some((col) => col.note);
+             비교 위험이 없어서 각주가 소음이다. 정의 자체는 헤더의 ⓘ 툴팁으로
+             항상 닿는다(col.note). */
+          /* note 유무로 판단하면 안 된다 — 지금은 거의 모든 컬럼에 정의가 붙어
+             있어서 항상 참이 된다. 각주가 말하는 건 "정의가 있다"가 아니라
+             "플랫폼마다 정의가 **다르다**"이므로 그 컬럼만 표시한다. */
+          const hasPlatformSpecificMetric = dataColumns.some((col) => col.isPlatformSpecific);
           const isMixedPlatform = new Set(rowsForGoal.map((r) => r.platform)).size > 1;
           /* 컬럼 구성(빈 컬럼 제거)은 페이지가 아니라 표 전체를 기준으로 판단한다 —
              페이지를 넘길 때마다 컬럼이 생겼다 없어지면 표가 아니라 다른 표가 된다.
@@ -1549,16 +1658,46 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, ...STICKY_CAMPAIGN_SX }}>Campaign</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Platform</TableCell>
-                      {dataColumns.map((col) => (
-                        <TableCell
-                          key={`${col.group}-${col.header}`}
-                          align="right"
-                          title={col.note}
-                          sx={{ fontWeight: 600, verticalAlign: 'bottom', ...(col.isGroupStart ? GROUP_DIVIDER_SX : null) }}
-                        >
-                          {col.header}
-                        </TableCell>
-                      ))}
+                      {dataColumns.map((column) => {
+                        /* 기준선은 **현재 페이지가 아니라 표 전체**(rowsForGoal)에서
+                           계산한다 — 페이지마다 기준이 달라지면 같은 값이 페이지를
+                           넘길 때 좋아 보였다 나빠 보였다 한다. */
+                        const median = column.hasBenchmark ? columnMedian(column, rowsForGoal) : null;
+                        return (
+                          <TableCell
+                            key={`${column.group}-${column.header}`}
+                            align="right"
+                            sx={{ fontWeight: 600, verticalAlign: 'bottom', ...(column.isGroupStart ? GROUP_DIVIDER_SX : null) }}
+                          >
+                            {/* 예전엔 정의가 native title이라 **보이는 신호가 없었고**
+                                터치 기기에서는 아예 열리지 않았다. 아이콘으로 "여기
+                                설명이 있다"를 먼저 말한다. */}
+                            {column.note ? (
+                              <Tooltip title={column.note} arrow enterTouchDelay={0}>
+                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, cursor: 'help' }}>
+                                  {column.header}
+                                  <InfoOutlinedIcon
+                                    sx={(t) => ({ fontSize: t.iconSize.inline, color: 'text.disabled' })}
+                                  />
+                                </Box>
+                              </Tooltip>
+                            ) : (
+                              column.header
+                            )}
+                            {/* 이 표 자신의 중앙값. 외부 벤치마크는 없지만 "우리
+                                평균보다 나은가"는 대부분의 판단에 충분하다. */}
+                            {median != null && (
+                              <Typography
+                                variant="caption"
+                                component="div"
+                                sx={{ fontWeight: 400, color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+                              >
+                                {`med ${column.format(median)}`}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        );
+                      })}
                       <TableCell />
                     </TableRow>
                   </TableHead>
