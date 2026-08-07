@@ -469,6 +469,44 @@ function downloadCsv(csv, filename) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * 계획 항목을 PhaseTimelineChart가 읽는 phase 배열로 바꾼다.
+ *
+ * 실제 집행 타임라인(buildPhaseTimeline)과 **같은 차트·같은 문법**을 쓴다 —
+ * 계획과 실제를 다른 그림으로 보여주면 둘을 머릿속에서 다시 맞춰야 한다
+ * (Plan/Performance 탭이 서로 다른 차트를 쓰다가 하나로 합친 것과 같은 이유).
+ *
+ * 같은 라벨의 항목은 플랫폼이 달라도 한 막대로 합친다. 계획은 "Coming Soon /
+ * Meta"와 "Coming Soon / TikTok"을 따로 적지만, 그건 예산을 나눠 적은 것이지
+ * 서로 다른 단계가 아니다 — 실제 타임라인이 플랫폼별 캠페인을 한 phase로
+ * 합치는 것과 같은 판단이다.
+ */
+function buildPlanPhases(plan) {
+  const byLabel = new Map();
+  (plan?.items ?? []).forEach((item) => {
+    const key = item.label.trim().toLowerCase();
+    if (!byLabel.has(key)) byLabel.set(key, { key, name: item.label.trim(), items: [] });
+    byLabel.get(key).items.push(item);
+  });
+
+  return [...byLabel.values()]
+    .map(({ key, name, items }) => {
+      const platforms = [...new Set(items.map((i) => i.platform))]
+        .sort((a, b) => Object.keys(PLATFORM_LABEL).indexOf(a) - Object.keys(PLATFORM_LABEL).indexOf(b));
+      return {
+        key,
+        name,
+        platformLabel: platforms.map((p) => PLATFORM_LABEL[p] ?? p).join(' + '),
+        startDate: items.reduce((min, i) => (i.startDate < min ? i.startDate : min), items[0].startDate),
+        endDate: items.reduce((max, i) => (i.endDate > max ? i.endDate : max), items[0].endDate),
+        totalDaily: items.reduce((sum, i) => sum + i.budgetDaily, 0),
+        totalBudget: items.reduce((sum, i) => sum + (planItemTotal(i) ?? 0), 0),
+      };
+    })
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
+    .map((phase, index, all) => ({ ...phase, fillAlpha: phaseFillAlpha(index, all.length) }));
+}
+
 /** 계획 금액 표기 — 계획은 소수점이 의미 없어 정수로 반올림한다. */
 function fmtPlanMoney(amount) {
   return amount == null ? EMPTY_CELL : `$${Math.round(amount).toLocaleString('en-US')}`;
@@ -674,6 +712,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
     );
   }
 
+  const planPhases = buildPlanPhases(plan);
   const isOver = comparison?.diff != null && comparison.diff > 0;
   const diffText = comparison?.diff == null
     ? EMPTY_CELL
@@ -721,6 +760,12 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
           </Box>
         ))}
       </Box>
+
+      {/* 계획 타임라인 — 실제 집행 타임라인과 같은 컴포넌트다. 표만 있으면
+          "언제 뭐가 겹치는지"가 안 보이는데, 단계·기간·예산이 이미 다 있으므로
+          그릴 수 있다. 아래 실제 타임라인과 같은 문법이라 둘을 눈으로 바로
+          비교할 수 있다. */}
+      {planPhases.length > 0 && <PhaseTimelineChart phases={planPhases} sx={{ mb: 2 }} />}
 
       <Table size="small">
         <TableHead>
