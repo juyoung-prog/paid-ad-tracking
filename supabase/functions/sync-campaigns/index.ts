@@ -433,6 +433,19 @@ async function syncTikTokBilling(admin: any, accessToken: string, accountId: str
 }
 
 /** Meta objective → 우리 goal enum. 모르는 값은 traffic으로 둔다(가장 중립적). */
+/**
+ * 목표를 유도하지 못했을 때 저장되던 **역사적** 기본값.
+ *
+ * Meta·TikTok 매퍼 둘 다 한때 이 값을 기본값으로 썼다(TikTok은 이후 awareness로
+ * 바뀌었다). 목표가 깨진 채 저장된 행들은 예외 없이 이 값을 들고 있으므로,
+ * "서버가 잘못 넣은 값인가"를 가리는 지문이 된다.
+ *
+ * 매퍼의 현재 기본값을 참조하면 안 된다 — 기본값이 바뀌면 지문이 과거를 못
+ * 가리키게 되고, 정작 고쳐야 할 행을 지나친다. 이 값은 과거를 가리키는
+ * 상수이므로 매퍼가 바뀌어도 따라 움직이면 안 된다.
+ */
+const BROKEN_INPUT_GOAL = 'traffic';
+
 function mapMetaGoal(objective: string | undefined) {
   switch (objective) {
     case 'OUTCOME_AWARENESS':
@@ -442,6 +455,9 @@ function mapMetaGoal(objective: string | undefined) {
     case 'OUTCOME_ENGAGEMENT':
     case 'POST_ENGAGEMENT':
     case 'VIDEO_VIEWS':
+    /* 이벤트 응답은 참여 목표다. 여기 없으면 기본값(traffic)으로 떨어져
+       "클릭이 0인 트래픽 캠페인"으로 보인다(실계정 4건). */
+    case 'EVENT_RESPONSES':
       return 'engagement';
     case 'OUTCOME_SALES':
     case 'CONVERSIONS':
@@ -789,7 +805,14 @@ function mapTikTokCampaign(
     // 일일 예산을 총액 칸에 넣게 된다(예전 버그). BUDGET_MODE_INFINITE면 budget이
     // 0으로 오는데, 그건 보통 캠페인이 아니라 광고그룹에 예산을 건 계정이다.
     ...mapTikTokBudget(item, adGroupBudgets?.get(String(item.campaign_id))),
-    goal: mapTikTokGoal(item.objective),
+    /* TikTok campaign/get이 주는 필드명은 `objective_type`이다 — `objective`가
+       아니다. 이걸 잘못 읽어서 **31건 전부** undefined → 기본값(traffic)으로
+       떨어졌다(플랫폼 실제 값은 REACH 26 / VIDEO_VIEWS 3 / ENGAGEMENT 1 /
+       TRAFFIC 1). mapTikTokGoal의 case를 아무리 넓혀도 입력이 항상 undefined라
+       아무 효과가 없었다 — 매퍼를 고치고도 화면이 안 바뀌던 이유가 이것이다.
+       objective도 함께 읽어 두는 건 TikTok이 필드명을 바꿔도 조용히 기본값으로
+       무너지지 않게 하려는 안전장치다. */
+    goal: mapTikTokGoal(item.objective_type ?? item.objective),
     thumbnail_url: thumbnails?.get(String(item.campaign_id)) ?? null,
   };
 }
@@ -943,6 +966,29 @@ Deno.serve(async (req) => {
            "1$ Deals"처럼 날짜를 떼어낸 값을 주면 그 값으로 바꾼다. */
         if (current.campaign_group === resolveEventGroupLegacy(current.name, stores)) {
           patch.campaign_group = row.campaign_group;
+        }
+
+        /* 목표(goal)도 같은 원칙 — **서버가 잘못 넣은 값만** 다시 계산한다.
+           goal은 드로어에서 사람이 고칠 수 있는 값이라 무조건 덮으면 안 된다.
+
+           왜 필요한가: TikTok 목표를 `item.objective`로 읽고 있었는데 실제 필드는
+           `objective_type`이라, 31건 전부 undefined → 기본값 traffic으로 저장됐다
+           (플랫폼 실제 값은 REACH 26 / VIDEO_VIEWS 3 / ENGAGEMENT 1 / TRAFFIC 1).
+           Meta도 EVENT_RESPONSES 4건이 기본값으로 떨어졌다. 합쳐서 34건이 "클릭이
+           0인 트래픽 캠페인"으로 보였고, 그 목표에 맞지도 않는 CTR·CPC 컬럼으로
+           평가되고 있었다.
+
+           지문은 "저장된 값이 **그 행이 쓰이던 시점의 기본값**과 같은가"다.
+           `mapTikTokGoal(undefined)`을 쓰면 안 된다 — 그 기본값은 그 사이
+           traffic에서 awareness로 바뀌었고, 깨진 행들이 들고 있는 건 **옛**
+           기본값이라 지문이 빗나가 30건이 그대로 남는다(시뮬레이션으로 확인).
+           역사적 값을 상수로 고정한다.
+
+           사람이 일부러 이 값과 같은 목표로 바꿔 둔 경우는 덮이지만, 그때 들어갈
+           새 값도 플랫폼의 실제 목표라 손실이 아니다. 다른 목표로 바꿔 둔 값은
+           그대로 남는다. */
+        if (current.goal === BROKEN_INPUT_GOAL && row.goal !== current.goal) {
+          patch.goal = row.goal;
         }
 
         /* 매장도 같은 원칙 — 비어 있을 때만 채운다. 이름 규칙이 좋아지면(예: 지역
