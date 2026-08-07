@@ -261,7 +261,7 @@ function goalExtraColumns(goalValue) {
     case GOAL.ENGAGEMENT:
       return [
         metricColumn('Engagements', (r) => r.engagements, fmtNumber, { note: NOTE.engagements }),
-        metricColumn('Engagement Rate', (r) => r.engagementRate, fmtPercent, { note: NOTE.engagementRate, hasBenchmark: true }),
+        metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { note: NOTE.engagementRate, hasBenchmark: true }),
       ];
     case GOAL.CONVERSION:
     case GOAL.STORE_VISIT:
@@ -292,22 +292,24 @@ const fmtSeconds = seconds;
 // 맞추면 goal 표끼리 같은 컬럼의 폭이 달라져서, 세로로 훑을 때 그룹 구분선이
 // 섹션마다 지그재그로 밀린다(실화면 스크린샷 리뷰로 발견).
 const CREATIVE_VIDEO_COLUMNS = [
-  metricColumn('Video Plays', (r) => r.videoPlays, fmtNumber, { width: 112, note: NOTE.videoPlays }),
+  metricColumn('Plays', (r) => r.videoPlays, fmtNumber, { width: 96, note: `Video plays. ${NOTE.videoPlays}` }),
   // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
   /* 폭 104 → 124. 헤더에 기준선(`med 21.89%`)이 붙으면서 104px로는 라벨·ⓘ·
      기준선이 세 줄로 쪼개졌다(실화면 12-12). 기준선이 들어갈 자리를 준다. */
-  metricColumn('Hook Rate', (r) => r.hookRate, fmtPercent, { width: 124, note: NOTE.hookRate, hasBenchmark: true, isPlatformSpecific: true }),
-  metricColumn('Hold Rate', (r) => r.holdRate, fmtPercent, { width: 124, note: NOTE.holdRate, hasBenchmark: true, isPlatformSpecific: true }),
-  metricColumn('Held Views', (r) => r.heldViews, fmtNumber, { width: 108, note: NOTE.heldViews }),
-  metricColumn('Avg Watch', (r) => r.avgWatchSeconds, fmtSeconds, { width: 116, note: NOTE.avgWatch, hasBenchmark: true }),
+  metricColumn('Hook', (r) => r.hookRate, fmtPercent, { width: 88, note: `Hook rate. ${NOTE.hookRate}`, hasBenchmark: true, isPlatformSpecific: true }),
+  metricColumn('Hold', (r) => r.holdRate, fmtPercent, { width: 88, note: `Hold rate. ${NOTE.holdRate}`, hasBenchmark: true, isPlatformSpecific: true }),
+  metricColumn('Completed', (r) => r.heldViews, fmtNumber, { width: 120, note: `Held views. ${NOTE.heldViews}` }),
+  metricColumn('Watch', (r) => r.avgWatchSeconds, fmtSeconds, { width: 88, note: `Average watch time. ${NOTE.avgWatch}`, hasBenchmark: true }),
 ];
 
+/* 폭은 "라벨 한 줄 + (있으면) ⓘ + 좌우 패딩"이 들어가는 최소치로 잡는다.
+   헤더에 nowrap을 걸었기 때문에 부족하면 줄바꿈 대신 옆 컬럼을 침범한다. */
 const CREATIVE_ENGAGEMENT_COLUMNS = [
   metricColumn('Likes', (r) => r.likes, fmtNumber, { width: 88 }),
-  metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 104 }),
+  metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 96 }),
   metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88 }),
-  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 92, note: NOTE.follows }),
-  metricColumn('Profile Visits', (r) => r.profileVisits, fmtNumber, { width: 120, note: NOTE.profileVisits }),
+  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 108, note: NOTE.follows }),
+  metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { width: 96, note: `Profile visits. ${NOTE.profileVisits}` }),
 ];
 
 /**
@@ -327,7 +329,13 @@ const COLUMN_WIDTH = {
   // 깎는 건 앞뒤가 안 맞는다.
   campaign: 360,
   platform: 96,
-  goalRegion: 480,
+  /* goal별 컬럼(Spend·CPM·Impressions…)이 나눠 갖는 총폭.
+     480 → 560. 헤더를 한 줄로 고정(nowrap)하면서, 가장 긴 라벨인
+     `Impressions`(+ⓘ)가 480/4 = 120px 칸을 넘쳐 옆 컬럼을 침범할 수 있게 됐다
+     — table-layout:fixed에서 nowrap은 줄바꿈 대신 넘침이 된다. 라벨과 아이콘이
+     들어갈 자리를 준다(140px). 대신 Video·Engagement 컬럼을 짧은 이름에 맞춰
+     줄였으므로 표 전체 폭은 오히려 줄었다(2012 → 1952). */
+  goalRegion: 560,
 };
 
 /**
@@ -363,6 +371,21 @@ const isColumnEmpty = (column, rows) => rows.every((r) => column.cell(r) === EMP
  * @returns {number|null} 값이 있는 행이 3개 미만이면 null — 그 표본으로 "평균"을
  *   말하면 근거 없는 권위를 주는 셈이다
  */
+/**
+ * 헤더 ⓘ 툴팁 내용 — 정의 + 이 표의 중앙값.
+ *
+ * 중앙값은 한때 헤더 안에 `med 5.47%` 한 줄로 붙어 있었다. 그러면 헤더가 두
+ * 줄(라벨 접힘) + 한 줄(기준선) = 세 줄이 되고, 15개 컬럼 전체가 두꺼워진다.
+ * 레퍼런스(influencer tracking dashboard)는 표 헤더를 **한 줄**로 두고 대표
+ * 중앙값 하나만 섹션 제목에 적는다 — 그 배치를 따른다. 컬럼별 중앙값은 필요한
+ * 사람만 보면 되는 정보라 툴팁이 맞는 자리다.
+ */
+function columnTooltip(column, rows) {
+  const median = column.hasBenchmark ? columnMedian(column, rows) : null;
+  if (median == null) return column.note;
+  return `${column.note} · Median ${column.format(median)} across ${rows.length} campaigns in this table.`;
+}
+
 function columnMedian(column, rows) {
   const values = rows
     .map((r) => column.value?.(r))
@@ -381,35 +404,21 @@ const SPEND_COLUMN = metricColumn('Spend', (r) => r.spend, fmtCurrency, { note: 
 const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA']);
 
 /*
- * 그룹 헤더 행 — 눈썹 라벨 + 관할 범위를 긋는 밑줄.
+ * 컬럼 그룹 — **라벨 행 없이** 세로 구분선으로만 남긴다.
  *
- * 이 자리는 두 번 바뀌었다. 처음엔 배경 없이 라벨만 뒀는데 부모(그룹 라벨)가
- * 자식(컬럼 헤더 14px 세미볼드)보다 약해 보였고, 그래서 surface.sunken →
- * surface.muted로 배경 띠를 한 단씩 올렸다.
+ * 한때 COST/PERFORMANCE/VIDEO/ENGAGEMENT 라벨을 얹은 그룹 헤더 행이 있었다.
+ * 회색 띠 → 밑줄로 두 번 손봤는데도 두 가지가 계속 걸렸다(사용자 지적):
  *
- * 그런데 배경을 올릴수록 다른 문제가 자랐다 — 회색 띠가 채워지니 그 줄이
- * **아래 헤더 행과 무관한 자기 완결적인 띠**로 보여서, COST/PERFORMANCE/VIDEO/
- * ENGAGEMENT 줄과 Spend/CPM/... 줄이 각각 독립된 헤더 두 개로 읽혔다(실화면
- * 리뷰 12-1). 세로 divider는 그룹끼리를 갈라줄 뿐, "이 라벨이 아래 이 컬럼들을
- * 덮는다"는 부모-자식 관계는 아무것도 말해주지 않았다.
+ *  1. **표 위에 빈 자리가 생긴다.** Campaign·Platform 두 컬럼에는 얹을 그룹이
+ *     없어 그 자리가 항상 빈 셀이었고, 표가 시작되기 전에 회색 여백부터 보였다.
+ *  2. 그 행이 있는 만큼 헤더가 두꺼워져, 라벨이 접히는 컬럼과 겹치면 세 줄이 됐다.
  *
- * 배경으로 존재감을 만드는 대신 관계를 직접 그린다: 배경을 걷고, 각 그룹
- * 라벨 아래에 그 그룹의 colSpan만큼만 밑줄을 긋는다. 밑줄의 **길이 자체가**
- * 관할 범위라, 라벨이 조용해도(12px secondary) 무엇을 덮는지 한눈에 보인다.
- * 이게 grouped header의 표준 처방이기도 하다.
- *
- * 배경색 상수는 **없애야** 한다. 남겨서 'transparent'를 깔면 아래 셀 스타일
- * 합성(`{...STICKY_CAMPAIGN_SX, ...GROUP_ROW_CELL_SX}`)에서 뒤쪽이 이겨 고정
- * Campaign 셀까지 투명해지고, 가로 스크롤 시 그 밑으로 지나가는 숫자가 비쳐
- * 보인다. 배경을 지정하지 않으면 sticky 셀은 자기 흰 배경을 그대로 유지한다.
+ * 레퍼런스(influencer tracking dashboard)의 성과 표는 **헤더가 한 줄뿐**이고
+ * 그룹 개념이 아예 없다. 이 프로젝트의 1순위 목표가 "같은 회사 툴군처럼 보이기"
+ * 라 그쪽을 따른다. 다만 우리 표는 컬럼이 15개까지 가서(레퍼런스는 13개) 완전히
+ * 평평하면 눈이 미끄러지므로, 그룹 **경계의 세로선 하나**만 남긴다 — 라벨이
+ * 없으니 자리도 안 먹고 줄바꿈도 안 만든다.
  */
-/**
- * 그룹 행 높이. 라벨이 11px 한 줄뿐이라 기본 셀 패딩을 그대로 두면 컬럼 헤더
- * 행과 높이가 비슷해져 두 줄이 한 덩어리로 뭉친다 — box-sizing으로 패딩까지
- * 이 높이 안에 넣어 라벨 줄을 명확히 얇게 유지한다.
- */
-const GROUP_ROW_HEIGHT = 28;
-
 /**
  * 한 번에 보여줄 행 수.
  *
@@ -430,28 +439,6 @@ const GROUP_ROW_HEIGHT = 28;
  * 대부분 한두 페이지로 끝난다(전체를 훑어야 하면 Export CSV가 더 빠르다).
  */
 const ROWS_PER_PAGE = 15;
-const GROUP_ROW_CELL_SX = {
-  height: GROUP_ROW_HEIGHT,
-  boxSizing: 'border-box',
-  py: 0,
-  borderBottom: 0,
-};
-const GROUP_LABEL_SX = {
-  ...GROUP_ROW_CELL_SX,
-  /* 조용한 라벨 + 관할 범위 밑줄. 라벨이 컬럼 헤더(14/600 primary)보다 약한 건
-     이제 문제가 아니다 — 부모임을 말하는 건 굵기가 아니라 밑줄의 길이다.
-     크기도 11px(0.6875rem)이라는 앱 어디에도 없던 고아 값에서 스케일의
-     caption(12px)으로 되돌린다. */
-  color: 'text.secondary',
-  fontSize: '0.75rem',
-  fontWeight: 600,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
-  whiteSpace: 'nowrap',
-  lineHeight: 1.4,
-  borderBottom: '1px solid',
-  borderBottomColor: 'divider',
-};
 
 // 그룹 경계 — 배경색 차이 대신 얇은 좌측 divider 하나만 쓴다(flat 시스템에
 // 면 배경까지 더하면 과함). 각 그룹의 첫 컬럼(헤더·바디 동일)에 붙인다.
@@ -1587,11 +1574,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           // 몇 개든 영역 총폭이 같아서 뒤따르는 그룹 경계가 표끼리 어긋나지 않는다.
           const goalColWidth = COLUMN_WIDTH.goalRegion / Math.max(costCols.length + perfCols.length, 1);
           const sized = (columns) => columns.map((c) => ({ ...c, width: goalColWidth }));
+          /* label은 없다 — 그룹 헤더 행을 걷어내서 그릴 자리가 없다. 그룹은
+             이제 **컬럼 순서와 경계선**으로만 남는다(위 COLUMN_WIDTH 주석). */
           const columnGroups = [
-            { key: 'cost', label: 'Cost', columns: sized(costCols) },
-            { key: 'perf', label: 'Performance', columns: sized(perfCols) },
-            { key: 'video', label: 'Video', columns: keep(CREATIVE_VIDEO_COLUMNS) },
-            { key: 'social', label: 'Engagement', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
+            { key: 'cost', columns: sized(costCols) },
+            { key: 'perf', columns: sized(perfCols) },
+            { key: 'video', columns: keep(CREATIVE_VIDEO_COLUMNS) },
+            { key: 'social', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
           ].filter((g) => g.columns.length > 0);
           const dataColumns = columnGroups.flatMap((g) => g.columns.map((col, colIndex) => ({ ...col, group: g.key, isGroupStart: colIndex === 0 })));
           /* 컬럼 폭의 합. 표는 width:100%로 늘리되 colgroup 마지막에 폭을 지정하지
@@ -1621,12 +1610,22 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           // 필터가 좁혀져 페이지 수가 줄면 현재 페이지가 범위를 벗어날 수 있다.
           const page = Math.min(pageByGoal[value] ?? 0, pageCount - 1);
           const visibleRows = rowsForGoal.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
+          /* 제목에 얹을 **대표** 중앙값 하나. goal마다 그 목적을 정의하는 지표가
+             하나씩 있다(도달이면 CPM, 트래픽이면 CTR …). 여러 개를 늘어놓으면
+             제목이 다시 표가 되므로 첫 번째 벤치마크 컬럼만 쓴다 — 컬럼 순서가
+             이미 "그 목적에서 판단 근거가 되는 순서"라 첫 번째가 대표다. */
+          const headlineColumn = dataColumns.find((c) => c.hasBenchmark);
+          const headlineValue = headlineColumn ? columnMedian(headlineColumn, rowsForGoal) : null;
+          const headlineMedian = headlineValue != null
+            ? `${headlineColumn.header} ${headlineColumn.format(headlineValue)}`
+            : null;
           return (
             <Box key={value} sx={{ mb: 3 }}>
               <Typography variant="title" sx={SECTION_TITLE_SX}>
                 {label}{' '}
                 <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
                   — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}
+                  {headlineMedian && ` · median ${headlineMedian}`}
                 </Typography>
               </Typography>
               {/* TableContainer 대신 ScrollArea — 기본 overflow는 넘쳤다는 신호를
@@ -1649,76 +1648,36 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                     <col />
                   </colgroup>
                   <TableHead>
-                    {/* 그룹 행 — 식별 컬럼 2개는 라벨 없이 빈 스팬(컬럼 1개짜리
-                        "Campaign Info" 그룹 라벨은 위계가 아니라 장식이다).
-                        Campaign 자리는 바디와 같은 sticky를 유지해야 스크롤된
-                        그룹 라벨이 밑으로 비쳐 보이지 않는다 — 다만 배경은 이 행의
-                        띠 색으로 덮어써야 띠 중간에 흰 구멍이 뚫리지 않는다. */}
-                    <TableRow>
-                      <TableCell sx={{ ...STICKY_CAMPAIGN_SX, ...GROUP_ROW_CELL_SX }} />
-                      <TableCell sx={GROUP_ROW_CELL_SX} />
-                      {columnGroups.map((g) => (
-                        <TableCell key={g.key} colSpan={g.columns.length} sx={{ ...GROUP_LABEL_SX, ...GROUP_DIVIDER_SX }}>
-                          {g.label}
-                        </TableCell>
-                      ))}
-                      <TableCell sx={GROUP_ROW_CELL_SX} />
-                    </TableRow>
                     <TableRow>
                       <TableCell sx={{ fontWeight: 600, ...STICKY_CAMPAIGN_SX }}>Campaign</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Platform</TableCell>
-                      {dataColumns.map((column) => {
-                        /* 기준선은 **현재 페이지가 아니라 표 전체**(rowsForGoal)에서
-                           계산한다 — 페이지마다 기준이 달라지면 같은 값이 페이지를
-                           넘길 때 좋아 보였다 나빠 보였다 한다. */
-                        const median = column.hasBenchmark ? columnMedian(column, rowsForGoal) : null;
-                        return (
-                          <TableCell
-                            key={`${column.group}-${column.header}`}
-                            align="right"
-                            sx={{ fontWeight: 600, verticalAlign: 'bottom', ...(column.isGroupStart ? GROUP_DIVIDER_SX : null) }}
-                          >
-                            {/* 예전엔 정의가 native title이라 **보이는 신호가 없었고**
-                                터치 기기에서는 아예 열리지 않았다. 아이콘으로 "여기
-                                설명이 있다"를 먼저 말한다. */}
-                            {column.note ? (
-                              <Tooltip title={column.note} arrow enterTouchDelay={0}>
-                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, cursor: 'help' }}>
-                                  {column.header}
-                                  <InfoOutlinedIcon
-                                    sx={(t) => ({ fontSize: t.iconSize.inline, color: 'text.disabled' })}
-                                  />
-                                </Box>
-                              </Tooltip>
-                            ) : (
-                              column.header
-                            )}
-                            {/* 이 표 자신의 중앙값. 외부 벤치마크는 없지만 "우리
-                                평균보다 나은가"는 대부분의 판단에 충분하다. */}
-                            {median != null && (
-                              <Typography
-                                variant="caption"
-                                component="div"
-                                /* 이 줄이 쪼개지면 "med"와 값이 다른 줄에 놓여
-                                   헤더가 세 줄이 된다(실화면 12-12). */
-                                sx={{
-                                  fontWeight: 400,
-                                  color: 'text.secondary',
-                                  fontVariantNumeric: 'tabular-nums',
-                                  whiteSpace: 'nowrap',
-                                }}
-                                /* 무엇의 중앙값인지 밝힌다 — 이 표 **전체**가
-                                   기준이라 지금 페이지에 보이는 15행만 보면
-                                   기준선이 틀린 것처럼 보인다(Traffic 표에서
-                                   보이는 행 대부분이 CTR 0%인데 med는 1.57%). */
-                                title={`Median across all ${rowsForGoal.length} campaigns in this table, not just this page`}
-                              >
-                                {`med ${column.format(median)}`}
-                              </Typography>
-                            )}
-                          </TableCell>
-                        );
-                      })}
+                      {dataColumns.map((column) => (
+                        <TableCell
+                          key={`${column.group}-${column.header}`}
+                          align="right"
+                          /* 헤더는 **한 줄**이다. 라벨을 짧게 잡고 줄바꿈을 막는다 —
+                             "Video Plays"·"Hook Rate"가 두 줄로 접히면 헤더 행이
+                             두 배로 두꺼워지고, 거기에 기준선까지 얹으면 세 줄이
+                             된다(실화면 12-14~12-17, 사용자 지적). 긴 이름과
+                             중앙값은 ⓘ 툴팁이 갖는다. */
+                          sx={{
+                            fontWeight: 600,
+                            whiteSpace: 'nowrap',
+                            ...(column.isGroupStart ? GROUP_DIVIDER_SX : null),
+                          }}
+                        >
+                          {column.note ? (
+                            <Tooltip title={columnTooltip(column, rowsForGoal)} arrow enterTouchDelay={0}>
+                              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, cursor: 'help' }}>
+                                {column.header}
+                                <InfoOutlinedIcon sx={(t) => ({ fontSize: t.iconSize.inline, color: 'text.disabled' })} />
+                              </Box>
+                            </Tooltip>
+                          ) : (
+                            column.header
+                          )}
+                        </TableCell>
+                      ))}
                       <TableCell />
                     </TableRow>
                   </TableHead>
