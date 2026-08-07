@@ -566,18 +566,37 @@ async function fetchTikTokAdGroupBudgets(
 }
 
 /** TikTok objective → 우리 goal enum. 모르는 값은 traffic으로 둔다. */
+/**
+ * TikTok objective_type → 우리 goal enum.
+ *
+ * 예전엔 아는 값 5개만 처리하고 나머지를 전부 traffic으로 떨어뜨렸다. 그게
+ * 실제 오탐을 만들었다: 클릭을 만들 목적이 아닌 캠페인이 traffic으로 저장되고,
+ * "목표 지표(=클릭) 0"이라며 알림이 떴는데 정작 그 캠페인은 좋아요 391·팔로우
+ * 148을 만들고 있었다. 도달·인지형 objective(RF_* 계열 포함)를 빠뜨린 게 원인.
+ *
+ * 목록을 넓히고, 그래도 모르는 값은 traffic이 아니라 **awareness**로 둔다 —
+ * awareness의 판정 지표는 도달(reach)이라, 전달만 됐으면 0이 아니다. 모르는
+ * 것을 가장 조용한 분류에 두는 쪽이 잘못된 경보보다 낫다.
+ */
 function mapTikTokGoal(objective: string | undefined) {
   switch (objective) {
     case 'REACH':
+    case 'RF_REACH':
       return 'awareness';
+    case 'TRAFFIC':
+    case 'LEAD_GENERATION':
+      return 'traffic';
     case 'VIDEO_VIEWS':
+    case 'RF_VIDEO_VIEWS':
     case 'ENGAGEMENT':
       return 'engagement';
     case 'CONVERSIONS':
+    case 'WEB_CONVERSIONS':
     case 'PRODUCT_SALES':
+    case 'APP_PROMOTION':
       return 'conversion';
     default:
-      return 'traffic';
+      return 'awareness';
   }
 }
 

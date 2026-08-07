@@ -600,6 +600,13 @@ const ALERT_SEVERITY_RANK = {
 };
 
 /**
+ * "이 광고에 사람이 반응했는가"를 말해주는 필드들. 어느 하나라도 0보다 크면
+ * 그 캠페인은 성과를 내고 있는 것이다(무엇을 목표로 했든).
+ * 노출·도달은 여기 없다 — 그건 전달됐다는 뜻이지 반응이 아니다.
+ */
+const RESPONSE_FIELDS = ['clicks', 'engagements', 'conversions', 'follows', 'profileVisits', 'likes', 'comments', 'shares'];
+
+/**
  * 이 목표가 "성공"으로 세는 대표 지표. 목표마다 무엇이 결과인지가 달라서,
  * 하나의 지표로 모든 캠페인을 판정할 수 없다.
  *
@@ -666,7 +673,20 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
            경보가 되고, 그게 반복되면 진짜 경보까지 무시된다. 동기화는 없는
            값을 0으로 만들지 않으므로(num()이 null을 유지) 이 구분이 성립한다. */
         const result = goalResultMetric(campaign, record);
-        if (record.spend > 0 && result && result.value === 0) {
+        /* 목표 지표 하나만 보면 안 된다. goal은 플랫폼 objective를 우리 5개
+           분류로 옮긴 값인데, mapTikTokGoal이 **모르는 objective를 전부
+           traffic으로 떨어뜨린다** — TikTok의 RF_REACH·LEAD_GENERATION 등이
+           여기 걸린다. 그러면 애초에 링크 클릭을 만들 목적이 아닌 광고를
+           "클릭 0"으로 판정하게 된다.
+           실제로 그렇게 터졌다: 클릭 0이라 알림이 떴는데 같은 캠페인이
+           좋아요 391·공유 64·팔로우 148·프로필 방문 178을 만들고 있었다.
+           죽은 게 아니라 우리가 목표를 잘못 붙인 것이었다.
+           그래서 "어느 축으로도 반응이 없다"까지 확인한 뒤에만 말한다.
+           목표 분류가 틀려도 이 조건은 틀리지 않는다 — 반응이 하나라도 있으면
+           그 캠페인은 뭔가를 하고 있는 것이고, 무엇을 하는지 판단하는 건
+           사람 몫이지 잘못된 라벨을 근거로 한 경보의 몫이 아니다. */
+        const hasAnyResponse = RESPONSE_FIELDS.some((field) => (record[field] ?? 0) > 0);
+        if (record.spend > 0 && result && result.value === 0 && !hasAnyResponse) {
           alerts.push({
             id: `alert-noresults-${campaign.id}`,
             campaignId: campaign.id,
