@@ -1026,11 +1026,20 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   { label: 'Campaigns', value: summary.totalCampaigns },
                   {
                     label: 'Planned Budget',
-                    /* null은 "계획 예산을 알 수 없다"는 뜻이라 0이 아니라 '—'로 찍는다 —
-                       $0은 "0으로 계획했다"는 거짓 주장이 된다. */
-                    value: summary.totalBudgetPlanned != null
-                      ? `$${summary.totalBudgetPlanned.toLocaleString('en-US')}`
-                      : EMPTY_CELL,
+                    /* 계획 문서가 있으면 **그 값**이 계획 예산이다. 없을 때만
+                       캠페인에서 역산한 값(일일예산×기간)을 쓴다.
+
+                       예전엔 항상 캠페인에서만 뽑아서, 계획을 세워둔 이벤트를
+                       고르면 헤더는 '—'인데 바로 아래 패널은 '$209'라고 말했다 —
+                       같은 단어로 다른 값을 말하는 상태다(이번 세션에서 계획
+                       예산이 드로어 $1,060 / Reports $0으로 갈렸던 것과 같은 종류).
+                       null은 0이 아니라 '—'로 찍는다: $0은 "0으로 계획했다"는
+                       거짓 주장이 된다. */
+                    value: (() => {
+                      const amount = planComparison?.planned ?? summary.totalBudgetPlanned;
+                      return amount != null ? `$${Math.round(amount).toLocaleString('en-US')}` : EMPTY_CELL;
+                    })(),
+                    sub: planComparison?.planned != null ? 'from the saved plan' : undefined,
                   },
                 ]
               : [
