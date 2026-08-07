@@ -102,3 +102,34 @@ export const WithDailyBudget = {
     );
   },
 };
+
+/**
+ * 계획 예산을 알 수 없는 캠페인 — Budget Spent 줄이 통째로 사라진다.
+ *
+ * 예전엔 비율을 '—'로 찍고 분모가 0인 분수를 그대로 노출했다
+ * (`— ($514.49 / $0)`). 계산이 안 된다는 걸 알면서 깨진 식을 보여준 셈이라,
+ * 바로 아래 멀쩡히 동작하는 Daily Avg 줄까지 같이 의심받았다(실사용 리뷰).
+ * 0%로 그린 빈 막대도 "아직 안 썼다"로 읽혀서 함께 없앤다.
+ *
+ * 동기화로 들어온 캠페인은 플랫폼에 계획 예산 개념이 없어 0으로 저장되므로
+ * 실제로 자주 발생한다. 다만 일일 예산이 있으면 effectiveBudgetPlanned가
+ * 기간을 곱해 복원하므로(위 WithDailyBudget) 이 상태까지 오는 건 일일 예산도
+ * 없는 경우뿐이다.
+ *
+ * 확인 포인트: Time Elapsed와 상단 라벨은 그대로 나오는가 — 근거가 있는 줄은
+ * 살리고 없는 줄만 지운다.
+ */
+export const NoPlannedBudget = {
+  render: () => {
+    const pacing = calcBudgetPacing(
+      { startDate: '2026-07-01', endDate: '2026-07-31', budgetPlanned: 0, budgetDaily: null },
+      514.49,
+      new Date('2026-07-20')
+    );
+    return (
+      <Box sx={{ maxWidth: 320 }}>
+        <PacingIndicator {...pacing} budgetPlanned={null} budgetDaily={null} spend={514.49} />
+      </Box>
+    );
+  },
+};
