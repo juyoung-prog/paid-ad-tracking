@@ -129,8 +129,8 @@ CPM $2.94\`), 컬럼별 중앙값은 ⓘ 툴팁이 갖는다. 대표 지표는 �
 첫 번째가 대표가 된다.
 
 ### 보조 컬럼은 기본으로 접혀 있다
-`Comments · Shares · Follows · Visits` 넷은 기본 숨김이고 `Show social columns (4)`
-버튼으로 편다. `Likes`는 항상 보인다.
+\`Comments · Shares · Follows · Visits\` 넷은 기본 숨김이고 \`Show social columns (4)\`
+버튼으로 편다. \`Likes\`는 항상 보인다.
 
 **Follows·Visits는 TikTok 전용**이라 Meta는 캠페인 레벨에 대응 지표가 없다
 (schema.js PerformanceRecord). 실계정 기준 170건 중 114건(67%)이 Meta라, 이 두
@@ -141,7 +141,7 @@ CPM $2.94\`), 컬럼별 중앙값은 ⓘ 툴팁이 갖는다. 대표 지표는 �
 버튼 라벨에 개수(4)를 적는 것이 중요하다 — 숨긴 것을 숨기면 그 컬럼이
 존재한다는 사실 자체를 모르게 된다.
 
-상태는 URL(`cols=all`)에 실린다. 새로고침·뒤로가기·링크 공유가 필터와 같은
+상태는 URL(\`cols=all\`)에 실린다. 새로고침·뒤로가기·링크 공유가 필터와 같은
 방식으로 동작한다.
 
 ### 컬럼 헤더의 ⓘ
