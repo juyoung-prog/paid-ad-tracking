@@ -34,8 +34,11 @@ const PHASES = [
   ['g-4b', 'G10_Now Open_0706 ~0831', PLATFORM.META, '2026-07-06', '2026-08-31', 2000, 25],
   // 7/6과 나흘 차이 — 축 눈금 최소 간격 판정에 걸리는 자리
   ['g-5', 'G10_1_Month Deals_0710~0831', PLATFORM.TIKTOK, '2026-07-10', '2026-08-31', 900, null],
-  // 타임라인 맨 끝에서 하루짜리 — 이름이 오른쪽으로 넘치면 안 된다
-  ['g-6', 'G10_Final Week Push — last-week concentrated spend across all stores', PLATFORM.META, '2026-08-31', '2026-08-31', 600, 600],
+  // 타임라인 맨 끝에서 하루짜리 — 막대·이름이 축 오른쪽으로 넘치면 안 된다.
+  // 두 이름은 대시 문자가 다르다(em dash — vs ASCII -): campaignNameKey가
+  // 대시 변형을 접어서 한 막대로 합쳐야 한다(실데이터의 Meta em dash 사례).
+  ['g-6a', 'G10_Final Week Push — last-week concentrated spend across all stores', PLATFORM.META, '2026-08-31', '2026-08-31', 600, 600],
+  ['g-6b', 'G10_Final Week Push - last-week concentrated spend across all stores', PLATFORM.TIKTOK, '2026-08-31', '2026-08-31', 400, 400],
 ];
 
 const groupedCampaigns = PHASES.map(([id, name, platform, startDate, endDate, budgetPlanned, budgetDaily]) => ({
@@ -119,18 +122,21 @@ export const Default = {
 
 /**
  * Event(G10 Opening)를 고른 상태 — 두 탭이 공유하는 Gantt 타임라인이 나온다.
- * 캠페인 9건이 들어가지만 phase는 **6개**로 합쳐져야 정상이다.
+ * 캠페인 10건이 들어가지만 phase는 **6개**로 합쳐져야 정상이다.
  *
  * 확인 포인트:
- * - 플랫폼별로 이름의 공백이 다른 세 쌍(Coming Soon·Grand Opening·Now Open)이
- *   각각 한 막대로 합쳐지고, 이름 뒤에 `Meta + TikTok`이 붙는가
+ * - 이름이 어긋난 네 쌍이 각각 한 막대로 합쳐지고 `Meta + TikTok`이 붙는가 —
+ *   구분자 공백 차이 세 쌍(Coming Soon·Grand Opening·Now Open)과
+ *   대시 문자 차이 한 쌍(Final Week Push: em dash — vs ASCII -)
  * - 부스팅 게시물 줄만 `Instagram post`가 굵고 뒤 캡션은 보통 굵기인가
  *   (이름 안의 줄바꿈이 한 줄로 접히는지도 같이 본다)
  * - 막대 안이 `기간 · $일일예산/day · $총예산 · Spend $X` 순인가.
  *   성과가 없는 부스팅 게시물 막대는 Spend 없이 끝나야 한다
  * - 축 눈금이 `6/17 · 7/6 · 7/10 · 8/31`인가 — 7/6과 7/10은 붙어 있지만
- *   최소 간격을 넘어 둘 다 남고, 양 끝은 예외 없이 남는다
- * - 마지막 하루짜리 phase(8/31)의 긴 이름이 차트 오른쪽으로 넘치지 않는가
+ *   최소 간격을 넘어 둘 다 남고, 양 끝은 예외 없이 남는다.
+ *   눈금이 버려진 날짜에는 세로 점선도 없어야 한다(날짜 없는 선 금지)
+ * - 마지막 하루짜리 phase(8/31)의 **막대와 이름이 축 오른쪽 끝을 넘지 않는가**
+ *   — 최소 폭 보정(1.5%)만큼 왼쪽으로 되밀려 오른쪽 끝이 8/31 눈금에 붙는다
  * - 타임라인 시작(6/17)에는 세로 점선이 없는가 — 축 원점과 겹치는 점선은
  *   구간 경계가 아니라 y축처럼 읽혀서 긋지 않는다
  */
