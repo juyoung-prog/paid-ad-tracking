@@ -39,7 +39,7 @@ import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
 import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
-import { getEffectiveStatus, calcBudgetPacing, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X, campaignInDateRange, generateId, inferStoreIdFromName, adsManagerUrl } from './paidAdsPageUtils';
@@ -1047,11 +1047,16 @@ export function DashboardPage() {
             budgetPlanned: c.budgetPlanned,
             budgetDaily: c.budgetDaily,
             spend: spendFor(c.id),
-            /* 페이스는 여기서 계산해 행에 실어준다 — 알림(15% 초과)과 같은
-               calcBudgetPacing을 쓰되, 알림은 임계를 넘을 때만 말하고 이 값은
-               항상 말한다. "괜찮다"를 확인하려고 사용자가 기간·일예산·지출로
-               암산하던 걸 없애는 게 목적이라, 정상 범위일 때 보이는 게 핵심이다. */
-            paceRatio: calcBudgetPacing(c, spendFor(c.id), today).dailyBudgetRatio,
+            /* 페이스는 여기서 계산해 행에 실어준다 — 알림(15% 초과)과 같은 근거를
+               쓰되, 알림은 임계를 넘을 때만 말하고 이 값은 항상 말한다. "괜찮다"를
+               확인하려고 사용자가 기간·일예산·지출로 암산하던 걸 없애는 게 목적이라,
+               정상 범위일 때 보이는 게 핵심이다.
+
+               dailyBudgetRatio만 쓰면 안 된다 — 일일 예산이 있는 캠페인에만 붙어서
+               Meta 쪽 상당수가 아무 신호도 못 받는다(플랫폼이 총액으로만 설정한
+               캠페인). budgetPaceRatio가 알림과 같은 우선순위로 총예산 기준 대체
+               경로까지 포함한다. */
+            paceRatio: budgetPaceRatio(c, spendFor(c.id), today),
             status: c.effectiveStatus,
             alertBadges: alertBadgesFor(c.id),
             overlapNote: overlapNoteFor(c.id),

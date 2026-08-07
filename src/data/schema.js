@@ -338,6 +338,32 @@ export function calcAutoBudgetPlanned(budgetDaily, startDate, endDate) {
  * @param {Date} [today] - 기준 시각 [Optional, 기본값: new Date()]
  * @returns {{ timeElapsedRatio: number|null, budgetUsedRatio: number|null, avgDailySpend: number|null, dailyBudgetRatio: number|null }}
  */
+/**
+ * 소진 속도를 "계획 대비 몇 배인가" 하나의 비율로 돌려준다(1이면 계획대로).
+ *
+ * calcBudgetPacing이 내놓는 두 가지 근거를 generateAlerts와 **같은 우선순위로**
+ * 하나로 합친다: 일일 예산이 있으면 그게 더 직접적인 신호라 우선 쓰고, 없으면
+ * "예산 소진률 ÷ 기간 경과율"로 대체한다. 둘 다 없으면 null — 동기화로 들어온
+ * 캠페인은 계획 예산 개념이 없어 0으로 저장되므로 실제로 자주 발생하고, 그때는
+ * 비교할 기준 자체가 없으므로 화면도 아무 말을 하지 않아야 한다(모르면서 아는
+ * 척하는 것이 침묵보다 나쁘다).
+ *
+ * 알림(generateAlerts)은 이 값이 임계를 넘을 때만 말하고, 목록은 정상일 때도
+ * 말한다 — 같은 근거를 쓰되 역할이 다르다.
+ *
+ * @param {Campaign} campaign
+ * @param {number|null} spend
+ * @param {Date} today
+ * @returns {number|null} 평균 소진 / 계획 소진. 판단 근거가 없으면 null
+ */
+export function budgetPaceRatio(campaign, spend, today = new Date()) {
+  const { dailyBudgetRatio, budgetUsedRatio, timeElapsedRatio } = calcBudgetPacing(campaign, spend, today);
+  if (dailyBudgetRatio != null) return dailyBudgetRatio;
+  // 기간이 하루도 안 지났으면 나눗셈이 발산한다 — 아직 판단할 근거가 없는 게 맞다.
+  if (budgetUsedRatio == null || !timeElapsedRatio) return null;
+  return budgetUsedRatio / timeElapsedRatio;
+}
+
 export function calcBudgetPacing(campaign, spend, today = new Date()) {
   const start = new Date(campaign.startDate);
   const end = new Date(campaign.endDate);

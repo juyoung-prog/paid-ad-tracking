@@ -313,7 +313,12 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
 
             {/* 우측 — 2줄 상태 스택(Influencer의 "Visit Unconfirmed / 12d overdue..."
                 구조와 동일). 알림이 있으면 알림이 우선, 없으면 캠페인 상태 + 기간·예산. */}
-            <Box sx={{ textAlign: 'right', flexShrink: 0, maxWidth: 320 }}>
+            {/* maxWidth 320에서는 페이스가 붙은 줄
+                ("07.10–08.31 · $20/day · $514.49 spent · on pace")이 딱 한 글자
+                넘쳐서 "on"과 "pace" 사이에서 잘렸다. 판단 문구가 두 줄로 쪼개지면
+                한눈에 안 읽히므로 폭을 늘린다 — 좌측 이름 블록은 minWidth:0이라
+                좁은 화면에서 알아서 줄어든다. */}
+            <Box sx={{ textAlign: 'right', flexShrink: 0, maxWidth: 400 }}>
               {hasAlert ? (
                 <Tooltip
                   title={
@@ -376,7 +381,13 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                         {' · '}
                         <Box
                           component="span"
-                          sx={{ color: pace.isOver ? 'warning.main' : 'text.secondary', fontWeight: pace.isOver ? 600 : 400 }}
+                          // 더 좁은 화면에서 줄이 넘치더라도 판단 문구만은 통째로
+                          // 넘어가야 한다("on"/"pace"로 쪼개지면 읽히지 않는다).
+                          sx={{
+                            whiteSpace: 'nowrap',
+                            color: pace.isOver ? 'warning.main' : 'text.secondary',
+                            fontWeight: pace.isOver ? 600 : 400,
+                          }}
                         >
                           {pace.text}
                         </Box>
