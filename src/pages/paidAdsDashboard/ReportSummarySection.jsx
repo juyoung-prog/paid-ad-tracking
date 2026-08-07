@@ -305,27 +305,26 @@ const CREATIVE_VIDEO_COLUMNS = [
 /* 폭은 "라벨 한 줄 + (있으면) ⓘ + 좌우 패딩"이 들어가는 최소치로 잡는다.
    헤더에 nowrap을 걸었기 때문에 부족하면 줄바꿈 대신 옆 컬럼을 침범한다.
 
-   `isSecondary`는 기본으로 접히는 컬럼이다. 이 넷을 고른 근거:
+   ## Comments·Shares·Follows·Visits를 왜 뺐나
+   한때 이 넷을 토글로 접었다 폈다 할 수 있게 뒀는데, **토글을 눌러도 화면이
+   안 변했다**(실사용 신고). 데이터가 없어서가 아니다 — Awareness 39건 중
+   comments 29·follows 26건에 값이 있다. 문제는 위치였다: 접힌 표가 이미
+   1,584px이고 화면 콘텐츠 폭이 1,648px이라, 펴면 388px이 통째로 오른쪽 화면
+   밖으로 나갔다. 있으나 마나 한 컨트롤이었다.
 
-   - **Follows·Visits는 TikTok 전용**이다. Meta는 캠페인 레벨에 대응 지표가
-     없어서(schema.js PerformanceRecord 참고) 이 계정 기준 170건 중 114건(67%)
-     에서 항상 '—'다. 화면의 3분의 2에서 아무 말도 안 하면서 204px를 차지했다.
-   - Comments·Shares도 실데이터에서 대부분 '—' 아니면 0~1이다.
-   - Likes만 남긴다 — Meta·TikTok 양쪽에 값이 있는 유일한 항목이다.
+   그리고 이 다섯은 **캠페인 상세(드로어)의 PlatformMetricList가 이미 전부**
+   보여준다. 표에서 행을 클릭하면 그리로 간다. 거기는 폭 제약이 없고 값 없는
+   지표는 알아서 숨기므로 원래 그 자리가 맞다. 표는 "캠페인끼리 비교"가 일이고,
+   화면 밖에 있는 컬럼은 비교에 아무 기여를 못 한다.
 
-   접으면 표 폭이 1,952 → 1,564px가 되어 대부분 화면에서 가로 스크롤이 사라진다.
-   지금은 이 컬럼들이 스크롤해야만 보여서, 자리는 먹으면서 실제로는 안 읽혔다. */
+   Likes만 남긴다 — 화면 안에 들어오고, 39건 중 36건에 값이 있어 실제로
+   훑어 비교된다. */
 const CREATIVE_ENGAGEMENT_COLUMNS = [
-  metricColumn('Likes', (r) => r.likes, fmtNumber, { width: 88 }),
-  metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 96, isSecondary: true }),
-  metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88, isSecondary: true }),
-  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 108, note: NOTE.follows, isSecondary: true }),
-  metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { width: 96, note: `Profile visits. ${NOTE.profileVisits}`, isSecondary: true }),
+  metricColumn('Likes', (r) => r.likes, fmtNumber, {
+    width: 88,
+    note: 'Comments, shares, follows and profile visits are on the campaign detail — click a row.',
+  }),
 ];
-
-/** 접혀 있는 보조 컬럼 수 — 토글 라벨에 적어 "숨겼다"는 사실을 드러낸다. */
-const SECONDARY_COLUMN_COUNT = CREATIVE_ENGAGEMENT_COLUMNS.filter((c) => c.isSecondary).length;
-
 /**
  * 컬럼 폭 체계. tableLayout:'fixed' + colgroup으로 강제한다.
  *
@@ -1025,11 +1024,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
     const saved = loadLastReportView();
     return { start: saved?.from ?? '', end: saved?.to ?? '' };
   });
-  /* 보조 컬럼 표시 여부. 필터는 아니지만 "지금 보고 있는 것"의 일부라 같은
-     URL 뷰에 얹는다 — 새로고침·뒤로가기·링크 공유가 공짜로 따라온다. */
-  const [showSecondaryColumns, setShowSecondaryColumns] = useState(
-    () => loadLastReportView()?.cols === 'all',
-  );
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
@@ -1040,7 +1034,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
   useViewUrlSync(
     {
       tab: reportTab,
-      cols: showSecondaryColumns ? 'all' : '',
       platform: groupValues.platform ?? '',
       event: groupValues.campaignGroup ?? '',
       from: dateRange.start ?? '',
@@ -1048,7 +1041,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
     },
     (next) => {
       setReportTab(next.tab || 'performance');
-      setShowSecondaryColumns(next.cols === 'all');
       setGroupValues((v) => ({ ...v, platform: next.platform, campaignGroup: next.event }));
       setDateRange({ start: next.from, end: next.to });
     },
@@ -1322,26 +1314,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
           setPageByGoal({});
           setDateRange(next);
         }}
-        sx={{ mb: 1.5 }}
+        sx={{ mb: 3 }}
       />
-
-      {/* 보조 컬럼 토글 — Performance 탭에서만 의미가 있다.
-          개수를 라벨에 적는다: 숨긴 걸 숨기면 사용자는 그 컬럼이 존재한다는
-          사실 자체를 모른다("no silent caps"). 필터가 아니라 표시 옵션이라
-          FilterBar 안에 넣지 않고 그 아래 오른쪽에 따로 둔다. */}
-      {reportTab === 'performance' && (
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-          <Button
-            size="small"
-            onClick={() => setShowSecondaryColumns((on) => !on)}
-            sx={{ boxShadow: 'none' }}
-          >
-            {showSecondaryColumns
-              ? `Hide social columns (${SECONDARY_COLUMN_COUNT})`
-              : `Show social columns (${SECONDARY_COLUMN_COUNT})`}
-          </Button>
-        </Box>
-      )}
 
       {/* Dashboard와 같은 규칙 — 백엔드 오류는 배너로 드러내고, 로딩과
           "결과 없음"을 구분한다(로드 전 빈 배열이 "No campaigns match"로
@@ -1605,9 +1579,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
              이름이라 같은 단어를 두 번 읽히고("Awareness — 9 campaigns" 아래
              "AWARENESS PERFORMANCE"), Engagement goal에서는 소재 그룹
              "Engagement"와도 헷갈렸다. */
-          const keep = (columns) => columns.filter(
-            (c) => !isColumnEmpty(c, rowsForGoal) && (showSecondaryColumns || !c.isSecondary),
-          );
+          const keep = (columns) => columns.filter((c) => !isColumnEmpty(c, rowsForGoal));
           const goalCols = goalExtraColumns(value);
           const costCols = keep([SPEND_COLUMN, ...goalCols.filter((c) => COST_METRIC_HEADERS.has(c.header))]);
           const perfCols = keep(goalCols.filter((c) => !COST_METRIC_HEADERS.has(c.header)));
