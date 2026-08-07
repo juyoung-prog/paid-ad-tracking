@@ -26,7 +26,7 @@ import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
-import { money, moneyWhole, count, percent } from '../../utils/format';
+import { money, moneyWhole, count, percent, seconds } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 
@@ -274,10 +274,12 @@ function goalExtraColumns(goalValue) {
   }
 }
 
-function fmtSeconds(value) {
-  if (value == null) return EMPTY_CELL;
-  return `${value.toFixed(2)}s`;
-}
+/* utils/format.js에 위임한다. 포맷터를 한 곳으로 모을 때 fmtBudget·fmtCurrency·
+   fmtNumber·fmtPercent만 옮기고 이것만 빠뜨렸는데, 그 사이 seconds()가 "Meta는
+   정수 초만 준다"는 이유로 표기를 바꿨는데도 이 표만 옛 규칙(2자리 고정)으로
+   남아 `2.00s`·`11.00s`를 찍고 있었다(실화면 12-14~12-17). 규칙이 두 벌이면
+   한쪽만 고쳐진다는 걸 이 파일이 스스로 증명한 셈이다. */
+const fmtSeconds = seconds;
 
 // goal별 컬럼 뒤에 모든 표가 공통으로 붙이는 블록. 위 goalExtraColumns가 "이 목적에서
 // 판단 근거가 되는가"로 고르는 것과 달리, 여기 지표는 목적이 아니라 소재가 어땠는지를

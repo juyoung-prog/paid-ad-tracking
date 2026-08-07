@@ -104,20 +104,26 @@ export function percent(ratio, { digits = 0 } = {}) {
 /**
  * 초 단위 시간(평균 시청 시간 등).
  *
- * 소수 **1자리**까지만 쓰고, 정수면 소수점을 아예 떼어낸다. 2자리 고정이었을 때
- * Meta 행이 전부 `2.00s`·`11.00s`로 찍혔는데, 그건 Meta가 캠페인 레벨 평균
- * 시청 시간을 **정수 초로만** 주기 때문이다(TikTok은 `2.96s`처럼 실수를 준다).
- * `2.00s`는 있지도 않은 백분의 일 초 정밀도를 주장하는 표기고, 같은 열에서
- * TikTok의 진짜 소수와 섞이면 어느 쪽이 실측인지 구분이 안 된다.
+ * **값이 가진 만큼만 쓴다** — 최대 2자리로 반올림하고 뒤따르는 0은 떼어낸다.
  *
- * seconds(2)     // '2s'
- * seconds(2.96)  // '3s'      ← 1자리 반올림 후 정수면 소수점을 뗀다
- * seconds(1.14)  // '1.1s'
+ * 2자리 고정이었을 때 Meta 행이 전부 `2.00s`·`11.00s`로 찍혔다. Meta는 캠페인
+ * 레벨 평균 시청 시간을 **정수 초로만** 주기 때문인데(TikTok은 `2.95s`처럼
+ * 실수를 준다), `2.00s`는 있지도 않은 백분의 일 초 정밀도를 주장하는 표기다.
+ *
+ * 그렇다고 1자리로 깎아서도 안 된다 — `2.95s`가 `3s`가 되고 `0.98s`가 `1s`가
+ * 되면서 **TikTok의 진짜 소수와 Meta의 정수가 같은 표기로 충돌한다.** 구분하려던
+ * 목적이 정확히 무너진다. 자릿수 자체가 "플랫폼이 그만큼 알려줬다"는 정보다.
+ *
+ * seconds(2)     // '2s'      ← Meta: 정수만 주므로 소수점 없음
+ * seconds(11)    // '11s'
+ * seconds(2.95)  // '2.95s'   ← TikTok: 준 만큼 그대로
+ * seconds(1.1)   // '1.1s'
  */
 export function seconds(value) {
   if (isBlank(value)) return EMPTY;
-  const rounded = Math.round(Number(value) * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}s`;
+  const rounded = Math.round(Number(value) * 100) / 100;
+  // toFixed로 자리를 채운 뒤 뒤따르는 0과 남은 소수점을 떼어낸다.
+  return `${rounded.toFixed(2).replace(/\.?0+$/, '')}s`;
 }
 
 // ============================================================
