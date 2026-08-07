@@ -844,7 +844,12 @@ export function DashboardPage() {
               <Typography variant="overline" sx={{ display: 'block', mb: 1, color: 'text.secondary', letterSpacing: '0.08em' }}>
                 Alerts
               </Typography>
-              {highSeverityAlerts.length === 0 ? (
+              {/* 판정 대상은 배지와 **같은 배열**이어야 한다. 벨과 KPI를 분리하면서
+                  배지만 bellAlerts로 바꾸고 이 줄을 highSeverityAlerts로 남겨둬서,
+                  계정 알림만 있을 때 "배지 1 + 알림 없음"이라는 자기모순이 화면에
+                  떴다(실사용 리뷰로 발견). 세는 곳과 그리는 곳이 갈리면 반드시
+                  이런 어긋남이 생긴다. */}
+              {bellAlerts.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
                   No alerts right now.
                 </Typography>
