@@ -418,7 +418,6 @@ export function DashboardPage() {
    * 탭(Planned/Ended 전체)이 아니라 Now 탭의 같은 이름 그룹(동일한 시간 창
    * 조각)으로 보내서, 클릭한 숫자가 그룹 헤더에 그대로 다시 보이게 한다.
    */
-  const startingSoonCount = campaignsWithStatus.filter((c) => isStartingSoon(c, today) && matchesGroupFilters(c)).length;
   const recentlyEndedCount = campaignsWithStatus.filter((c) => isRecentlyEnded(c, today) && matchesGroupFilters(c)).length;
   // 값이 0이면 클릭을 떼어낸다(KpiBar는 onClick 있는 항목만 클릭 가능) —
   // "Starting Soon 0"을 눌렀는데 Now 탭의 다른 그룹들(Live·Recently Ended)이
@@ -430,13 +429,21 @@ export function DashboardPage() {
     sub,
     onClick: value > 0 ? () => setTab(target) : undefined,
   });
+  const highSeverityAlerts = alerts.filter((a) => HIGH_SEVERITY_TYPES.includes(a.type));
+
+  /* 4차 — 첫 자리를 "손댈 것이 있나"로 바꾼다. Starting Soon은 이 계정에서
+     사실상 항상 0인데(광고를 미리 등록하지 않고 플랫폼에서 만든 뒤 동기화되는
+     운영 방식이라 planned 상태 자체가 안 생긴다) 화면 최상단 3분의 1을 차지하고
+     있었고, 0은 어떤 결정도 바꾸지 못한다(실사용 피드백으로 두 번 지적됨).
+     대신 알림 건수를 올린다 — 이 대시보드를 여는 세 질문("무슨 일인가 / 왜 /
+     뭘 해야 하나") 중 마지막에 답하는 유일한 숫자이고, 0일 때조차 "확인했고
+     이상 없다"는 정보를 준다(아래 all-clear 줄과 짝). 클릭하면 그 캠페인들이
+     모인 Now 탭으로 간다. */
   const kpiItems = [
+    countKpi('Needs Attention', highSeverityAlerts.length, 'now'),
     countKpi('Live Now', activeCount, 'active'),
-    countKpi('Starting Soon', startingSoonCount, 'now', `next ${STARTING_SOON_DAYS} days`),
     countKpi('Recently Ended', recentlyEndedCount, 'now', `last ${RECENTLY_ENDED_DAYS} days`),
   ];
-
-  const highSeverityAlerts = alerts.filter((a) => HIGH_SEVERITY_TYPES.includes(a.type));
 
   // 캠페인 하나에 고긴급 알림이 동시에 2개 이상 걸릴 수 있다(예: ending_soon +
   // budget_pacing). 예전엔 .find()로 하나만 골라 나머지를 조용히 숨겼는데,
@@ -887,10 +894,18 @@ export function DashboardPage() {
                 캠페인이라, 전체 목록은 기본 시야가 아니라 아카이브 조회다.
                 데이터를 숨기는 게 아니라 기본값만 좁힌다(All은 항상 한 번의
                 클릭 거리에 있다). */}
-            <Tab label={`Now (${nowCount})`} value="now" sx={{ textTransform: 'none' }} />
-            <Tab label={`Active (${activeCount})`} value="active" sx={{ textTransform: 'none' }} />
-            <Tab label={`Planned (${plannedCount})`} value="planned" sx={{ textTransform: 'none' }} />
-            <Tab label={`Ended (${endedCount})`} value="ended" sx={{ textTransform: 'none' }} />
+            {/* "Now"였는데 이 탭은 2주 전에 끝난 캠페인까지 담는다 —
+                이름이 내용을 배신했다("지금"이 왜 2주 전을 포함하는지 첫
+                사용자가 알아낼 방법이 없다). 담고 있는 게 실제로 무엇인지
+                (오늘 기준 시간 창)를 이름으로 말한다.
+
+                값이 0인 탭은 비활성으로 둔다 — 눌러도 빈 화면이 나오는 선택지는
+                제약(constraint)으로 막는 게 맞다. 배지 숫자는 남으므로 "없다"는
+                정보 자체는 그대로 읽힌다. */}
+            <Tab label={`This Period (${nowCount})`} value="now" sx={{ textTransform: 'none' }} />
+            <Tab label={`Active (${activeCount})`} value="active" disabled={activeCount === 0} sx={{ textTransform: 'none' }} />
+            <Tab label={`Planned (${plannedCount})`} value="planned" disabled={plannedCount === 0} sx={{ textTransform: 'none' }} />
+            <Tab label={`Ended (${endedCount})`} value="ended" disabled={endedCount === 0} sx={{ textTransform: 'none' }} />
             <Tab label={`All (${allCount})`} value="all" sx={{ textTransform: 'none' }} />
           </Tabs>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1032,6 +1047,11 @@ export function DashboardPage() {
             budgetPlanned: c.budgetPlanned,
             budgetDaily: c.budgetDaily,
             spend: spendFor(c.id),
+            /* 페이스는 여기서 계산해 행에 실어준다 — 알림(15% 초과)과 같은
+               calcBudgetPacing을 쓰되, 알림은 임계를 넘을 때만 말하고 이 값은
+               항상 말한다. "괜찮다"를 확인하려고 사용자가 기간·일예산·지출로
+               암산하던 걸 없애는 게 목적이라, 정상 범위일 때 보이는 게 핵심이다. */
+            paceRatio: calcBudgetPacing(c, spendFor(c.id), today).dailyBudgetRatio,
             status: c.effectiveStatus,
             alertBadges: alertBadgesFor(c.id),
             overlapNote: overlapNoteFor(c.id),
@@ -1083,14 +1103,29 @@ export function DashboardPage() {
           if (sections.length === 0) {
             return <CampaignTable rows={campaignRows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />;
           }
-          return sections.map((section, i) => (
-            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
-              <Typography variant="overline" sx={groupHeaderSx}>
-                {section.label} ({section.rows.length})
-              </Typography>
-              <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
-            </Box>
-          ));
+          /* 손댈 게 없으면 그 사실을 말한다. Action Required 그룹은 비면 통째로
+             사라지는데(위 filter), 그러면 화면에는 아무 흔적도 남지 않아서
+             "문제가 없다"와 "문제를 확인하지 않는다"가 구분되지 않는다 — 사용자
+             입장에서 전혀 다른 두 상태가 같은 화면으로 보인다. 한 줄로 확인 결과를
+             남긴다. Now 탭에서만 띄운다(다른 탭은 트리아지 화면이 아니다). */
+          const showAllClear = tab === 'now' && actionRows.length === 0 && campaignRows.length > 0;
+          return (
+            <>
+              {showAllClear && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  No campaigns need attention — all live budgets are pacing within range.
+                </Typography>
+              )}
+              {sections.map((section, i) => (
+                <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
+                  <Typography variant="overline" sx={groupHeaderSx}>
+                    {section.label} ({section.rows.length})
+                  </Typography>
+                  <CampaignTable rows={section.rows} allCampaigns={campaigns} onRowClick={openCampaignDrawer} />
+                </Box>
+              ))}
+            </>
+          );
         })()}
       </PageContainer>
 

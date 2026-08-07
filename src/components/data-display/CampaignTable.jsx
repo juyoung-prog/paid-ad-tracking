@@ -53,6 +53,37 @@ function formatBudget(row) {
   return parts.join(' · ');
 }
 
+/** 페이스가 "정상"으로 읽히는 폭. 이 안이면 편차를 숫자로 말하지 않는다. */
+const ON_PACE_TOLERANCE = 0.1;
+
+/**
+ * 일일 예산 대비 실제 소진 속도를 한 조각의 문장으로 바꾼다.
+ *
+ * 이걸 왜 행마다 보여주나: 예전엔 행이 `07.10–08.31 · $20/day · $514.49 spent`
+ * 까지만 말했다. 이 세 값으로 "잘 쓰고 있나"를 알려면 사용자가 기간 일수를 세고,
+ * 경과일을 곱하고, 실제 지출과 비교해야 한다 — 필요한 숫자가 전부 화면에 있는데
+ * 관계만 사람 머리에 떠넘긴 형태였고, 10개 행마다 반복되니 실제로는 아무도 하지
+ * 않았다. 그래서 화면이 "무슨 일이 일어나는가"에만 답하고 "그래서 괜찮은가"에는
+ * 답하지 못했다.
+ *
+ * 임계(15%)를 넘으면 budget_pacing 알림이 따로 뜬다. 여기서는 **정상일 때도**
+ * 말하는 게 핵심이다 — 알림이 없다는 것과 확인해 봤더니 괜찮다는 것은 사용자
+ * 입장에서 전혀 다른 정보다.
+ *
+ * @param {number|null} paceRatio - 평균 일일 소진 / 일일 예산 (1이면 딱 계획대로)
+ * @returns {{text: string, isOver: boolean}|null} 판단할 근거가 없으면 null
+ */
+function formatPace(paceRatio) {
+  if (paceRatio == null || !Number.isFinite(paceRatio)) return null;
+  const deviation = paceRatio - 1;
+  if (Math.abs(deviation) <= ON_PACE_TOLERANCE) return { text: 'on pace', isOver: false };
+  const percent = Math.round(Math.abs(deviation) * 100);
+  return {
+    text: deviation > 0 ? `${percent}% over pace` : `${percent}% under pace`,
+    isOver: deviation > 0,
+  };
+}
+
 /**
  * CampaignTable 컴포넌트
  *
@@ -84,7 +115,7 @@ function formatBudget(row) {
  * 서로를 못 찾는다.
  *
  * Props:
- * @param {Array<{id: string, name: string, campaignGroup?: string|null, platform: string, accountLabel: string, targetScope: string, targetStoreIds: string[], startDate: string, endDate: string, budgetPlanned: number, budgetDaily?: number|null, spend?: number, status: string, alertBadges?: Array<{text: string, severity: 'warning'|'error'}>, overlapNote?: string, thumbnailUrl?: string|null, creativeUrl?: string|null}>} rows - 미리 조인된 캠페인 행 배열(현재 탭/필터 적용됨). alertBadges는 캠페인 하나에 고긴급 알림이 동시에 여러 개 걸릴 수 있어 배열이다 [Required]
+ * @param {Array<{id: string, name: string, campaignGroup?: string|null, platform: string, accountLabel: string, targetScope: string, targetStoreIds: string[], startDate: string, endDate: string, budgetPlanned: number, budgetDaily?: number|null, spend?: number, paceRatio?: number|null, status: string, alertBadges?: Array<{text: string, severity: 'warning'|'error'}>, overlapNote?: string, thumbnailUrl?: string|null, creativeUrl?: string|null}>} rows - 미리 조인된 캠페인 행 배열(현재 탭/필터 적용됨). alertBadges는 캠페인 하나에 고긴급 알림이 동시에 여러 개 걸릴 수 있어 배열이다 [Required]
  * @param {Array<{id: string, name: string, campaignGroup?: string|null, platform: string}>} allCampaigns - 형제 칩 판단용 전체 캠페인 목록(탭/필터 미적용). 생략하면 rows로 대체 [Optional, 기본값: rows]
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
@@ -122,6 +153,7 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
         // 태그해둔 것 자체가 의미 있는 선언인데, 짝이 생길 때까지 숨기면 태그를
         // 걸어놓고도 리스트에서 찾을 방법이 없어진다(실사용 피드백으로 발견).
         const showGroupTag = Boolean(row.campaignGroup);
+        const pace = formatPace(row.paceRatio);
 
         return (
           <Box
@@ -202,7 +234,13 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5, minWidth: 0 }}>
                 {(() => {
                   const parts = [
-                    <Typography key="platform" variant="body2" color="text.secondary">
+                    /* 플랫폼만 한 단 진하게 둔다. 같은 소재를 Meta·TikTok에
+                       나눠 돌리면 이름이 공백 하나 차이로 거의 같고 썸네일은
+                       아예 동일해서, 가장 강한 시각 신호(이미지)가 "같은 행"
+                       이라고 거짓말을 한다 — 실제로 구분해 주는 유일한 값이
+                       여기 회색 평문 첫 단어로 묻혀 있었다. 칩으로 올리지는
+                       않는다(메타 줄은 평문이라는 기존 결정 유지). */
+                    <Typography key="platform" variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
                       {PLATFORM_LABEL[row.platform] ?? row.platform}
                     </Typography>,
                     <Typography key="store" variant="body2" color="text.secondary" noWrap>
@@ -234,7 +272,13 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                           noWrap
                           sx={{ color: 'text.secondary', cursor: 'help', maxWidth: 240 }}
                         >
-                          {samePlatformSiblingCount > 0 ? `${groupKey} (+${samePlatformSiblingCount})` : groupKey}
+                          {/* "(+3)"만 쓰면 무엇이 3개인지 hover해야 알 수 있었고,
+                              바로 옆 행이 "(+4)"라(같은 플랫폼 형제만 세므로)
+                              같은 그룹인데 숫자가 다른 설명 불가능한 불일치로
+                              보였다. 세는 대상을 라벨에 적는다. */}
+                          {samePlatformSiblingCount > 0
+                            ? `${groupKey} · ${samePlatformSiblingCount} more on ${PLATFORM_LABEL[row.platform] ?? row.platform}`
+                            : groupKey}
                         </Typography>
                       </Tooltip>,
                     );
@@ -323,6 +367,21 @@ export function CampaignTable({ rows, allCampaigns = rows, onRowClick, sx }) {
                     {[`${formatDate(row.startDate)}–${formatDate(row.endDate)}`, formatBudget(row)]
                       .filter(Boolean)
                       .join(' · ')}
+                    {/* 페이스만 색을 갖는다 — 초과는 지금 돈이 새는 중이라 눈에
+                        걸려야 하고, 정상·미달은 판단 재료일 뿐이라 회색으로 둔다.
+                        같은 줄에 이어 붙여 "얼마 썼다"와 "그게 빠른가"가 한 문장
+                        으로 읽히게 한다. */}
+                    {pace && (
+                      <>
+                        {' · '}
+                        <Box
+                          component="span"
+                          sx={{ color: pace.isOver ? 'warning.main' : 'text.secondary', fontWeight: pace.isOver ? 600 : 400 }}
+                        >
+                          {pace.text}
+                        </Box>
+                      </>
+                    )}
                   </Typography>
                 </>
               )}

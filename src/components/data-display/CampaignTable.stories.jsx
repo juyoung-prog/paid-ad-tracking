@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import { CampaignTable } from './CampaignTable';
-import { getEffectiveStatus } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing } from '../../data/schema';
 import { mockCampaigns, mockPerformanceRecords } from '../../data/paidAdsMockData';
 
 const thumbnailFor = (campaignId) => mockCampaigns.find((c) => c.id === campaignId)?.thumbnailUrl ?? null;
@@ -56,6 +56,7 @@ export const Default = {
       budgetPlanned: c.budgetPlanned,
       budgetDaily: c.budgetDaily,
       spend: spendFor(c.id),
+      paceRatio: calcBudgetPacing(c, spendFor(c.id), today).dailyBudgetRatio,
       status: getEffectiveStatus(c, today),
       thumbnailUrl: c.thumbnailUrl,
       creativeUrl: c.creativeUrl,
@@ -66,6 +67,54 @@ export const Default = {
       </Box>
     );
   },
+};
+
+/**
+ * 예산 페이스 — 상태줄 맨 끝에 "지금 속도가 맞나"를 붙인다.
+ *
+ * 이 표시가 없던 시절엔 행이 `07.10–08.31 · $20/day · $514.49 spent`까지만
+ * 말했다. 괜찮은지 알려면 사용자가 기간 일수를 세고, 경과일을 곱하고, 실제
+ * 지출과 비교해야 했다 — 숫자는 다 화면에 있는데 관계만 사람 머리에 떠넘긴
+ * 형태였고, 행마다 반복되니 실제로는 아무도 하지 않았다.
+ *
+ * 임계(15%)를 넘으면 budget_pacing 알림이 따로 뜬다. 여기서 중요한 건
+ * **정상일 때도 말한다**는 점이다 — "알림이 없다"와 "확인해 봤더니 괜찮다"는
+ * 사용자에게 전혀 다른 정보다.
+ *
+ * 확인 포인트: ±10% 안이면 편차 숫자 없이 `on pace`, 초과면 warning 색 + 굵게,
+ * 미달이면 회색(판단 재료일 뿐 급하지 않다). 일일 예산이 없거나 기간이 하루라
+ * 계산 근거가 없으면 아예 안 붙는다(모르면서 아는 척하지 않는다).
+ */
+export const BudgetPace = {
+  render: (args) => (
+    <Box>
+      <CampaignTable
+        rows={[
+          ['pace-over', 'G10_Now Open_0706~0831', 'meta', 1.34, 20, 1180],
+          ['pace-on', 'G10_1_Month Deals_0710~0831', 'tiktok', 1.03, 20, 514.49],
+          ['pace-under', 'G10_Coming Soon_0617~0707', 'meta', 0.66, 20, 320],
+          // 일일 예산이 없는 캠페인 — 페이스를 계산할 근거가 없어 표시하지 않는다
+          ['pace-none', 'AllStores_RaffleReceipt_0625-0731', 'meta', null, null, 355.27],
+        ].map(([id, name, platform, paceRatio, budgetDaily, spend]) => ({
+          id,
+          name,
+          platform,
+          targetScope: 'single_store',
+          targetStoreIds: ['G10'],
+          startDate: '2026-07-06',
+          endDate: '2026-08-31',
+          budgetPlanned: 0,
+          budgetDaily,
+          spend,
+          paceRatio,
+          status: 'active',
+          thumbnailUrl: null,
+          creativeUrl: null,
+        }))}
+        onRowClick={args.onRowClick}
+      />
+    </Box>
+  ),
 };
 
 /**
