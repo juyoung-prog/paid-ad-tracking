@@ -33,7 +33,11 @@ const FUNCTIONS_BASE = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 
 /** OAuth 시작 URL. 브라우저를 통째로 보내야 한다 — fetch로 부르면 리다이렉트를 따라갈 수 없다. */
 function startUrl(target) {
-  if (target.platform === 'tiktok') return `${FUNCTIONS_BASE}/auth-tiktok-start`;
+  /* TikTok도 account_id를 넘긴다. 예전엔 안 넘겼고 auth-tiktok-start가
+     'tiktok-unified'를 하드코딩했는데, DB 계정을 목록에 병합하면서부터는
+     두 번째 TikTok 계정 줄의 Connect를 눌러도 엉뚱하게 tiktok-unified의
+     토큰이 갱신되는 경로가 생겼다 — 누른 줄은 계속 Not connected로 남는다. */
+  if (target.platform === 'tiktok') return `${FUNCTIONS_BASE}/auth-tiktok-start?account_id=${encodeURIComponent(target.accountId)}`;
   return `${FUNCTIONS_BASE}/auth-meta-start?account_id=${target.accountId}&region=${target.region}`;
 }
 

@@ -137,14 +137,14 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
      원점이라 그 자리의 세로 점선이 "구간 경계"가 아니라 차트의 왼쪽 테두리(혹은
      y축)처럼 읽힌다. 이 차트에는 y축이 없으므로 없는 축을 암시하게 된다. 날짜
      자체는 축 눈금이 그대로 말한다. */
-  const milestoneDates = [...new Set(phases.map((p) => p.startDate))]
+  const candidateDates = [...new Set(phases.map((p) => p.startDate))]
     .filter((date) => date !== timelineStart && date !== timelineEnd)
     .sort();
 
   /* 축 눈금 = 타임라인 양 끝 + 마일스톤 날짜. 날짜가 서로 너무 가까우면 라벨이
      겹치므로 최소 간격 미만은 버린다 — 양 끝은 축의 범위를 말하므로 예외 없이
      남기고, 중간 눈금만 앞 눈금과 끝 눈금 양쪽으로 간격을 확인한다. */
-  const axisTicks = [...new Set([timelineStart, ...milestoneDates, timelineEnd])]
+  const axisTicks = [...new Set([timelineStart, ...candidateDates, timelineEnd])]
     .sort()
     .reduce((kept, date) => {
       const pct = timelinePct(date);
@@ -154,6 +154,11 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
       const tooCloseToEnd = 100 - pct < MIN_TICK_GAP_PCT;
       return tooCloseToPrev || tooCloseToEnd ? kept : [...kept, { date, pct }];
     }, []);
+
+  /* 점선은 축 눈금이 살아남은 날짜에만 긋는다. 간격 때문에 눈금이 버려진 자리에
+     점선만 남기면 "이 선의 날짜는 축이 말한다"는 전제가 깨진 날짜 없는 선이 된다. */
+  const tickDates = new Set(axisTicks.map((t) => t.date));
+  const milestoneDates = candidateDates.filter((date) => tickDates.has(date));
 
   return (
     /* 바깥 Box(px)는 실제 여백을 만들고, 안쪽 Box(position:relative)는 패딩 없이
@@ -184,8 +189,12 @@ export function PhaseTimelineChart({ phases, barSuffix, sx }) {
         ))}
 
         {phases.map((p) => {
-          const left = timelinePct(p.startDate);
-          const width = Math.max(timelinePct(p.endDate) - left, 1.5);
+          /* 최소 폭(1.5%)을 보정한 만큼 왼쪽으로 되민다 — 타임라인 끝에서 시작하는
+             하루짜리 phase가 축 너머(100~101.5%)에 그려지면 "종료일을 지나서도
+             돌았다"로 읽힌다. 막대의 오른쪽 끝은 절대 축 끝을 넘지 않는다. */
+          const rawLeft = timelinePct(p.startDate);
+          const width = Math.max(timelinePct(p.endDate) - rawLeft, 1.5);
+          const left = Math.min(rawLeft, 100 - width);
           /* 플랫폼 표기는 이름과 한 덩어리다 — 둘 다 "이 막대가 무엇인가"를
              말하고, 막대 안의 숫자들은 전부 이 플랫폼(들) 기준이다. */
           const { prefix, rest } = splitNamePrefix(p.name);

@@ -26,7 +26,7 @@ Dashboard 캠페인 목록. 실제 Influencer Tracking Dashboard 레퍼런스(�
 dense table 패턴보다 레퍼런스 일치를 우선한다.
 
 ### 기능
-- 맨 좌측: 소재 썸네일(CampaignThumbnail) — thumbnailUrl 없으면 플랫폼색 이니셜로 자동 대체, 항상 뭔가 보임
+- 맨 좌측: 소재 썸네일(CampaignThumbnail) — thumbnailUrl 없으면 중립색 이니셜로 자동 대체, 항상 뭔가 보임
 - 좌측: 캠페인명(Hero, bold) + (creativeUrl 있으면) 외부 링크 아이콘("View Ad"), 그 아래 메타 줄은 **칩이 아니라 평문 + 가운뎃점**으로 이어진다 — 플랫폼 · 타겟 · (형제 있거나 campaignGroup 입력됐으면) "{그룹명} (+N)" · (있으면) 중복 타겟팅(warning 색). 예전엔 전부 outlined 칩이라 한 행에 테두리가 5~6개씩 생겨 캠페인명보다 테두리가 먼저 읽혔다
 - 우측: 고긴급 알림이 있으면 알림 텍스트 2줄(여러 개면 Tooltip에 전부), 없으면 캠페인 상태 칩 + 기간·예산 — 칩은 이제 "상태"에만 남는다(StoreTable과 동일 기준)
 - onRowClick이 있으면 행이 Tab으로 포커스 가능하고 Enter/Space로 활성화됨

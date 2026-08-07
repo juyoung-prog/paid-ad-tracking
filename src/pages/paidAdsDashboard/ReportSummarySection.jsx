@@ -102,9 +102,15 @@ function buildPhaseTimeline(campaigns) {
     .map(([key, { name, group }]) => {
       const startDate = group.reduce((min, c) => (c.startDate < min ? c.startDate : min), group[0].startDate);
       const endDate = group.reduce((max, c) => (c.endDate > max ? c.endDate : max), group[0].endDate);
+      /* 같은 플랫폼 캠페인이 한 phase에 여러 개면(같은 게시물 재부스팅 등) 덮어쓰지
+         않고 누적한다 — 덮어쓰면 totalBudget(전체 합)과 플랫폼 칸의 합이 어긋나서
+         Budget Breakdown 행이 자기 Total과 안 맞게 된다. */
       const byPlatform = {};
       group.forEach((c) => {
-        byPlatform[c.platform] = { daily: c.budgetDaily ?? null, total: c.budgetPlanned };
+        const acc = byPlatform[c.platform] ?? { daily: null, total: 0 };
+        if (c.budgetDaily != null) acc.daily = (acc.daily ?? 0) + c.budgetDaily;
+        acc.total += c.budgetPlanned;
+        byPlatform[c.platform] = acc;
       });
       const totalBudget = group.reduce((sum, c) => sum + c.budgetPlanned, 0);
       // 플랫폼별 일일 예산의 합 = 이 phase가 하루에 쓰는 돈. 막대 라벨이

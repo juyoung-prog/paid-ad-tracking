@@ -19,7 +19,11 @@ Deno.serve(async (req) => {
   // TikTok 인가 화면이 이 문자들에서 502(System Error)로 죽는 사례가 있었다.
   // 콘솔이 제시하는 예시(state=your_custom_params)도 단순 문자열이다.
   // encodeURIComponent를 직접 걸지 않는다 — 아래 searchParams.set이 이미 인코딩한다.
-  const state = 'tiktok-unified';
+  //
+  // 어느 계정인지는 호출한 쪽(Settings의 Connect 버튼)이 안다 — 하드코딩하면
+  // TikTok 계정이 둘 이상일 때 어떤 줄을 눌러도 첫 계정의 토큰만 갱신된다.
+  // 파라미터 없이 부르는 예전 링크를 위해 기본값은 유지한다.
+  const state = new URL(req.url).searchParams.get('account_id') ?? 'tiktok-unified';
 
   const authUrl = new URL('https://business-api.tiktok.com/portal/auth');
   authUrl.searchParams.set('app_id', appId);

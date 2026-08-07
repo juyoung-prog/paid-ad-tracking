@@ -53,7 +53,6 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 48, sx 
      프레임에 넣으면 좌우가 44% 잘려나갔다. 게다가 높이 40일 때 폭이 22px밖에
      안 돼서 "소재를 알아본다"는 이 컴포넌트의 목적 자체가 성립하지 않았다
      (실사용 신고 — 썸네일이 너무 작다). 소스 형식에 맞춰 정사각형으로 둔다. */
-  const width = size;
 
   if (showImage) {
     return (
@@ -63,7 +62,7 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 48, sx 
         alt={`${name} creative thumbnail`}
         onError={() => setErroredUrl(thumbnailUrl)}
         sx={{
-          width,
+          width: size,
           height: size,
           borderRadius: (theme) => `${theme.shape.radius.control}px`,
           objectFit: 'cover',
@@ -79,7 +78,7 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 48, sx 
       role="img"
       aria-label={`${name}${platform ? ` (${PLATFORM_LABEL[platform] ?? platform})` : ''} thumbnail — no creative image uploaded`}
       sx={{
-        width,
+        width: size,
         height: size,
         borderRadius: (theme) => `${theme.shape.radius.control}px`,
         flexShrink: 0,
@@ -93,7 +92,7 @@ export function CampaignThumbnail({ thumbnailUrl, name, platform, size = 48, sx 
         boxSizing: 'border-box',
         color: 'text.secondary',
         fontWeight: 700,
-        fontSize: Math.round(width * 0.5),
+        fontSize: Math.round(size * 0.5),
         letterSpacing: '0.02em',
         ...sx,
       }}

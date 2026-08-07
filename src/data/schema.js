@@ -419,6 +419,11 @@ export function campaignNameKey(name) {
   return (name ?? '')
     .toLowerCase()
     .replace(/_/g, ' ')          // `_`와 공백을 같은 구분자로
+    // 대시·물결의 변형 문자를 ASCII로 통일한다 — Meta 쪽 이름에 em dash(—)가
+    // 실제로 있고, 한글 IME는 전각 물결(～)을 내놓는다. 이걸 안 접으면 "A — B"와
+    // "A - B"가 다른 phase로 갈라져서 이 함수가 잡으려던 문제가 그대로 재발한다.
+    .replace(/[—–]/g, '-')
+    .replace(/～/g, '~')
     .replace(/\s*([~-])\s*/g, '$1') // 기간 구분자 주변 공백 제거: "0706 ~ 0801" → "0706~0801"
     .replace(/\s+/g, ' ')
     .trim();

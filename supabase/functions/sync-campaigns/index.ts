@@ -11,6 +11,22 @@ import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 const MAX_PAGES = 50;
 
 /**
+ * 모든 외부 fetch의 상한. 이게 없으면 응답이 영영 안 오는 연결 하나가 함수
+ * 전체를 플랫폼 강제 종료까지 붙잡아 둔다 — 특히 oEmbed는 비즈니스 API가
+ * 아니라 소비자용 tiktok.com이라, 데이터센터 IP를 안티봇으로 오래 물고 있는
+ * (tarpit) 동작이 실제로 알려져 있다. 크론 호출(net.http_post)의 제한이
+ * 60초인데 정상 전체 실행이 이미 ~22초라(실측), 느린 연결 몇 개면 초과한다.
+ * 초과하면 데이터는 멀쩡한데 실패로 기록되고, 재시도가 아직 도는 원본과
+ * 동시에 또 떠서 호출량만 배가 된다.
+ */
+const FETCH_TIMEOUT_MS = 10_000;
+
+/** AbortSignal.timeout을 강제한 fetch. 이 파일의 모든 외부 호출은 이걸 쓴다. */
+function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+}
+
+/**
  * 플랫폼 조회 결과. 실패를 errorMessage로 돌려주는 게 핵심이다 —
  * 예전에는 콘솔에만 찍고 빈 배열을 반환해서, 토큰이 만료돼도 응답은 200 성공이고
  * 데이터만 0건이 됐다. 그러면 아무도 고장 난 걸 모른다.
@@ -231,7 +247,7 @@ async function fetchMetaCampaigns(accessToken: string, externalAccountId: string
 
   // 응답이 잘못돼 next가 계속 나오는 상황에서도 무한히 돌지 않도록 상한을 둔다.
   for (let page = 0; url && page < MAX_PAGES; page += 1) {
-    const res: Response = await fetch(url);
+    const res: Response = await fetchWithTimeout(url);
     // 명시적으로 any를 준다 — url의 타입이 json에서, json이 url에서 유도돼
     // TS가 순환으로 판단하고 추론을 포기한다(TS7022).
     const json: any = await res.json();
@@ -281,7 +297,7 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/ads?fields=${fields}&limit=200&access_token=${accessToken}`;
 
   for (let page = 0; url && page < MAX_PAGES; page += 1) {
-    const res: Response = await fetch(url);
+    const res: Response = await fetchWithTimeout(url);
     const json: any = await res.json();
     if (json?.error) {
       console.error('Meta 썸네일 조회 실패(무시하고 계속)', json.error);
@@ -368,7 +384,7 @@ async function fetchTikTokCampaigns(accessToken: string, advertiserId: string): 
     url.searchParams.set('page', String(page));
     url.searchParams.set('page_size', '1000');
 
-    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const res = await fetchWithTimeout(url.toString(), { headers: { 'Access-Token': accessToken } });
     const json = await res.json();
 
     // TikTok은 HTTP 200에 body의 code로 실패를 알린다 — res.ok만 보면 에러를 놓친다.
@@ -412,7 +428,7 @@ async function fetchTikTokPages(path: string, accessToken: string, advertiserId:
     url.searchParams.set('advertiser_id', advertiserId);
     url.searchParams.set('page', String(page));
     url.searchParams.set('page_size', '100');
-    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const res = await fetchWithTimeout(url.toString(), { headers: { 'Access-Token': accessToken } });
     const json = await res.json();
     if (json?.code !== 0) {
       console.error(`TikTok ${path} 조회 실패(무시하고 계속)`, { page, code: json?.code, message: json?.message });
@@ -484,7 +500,7 @@ async function fetchTikTokThumbnails(accessToken: string, advertiserId: string):
       byCampaign.set(campaignId, imageUrl.get(clue.imageId)!);
     } else if (clue.itemId) {
       try {
-        const res = await fetch(`https://www.tiktok.com/oembed?url=${encodeURIComponent(`https://www.tiktok.com/@_/video/${clue.itemId}`)}`);
+        const res = await fetchWithTimeout(`https://www.tiktok.com/oembed?url=${encodeURIComponent(`https://www.tiktok.com/@_/video/${clue.itemId}`)}`);
         const json = await res.json();
         if (json?.thumbnail_url) byCampaign.set(campaignId, json.thumbnail_url);
       } catch (err) {
@@ -508,7 +524,7 @@ async function fetchTikTokAdGroupBudgets(
     url.searchParams.set('page', String(page));
     url.searchParams.set('page_size', '1000');
 
-    const res = await fetch(url.toString(), { headers: { 'Access-Token': accessToken } });
+    const res = await fetchWithTimeout(url.toString(), { headers: { 'Access-Token': accessToken } });
     const json = await res.json();
 
     if (json?.code !== 0) {
@@ -761,20 +777,12 @@ Deno.serve(async (req) => {
       const current = existingById.get(row.external_campaign_id);
       if (current) {
         const patch: Record<string, unknown> = { name: row.name, updated_at: new Date().toISOString() };
-        /* 예전 오매핑으로 **일일 예산이 총예산 칸에 들어간** 행을 되돌린다.
-           "비어 있을 때만 채운다"로는 손이 닿지 않는다 — 칸이 비어 있지 않고,
-           틀린 값으로 차 있기 때문이다.
-
-           조건을 좁게 잡는다: 플랫폼이 지금 일일 예산이라고 말하고, 저장된
-           일일 칸은 비어 있으며, 저장된 총예산이 그 일일 금액과 **정확히** 같을
-           때만. 이 셋이 동시에 성립하는 건 우리가 일일 금액을 총액 칸에 넣었을
-           때뿐이라, 사용자가 직접 넣은 총예산을 건드릴 위험이 없다(실데이터
-           14건 전부 이 지문과 일치, 그 외 0건인 것을 확인하고 넣은 규칙). */
-        const isMisfiledDailyBudget =
-          row.budget_daily != null &&
-          current.budget_daily == null &&
-          Number(current.budget_planned) === Number(row.budget_daily);
-        if (isMisfiledDailyBudget) patch.budget_planned = 0;
+        /* 참고: 예전 오매핑(일일 예산이 총예산 칸에 저장됨)을 되돌리는 자가교정이
+           여기 있었다. "총예산 == 플랫폼 일일예산이면 오매핑"이라는 지문을 썼는데,
+           이 지문은 하루짜리 캠페인의 정상 데이터와 구분이 안 된다(1일짜리는
+           총액=일일이 정의상 같다) — 조건이 맞으면 사용자가 넣은 총예산을 지우고
+           복구 경로가 없다. 대상 14건이 전부 교정된 것을 확인하고 제거했다.
+           일회성 백필은 소임을 다하면 지우는 게 안전하다. */
 
         // 비어 있는 예산만 채운다(0/null이 "값 없음" — 화면도 0을 예산 없음으로 읽는다).
         if (!current.budget_planned && row.budget_planned) patch.budget_planned = row.budget_planned;

@@ -74,11 +74,11 @@ export const BrokenUrl = {
   },
 };
 
-/** 크기 비교 — 리스트 행(48px, 기본값)과 Drawer 상세(64px)에서 쓰는 크기 */
+/** 크기 비교 — 리스트 행(48px, 기본값)과 Drawer 헤더·폼 미리보기(56px)에서 쓰는 크기 */
 export const Sizes = {
   render: () => (
     <Stack direction="row" spacing={3} alignItems="flex-end">
-      {[32, 48, 64].map((size) => (
+      {[32, 48, 56].map((size) => (
         <Stack key={size} spacing={1} alignItems="center">
           <CampaignThumbnail name="Ending Soon Campaign" platform={PLATFORM.META} size={size} />
           <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
