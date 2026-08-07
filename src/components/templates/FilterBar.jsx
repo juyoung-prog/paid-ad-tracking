@@ -232,11 +232,6 @@ export function FilterBar({
               MenuProps={{ PaperProps: { sx: { maxHeight: OPTION_MENU_MAX_HEIGHT } } }}
               sx={{ minWidth: 140 }}
             >
-              {/* 필터 해제 항목. 예전 라벨이 그룹 이름("Event")이라 목록 안에서
-                  제목처럼 보였고, 정작 "전체로 되돌리기"라는 기능은 읽히지 않았다.
-                  하는 일을 그대로 적는다 — 선택이 없을 때 트리거에 뜨는 문구이기도
-                  해서, 빈칸 대신 "All Events"가 보인다. */}
-              <MenuItem value="">{group.allLabel ?? `All ${group.label}s`}</MenuItem>
               {/* 옵션이 많으면 검색을 붙인다. Event 필터가 25개 넘는 항목을
                   정렬·그룹 없이 쏟아내서 원하는 걸 찾는 게 스캔 작업이었다
                   (자동 생성된 게시물 이름·오타·"- Copy" 사본이 섞여 있다).
@@ -260,6 +255,15 @@ export function FilterBar({
                   />
                 </Box>
               )}
+              {/* 필터 해제 항목이자 목록의 첫 선택지. 검색창 **아래**에 둔다 —
+                  검색은 목록을 다루는 도구라 머리말 자리가 맞고, 이게 검색창과
+                  목록 사이에 끼면 어디까지가 머리말인지 흐려진다.
+                  라벨은 예전에 그룹 이름("Event")이라 목록 안에서 제목처럼 보이고
+                  정작 "전체로 되돌리기"라는 기능은 읽히지 않았다. 하는 일을 그대로
+                  적는다 — 선택이 없을 때 트리거에 뜨는 문구이기도 하다.
+                  검색어와 무관하게 항상 남긴다: 검색 결과가 아니라 언제든 눌러야
+                  하는 동작이다. */}
+              <MenuItem value="">{group.allLabel ?? `All ${group.label}s`}</MenuItem>
               {group.options
                 .filter((opt) => {
                   // 선택된 항목은 검색어와 무관하게 항상 남긴다 — MUI Select는
