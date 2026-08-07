@@ -124,24 +124,53 @@ function resolveEventGroup(name: string, stores: StoreIndex) {
      "1$ Deals 6.27-7.5"처럼 공백·마침표로 쓴 날짜가 그대로 남았다 — 같은 행사가
      회차마다 다른 이벤트로 갈라졌다(1$ Deals가 3개, 2months Deals가 2개).
      지역 접미사보다 먼저 뗀다(날짜가 뒤에 붙는 경우가 있다). */
-  const withoutDates = kept.join(' ').replace(DOTTED_DATE_RANGE, ' ');
+  const joined = kept.join(' ');
+  const withoutDates = joined.replace(DOTTED_DATE_RANGE, ' ');
 
   // 지역 접미사를 뗀다 — "Labor Day FL"/"labor day GA"는 같은 이벤트다.
   const base = withoutDates.replace(/\s+(FL|GA|ALL)$/i, '').replace(/\s+/g, ' ').trim();
   if (!base) return null;
 
-  /* 아무것도 못 떼어냈으면 그룹을 **유도한 게 아니라 이름을 되풀이한 것**이라
-     null을 돌려준다. 예전엔 이때도 이름을 그대로 그룹으로 삼아서, 부스팅 게시물
-     93건이 각자 하나의 "이벤트"가 됐다 — Reports의 Event 드롭다운이 캡션 목록으로
-     뒤덮여 정작 진짜 이벤트(G10 Opening 등)가 파묻혔다(실사용 신고).
-
-     null이어도 잃는 건 없다: campaignGroupKey가 이름으로 대체하므로 같은 이름의
-     캠페인은 여전히 묶이고, 화면은 2건 이상인 것만 옵션으로 보여준다. 즉 진짜
-     묶임은 남고 혼자짜리 캡션만 사라진다. */
-  const collapsed = name.replace(/\s+/g, ' ').trim();
-  if (base === collapsed) return null;
+  /* 무언가를 **실제로 알아보고 떼어냈는지**로 판단한다. 문자열 비교(결과 === 원본
+     이름)로 하다가 캡션 안에 `_`가 든 이름에서 빗나갔다 — "@beautymaster_official"
+     이 밑줄 기준으로 쪼개졌다 붙으면서 원본과 달라져, 아무것도 못 알아봤는데도
+     그룹이 만들어졌다. 세 가지 중 하나라도 있었어야 유도한 것이다. */
+  const recognizedSomething =
+    kept.length !== parts.length ||          // 매장/지역 접두사나 회차를 떼어냄
+    withoutDates !== joined ||                // 기간 표기를 떼어냄
+    base !== joined.replace(/\s+/g, ' ').trim(); // 지역 접미사를 떼어냄
+  if (!recognizedSomething) return null;
 
   return normalizeCase(base);
+}
+
+/**
+ * **예전** 규칙이 이 이름으로 만들었을 그룹 값. 백필 판정에만 쓴다.
+ *
+ * "저장된 그룹을 덮어써도 되는가"를 알려면 그게 서버가 만든 값인지 사람이 넣은
+ * 값인지 구분해야 하는데, 그걸 기록해 둔 컬럼이 없다. 대신 예전 규칙을 그대로
+ * 재현해서 "지금 저장된 값이 예전 규칙의 출력과 같은가"를 본다 — 같으면 서버가
+ * 만든 것이고, 다르면 사람이 손댄 것이다.
+ *
+ * 처음엔 그냥 `group === name`으로 봤는데 대부분 걸리지 않았다. 예전 규칙도
+ * `_`를 공백으로 바꾸고 매장 코드·줄바꿈을 정리한 뒤 저장했기 때문이다
+ * (`BF3_1$ Deals_5.15~6.7` → `1$ Deals 5.15~6.7`). 원본 이름과 비교하면 당연히
+ * 안 맞는다 — 비교 대상은 이름이 아니라 **예전 규칙의 출력**이어야 한다.
+ */
+function resolveEventGroupLegacy(name: string, stores: StoreIndex) {
+  const storeId = resolveStoreId(name, stores);
+  if (storeId && OPENING_PHASE.test(name)) return `${storeId} Opening`;
+
+  const parts = name.split('_').map((p) => p.trim()).filter(Boolean);
+  const kept = parts.filter((part, index) => {
+    if (index === 0 && (stores.byId.has(part) || stores.byRegion.has(part.toUpperCase()))) return false;
+    if (index === 0 && part.toUpperCase() === 'ALLSTORES') return false;
+    if (isDateToken(part)) return false;
+    if (/^\d{1,2}$/.test(part)) return false;
+    return true;
+  });
+  const base = kept.join(' ').replace(/\s+(FL|GA|ALL)$/i, '').replace(/\s+/g, ' ').trim();
+  return base ? normalizeCase(base) : null;
 }
 
 /**
@@ -912,7 +941,7 @@ Deno.serve(async (req) => {
            원래 그룹을 안 건드린다). 부스팅 게시물 93건이 각자 이벤트로 남아
            드롭다운을 뒤덮은 채 그대로였을 것이다. 새 규칙이 null을 주면 null로,
            "1$ Deals"처럼 날짜를 떼어낸 값을 주면 그 값으로 바꾼다. */
-        if (current.campaign_group === current.name) {
+        if (current.campaign_group === resolveEventGroupLegacy(current.name, stores)) {
           patch.campaign_group = row.campaign_group;
         }
 

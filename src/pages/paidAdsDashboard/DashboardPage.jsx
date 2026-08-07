@@ -502,13 +502,12 @@ export function DashboardPage() {
   //   태그해둔 것 자체가 의미 있는 선언이라, 짝이 아직 없다고 숨기면 태그를
   //   걸어놓고도 찾을 방법이 없어진다(실사용 피드백으로 발견 — "raffle이라고
   //   저장했는데 리스트에도 필터에도 안 보인다").
-  const explicitGroups = new Set(campaigns.filter((c) => c.campaignGroup).map((c) => c.campaignGroup));
-  const nameCounts = campaigns.reduce((counts, c) => {
-    const key = campaignGroupKey(c);
-    return { ...counts, [key]: (counts[key] ?? 0) + 1 };
-  }, {});
-  const campaignGroupOptions = Object.keys(nameCounts)
-    .filter((key) => explicitGroups.has(key) || nameCounts[key] > 1)
+  /* 이름이 우연히 겹치는 것까지 옵션으로 올리던 규칙(nameCounts > 1)은 뺐다.
+     사람이 묶으려고 일부러 같은 이름을 지었을 때를 위한 것이었는데, 실데이터에서는
+     같은 게시물을 여러 번 부스팅하면 캡션이 그대로 이름이라 **우연히** 중복되고
+     그게 전부 "이벤트"로 올라왔다. 서버가 유도 못 한 이름에는 이제 그룹을 안
+     붙이므로(resolveEventGroup이 null) 그룹 유무 하나로 판단한다. */
+  const campaignGroupOptions = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))]
     .map((key) => ({ value: key, label: key }));
 
   const lastUpdatedAt = campaigns.length

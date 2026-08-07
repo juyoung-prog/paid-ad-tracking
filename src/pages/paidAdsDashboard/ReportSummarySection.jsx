@@ -586,15 +586,14 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
     }
   }, [reportTab, groupValues, dateRange]);
 
-  /* FilterBar의 Campaign Group 드롭다운 옵션 — Dashboard와 동일 규칙(명시적으로
-     태그한 campaignGroup은 1개여도 옵션, 이름만 우연히 겹치는 경우만 2개 이상). */
-  const explicitGroups = new Set(campaigns.filter((c) => c.campaignGroup).map((c) => c.campaignGroup));
-  const nameCounts = campaigns.reduce((counts, c) => {
-    const key = campaignGroupKey(c);
-    return { ...counts, [key]: (counts[key] ?? 0) + 1 };
-  }, {});
-  const campaignGroupOptions = Object.keys(nameCounts)
-    .filter((key) => explicitGroups.has(key) || nameCounts[key] > 1)
+  /* Event 드롭다운 옵션 = **이벤트로 유도된 그룹만**.
+     예전엔 "이름이 같은 캠페인이 2건 이상"도 옵션으로 올렸다. 그 규칙은 사람이
+     묶으려고 일부러 같은 이름을 지었을 때를 위한 것이었는데, 실데이터에서는 같은
+     게시물을 여러 번 부스팅하면 캡션이 그대로 이름이라 **우연히** 중복되고 그게
+     전부 "이벤트"로 올라왔다(드롭다운이 캡션 목록으로 뒤덮인 원인의 절반).
+     이제 서버가 유도 못 한 이름에는 그룹을 안 붙이므로(resolveEventGroup이 null)
+     이 조건 하나로 충분하다 — 유도된 게 없으면 이벤트도 없다. */
+  const campaignGroupOptions = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))]
     .map((key) => ({ value: key, label: key }));
 
   /* 저장된 Event 값이 지금 데이터에 없으면 필터를 걸지 않는다. 탭·필터를
