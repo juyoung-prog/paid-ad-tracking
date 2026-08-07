@@ -207,7 +207,6 @@ const routes = [
   { path: '/dashboard?platform=meta&account=ga&store=G01&status=active', desc: '필터 상태 URL 유지' },
   { path: '/dashboard?tab=ended', desc: '상태 탭 딥링크' },
   { path: '/dashboard?campaign={id}', desc: '특정 캠페인 Drawer 오픈 상태로 진입' },
-  { path: '/dashboard?new=1', desc: '캠페인 등록 Dialog 오픈 상태로 진입' },
   { path: '/stores', desc: '매장 마스터 관리' },
   { path: '/reports', desc: '성과 보고서 뷰/내보내기' },
   { path: '/reports?from=2026-01-01&to=2026-03-31&store=G01', desc: '보고서 필터 상태 URL 유지' },

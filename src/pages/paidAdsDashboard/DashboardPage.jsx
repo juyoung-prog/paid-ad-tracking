@@ -1,5 +1,4 @@
 import { useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { alpha } from '@mui/material/styles';
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Badge from '@mui/material/Badge';
@@ -42,7 +41,8 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
-import { PAGE_GUTTER_X, campaignInDateRange, generateId, inferStoreIdFromName, adsManagerUrl } from './paidAdsPageUtils';
+import { supabase } from '../../lib/supabase';
+import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl } from './paidAdsPageUtils';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
 const TAB_GROUPS = {
@@ -139,7 +139,11 @@ function loadLastView() {
 }
 
 /**
- * 생성 폼(New Campaign Dialog)과 수정 폼(캠페인 Drawer)이 같은 필수 필드 규칙을 쓴다.
+ * 캠페인 **생성**은 이 앱에 없다. 원본이 항상 Meta/TikTok에 있고, 여기서 만든
+ * 캠페인은 external_campaign_id가 없어 성과 동기화가 영원히 안 붙기 때문이다
+ * (sync-performance가 `.not('external_campaign_id','is',null)`로 거른다).
+ * CampaignForm은 Drawer의 **수정**에서만 쓴다 — 동기화가 못 가져오는 이벤트·
+ * 매장·목표·썸네일을 사람이 채우는 자리.
  * Event(campaignGroup)는 모든 캠페인이 어떤 상위 이벤트에 속하는지 태깅되어야
  * 한다는 운영 방침이라 optional이 아니라 필수다.
  *
@@ -203,7 +207,6 @@ export function DashboardPage() {
     isLoading,
     error,
     refresh,
-    addCampaign,
     updateCampaign,
     deleteCampaign,
     upsertPerformanceRecord,
@@ -219,8 +222,6 @@ export function DashboardPage() {
   const [tab, setTab] = useState(() => loadLastView()?.tab ?? 'now');
   const [groupValues, setGroupValues] = useState(() => loadLastView()?.groupValues ?? { platform: '', store: '' });
   const [dateRange, setDateRange] = useState(() => loadLastView()?.dateRange ?? { start: '', end: '' });
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [newCampaignValues, setNewCampaignValues] = useState(emptyCampaignValues);
   const [selectedCampaignId, setSelectedCampaignId] = useState(null);
   const [editCampaignValues, setEditCampaignValues] = useState(emptyCampaignValues);
   const [performanceValues, setPerformanceValues] = useState({});
@@ -258,7 +259,7 @@ export function DashboardPage() {
   // 같이 갱신해서(핸들러 쪽에서), 저장 직후엔 dirty로 오탐하지 않게 한다.
   const [originalCampaignSnapshot, setOriginalCampaignSnapshot] = useState(null);
   const [originalPerformanceSnapshot, setOriginalPerformanceSnapshot] = useState(null);
-  // 'newCampaign' | 'drawer' | null — 닫으려는 대상에 미저장 변경이 있을 때만 연다.
+  // 'drawer' | null — 닫으려는 대상에 미저장 변경이 있을 때만 연다.
   const [discardTarget, setDiscardTarget] = useState(null);
 
   const accountLabelFor = (accountId) => {
@@ -347,31 +348,7 @@ export function DashboardPage() {
     }
   }, [tab, groupValues, dateRange]);
 
-  // 'N' → New Campaign — 입력 중인 필드에 포커스가 있거나 이미 다른 Dialog/
-  // Drawer가 열려 있으면 무시한다(텍스트에 실제로 'n'을 타이핑하는 중일 수
-  // 있고, 이미 열린 폼 위에 또 다른 폼을 여는 건 혼란만 준다).
-  // MUI Select의 트리거는 <input>이 아니라 role="combobox"인 <div>라서 태그
-  // 이름만으로는 못 걸러진다 — Select에 포커스된 상태에서 옵션을 찾으려고
-  // 'n'을 눌렀는데 New Campaign이 열려버리는 충돌을 막기 위해 combobox/
-  // listbox 역할도 함께 확인한다.
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key !== 'n' && event.key !== 'N') return;
-      const target = event.target;
-      const tag = target.tagName;
-      const isInteractiveWidget =
-        tag === 'INPUT' ||
-        tag === 'TEXTAREA' ||
-        target.isContentEditable ||
-        target.closest('[role="combobox"], [role="listbox"], [role="searchbox"]');
-      if (isInteractiveWidget) return;
-      if (isFormOpen || selectedCampaignId || discardTarget) return;
-      event.preventDefault();
-      setIsFormOpen(true);
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isFormOpen, selectedCampaignId, discardTarget]);
+
 
   // 탭(상태) 자체를 뺀 나머지 필터(Platform/Store/Campaign Group/기간) — 리스트와
   // 탭 배지 숫자가 반드시 같은 기준으로 캠페인을 세야 한다. 예전엔 탭 배지가 이
@@ -570,11 +547,9 @@ export function DashboardPage() {
     return ordered.find((c) => c.id !== selectedCampaignId && !hasRecord(c.id))?.id ?? null;
   })();
 
-  const newCampaignMissing = missingRequiredFields(newCampaignValues);
   const editCampaignMissing = missingRequiredFields(editCampaignValues, { isNew: false });
   // 저장을 막지는 않되, 태그가 없으면 그 사실과 결과를 말해준다.
   const isEditedCampaignUntagged = Boolean(selectedCampaignId) && !editCampaignValues.campaignGroup;
-  const canSaveCampaign = newCampaignMissing.length === 0;
   // 빈 폼 저장이 미보고 알림을 데이터 없이 해제하는 것을 막는다(handleSavePerformance 참고).
   const canSavePerformance = hasAnyMetricValue(performanceValues);
   const canSaveCampaignEdit = editCampaignMissing.length === 0;
@@ -584,18 +559,31 @@ export function DashboardPage() {
   // 기준. 문자열 비교라 타입이 완전히 같지 않으면(예: 필드를 건드렸다가 원래
   // 값으로 되돌린 경우) dirty로 오탐할 수 있지만, 그 방향의 오탐(불필요한 확인
   // 한 번 더)이 반대 방향(무음 데이터 손실)보다 훨씬 안전하다.
-  const isNewCampaignDirty = () => JSON.stringify(newCampaignValues) !== JSON.stringify(emptyCampaignValues);
 
   const isDrawerDirty = () =>
     JSON.stringify(editCampaignValues) !== JSON.stringify(originalCampaignSnapshot) ||
     JSON.stringify(performanceValues) !== JSON.stringify(originalPerformanceSnapshot);
 
-  const requestCloseNewCampaignForm = () => {
-    if (isNewCampaignDirty()) {
-      setDiscardTarget('newCampaign');
-    } else {
-      setIsFormOpen(false);
+  /* 헤더의 "Sync now". Settings에도 같은 동작이 있지만, 데이터가 안 맞아 보일 때
+     사용자가 있는 곳은 이 목록 화면이고 바로 왼쪽에 "Last synced"가 있다 —
+     의심이 드는 자리에 해결 수단을 둔다.
+
+     캠페인을 먼저 맞춘 뒤 성과를 가져온다(Settings와 동일) — 순서가 바뀌면 방금
+     들어온 캠페인의 성과를 이번 회차에 놓친다. */
+  const [isSyncing, setIsSyncing] = useState(false);
+  const handleSyncNow = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    const campaignsRes = await supabase.functions.invoke('sync-campaigns');
+    const performanceRes = campaignsRes.error ? null : await supabase.functions.invoke('sync-performance');
+    const failure = campaignsRes.error ?? performanceRes?.error;
+    setIsSyncing(false);
+    if (failure) {
+      notify(`Sync failed — ${failure.message}`, 'error');
+      return;
     }
+    await refresh();
+    notify('Sync complete');
   };
 
   const requestCloseDrawer = () => {
@@ -607,12 +595,7 @@ export function DashboardPage() {
   };
 
   const handleConfirmDiscard = () => {
-    if (discardTarget === 'newCampaign') {
-      setIsFormOpen(false);
-      setNewCampaignValues(emptyCampaignValues);
-    } else if (discardTarget === 'drawer') {
-      setSelectedCampaignId(null);
-    }
+    if (discardTarget === 'drawer') setSelectedCampaignId(null);
     setDiscardTarget(null);
   };
 
@@ -621,31 +604,6 @@ export function DashboardPage() {
   // 그러면 insert가 실패해도 "저장됨"이라는 거짓 확인과 함께 입력값이 통째로
   // 유실된다(엔터프라이즈 리뷰 — Fiori 메시지 핸들링: 성공 확인은 실제 커밋
   // 후에만, 실패는 반드시 드러나야 한다). 실패 시 폼을 그대로 열어 둔다.
-  const handleSaveCampaign = async () => {
-    // 저장이 도는 동안 버튼과 Enter가 계속 살아 있어서, 연타하면 insert가 두 번
-    // 나가고 id를 DB가 발급하므로 충돌로 막히지도 않는다 — 같은 캠페인이 2건 생긴다.
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    const now = new Date().toISOString();
-    const saved = await addCampaign({
-      ...newCampaignValues,
-      id: generateId('camp'),
-      budgetPlanned: Number(newCampaignValues.budgetPlanned),
-      manualStatus: null,
-      createdAt: now,
-      updatedAt: now,
-    });
-    setIsSubmitting(false);
-    if (!saved) {
-      notify('Save failed — the campaign was not created. Your input is kept, try again.', 'error');
-      return;
-    }
-    setIsFormOpen(false);
-    setNewCampaignValues(emptyCampaignValues);
-    // 나머지 쓰기 핸들러는 전부 성공을 알리는데 생성만 조용했다.
-    notify('Campaign created');
-  };
-
   // 캠페인 자체 필드(이름/예산/기간/타겟/goal) 저장 — 성과 입력 저장과는
   // 완전히 분리된 별도 버튼/핸들러다. 하나가 둘 다 저장하면 사용자가
   // 성과만 입력하려다 캠페인 정보까지 의도치 않게 바꿀 수 있다.
@@ -713,29 +671,6 @@ export function DashboardPage() {
     else notify('Manual status cleared — schedule dates decide the status again');
   };
 
-  // 같은 아이디어를 메타·틱톡 둘 다 돌릴 때, 매번 이름·기간·매장·예산·goal을
-  // 처음부터 다시 입력하는 대신 지금 보고 있는 캠페인을 복제해서 플랫폼만
-  // 바꾸면 되게 한다 — Campaign Name을 그대로 유지하므로(campaignGroupKey가
-  // campaignGroup 없으면 name으로 대체) 복제만 해도 자동으로 같은 그룹으로
-  // 묶인다. Platform은 자동으로 반대쪽으로 뒤집어서 정확히 "이것만 바꾸면
-  // 되는" 상태로 New Campaign 다이얼로그를 연다. Account는 플랫폼이 바뀌면
-  // 이전 계정이 더 이상 유효하지 않으므로 비워서 다시 고르게 한다(플랫폼 변경
-  // 시 항상 하던 것과 동일 규칙). Ad Link는 플랫폼마다 별도 광고 관리자 링크라
-  // 그대로 넘기면 틀린 링크가 되므로 비운다 — 나머지(이름·매장·기간·예산·goal·
-  // 썸네일)는 보통 그대로 재사용되므로 유지한다. 저장 전까지는 원본 캠페인에
-  // 아무 영향도 없다(지금 화면의 값을 그대로 복사만 할 뿐).
-  const handleDuplicateForOtherPlatform = () => {
-    const otherPlatform = editCampaignValues.platform === PLATFORM.META ? PLATFORM.TIKTOK : PLATFORM.META;
-    setNewCampaignValues({
-      ...editCampaignValues,
-      platform: otherPlatform,
-      accountId: '',
-      creativeUrl: '',
-      manualStatus: null,
-    });
-    setSelectedCampaignId(null);
-    setIsFormOpen(true);
-  };
 
   // 성공 여부를 반환한다 — Save & Next(아래)가 저장이 실제로 된 경우에만
   // 다음 캠페인으로 이동해야 하기 때문. 실패했는데 이동하면 실패한 입력이
@@ -867,26 +802,25 @@ export function DashboardPage() {
               )}
             </Box>
           </Popover>
-          <Button variant="contained" size="small" onClick={() => setIsFormOpen(true)} sx={{ gap: 0.75, boxShadow: 'none' }}>
-            New Campaign
-            {/* 'N' 단축키 힌트 — 단축키가 있다는 걸 알 방법이 없으면 아무도 안 쓴다 */}
-            <Box
-              component="span"
-              sx={theme => ({
-                fontSize: 11,
-                lineHeight: 1,
-                px: 0.5,
-                py: 0.25,
-                // 버튼 *안에* 들어가는 미세 요소 → inlay radius
-                borderRadius: `${theme.shape.radius.inlay}px`,
-                border: '1px solid',
-                // 흰색을 직접 쓰지 않고 버튼 대비색에서 파생시킨다(반투명 contrastText 토큰이 없어 alpha로 만든다).
-                borderColor: alpha(theme.palette.primary.contrastText, 0.5),
-                opacity: 0.85,
-              })}
-            >
-              N
-            </Box>
+          {/* 예전엔 여기가 "New Campaign"이었다. 뺀 이유: 이 앱은 광고 플랫폼의
+              거울이라 캠페인의 원본이 항상 Meta/TikTok에 있다. 여기서 만든
+              캠페인은 external_campaign_id가 없어 sync-performance가 걸러내므로
+              (`.not('external_campaign_id','is',null)`) 성과가 영원히 자동으로
+              안 들어오는 반쪽짜리가 되고, 나중에 진짜 캠페인이 동기화되면 중복이
+              된다. 실제로 전체 170건이 전부 동기화본이고 수동 생성은 0건이었다 —
+              쓰이지도 않으면서 화면에서 가장 강한 요소였다.
+
+              대신 바로 왼쪽 "Last synced"와 짝이 되는 동작을 둔다. 데이터가 안
+              맞아 보일 때 실제로 원하는 건 "다시 가져와"인데 그 버튼은 Settings에
+              묻혀 있었다. 매일 크론이 도는 보조 동작이라 강조는 낮춘다. */}
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleSyncNow}
+            disabled={isSyncing}
+            sx={{ gap: 0.75, boxShadow: 'none' }}
+          >
+            {isSyncing ? 'Syncing…' : 'Sync now'}
           </Button>
         </Box>
       </Box>
@@ -1152,56 +1086,6 @@ export function DashboardPage() {
         })()}
       </PageContainer>
 
-      {/* 캠페인 등록 Dialog — form으로 감싸서 Enter가 Save를 트리거하게 한다.
-          Cancel은 type="button"으로 명시 — form 안의 버튼은 type을 안 주면
-          기본이 submit이라, 안 붙이면 Cancel도 저장을 시도한다. */}
-      <Dialog open={isFormOpen} onClose={requestCloseNewCampaignForm} maxWidth="sm" fullWidth>
-        <form onSubmit={(e) => { e.preventDefault(); if (canSaveCampaign) handleSaveCampaign(); }}>
-          <DialogTitle>New Campaign</DialogTitle>
-          <DialogContent>
-            {/* 이름에 매장 코드가 있으면 Target Store를 미리 채운다 — 서버
-                (sync-campaigns)가 동기화 캠페인에 이미 적용하는 규칙과 같은
-                것을 수기 등록에도 준다. 두 가지 조건을 건다: 신규 등록에서만,
-                그리고 매장이 아직 비어 있을 때만. 사용자가 이미 고른 값을 이름
-                수정 때문에 덮어쓰면 "내가 안 한 일을 시스템이 한" 것이 되고,
-                그건 성과가 조용히 엉뚱한 매장에 귀속되는 사고로 이어진다. */}
-            <CampaignForm
-              stores={stores}
-              accounts={adAccounts}
-              values={newCampaignValues}
-              onChange={(field, value) =>
-                setNewCampaignValues((v) => {
-                  const next = { ...v, [field]: value };
-                  if (
-                    field === 'name' &&
-                    next.targetScope === TARGET_SCOPE.SINGLE_STORE &&
-                    next.targetStoreIds.length === 0
-                  ) {
-                    const inferred = inferStoreIdFromName(value, stores);
-                    if (inferred) next.targetStoreIds = [inferred];
-                  }
-                  return next;
-                })
-              }
-              sx={{ mt: 1 }}
-            />
-          </DialogContent>
-          {/* 무엇이 비어서 저장이 막혔는지 버튼 옆에 말한다 — 이유 없는 비활성
-              버튼은 고장과 구분되지 않는다. */}
-          <DialogActions sx={{ justifyContent: 'space-between', px: 3, pb: 2 }}>
-            <Typography variant="caption" color="text.secondary">
-              {canSaveCampaign ? '' : `Required: ${newCampaignMissing.join(', ')}`}
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button type="button" onClick={requestCloseNewCampaignForm}>Cancel</Button>
-              <Button type="submit" variant="contained" disabled={!canSaveCampaign || isSubmitting} sx={{ boxShadow: 'none' }}>
-                {isSubmitting ? 'Saving…' : 'Save'}
-              </Button>
-            </Box>
-          </DialogActions>
-        </form>
-      </Dialog>
-
       {/* 미저장 변경 확인 — New Campaign/Drawer 닫기 두 경로가 공유한다. */}
       <Dialog open={Boolean(discardTarget)} onClose={() => setDiscardTarget(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Discard unsaved changes?</DialogTitle>
@@ -1345,15 +1229,6 @@ export function DashboardPage() {
                     </IconButton>
                   </Tooltip>
                 )}
-                <Tooltip title="Duplicate for other platform">
-                  <IconButton
-                    size="small"
-                    onClick={handleDuplicateForOtherPlatform}
-                    aria-label="Duplicate for other platform"
-                  >
-                    <ContentCopyIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
                 <Tooltip title="Delete Campaign">
                   <IconButton
                     size="small"
@@ -1368,7 +1243,7 @@ export function DashboardPage() {
             </Box>
 
             {/* 캠페인 자체 필드 편집 — 성과 입력(Performance)과 저장 버튼·form이
-                분리되어 있다. 생성 폼과 동일한 CampaignForm/검증을 재사용한다.
+                분리되어 있다. CampaignForm/검증을 그대로 쓴다.
                 form으로 감싸서 Enter가 이 섹션의 저장만 트리거하게 한다. */}
             <form onSubmit={(e) => { e.preventDefault(); if (canSaveCampaignEdit) handleSaveCampaignEdit(); }}>
               {/* Drawer 안에 "Campaign Details"/"Performance" 두 개의 독립된 폼(저장
