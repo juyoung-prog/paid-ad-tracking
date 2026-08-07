@@ -77,6 +77,9 @@ import { DateRangeField } from '../input/DateRangeField';
  *   onDateRangeChange={setDateRange}
  * />
  */
+/** 이 개수를 넘는 옵션 목록에만 검색창을 붙인다(적으면 검색이 단계만 늘린다). */
+const OPTION_SEARCH_THRESHOLD = 8;
+
 export function FilterBar({
   searchValue = '',
   onSearchChange,
@@ -100,6 +103,9 @@ export function FilterBar({
 }) {
   const [showFilters, setShowFilters] = useState(false);
   const [sortAnchorEl, setSortAnchorEl] = useState(null);
+  /* 드롭다운 안 검색어(그룹 키별). 드롭다운을 닫을 때 비운다 — 남겨두면 다음에
+     열었을 때 목록이 이미 걸러진 채로 떠서 "항목이 사라졌다"로 보인다. */
+  const [optionSearch, setOptionSearch] = useState({});
 
   const sortOptions = [
     { id: 'newest', label: 'Newest First' },
@@ -211,13 +217,39 @@ export function FilterBar({
               displayEmpty
               value={groupValues[group.key] ?? ''}
               onChange={(e) => onGroupChange?.(group.key, e.target.value)}
+              onClose={() => setOptionSearch((prev) => ({ ...prev, [group.key]: '' }))}
               slotProps={{ input: { 'aria-label': group.label } }}
               sx={{ minWidth: 140 }}
             >
               <MenuItem value="">{group.label}</MenuItem>
-              {group.options.map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-              ))}
+              {/* 옵션이 많으면 검색을 붙인다. Event 필터가 25개 넘는 항목을
+                  정렬·그룹 없이 쏟아내서 원하는 걸 찾는 게 스캔 작업이었다
+                  (자동 생성된 게시물 이름·오타·"- Copy" 사본이 섞여 있다).
+                  적을 때는 검색창이 오히려 단계를 늘리므로 안 띄운다. */}
+              {group.options.length > OPTION_SEARCH_THRESHOLD && (
+                <Box sx={{ px: 1.5, py: 1 }} onKeyDown={(e) => e.stopPropagation()}>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    autoFocus
+                    placeholder={`Search ${group.label.toLowerCase()}`}
+                    value={optionSearch[group.key] ?? ''}
+                    onChange={(e) => setOptionSearch((prev) => ({ ...prev, [group.key]: e.target.value }))}
+                    slotProps={{ input: { 'aria-label': `Search ${group.label}` } }}
+                  />
+                </Box>
+              )}
+              {group.options
+                .filter((opt) => {
+                  // 선택된 항목은 검색어와 무관하게 항상 남긴다 — MUI Select는
+                  // 선택된 MenuItem이 자식에 없으면 닫힌 상태의 라벨을 못 그린다.
+                  if (opt.value === groupValues[group.key]) return true;
+                  const query = (optionSearch[group.key] ?? '').trim().toLowerCase();
+                  return !query || opt.label.toLowerCase().includes(query);
+                })
+                .map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                ))}
             </Select>
           )
         )}

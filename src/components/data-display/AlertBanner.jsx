@@ -16,7 +16,14 @@ import { ALERT_SEVERITY, ALERT_TYPE } from '../../data/schema';
 // 근거로 다시 생성한다(레코드가 저장되는 순간 자연 해제되므로 "영원히 미보고로
 // 고정"되던 예전 고장은 재발하지 않는다). Visual Direction의 원래 분류대로
 // 고긴급(error)이라 배너 대상이다.
-const BANNERABLE_TYPES = new Set([ALERT_TYPE.ENDING_SOON, ALERT_TYPE.BUDGET_PACING, ALERT_TYPE.MISSING_PERFORMANCE]);
+// no_results도 고긴급이다 — 예산 페이싱은 "쓰는 속도"만 보므로 계획대로 태워서
+// 성과 0인 상태를 잡지 못한다. 실제로 그 캠페인이 "on pace"로 표시됐다.
+const BANNERABLE_TYPES = new Set([
+  ALERT_TYPE.ENDING_SOON,
+  ALERT_TYPE.BUDGET_PACING,
+  ALERT_TYPE.MISSING_PERFORMANCE,
+  ALERT_TYPE.NO_RESULTS,
+]);
 
 const SEVERITY_COLOR = {
   warning: 'warning.main',

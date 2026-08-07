@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 
 import { StoreTable } from '../../components/data-display/StoreTable';
 import { StoreForm } from '../../components/templates/StoreForm';
-import { REGION, STORE_STATUS, getStoreBreakdown } from '../../data/schema';
+import { REGION, STORE_STATUS, TARGET_SCOPE } from '../../data/schema';
 
 const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_STATUS.PLANNED };
 
@@ -30,7 +30,7 @@ const emptyStoreValues = { id: '', name: '', region: REGION.GA, status: STORE_ST
  * 참조하는 값이라 바꾸면 참조가 깨지므로 StoreForm의 isIdLocked로 잠근다.
  *
  * 매장별 캠페인 수는 Dashboard 사이드바(StoreBreakdown)가 이미 쓰는
- * getStoreBreakdown()을 그대로 재사용해서 계산한다 — 새 집계 로직을 만들지 않는다.
+ * Campaigns 컬럼은 매장 **전용** 캠페인만 센다(전 매장 대상은 각주로 분리).
  *
  * Props:
  * @param {Store[]} stores - 매장 목록 [Required]
@@ -68,8 +68,19 @@ export function StoreListSection({ stores, campaigns, onAddStore, onUpdateStore,
     setIsFormOpen(true);
   };
 
+  /* 전용 캠페인 수만 센다. 예전엔 getStoreBreakdown이 주는 전체(= 전 매장 대상
+     캠페인 + 이 매장 전용)를 그대로 썼는데, 전 매장 대상이 15개 매장 모두에
+     각각 세어져서 어느 매장이든 87~100으로 찍혔다 — 차이(13)가 공통값(약 85)에
+     묻혀 "어느 매장에 광고를 많이 돌렸나"라는 이 컬럼의 유일한 용도를 못 했다
+     (전체 캠페인은 170개인데 15개 매장 합이 1,350이 되는 것도 오해를 부른다).
+     공통분은 표 아래 각주로 한 번만 말하고, 컬럼은 매장끼리 실제로 다른 값만
+     보여준다. */
+  const sharedCampaignCount = campaigns.filter((c) => c.targetScope === TARGET_SCOPE.ALL_STORES).length;
   const campaignCounts = Object.fromEntries(
-    getStoreBreakdown(stores, campaigns).map((row) => [row.storeId, row.campaigns.length])
+    stores.map((store) => [
+      store.id,
+      campaigns.filter((c) => c.targetScope !== TARGET_SCOPE.ALL_STORES && c.targetStoreIds.includes(store.id)).length,
+    ])
   );
 
   // 쓰기 결과를 확인한다 — 스토어의 쓰기 함수는 실패 시 falsy를 돌려주는데,
@@ -140,7 +151,16 @@ export function StoreListSection({ stores, campaigns, onAddStore, onUpdateStore,
           ))}
         </Box>
       ) : (
-        <StoreTable stores={stores} campaignCounts={campaignCounts} onRowClick={handleOpenEdit} />
+        <>
+          <StoreTable stores={stores} campaignCounts={campaignCounts} onRowClick={handleOpenEdit} />
+          {/* 공통분은 여기서 한 번만 말한다 — 매장마다 같은 수를 더해 보여주면
+              컬럼이 비교 불가능해진다. */}
+          {sharedCampaignCount > 0 && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+              Campaigns counts store-specific campaigns only. {sharedCampaignCount} all-store campaigns run across every location.
+            </Typography>
+          )}
+        </>
       )}
 
       <Dialog open={isFormOpen} onClose={() => setIsFormOpen(false)} maxWidth="sm" fullWidth>

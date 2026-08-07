@@ -66,6 +66,7 @@ export const ALERT_TYPE = Object.freeze({
   // 곧 미보고다. 이 앱의 존재 이유(종료 후 성과 기록 → 보고)를 리마인드하는
   // 유일한 장치라 성과 레코드 부재 기준으로 되살린다.
   MISSING_PERFORMANCE: 'missing_performance',
+  NO_RESULTS: 'no_results',
   NEW_STORE_REMINDER: 'new_store_reminder',
 });
 
@@ -339,6 +340,30 @@ export function calcAutoBudgetPlanned(budgetDaily, startDate, endDate) {
  * @returns {{ timeElapsedRatio: number|null, budgetUsedRatio: number|null, avgDailySpend: number|null, dailyBudgetRatio: number|null }}
  */
 /**
+ * 이 캠페인의 계획 예산. 저장된 값이 없으면 일일 예산 × 기간으로 계산한다.
+ *
+ * **"모르는 값"과 "0"을 구분하는 규칙의 핵심**이다. 동기화로 들어온 캠페인은
+ * 플랫폼에 "계획 예산"이라는 개념이 없어 budget_planned가 0으로 저장되는데,
+ * 그 0을 그대로 화면에 쓰면 "0으로 계획했다"는 강한 주장이 된다 — 사실이 아니고,
+ * 그런 화면이 하나 있으면 옆의 멀쩡한 숫자까지 같이 의심받는다.
+ *
+ * 실제로 같은 캠페인이 화면마다 다른 값을 보이고 있었다(실사용 리뷰로 발견):
+ * 드로어는 calcAutoBudgetPlanned로 $1,060을 보여주는데, Reports는 저장된 0을
+ * 그대로 써서 "PLANNED BUDGET $0"에 Budget Breakdown 합계도 $0이었다. 계산할
+ * 줄 아는 값을 한쪽에서만 계산한 것이 원인이라, 그 계산을 여기 한 곳에 둔다.
+ *
+ * 근거가 아무것도 없으면 **0이 아니라 null**을 돌려준다. 호출부는 null을 '—'로
+ * 표시해서 "모른다"와 "0으로 계획했다"를 구분한다.
+ *
+ * @param {Campaign} campaign
+ * @returns {number|null} 계획 예산. 저장값도 계산 근거도 없으면 null
+ */
+export function effectiveBudgetPlanned(campaign) {
+  if (campaign?.budgetPlanned > 0) return campaign.budgetPlanned;
+  return calcAutoBudgetPlanned(campaign?.budgetDaily, campaign?.startDate, campaign?.endDate)?.amount ?? null;
+}
+
+/**
  * 소진 속도를 "계획 대비 몇 배인가" 하나의 비율로 돌려준다(1이면 계획대로).
  *
  * calcBudgetPacing이 내놓는 두 가지 근거를 generateAlerts와 **같은 우선순위로**
@@ -381,7 +406,13 @@ export function calcBudgetPacing(campaign, spend, today = new Date()) {
 
   return {
     timeElapsedRatio: elapsedMs / totalMs,
-    budgetUsedRatio: campaign.budgetPlanned ? spend / campaign.budgetPlanned : null,
+    /* 저장된 budgetPlanned가 아니라 effectiveBudgetPlanned를 쓴다 — 동기화
+       캠페인은 0으로 저장돼서 이 값이 항상 null이었고, 드로어의 Budget Spent
+       줄이 "— ($514.49 / $0)"로 깨져 있었다. 일일 예산이 있으면 기간을 곱해
+       복원되므로 그 줄이 실제 비율을 말하게 된다.
+       알림 동작은 바뀌지 않는다: 여기서 새로 값이 생기는 경우는 budgetDaily가
+       있는 캠페인뿐인데, 그때는 dailyBudgetRatio가 이미 우선권을 갖는다. */
+    budgetUsedRatio: effectiveBudgetPlanned(campaign) ? spend / effectiveBudgetPlanned(campaign) : null,
     avgDailySpend,
     dailyBudgetRatio: campaign.budgetDaily && avgDailySpend != null ? avgDailySpend / campaign.budgetDaily : null,
   };
@@ -547,6 +578,7 @@ export const ALERT_SEVERITY = {
   [ALERT_TYPE.BUDGET_PACING]: 'error',
   // 03-visual-direction의 긴급도 체계 그대로 — 보고 자체가 막히는 상태라 error로 격상
   [ALERT_TYPE.MISSING_PERFORMANCE]: 'error',
+  [ALERT_TYPE.NO_RESULTS]: 'error',
   [ALERT_TYPE.ENDING_SOON]: 'warning',
   [ALERT_TYPE.OVERLAP_TARGET]: 'warning',
 };
@@ -559,10 +591,32 @@ const ALERT_SEVERITY_RANK = {
   [ALERT_TYPE.BUDGET_PACING]: 0,
   // 같은 error라도 budget_pacing 다음 — 저긴 지금도 돈이 나가는 중이고, 이건
   // 이미 끝난 캠페인의 기록 문제라 실시간성이 없다.
-  [ALERT_TYPE.MISSING_PERFORMANCE]: 1,
-  [ALERT_TYPE.ENDING_SOON]: 2,
-  [ALERT_TYPE.OVERLAP_TARGET]: 3,
+  // 예산 초과 다음 — 저긴 쓰는 속도가 문제고 이건 쓴 돈이 성과 0이라
+  // 실시간성은 같지만 초과 집행이 더 즉각적인 손실이다.
+  [ALERT_TYPE.NO_RESULTS]: 1,
+  [ALERT_TYPE.MISSING_PERFORMANCE]: 2,
+  [ALERT_TYPE.ENDING_SOON]: 3,
+  [ALERT_TYPE.OVERLAP_TARGET]: 4,
 };
+
+/**
+ * 이 목표가 "성공"으로 세는 대표 지표. 목표마다 무엇이 결과인지가 달라서,
+ * 하나의 지표로 모든 캠페인을 판정할 수 없다.
+ *
+ * @param {Campaign} campaign
+ * @param {PerformanceRecord} record
+ * @returns {{label: string, value: number|null}|null} 대응 지표가 없으면 null
+ */
+export function goalResultMetric(campaign, record) {
+  switch (campaign.goal) {
+    case GOAL.TRAFFIC: return { label: 'clicks', value: record.clicks };
+    case GOAL.AWARENESS: return { label: 'reach', value: record.reach };
+    case GOAL.ENGAGEMENT: return { label: 'engagements', value: record.engagements };
+    case GOAL.CONVERSION:
+    case GOAL.STORE_VISIT: return { label: 'conversions', value: record.conversions };
+    default: return null;
+  }
+}
 
 /**
  * 캠페인·성과 데이터를 기준으로 알림을 매번 다시 계산한다. Alert를 저장된
@@ -602,6 +656,27 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
       }
 
       if (record) {
+        /* 돈은 나가는데 목표 지표가 0인 캠페인. 예산 페이싱만 보면 "계획대로
+           쓰는 중"이라 초록으로 보이는데, 실제로는 계획대로 태워서 아무것도
+           못 얻고 있는 상태다 — 실사용 리뷰에서 Traffic 목표에 클릭 0인
+           캠페인이 "on pace"로 표시된 것이 발단.
+
+           **확인된 0에만 반응한다**: 값이 null이면(플랫폼이 그 지표를 안 준
+           경우) 아무 말도 하지 않는다. 모르는 것을 실패로 단정하면 잘못된
+           경보가 되고, 그게 반복되면 진짜 경보까지 무시된다. 동기화는 없는
+           값을 0으로 만들지 않으므로(num()이 null을 유지) 이 구분이 성립한다. */
+        const result = goalResultMetric(campaign, record);
+        if (record.spend > 0 && result && result.value === 0) {
+          alerts.push({
+            id: `alert-noresults-${campaign.id}`,
+            campaignId: campaign.id,
+            type: ALERT_TYPE.NO_RESULTS,
+            triggeredAt: today.toISOString(),
+            resolvedAt: null,
+            message: `${campaign.name} — $${record.spend.toLocaleString('en-US')} spent with 0 ${result.label} on a ${campaign.goal} campaign — check targeting or creative`,
+          });
+        }
+
         const { timeElapsedRatio, budgetUsedRatio, avgDailySpend, dailyBudgetRatio } = calcBudgetPacing(campaign, record.spend, today);
         // budgetDaily를 선언한 캠페인은 그 신호가 더 직접적이므로 우선 쓰고,
         // 없는 캠페인만 기존 경과일/전체기간 비율 방식으로 대체한다 — 같은
@@ -686,10 +761,15 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
  *
  * @param {Campaign[]} campaigns
  * @param {PerformanceRecord[]} performanceRecords
- * @returns {{ totalCampaigns: number, totalBudgetPlanned: number, totalSpend: number, avgCPM: number|null, avgCTR: number|null }}
+ * @returns {{ totalCampaigns: number, totalBudgetPlanned: number|null, totalSpend: number, avgCPM: number|null, avgCTR: number|null }}
  */
 export function getReportSummary(campaigns, performanceRecords) {
-  const totalBudgetPlanned = campaigns.reduce((sum, c) => sum + c.budgetPlanned, 0);
+  /* 저장된 0을 그대로 더하지 않는다 — effectiveBudgetPlanned가 일일 예산×기간으로
+     복원한다(같은 캠페인이 드로어에선 $1,060, Reports에선 $0으로 보이던 불일치).
+     근거가 하나도 없으면 합계도 null로 남겨 호출부가 '—'를 찍게 한다: 0을 찍으면
+     "0으로 계획했다"는 거짓 주장이 되고, 그 화면의 다른 숫자까지 의심받는다. */
+  const plannedAmounts = campaigns.map(effectiveBudgetPlanned).filter((v) => v != null);
+  const totalBudgetPlanned = plannedAmounts.length > 0 ? plannedAmounts.reduce((sum, v) => sum + v, 0) : null;
 
   const recordsWithSpend = performanceRecords.filter((r) => r.spend != null);
   const totalSpend = recordsWithSpend.reduce((sum, r) => sum + r.spend, 0);

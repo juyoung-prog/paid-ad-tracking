@@ -70,16 +70,22 @@ const ON_PACE_TOLERANCE = 0.1;
  * 말하는 게 핵심이다 — 알림이 없다는 것과 확인해 봤더니 괜찮다는 것은 사용자
  * 입장에서 전혀 다른 정보다.
  *
+ * 문구에 "budget"을 반드시 넣는다. 그냥 "on pace"라고 쓰면 "잘되고 있다"로
+ * 읽히는데, 이건 **돈을 계획한 속도로 쓰고 있다**는 뜻일 뿐 성과와는 무관하다.
+ * 실제로 목표가 Traffic인데 클릭이 0인 캠페인이 "on pace"로 표시됐다 —
+ * 계획대로 돈을 태워 아무것도 못 얻는 상태가 초록 신호로 보였다(실사용 리뷰).
+ * 이 줄이 화면에서 유일하게 판단을 담은 문구라 오독의 대가가 크다.
+ *
  * @param {number|null} paceRatio - 평균 일일 소진 / 일일 예산 (1이면 딱 계획대로)
  * @returns {{text: string, isOver: boolean}|null} 판단할 근거가 없으면 null
  */
 function formatPace(paceRatio) {
   if (paceRatio == null || !Number.isFinite(paceRatio)) return null;
   const deviation = paceRatio - 1;
-  if (Math.abs(deviation) <= ON_PACE_TOLERANCE) return { text: 'on pace', isOver: false };
+  if (Math.abs(deviation) <= ON_PACE_TOLERANCE) return { text: 'on budget pace', isOver: false };
   const percent = Math.round(Math.abs(deviation) * 100);
   return {
-    text: deviation > 0 ? `${percent}% over pace` : `${percent}% under pace`,
+    text: deviation > 0 ? `${percent}% over budget pace` : `${percent}% under budget pace`,
     isOver: deviation > 0,
   };
 }

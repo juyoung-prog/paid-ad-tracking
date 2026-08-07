@@ -165,7 +165,11 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
   return (
     <Box sx={sx}>
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 7 }}>
+        {/* 이름은 전체 폭을 준다. 7/12 컬럼에서는 동기화된 실제 이름
+            ("G10_1_Month Deals_0710~0831")이 입력창 안에서 잘려서, 이름을
+            고치는 화면인데 정작 이름이 안 보였다(실사용 리뷰로 발견). Event는
+            아래 줄로 내린다 — 짧은 값이라 좁은 컬럼에서도 온전히 보인다. */}
+        <Grid size={12}>
           <FieldLabel>Campaign Name</FieldLabel>
           <TextField
             fullWidth

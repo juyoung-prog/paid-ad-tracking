@@ -21,7 +21,7 @@ import { ScrollArea } from '../../components/container/ScrollArea';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, PLATFORM, GOAL } from '../../data/schema';
+import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
 
 const PLATFORM_LABEL = {
@@ -109,10 +109,10 @@ function buildPhaseTimeline(campaigns) {
       group.forEach((c) => {
         const acc = byPlatform[c.platform] ?? { daily: null, total: 0 };
         if (c.budgetDaily != null) acc.daily = (acc.daily ?? 0) + c.budgetDaily;
-        acc.total += c.budgetPlanned;
+        acc.total += effectiveBudgetPlanned(c) ?? 0;
         byPlatform[c.platform] = acc;
       });
-      const totalBudget = group.reduce((sum, c) => sum + c.budgetPlanned, 0);
+      const totalBudget = group.reduce((sum, c) => sum + (effectiveBudgetPlanned(c) ?? 0), 0);
       // 플랫폼별 일일 예산의 합 = 이 phase가 하루에 쓰는 돈. 막대 라벨이
       // 총액과 함께 이 값을 말한다 — "하루 얼마씩"과 "총 얼마"는 예산을
       // 판단할 때 서로 대체되지 않는 두 질문이다. 아무 플랫폼도 일일 예산을
@@ -422,7 +422,7 @@ function toCsvRow(values) {
 function planToCsv(campaigns) {
   const header = ['Campaign', 'Platform', 'Start', 'End', 'Daily Budget', 'Total Budget'];
   const lines = campaigns.map((c) =>
-    toCsvRow([c.name, c.platform, c.startDate, c.endDate, c.budgetDaily ?? '', c.budgetPlanned])
+    toCsvRow([c.name, c.platform, c.startDate, c.endDate, c.budgetDaily ?? '', effectiveBudgetPlanned(c) ?? ''])
   );
   return [toCsvRow(header), ...lines].join('\n');
 }
@@ -637,10 +637,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
   // Plan 탭 — 지금 필터에 걸린 캠페인 전체 기준(Event 선택 여부와 무관).
   const planCampaigns = filteredCampaigns;
   const planBudgetByPlatform = planCampaigns.reduce((acc, c) => {
-    acc[c.platform] = (acc[c.platform] ?? 0) + c.budgetPlanned;
+    acc[c.platform] = (acc[c.platform] ?? 0) + (effectiveBudgetPlanned(c) ?? 0);
     return acc;
   }, {});
-  const planTotalBudget = planCampaigns.reduce((sum, c) => sum + c.budgetPlanned, 0);
+  const planTotalBudget = planCampaigns.reduce((sum, c) => sum + (effectiveBudgetPlanned(c) ?? 0), 0);
 
   /* Event를 선택했을 때만 타임라인을 그린다 — 여러 Event가 섞인 상태에서 phase
      막대를 그리면 서로 무관한 캠페인들이 같은 축에 놓여 의미가 없다. Event 없이
@@ -685,7 +685,14 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
             reportTab === 'plan'
               ? [
                   { label: 'Campaigns', value: summary.totalCampaigns },
-                  { label: 'Planned Budget', value: `$${summary.totalBudgetPlanned.toLocaleString('en-US')}` },
+                  {
+                    label: 'Planned Budget',
+                    /* null은 "계획 예산을 알 수 없다"는 뜻이라 0이 아니라 '—'로 찍는다 —
+                       $0은 "0으로 계획했다"는 거짓 주장이 된다. */
+                    value: summary.totalBudgetPlanned != null
+                      ? `$${summary.totalBudgetPlanned.toLocaleString('en-US')}`
+                      : EMPTY_CELL,
+                  },
                 ]
               : [
                   { label: 'Campaigns', value: summary.totalCampaigns },
@@ -900,7 +907,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, isLoading 
                         {c.budgetDaily != null ? `$${c.budgetDaily.toLocaleString('en-US')}/day` : EMPTY_CELL}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                        {fmtBudget(c.budgetPlanned)}
+                        {fmtBudget(effectiveBudgetPlanned(c))}
                       </TableCell>
                     </TableRow>
                   ))}

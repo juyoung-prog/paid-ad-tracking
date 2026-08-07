@@ -66,6 +66,12 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
         </Typography>
       </Box>
 
+      {/* 계획 예산이 없으면 이 줄을 통째로 그리지 않는다. 예전엔 비율을 '—'로
+          찍고 분모가 0인 분수를 그대로 노출했다("— ($514.49 / $0)") — 계산이
+          안 된다는 걸 알면서 깨진 식을 보여준 셈이라, 바로 아래 멀쩡히 동작하는
+          Daily Avg 줄까지 같이 의심받았다(실사용 리뷰로 발견). 빈 막대도 함께
+          사라진다: 0%로 그린 막대는 "아직 안 썼다"로 읽힌다. */}
+      {budgetUsedRatio != null && (
       <Box sx={{ mb: 0.5 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
           <Typography variant="caption" color="text.secondary">Budget Spent</Typography>
@@ -92,6 +98,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           }}
         />
       </Box>
+      )}
 
       <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>

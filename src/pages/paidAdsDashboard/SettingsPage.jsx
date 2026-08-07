@@ -151,7 +151,7 @@ export function SettingsPage() {
       <Stack spacing={ 1 } sx={ { mb: 3 } }>
         <Typography variant="h5" component="h1">Settings</Typography>
         <Typography variant="body2" color="text.secondary">
-          Connect an ad platform account and campaigns and performance sync in daily.
+          Connect your ad platform accounts. Campaigns and performance then sync automatically once a day.
         </Typography>
       </Stack>
 

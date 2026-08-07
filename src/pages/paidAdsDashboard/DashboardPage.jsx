@@ -39,7 +39,7 @@ import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
 import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
-import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X, campaignInDateRange, generateId, inferStoreIdFromName, adsManagerUrl } from './paidAdsPageUtils';
@@ -104,7 +104,7 @@ const NO_EVENT = '(no-event)';
 // 결과에 영향을 주지 않는다.
 const STATUS_GROUP_ORDER = { active: 0, planned: 1, ended: 2, ended_early: 2, archived: 2 };
 
-const HIGH_SEVERITY_TYPES = ['ending_soon', 'budget_pacing', 'missing_performance'];
+const HIGH_SEVERITY_TYPES = ['ending_soon', 'budget_pacing', 'missing_performance', 'no_results'];
 
 const emptyCampaignValues = {
   name: '',
@@ -1402,7 +1402,9 @@ export function DashboardPage() {
               (selectedCampaign.budgetPlanned > 0 || selectedCampaign.budgetDaily != null) && (
               <PacingIndicator
                 {...calcBudgetPacing(selectedCampaign, Number(performanceValues.spend) || 0, today)}
-                budgetPlanned={selectedCampaign.budgetPlanned}
+                // 표시용 분모도 같은 규칙 — 저장된 0을 그대로 넘기면 "$514.49 / $0"
+                // 이 다시 나온다(calcBudgetPacing과 짝을 맞춘다).
+                budgetPlanned={effectiveBudgetPlanned(selectedCampaign)}
                 budgetDaily={selectedCampaign.budgetDaily}
                 spend={Number(performanceValues.spend) || 0}
                 sx={{ mb: 3 }}
