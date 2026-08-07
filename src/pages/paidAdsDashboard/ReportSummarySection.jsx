@@ -1613,17 +1613,27 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
             { key: 'social', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
           ].filter((g) => g.columns.length > 0);
           const dataColumns = columnGroups.flatMap((g) => g.columns.map((col, colIndex) => ({ ...col, group: g.key, isGroupStart: colIndex === 0 })));
-          /* 컬럼 폭의 합. 표는 width:100%로 늘리되 colgroup 마지막에 폭을 지정하지
-             않은 여백 열을 하나 두어, 남는 폭을 그 열이 전부 흡수하게 한다 —
-             table-layout:fixed에서 폭 미지정 열이 잔여 공간을 가져가는 규칙이다.
-             지정 열들은 어느 표에서든 정확히 같은 폭을 유지하므로 그룹 경계 정렬이
-             깨지지 않고, 동시에 컬럼 수가 다른 표들도 오른쪽 끝선을 공유한다
-             (여백 열이 없을 때는 컬럼이 적은 Awareness 표만 짧게 끝나서 페이지가
-             미완성처럼 보였다 — 실화면 리뷰). minWidth로 이 합을 걸어두면 창이
-             좁아질 때 여백 열이 0이 되고 그 뒤부터 가로 스크롤이 걸린다. */
+          /* 컬럼 폭의 합. 표는 이 폭에 딱 맞춘다 — 늘리지 않는다.
+
+             예전엔 width:100%로 늘리고 colgroup 마지막에 폭 미지정 여백 열을 하나
+             둬서 남는 폭을 흡수하게 했다. goal 표마다 컬럼 수가 달라도 오른쪽
+             끝선을 공유하게 하려던 장치였는데, 그 근거였던 그룹 경계 정렬이
+             그룹 라벨 행과 함께 사라졌다. 남은 건 **마지막 컬럼 너머로 370px쯤
+             이어지는 빈 행 구분선**뿐이었다 — 컬럼이 더 있어야 할 것처럼 보인다
+             (실화면 12-22·12-23). 표를 콘텐츠 폭으로 두면 그 꼬리가 사라진다. */
           const tableWidth = COLUMN_WIDTH.campaign + COLUMN_WIDTH.platform + dataColumns.reduce((sum, c) => sum + c.width, 0);
           // 성과 레코드가 아예 없는 캠페인 — 전 컬럼이 '—'로 채워진 행이 된다.
           const isRowEmpty = (r) => dataColumns.every((col) => col.cell(r) === EMPTY_CELL);
+          /* 레코드는 있는데 **한 번도 나가지 않은** 캠페인. 지출도 노출도 0이면
+             그 아래 숫자들은 측정된 값이 아니라 측정할 게 없었다는 뜻이다.
+             그런데 그대로 그리면 `$0.00 · 0 · 0 · 0s · 0`이 한 줄로 늘어서고,
+             `Watch 0s`는 "0초를 시청했다고 측정했다"로 읽힌다 — 이 앱이 지켜온
+             "모르는 값과 0을 구분한다"의 뒷면이다(실화면 12-23의
+             "Beauty Master Florida Mall Now Open" TikTok 행).
+             0이 진짜 측정값인 경우(노출은 있었는데 아무도 안 눌렀다)와 섞이지
+             않도록 **노출까지 0일 때만** 이 판정을 쓴다. */
+          const isRowUndelivered = (r) =>
+            !isRowEmpty(r) && (r.spend ?? 0) === 0 && (r.impressions ?? 0) === 0;
           /* 플랫폼별 정의가 다른 지표(Hook/Hold Rate)가 이 표에 있고, 실제로 두
              플랫폼이 섞여 있을 때만 경고를 단다 — 한 플랫폼만 있는 표에서는
              비교 위험이 없어서 각주가 소음이다. 정의 자체는 헤더의 ⓘ 툴팁으로
@@ -1667,15 +1677,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                     정한다. 콘텐츠 기반(auto)이면 캠페인 이름 길이 같은 표별 사정에
                     따라 같은 컬럼도 폭이 달라져, goal 표를 세로로 훑을 때 그룹
                     구분선이 섹션마다 밀린다. */}
-                <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
+                <Table size="small" sx={{ tableLayout: 'fixed', width: tableWidth }}>
                   <colgroup>
                     <col style={{ width: COLUMN_WIDTH.campaign }} />
                     <col style={{ width: COLUMN_WIDTH.platform }} />
                     {dataColumns.map((col) => (
                       <col key={`${col.group}-${col.header}`} style={{ width: col.width }} />
                     ))}
-                    {/* 폭 미지정 = 잔여 공간 흡수용 여백 열 (위 tableWidth 주석 참고) */}
-                    <col />
                   </colgroup>
                   <TableHead>
                     <TableRow>
@@ -1708,7 +1716,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                           )}
                         </TableCell>
                       ))}
-                      <TableCell />
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1730,12 +1737,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                             읽는 사람이 매번 "빈 건가 0인가"를 확인하게 만든다. 이 행들이
                             곧 missing_performance 알림의 대상이라, 표에서도 그 사실이
                             보이는 게 맞다. */}
-                        {isRowEmpty(r) ? (
+                        {isRowEmpty(r) || isRowUndelivered(r) ? (
                           <TableCell
-                            colSpan={dataColumns.length + 1}
+                            colSpan={dataColumns.length}
                             sx={{ color: 'text.secondary', ...GROUP_DIVIDER_SX }}
                           >
-                            No performance data yet
+                            {isRowEmpty(r) ? 'No performance data yet' : 'Never delivered — no spend, no impressions'}
                           </TableCell>
                         ) : (
                           <>
@@ -1748,7 +1755,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                                 {col.cell(r)}
                               </TableCell>
                             ))}
-                            <TableCell />
                           </>
                         )}
                       </TableRow>
