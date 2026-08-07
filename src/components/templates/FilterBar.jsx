@@ -44,7 +44,7 @@ import { DateRangeField } from '../input/DateRangeField';
  * @param {string} viewMode - 현재 뷰 모드 ('grid' | 'list') [Optional, 기본값: 'grid']
  * @param {function} onViewModeChange - 뷰 모드 변경 핸들러 [Optional]
  * @param {number} resultCount - 검색 결과 수 [Optional]
- * @param {Array<{key: string, label: string, options: Array<{value: string, label: string}>, variant?: 'select'|'segmented'}>} filterGroups - 범용 필터 그룹 (도메인 필드를 하드코딩하지 않고 호출부에서 정의). variant='segmented'면 드롭다운 대신 All+옵션 전부를 ToggleButtonGroup으로 보여준다 — 옵션이 2~4개로 고정된 배타적 선택지(예: Platform)에 적합, 옵션 개수가 늘어날 수 있는 필터(예: Campaign Group)는 기본값(select)을 쓴다 [Optional, 기본값: []]
+ * @param {Array<{key: string, label: string, allLabel?: string, options: Array<{value: string, label: string}>, variant?: 'select'|'segmented'}>} filterGroups - 범용 필터 그룹 (도메인 필드를 하드코딩하지 않고 호출부에서 정의). allLabel은 필터 해제 항목의 문구(기본값 `All {label}s`) — 선택이 없을 때 트리거에 뜨는 문구이기도 하다. variant='segmented'면 드롭다운 대신 All+옵션 전부를 ToggleButtonGroup으로 보여준다 — 옵션이 2~4개로 고정된 배타적 선택지(예: Platform)에 적합, 옵션 개수가 늘어날 수 있는 필터(예: Campaign Group)는 기본값(select)을 쓴다 [Optional, 기본값: []]
  * @param {object} groupValues - filterGroups 각 key의 현재 선택값 { [key]: value } [Optional, 기본값: {}]
  * @param {function} onGroupChange - 그룹 필터 변경 핸들러 (key, value) => void [Optional]
  * @param {{ start: string, end: string }} dateRange - 기간 필터 값 [Optional]
@@ -79,6 +79,9 @@ import { DateRangeField } from '../input/DateRangeField';
  */
 /** 이 개수를 넘는 옵션 목록에만 검색창을 붙인다(적으면 검색이 단계만 늘린다). */
 const OPTION_SEARCH_THRESHOLD = 8;
+
+/** 드롭다운 최대 높이. 이 높이를 넘으면 목록만 스크롤된다(검색창은 sticky로 남는다). */
+const OPTION_MENU_MAX_HEIGHT = 440;
 
 export function FilterBar({
   searchValue = '',
@@ -215,19 +218,37 @@ export function FilterBar({
               key={group.key}
               size="small"
               displayEmpty
-              value={groupValues[group.key] ?? ''}
+              /* 옵션에 없는 값이면 빈 값으로 되돌려 보여준다. 저장된 필터가 가리키던
+                 항목이 사라지면(이벤트 그룹 규칙이 바뀌는 등) MUI가 대응하는
+                 MenuItem을 못 찾아 트리거가 **통째로 빈칸**이 된다 — 실제로 그 상태를
+                 봤다. 호출부의 필터 판정도 모르는 값은 이미 무시하므로, 여기서
+                 빈 값으로 보이게 하면 화면과 실제 동작이 일치한다. */
+              value={group.options.some((o) => o.value === groupValues[group.key]) ? groupValues[group.key] : ''}
               onChange={(e) => onGroupChange?.(group.key, e.target.value)}
               onClose={() => setOptionSearch((prev) => ({ ...prev, [group.key]: '' }))}
               slotProps={{ input: { 'aria-label': group.label } }}
+              /* 목록이 화면 바닥까지 늘어지면 어디가 끝인지 안 보이고 스크롤도
+                 페이지와 섞인다. 높이를 묶고 목록만 스크롤시킨다. */
+              MenuProps={{ PaperProps: { sx: { maxHeight: OPTION_MENU_MAX_HEIGHT } } }}
               sx={{ minWidth: 140 }}
             >
-              <MenuItem value="">{group.label}</MenuItem>
+              {/* 필터 해제 항목. 예전 라벨이 그룹 이름("Event")이라 목록 안에서
+                  제목처럼 보였고, 정작 "전체로 되돌리기"라는 기능은 읽히지 않았다.
+                  하는 일을 그대로 적는다 — 선택이 없을 때 트리거에 뜨는 문구이기도
+                  해서, 빈칸 대신 "All Events"가 보인다. */}
+              <MenuItem value="">{group.allLabel ?? `All ${group.label}s`}</MenuItem>
               {/* 옵션이 많으면 검색을 붙인다. Event 필터가 25개 넘는 항목을
                   정렬·그룹 없이 쏟아내서 원하는 걸 찾는 게 스캔 작업이었다
                   (자동 생성된 게시물 이름·오타·"- Copy" 사본이 섞여 있다).
                   적을 때는 검색창이 오히려 단계를 늘리므로 안 띄운다. */}
               {group.options.length > OPTION_SEARCH_THRESHOLD && (
-                <Box sx={{ px: 1.5, py: 1 }} onKeyDown={(e) => e.stopPropagation()}>
+                <Box
+                  onKeyDown={(e) => e.stopPropagation()}
+                  /* 목록이 스크롤돼도 검색창은 붙어 있어야 한다 — autoFocus가 걸려
+                     있어서, 스크롤과 함께 사라지면 "타이핑은 되는데 입력창이 안
+                     보이는" 상태가 된다. */
+                  sx={{ px: 1.5, py: 1, position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'background.paper' }}
+                >
                   <TextField
                     size="small"
                     fullWidth
