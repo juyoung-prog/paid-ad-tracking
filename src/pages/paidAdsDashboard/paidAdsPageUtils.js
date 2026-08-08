@@ -132,26 +132,39 @@ export function inferStoreIdFromName(name, stores) {
 }
 
 /**
- * 플랫폼 광고 관리자에서 이 캠페인을 여는 링크.
+ * 플랫폼 광고 관리자를 여는 링크.
  *
- * 동기화는 creative_url(실제 게시물 링크)을 채우지 않는다 — 캠페인 하나에 광고
- * 소재가 여러 개라 "그 캠페인의 광고 링크" 하나가 존재하지 않기 때문이다(Meta의
- * preview_shareable_link는 광고 단위라 아무거나 고르면 틀린 링크가 된다). 대신
- * 캠페인 자체를 여는 링크는 저장된 외부 id로 결정론적으로 만들 수 있다.
+ * Meta는 그 캠페인이 **선택된 상태**까지 딥링크된다. TikTok은 캠페인 단위
+ * 딥링크가 안정적으로 구성되지 않아 **광고주의 캠페인 목록**까지만 연다 —
+ * 한때 그 비대칭 때문에 TikTok을 아예 지원하지 않았는데("계정 화면만 열리는
+ * 링크를 '이 캠페인 열기'로 내보내면 거짓말"), 버튼 라벨이 일반형
+ * "Ads Manager"가 되면서 그 반대 논리가 성립한다: 관리자로 가는 문 자체는
+ * 정직하게 제공할 수 있고, 없는 것보다 훨씬 낫다(실사용 지적 — TikTok
+ * 캠페인에서 버튼이 통째로 사라져 "왜 없나"가 됐다).
  *
- * TikTok은 캠페인 단위 딥링크가 안정적으로 구성되지 않아 지원하지 않는다 —
- * 광고주 계정 화면까지만 열리는 링크를 "이 캠페인 열기"로 내보내면 거짓말이 된다.
+ * 동기화는 creative_url(실제 게시물 링크)을 채우지 않는 대신 ad_link를
+ * 채운다 — "View ad"는 그쪽 소관이고, 이 링크는 관리 화면 전용이다.
  *
  * @param {object} campaign - externalCampaignId, platform을 가진 캠페인
  * @param {object} account - externalAccountId를 가진 광고 계정
  * @returns {string|null}
  */
 export function adsManagerUrl(campaign, account) {
-  if (campaign?.platform !== 'meta') return null;
-  if (!campaign?.externalCampaignId || !account?.externalAccountId) return null;
-  // Meta 계정 id는 "act_123..." 형태로 오는데 act 파라미터는 숫자만 받는다.
-  const accountId = String(account.externalAccountId).replace(/^act_/, '');
-  return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(accountId)}&selected_campaign_ids=${encodeURIComponent(campaign.externalCampaignId)}`;
+  if (!account?.externalAccountId) return null;
+
+  if (campaign?.platform === 'meta') {
+    if (!campaign?.externalCampaignId) return null;
+    // Meta 계정 id는 "act_123..." 형태로 오는데 act 파라미터는 숫자만 받는다.
+    const accountId = String(account.externalAccountId).replace(/^act_/, '');
+    return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${encodeURIComponent(accountId)}&selected_campaign_ids=${encodeURIComponent(campaign.externalCampaignId)}`;
+  }
+
+  if (campaign?.platform === 'tiktok') {
+    // 광고주의 캠페인 목록. aadvid = advertiser id(우리 external_account_id).
+    return `https://ads.tiktok.com/i18n/perf/campaign?aadvid=${encodeURIComponent(String(account.externalAccountId))}`;
+  }
+
+  return null;
 }
 
 /**
