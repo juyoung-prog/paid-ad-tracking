@@ -1215,44 +1215,6 @@ export function DashboardPage() {
                 <Typography variant="h6" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {editCampaignValues.name}
                 </Typography>
-                {/* View Ad는 사람이 입력한 실제 게시물 링크다. 그게 없을 때는
-                    저장된 외부 id로 만든 광고 관리자 링크로 대체한다 — 동기화가
-                    creative_url을 못 채우는 이유(캠페인 하나에 소재가 여러 개라
-                    "그 캠페인의 광고 링크"가 하나로 정해지지 않는다)는 구조적이라
-                    자동 입력이 불가능하지만, 캠페인 자체를 플랫폼에서 여는 것은
-                    항상 가능하다. 라벨을 달리해서 둘을 섞지 않는다 — "광고를 본다"와
-                    "관리자에서 캠페인을 연다"는 다른 일이다. */}
-                {editCampaignValues.creativeUrl ? (
-                  <Tooltip title={editCampaignValues.creativeUrl}>
-                    <Button
-                      component="a"
-                      href={editCampaignValues.creativeUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      size="small"
-                      endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
-                      sx={{ p: 0, minWidth: 0, textTransform: 'none' }}
-                    >
-                      View Ad
-                    </Button>
-                  </Tooltip>
-                ) : (
-                  selectedCampaignAdsManagerUrl && (
-                    <Tooltip title="No creative link saved — opens this campaign in Meta Ads Manager">
-                      <Button
-                        component="a"
-                        href={selectedCampaignAdsManagerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        size="small"
-                        endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
-                        sx={{ p: 0, minWidth: 0, textTransform: 'none' }}
-                      >
-                        Open in Ads Manager
-                      </Button>
-                    </Tooltip>
-                  )
-                )}
               </Box>
               {/* Duplicate·Delete 둘 다 Campaign Details 폼(아래)이 아니라
                   여기(캠페인 헤더)에 둔다 — 사용자 입장에서 둘 다 "이 폼의
@@ -1315,6 +1277,49 @@ export function DashboardPage() {
                   </IconButton>
                 </Tooltip>
               </Box>
+            </Box>
+
+            {/* 바깥으로 나가는 문 — Reports의 CampaignDetailPanel과 같은 줄,
+                같은 자리(헤더 바로 아래)다. 형제 드로어끼리 문법을 맞춘다.
+
+                예전엔 이름 아래 작은 텍스트 링크 하나가 둘 중 하나만 보여줬다
+                (creativeUrl 있으면 View Ad, 없으면 Ads Manager 대체). "광고를
+                본다"와 "관리자에서 연다"는 다른 일이라 대체 관계가 아니고,
+                동기화가 게시물 링크(adLink)를 채우면서 "자동 입력 불가"라던
+                옛 전제도 사라졌다 — 이제 거의 모든 캠페인이 둘 다 갖는다.
+
+                View ad는 폼에서 편집 중인 creativeUrl을 우선한다(입력 즉시
+                반영 — 저장 전까지 안 바뀌면 "반영이 안 됐다"는 착각을 준다).
+                없으면 동기화가 채운 게시물 링크(adLink). */}
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              {(editCampaignValues.creativeUrl || selectedCampaign.adLink) && (
+                <Button
+                  component="a"
+                  href={editCampaignValues.creativeUrl || selectedCampaign.adLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
+                  sx={{ boxShadow: 'none' }}
+                >
+                  View ad
+                </Button>
+              )}
+              {selectedCampaignAdsManagerUrl && (
+                <Button
+                  component="a"
+                  href={selectedCampaignAdsManagerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
+                  sx={{ boxShadow: 'none' }}
+                >
+                  Ads Manager
+                </Button>
+              )}
             </Box>
 
             {/* 캠페인 자체 필드 편집 — 성과 입력(Performance)과 저장 버튼·form이
