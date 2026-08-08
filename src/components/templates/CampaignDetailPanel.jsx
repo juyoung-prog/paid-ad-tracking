@@ -112,41 +112,13 @@ export function CampaignDetailPanel({
           </Tooltip>
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
-
-        <Box sx={{ mb: 2 }}>
-          <Row label="Dates" value={dateRange(campaign.startDate, campaign.endDate)} />
-          {/* 계획 예산은 정수, 집행은 2자리 (utils/format.js 규칙) */}
-          <Row label="Planned budget" value={planned != null ? moneyWhole(planned) : null} />
-          <Row label="Daily budget" value={campaign.budgetDaily != null ? `${moneyWhole(campaign.budgetDaily)}/day` : null} />
-          <Row label="Spend" value={spend != null ? money(spend) : null} />
-        </Box>
-
-        {showPacing && (
-          <PacingIndicator
-            {...pacing}
-            budgetPlanned={planned}
-            budgetDaily={campaign.budgetDaily}
-            spend={spend}
-            sx={{ mb: 3 }}
-          />
-        )}
-
-        {/* 전 지표를 세로로 한눈에 — 표에도 같은 값이 있지만 여기서는 한
-            캠페인만 놓고 읽는다. 값이 없는 항목은 이 컴포넌트가 알아서 숨긴다. */}
-        <PlatformMetricList metrics={performance} sx={{ mb: 3 }} />
-
-        {!performance && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            No performance data yet for this campaign.
-          </Typography>
-        )}
-
-        <Divider sx={{ mb: 2 }} />
-
-        {/* 바깥으로 나가는 문만 남긴다 — Close 버튼은 뺐다: 우상단 ✕,
-            바깥 클릭, ESC까지 닫는 길이 이미 셋이라 네 번째는 자리만 먹는다
-            (실사용 지적). 이 줄의 버튼은 전부 "다른 곳으로 간다"로 통일된다.
+        {/* 바깥으로 나가는 문 — **헤더 바로 아래**에 둔다. 원래 맨 아래였는데
+            지표 목록이 길면 낮은 창에서 접힌 화면 밖으로 밀렸다 — 이 링크들이
+            패널을 연 이유인 경우가 많은데 스크롤해야 보였다(실사용 지적).
+            하단 액션은 확인/취소가 있는 다이얼로그의 관행이고, 여기는 저장할
+            것 없는 읽기 패널이라 그 관행이 적용될 이유가 없다. Dashboard 편집
+            드로어도 액션(복제·삭제)이 상단이다 — 형제 드로어끼리 문법을 맞춘다.
+            Close 버튼은 없다: 우상단 ✕·바깥 클릭·ESC로 이미 셋이다.
 
             Dashboard 편집 드로어와 같은 쌍이다.
             View ad는 실제 게시물(creativeUrl, 사람이 입력한 링크), Ads Manager는
@@ -154,7 +126,7 @@ export function CampaignDetailPanel({
             단위 딥링크가 안정적으로 구성되지 않아 호출부가 안 넘긴다).
             성과가 이상해 보일 때 다음 행동이 "원본을 열어 확인"이라, 그 문이
             이 패널에 없으면 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. */}
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
           {viewAdHref && (
             <Button
               component="a"
@@ -194,6 +166,36 @@ export function CampaignDetailPanel({
             </Button>
           )}
         </Box>
+
+        <Divider sx={{ mb: 2 }} />
+
+        <Box sx={{ mb: 2 }}>
+          <Row label="Dates" value={dateRange(campaign.startDate, campaign.endDate)} />
+          {/* 계획 예산은 정수, 집행은 2자리 (utils/format.js 규칙) */}
+          <Row label="Planned budget" value={planned != null ? moneyWhole(planned) : null} />
+          <Row label="Daily budget" value={campaign.budgetDaily != null ? `${moneyWhole(campaign.budgetDaily)}/day` : null} />
+          <Row label="Spend" value={spend != null ? money(spend) : null} />
+        </Box>
+
+        {showPacing && (
+          <PacingIndicator
+            {...pacing}
+            budgetPlanned={planned}
+            budgetDaily={campaign.budgetDaily}
+            spend={spend}
+            sx={{ mb: 3 }}
+          />
+        )}
+
+        {/* 전 지표를 세로로 한눈에 — 표에도 같은 값이 있지만 여기서는 한
+            캠페인만 놓고 읽는다. 값이 없는 항목은 이 컴포넌트가 알아서 숨긴다. */}
+        <PlatformMetricList metrics={performance} sx={{ mb: 3 }} />
+
+        {!performance && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+            No performance data yet for this campaign.
+          </Typography>
+        )}
       </Box>
     </Drawer>
   );
