@@ -275,11 +275,19 @@ const typography = {
    * 칸을 새로 판다.
    */
 
-  /** KPI 값 등 화면에서 가장 큰 숫자. h4(24px)로는 $93,276.65가 존재감이 부족했다 */
+  /**
+   * KPI 값 등 화면에서 가장 큰 숫자.
+   *
+   * 한때 28px로 올렸다가 24px로 되돌렸다. "$93,276.65가 옆 목록의 16px 캠페인명에
+   * 눌린다"는 판단이었는데, **레퍼런스(influencer tracking dashboard)의 KPI가
+   * 24px**이고 이 프로젝트의 1순위 목표는 "같은 회사 툴군처럼 보이기"다. 일반적인
+   * 위계 원칙보다 그 일치가 먼저다 — 두 도구를 오가는 사람에게는 숫자 크기가
+   * 다른 것 자체가 "다른 제품"이라는 신호가 된다(실사용 지적).
+   */
   display: {
     fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
     fontWeight: 700,
-    fontSize: '1.75rem',     // 28px
+    fontSize: '1.5rem',      // 24px — 레퍼런스 실측값
     lineHeight: 1.2,
     letterSpacing: '-0.01em',
     fontVariantNumeric: 'tabular-nums', // 자릿수가 바뀌어도 레이아웃이 흔들리지 않게
