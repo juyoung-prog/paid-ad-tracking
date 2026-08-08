@@ -24,7 +24,6 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RestoreIcon from '@mui/icons-material/Restore';
-import StopCircleOutlinedIcon from '@mui/icons-material/StopCircleOutlined';
 
 import { PageContainer } from '../../components/layout/PageContainer';
 import { KpiBar } from '../../components/data-display/KpiBar';
@@ -674,8 +673,7 @@ export function DashboardPage() {
     }
     setEditCampaignValues((v) => ({ ...v, manualStatus }));
     setOriginalCampaignSnapshot((s) => (s ? { ...s, manualStatus } : s));
-    if (manualStatus === MANUAL_STATUS.ENDED_EARLY) notify('Campaign ended early — it stays under Recently Ended for performance entry');
-    else if (manualStatus === MANUAL_STATUS.ARCHIVED) notify('Campaign archived');
+    if (manualStatus === MANUAL_STATUS.ARCHIVED) notify('Campaign archived');
     else notify('Manual status cleared — schedule dates decide the status again');
   };
 
@@ -1231,19 +1229,15 @@ export function DashboardPage() {
               <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0, alignSelf: 'flex-start' }}>
                 {/* 상태 전환도 Duplicate/Delete와 같은 "이 캠페인 자체"에 대한
                     레코드 액션이라 여기(헤더)에 둔다. 상태별로 지금 가능한
-                    전환만 보여준다 — active는 조기 종료, 끝난 것은 아카이브,
-                    수동 상태가 걸린 것은 해제(날짜 계산으로 복귀). */}
-                {selectedCampaign.effectiveStatus === 'active' && (
-                  <Tooltip title="End campaign early">
-                    <IconButton
-                      size="small"
-                      onClick={() => handleSetManualStatus(MANUAL_STATUS.ENDED_EARLY)}
-                      aria-label="End campaign early"
-                    >
-                      <StopCircleOutlinedIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                )}
+                    전환만 보여준다 — 끝난 것은 아카이브, 수동 상태가 걸린 것은
+                    해제(날짜 계산으로 복귀).
+
+                    "End campaign early"는 있다가 뺐다(실사용 결정). 실제 광고를
+                    멈추는 게 아니라 우리 기록에만 표식을 다는 버튼인데, 화면
+                    어디에도 그 사실이 안 적혀 있어서 "이걸로 광고를 껐다"는
+                    오해가 가능했다 — 돈이 걸린 오해다. 플랫폼에서 중단한
+                    캠페인은 다음 동기화 때 상태가 따라오고, 이미 표식이 달린
+                    기존 데이터(ended_early)는 그대로 읽힌다. */}
                 {(selectedCampaign.effectiveStatus === 'ended' || selectedCampaign.effectiveStatus === 'ended_early') && (
                   <Tooltip title="Archive campaign">
                     <IconButton
