@@ -25,7 +25,7 @@ import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, shortDate, PAGE_GUTTER_X } from './paidAdsPageUtils';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
@@ -1011,7 +1011,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
  * Example usage:
  * <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
  */
-export function ReportSummarySection({ campaigns, performanceRecords, plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
+export function ReportSummarySection({ campaigns, performanceRecords, adAccounts = [], plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
   const navigate = useNavigate();
   const theme = useTheme();
   /* 기본 탭은 Performance다. 이 화면 이름이 Reports이고, 보고서에 오는 사람의
@@ -1340,14 +1340,21 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
 
       {/* 읽기 전용 상세 — Reports를 떠나지 않는다. 열려 있을 때만 마운트해서
           닫았다 열면 항상 새 값으로 그린다(CampaignDetailPanel 주석 참고). */}
-      {detailCampaign && (
-        <CampaignDetailPanel
-          campaign={detailCampaign}
-          performance={performanceRecords.find((r) => r.campaignId === detailCampaign.id)}
-          onClose={() => setDetailCampaignId(null)}
-          onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
-        />
-      )}
+      {detailCampaign && (() => {
+        const detailAccount = adAccounts.find((a) => a.id === detailCampaign.accountId);
+        return (
+          <CampaignDetailPanel
+            campaign={detailCampaign}
+            performance={performanceRecords.find((r) => r.campaignId === detailCampaign.id)}
+            accountLabel={detailAccount?.label}
+            /* 링크 규칙(adsManagerUrl)은 pages 레이어의 것이라 여기서 계산해
+               넘긴다 — 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다. */
+            adsManagerHref={adsManagerUrl(detailCampaign, detailAccount)}
+            onClose={() => setDetailCampaignId(null)}
+            onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
+          />
+        );
+      })()}
 
       {isLoading && (
         <Box aria-label="Loading report" role="status">

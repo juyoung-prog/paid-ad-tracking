@@ -60,6 +60,7 @@ function Row({ label, value }) {
  * @param {object} campaign - 캠페인 [Required]
  * @param {object} performance - 이 캠페인의 성과 레코드. 없으면 성과 블록을 안 그린다 [Optional]
  * @param {string} accountLabel - 광고 계정 표시명 [Optional]
+ * @param {string} adsManagerHref - 플랫폼 광고 관리자에서 이 캠페인을 여는 링크. **호출부가 계산해서 넘긴다** — 링크 규칙(adsManagerUrl)은 pages 레이어에 있고, 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다 [Optional]
  * @param {Date} today - 페이싱 계산 기준일 [Optional, 기본값: new Date()]
  * @param {function} onClose - 닫기 핸들러 [Required]
  * @param {function} onEdit - "Edit on Dashboard" 핸들러 (campaignId) => void [Optional]
@@ -71,6 +72,7 @@ export function CampaignDetailPanel({
   campaign,
   performance,
   accountLabel,
+  adsManagerHref,
   today = new Date(),
   onClose,
   onEdit,
@@ -140,13 +142,46 @@ export function CampaignDetailPanel({
 
         <Divider sx={{ mb: 2 }} />
 
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        {/* 바깥으로 나가는 문 두 개 — Dashboard 편집 드로어와 같은 쌍이다.
+            View ad는 실제 게시물(creativeUrl, 사람이 입력한 링크), Ads Manager는
+            플랫폼 관리 화면(외부 id로 결정론적 생성, Meta만 — TikTok은 캠페인
+            단위 딥링크가 안정적으로 구성되지 않아 호출부가 안 넘긴다).
+            성과가 이상해 보일 때 다음 행동이 "원본을 열어 확인"이라, 그 문이
+            이 패널에 없으면 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. */}
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {campaign.creativeUrl && (
+            <Button
+              component="a"
+              href={campaign.creativeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="outlined"
+              size="small"
+              endIcon={<OpenInNewIcon sx={(t) => ({ fontSize: t.iconSize.inline })} />}
+              sx={{ boxShadow: 'none' }}
+            >
+              View ad
+            </Button>
+          )}
+          {adsManagerHref && (
+            <Button
+              component="a"
+              href={adsManagerHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="outlined"
+              size="small"
+              endIcon={<OpenInNewIcon sx={(t) => ({ fontSize: t.iconSize.inline })} />}
+              sx={{ boxShadow: 'none' }}
+            >
+              Ads Manager
+            </Button>
+          )}
           {onEdit && (
             <Button
               variant="outlined"
               size="small"
               onClick={() => onEdit(campaign.id)}
-              endIcon={<OpenInNewIcon sx={(t) => ({ fontSize: t.iconSize.inline })} />}
               sx={{ boxShadow: 'none' }}
             >
               Edit on Dashboard

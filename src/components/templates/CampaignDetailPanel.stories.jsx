@@ -73,6 +73,14 @@ DashboardPage 상태에 얽혀 있기도 하다.
 여기서는 읽기만 한다. 고칠 게 있으면 \`Edit on Dashboard\`로 간다 — 당하는 이동이
 아니라 고르는 이동이 된다.
 
+### 바깥으로 나가는 문 두 개
+\`View ad\`(실제 게시물 — campaign.creativeUrl)와 \`Ads Manager\`(플랫폼 관리
+화면 — Meta만, 호출부가 adsManagerUrl로 계산해 \`adsManagerHref\`로 넘긴다).
+성과가 이상해 보일 때 다음 행동은 "원본을 열어 확인"이라, 이 문이 없으면
+표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. 링크 규칙은 pages 레이어의
+것이라 이 컴포넌트는 href를 받기만 한다 — 컴포넌트가 pages를 임포트하면 의존
+방향이 뒤집힌다.
+
 ### 전 지표를 세로로 한눈에
 표에도 같은 값이 있지만(전 컬럼 노출 + 가로 스크롤 — Meta 광고 관리자와 같은
 문법), 이 패널은 **한 캠페인만** 놓고 읽는 자리다. 값이 없는 항목은
@@ -83,7 +91,7 @@ DashboardPage 상태에 얽혀 있기도 하다.
   },
 };
 
-function Harness({ campaign, performance }) {
+function Harness({ campaign, performance, adsManagerHref }) {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <Box sx={{ minWidth: 320 }}>
@@ -95,6 +103,7 @@ function Harness({ campaign, performance }) {
           campaign={campaign}
           performance={performance}
           accountLabel="TikTok Unified"
+          adsManagerHref={adsManagerHref}
           today={TODAY}
           onClose={() => setIsOpen(false)}
           onEdit={() => {}}
@@ -127,6 +136,24 @@ export const WithPerformance = {
  */
 export const NoPerformance = {
   render: () => <Harness campaign={CAMPAIGN} performance={undefined} />,
+};
+
+/**
+ * 외부 링크가 둘 다 있는 캠페인.
+ *
+ * 확인 포인트:
+ * - `View ad` — creativeUrl이 있을 때만 나타난다
+ * - `Ads Manager` — adsManagerHref가 넘어왔을 때만(Meta 캠페인) 나타난다
+ * - 둘 다 새 탭(target=_blank)이고, 없는 링크는 빈 버튼 대신 아예 안 그린다
+ */
+export const WithExternalLinks = {
+  render: () => (
+    <Harness
+      campaign={{ ...CAMPAIGN, id: 'c-3', platform: PLATFORM.META, creativeUrl: 'https://www.facebook.com/beautymaster/posts/123' }}
+      performance={PERFORMANCE}
+      adsManagerHref="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123&selected_campaign_ids=456"
+    />
+  ),
 };
 
 /**
