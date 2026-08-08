@@ -350,10 +350,15 @@ type CreativeInfo = { thumb: string | null; link: string | null };
 
 async function fetchMetaThumbnails(accessToken: string, externalAccountId: string): Promise<Map<string, CreativeInfo>> {
   const byCampaign = new Map<string, CreativeInfo>();
-  /* effective_object_story_id — 이 광고가 부스팅한 실제 게시물("페이지id_게시물id").
-     소비자가 보는 링크는 이걸로 만든다. 다크 광고(게시물 없이 만든 광고)는 이
-     값이 없어서 preview_shareable_link(공유 가능한 미리보기)로 대체한다. */
-  const fields = 'campaign_id,preview_shareable_link,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url,effective_object_story_id}';
+  /* 링크 우선순위 — 소비자가 실제로 그 광고를 본 곳으로 보낸다:
+       1. instagram_permalink_url — 인스타그램 게시물 주소. 이 계정의 부스팅
+          원본은 대부분 인스타 게시물이라("Instagram post: …" 캠페인들) 이게
+          1순위다. 페이스북 게시물 링크로 보내면 같은 소재라도 소비자가 본
+          지면이 아니다(실사용 지적).
+       2. effective_object_story_id — 페이스북 게시물("페이지id_게시물id").
+          인스타 permalink가 없는 페이스북 지면 부스팅용.
+       3. preview_shareable_link — 게시물 없이 만든 다크 광고의 미리보기. */
+  const fields = 'campaign_id,preview_shareable_link,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url,effective_object_story_id,instagram_permalink_url}';
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/ads?fields=${fields}&limit=200&access_token=${accessToken}`;
 
@@ -370,10 +375,12 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
       // 광고에서 뽑아야 화면의 썸네일과 링크가 같은 소재를 가리킨다.
       if (!campaignId || byCampaign.has(campaignId)) continue;
       const thumb = ad?.creative?.thumbnail_url ?? null;
+      const igPermalink = ad?.creative?.instagram_permalink_url;
       const storyId = ad?.creative?.effective_object_story_id;
-      const link = storyId
-        ? `https://www.facebook.com/${String(storyId).replace('_', '/posts/')}`
-        : (ad?.preview_shareable_link ?? null);
+      const link = igPermalink
+        ?? (storyId ? `https://www.facebook.com/${String(storyId).replace('_', '/posts/')}` : null)
+        ?? ad?.preview_shareable_link
+        ?? null;
       if (thumb || link) byCampaign.set(campaignId, { thumb, link });
     }
     url = json.paging?.next ?? null;
