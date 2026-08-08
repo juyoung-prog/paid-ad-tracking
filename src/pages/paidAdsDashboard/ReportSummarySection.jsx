@@ -233,6 +233,7 @@ const NOTE = {
   engagementRate: 'Engagements ÷ impressions.',
   conversions: 'Actions the platform counted for this campaign objective.',
   cpa: 'Spend ÷ conversions. Lower is cheaper.',
+  cpe: 'Spend ÷ engagements. Lower is cheaper.',
   videoPlays: 'Total plays, with no minimum watch time.',
   hookRate: 'Platform-specific: TikTok counts a 2-second view, Meta counts 25% of the video.',
   holdRate: 'Share of hook views that watched to completion — based on the platform-specific hook definition.',
@@ -261,9 +262,17 @@ function goalExtraColumns(goalValue) {
         metricColumn('CPC', (r) => r.cpc, fmtCurrency, { width: 104, note: NOTE.cpc, hasBenchmark: true }),
       ];
     case GOAL.ENGAGEMENT:
+      /* CPE·Impressions는 나중에 추가됐다. Awareness는 CPM, Traffic은 CPC,
+         Conversion은 CPA를 갖는데 이 표만 비용 효율 지표가 없어서, 같은
+         이벤트의 Meta($1.60/참여)와 TikTok($5.85/참여)이 3.7배 차이 나는데도
+         화면에서 비교가 안 됐다. Impressions는 Eng. Rate의 분모다 — 분모가
+         화면에 없으면 0.08%가 어디서 온 숫자인지 확인할 길이 없다(실화면
+         13-9 리뷰). */
       return [
+        metricColumn('CPE', (r) => r.cpe, fmtCurrency, { width: 104, note: NOTE.cpe, hasBenchmark: true }),
         metricColumn('Engagements', (r) => r.engagements, fmtNumber, { width: 140, note: NOTE.engagements }),
         metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { width: 128, note: NOTE.engagementRate, hasBenchmark: true }),
+        metricColumn('Impressions', (r) => r.impressions, fmtNumber, { width: 140, note: NOTE.impressions }),
       ];
     case GOAL.CONVERSION:
     case GOAL.STORE_VISIT:
@@ -412,7 +421,7 @@ function columnMedian(column, rows) {
 // 섞여 있었는데(예: Impressions·Reach 다음 CPM), "얼마 썼고 단가가 얼마인가"와
 // "얼마나 잘 됐나"는 서로 다른 질문이라 그룹으로 가른다.
 const SPEND_COLUMN = metricColumn('Spend', (r) => r.spend, fmtCurrency, { width: 128, note: NOTE.spend });
-const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA']);
+const COST_METRIC_HEADERS = new Set(['CPM', 'CPC', 'CPA', 'CPE']);
 
 /*
  * 컬럼 그룹 — **라벨 행 없이** 세로 구분선으로만 남긴다.
@@ -521,7 +530,7 @@ function planToCsv(campaigns) {
 function performanceToCsv(rows) {
   const header = [
     'Campaign', 'Platform', 'Goal', 'Spend', 'Impressions', 'Reach', 'Clicks',
-    'Engagements', 'Conversions', 'CPM', 'CTR', 'CPC', 'Engagement Rate', 'CPA',
+    'Engagements', 'Conversions', 'CPM', 'CTR', 'CPC', 'Engagement Rate', 'CPE', 'CPA',
     'Video Plays', 'Hook Rate', 'Hold Rate', 'Held Views', 'Avg Watch (s)',
     'Likes', 'Comments', 'Shares', 'Follows', 'Profile Visits',
   ];
@@ -533,6 +542,7 @@ function performanceToCsv(rows) {
       r.ctr != null ? (r.ctr * 100).toFixed(2) : '',
       r.cpc != null ? r.cpc.toFixed(2) : '',
       r.engagementRate != null ? (r.engagementRate * 100).toFixed(2) : '',
+      r.cpe != null ? r.cpe.toFixed(2) : '',
       r.cpa != null ? r.cpa.toFixed(2) : '',
       r.videoPlays ?? '',
       r.hookRate != null ? (r.hookRate * 100).toFixed(2) : '',

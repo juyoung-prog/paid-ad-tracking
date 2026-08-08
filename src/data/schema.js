@@ -307,6 +307,23 @@ export function calcCPA(spend, conversions) {
   return spend / conversions;
 }
 
+/**
+ * CPE(참여당 비용)를 계산한다. (goal=engagement일 때만 의미 있음)
+ *
+ * 왜 필요한가: goal별 표에서 Awareness는 CPM, Traffic은 CPC, Conversion은
+ * CPA를 갖는데 Engagement만 비용 효율 지표 없이 Spend 원액뿐이었다. 그래서
+ * 같은 이벤트의 Meta($1.60/참여)와 TikTok($5.85/참여)이 3.7배 차이 나는데도
+ * 화면에서 비교가 안 됐다(실화면 13-9 리뷰).
+ *
+ * @param {number} spend
+ * @param {number|null} engagements
+ * @returns {number|null}
+ */
+export function calcCPE(spend, engagements) {
+  if (!engagements) return null;
+  return spend / engagements;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
@@ -1057,7 +1074,7 @@ export function getCampaignMetricsRow(campaign, record) {
  * 서로 다른 컬럼 구성의 표로 보여줄 때 이 값을 그대로 쓴다.
  * @param {Campaign} campaign
  * @param {PerformanceRecord} [record]
- * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpa: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
+ * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpe: number|null, cpa: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
  */
 export function getGoalMetricsRow(campaign, record) {
   const spend = record?.spend ?? null;
@@ -1082,6 +1099,7 @@ export function getGoalMetricsRow(campaign, record) {
     ctr: calcCTR(clicks, impressions),
     cpc: spend != null ? calcCPC(spend, clicks) : null,
     engagementRate: calcEngagementRate(engagements, impressions),
+    cpe: spend != null ? calcCPE(spend, engagements) : null,
     cpa: spend != null ? calcCPA(spend, conversions) : null,
     // 아래는 goal과 무관하게 "소재가 어땠는가"를 말하는 값이라 goal별로 고르지 않고
     // 전부 그대로 전달한다. 어떤 목적의 캠페인이든 영상이 붙으면 의미가 있다.
