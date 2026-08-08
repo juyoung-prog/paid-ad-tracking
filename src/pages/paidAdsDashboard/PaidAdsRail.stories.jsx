@@ -1,6 +1,8 @@
 import { MemoryRouter } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { PaidAdsRail, RAIL_WIDTH } from './PaidAdsRail';
+import { PaidAdsStoreProvider } from './PaidAdsStoreProvider';
+import { createMockPaidAdsStore } from './createMockPaidAdsStore';
 
 export default {
   title: 'Paid Ads Dashboard/Layout/PaidAdsRail',
@@ -31,6 +33,17 @@ export default {
 라벨 문제를 정말 풀어야 한다면 레퍼런스 쪽과 함께 바꿔야지 이 앱만 따로 바꾸면
 안 된다.
 
+### 하단 유틸리티 블록 — 레퍼런스와 같은 구성
+\`Last synced {시각}\` → \`Refresh\` → \`Settings\` 순서(13-4 실측). 레퍼런스의
+\`Open Google Sheet\`만 없다 — 그쪽은 데이터 원천이 시트 하나라 그 행이 있고,
+우리 원천은 Meta·TikTok 광고 관리자 둘이라 대응되는 단일 링크가 없다(캠페인
+단위 딥링크는 Drawer가 담당).
+
+Refresh는 Dashboard 헤더의 Sync now와 같은 동작(캠페인 → 성과 순서)이고, 끝나면
+\`paidads:refresh\` 이벤트로 현재 페이지의 스토어에 다시 읽기를 알린다 — 레일은
+어떤 페이지의 스토어에도 직접 접근할 수 없다. Last synced 행은 아이콘이 없어서
+접힘 상태에서는 **높이째** 접힌다(라벨만 숨기면 빈 슬롯이 남는다).
+
 이 프로젝트 전용이라 컴포넌트 라이브러리가 아니라 페이지 폴더에 둔다.
         `,
       },
@@ -40,6 +53,11 @@ export default {
 
 /** 레일은 position:absolute라 높이가 정해진 relative 컨테이너 안에서만 보인다 */
 const RailFrame = ({ path }) => (
+  /* 스토어를 주입해 실조회(useSyncRuns)와 동기화 호출을 끈다 — 레일이 하단
+     유틸리티 데이터를 스스로 읽기 때문에, 안 감싸면 스토리가 Supabase에
+     실제 쿼리를 날린다. 주입 모드에서는 Last synced 행이 숨고(값 없음)
+     Refresh는 보이되 눌러도 아무 일도 안 한다. */
+  <PaidAdsStoreProvider value={ createMockPaidAdsStore() }>
   <MemoryRouter initialEntries={ [path] }>
     <Box sx={ { position: 'relative', isolation: 'isolate', display: 'flex', height: 420 } }>
       <Box aria-hidden sx={ { width: RAIL_WIDTH, flexShrink: 0 } } />
@@ -49,6 +67,7 @@ const RailFrame = ({ path }) => (
       </Box>
     </Box>
   </MemoryRouter>
+  </PaidAdsStoreProvider>
 );
 
 export const Default = {

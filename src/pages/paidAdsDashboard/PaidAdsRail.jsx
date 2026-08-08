@@ -1,6 +1,12 @@
+import { useContext, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import { supabase } from '../../lib/supabase';
+import { useSnackbar } from '../../hooks/useSnackbar';
+import { PaidAdsStoreContext } from './usePaidAdsStore';
+import { useSyncRuns } from './useSyncRuns';
 import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
@@ -73,6 +79,13 @@ const MARK_SIZE = 20;
 const WIDTH_CLASS = 'rail-w';
 /** 펼칠 때만 나타나는 텍스트 */
 const LABEL_CLASS = 'rail-label';
+/**
+ * 펼칠 때만 나타나는 **행**(Last synced). LABEL_CLASS는 행 안의 텍스트만 숨겨서
+ * 접힌 레일에도 행 높이가 남는데, 이 행은 아이콘이 없어서 접힘 상태에 빈 슬롯만
+ * 남긴다 — 레퍼런스의 접힌 레일 하단은 아이콘 3개가 빈틈없이 쌓여 있으므로
+ * 높이째 접는다.
+ */
+const SYNCED_CLASS = 'rail-synced';
 
 /**
  * RailRow — 레일의 한 줄 (아이콘 + 라벨).
@@ -153,6 +166,63 @@ function RailRow({ icon, label, to, isActive = false }) {
 }
 
 /**
+ * RailButton — RailRow의 버튼 판. 링크가 아니라 **동작**(Refresh)을 담는 행이라
+ * NavLink 대신 button으로 그린다. 스타일은 RailRow와 같은 문법을 쓴다 — 하단
+ * 유틸리티 블록에서 링크 행(Settings)과 나란히 놓이므로 시각적으로 갈리면 안 된다.
+ *
+ * Props:
+ * @param {node} icon - 좌측 아이콘 엘리먼트 [Required]
+ * @param {string} label - 라벨. 접힘 상태에서는 접근성 이름으로만 남는다 [Required]
+ * @param {function} onClick - 클릭 핸들러 [Required]
+ * @param {boolean} isBusy - 진행 중 여부. 클릭을 막고 라벨을 바꾸는 건 호출부 책임 [Optional, 기본값: false]
+ */
+function RailButton({ icon, label, onClick, isBusy = false }) {
+  return (
+    <Box
+      component="button"
+      type="button"
+      onClick={ onClick }
+      disabled={ isBusy }
+      aria-label={ label }
+      className={ WIDTH_CLASS }
+      sx={ theme => ({
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.25,
+        width: RAIL_ROW_WIDTH,
+        flexShrink: 0,
+        overflow: 'hidden',
+        whiteSpace: 'nowrap',
+        px: 1.25,
+        py: 0.75,
+        mb: 0.25,
+        border: 0,
+        backgroundColor: 'transparent',
+        borderRadius: `${theme.shape.radius.control}px`,
+        cursor: isBusy ? 'default' : 'pointer',
+        color: 'text.secondary',
+        font: 'inherit',
+        textAlign: 'left',
+        transition: theme.transitions.create(['width', 'background-color'], {
+          duration: 180,
+          easing: theme.transitions.easing.easeOut,
+        }),
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: theme.palette.action.hover },
+        },
+        '& .MuiSvgIcon-root': { fontSize: theme.iconSize.inline, flexShrink: 0 },
+        '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+      }) }
+    >
+      { icon }
+      <Typography variant="body2" className={ LABEL_CLASS } sx={ { fontWeight: 500, lineHeight: 1 } }>
+        { label }
+      </Typography>
+    </Box>
+  );
+}
+
+/**
  * PaidAdsRail
  *
  * 좌측 아이콘 레일 내비게이션. 기본은 아이콘만 보이는 56px 레일이고,
@@ -175,6 +245,32 @@ function RailRow({ icon, label, to, isActive = false }) {
 export function PaidAdsRail({ sx }) {
   const { pathname } = useLocation();
   const isPathActive = (to) => pathname === to || pathname.startsWith(`${to}/`);
+
+  /* 하단 유틸리티의 데이터. Storybook은 스토어를 주입하고 백엔드가 없으므로,
+     주입 여부로 실조회를 끈다 — DashboardPage와 같은 판별. */
+  const injectedStore = useContext(PaidAdsStoreContext);
+  const { lastSuccessAt, refresh: refreshRuns } = useSyncRuns(!injectedStore);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const { notify, SnackbarComponent } = useSnackbar();
+
+  /* Dashboard 헤더의 Sync now와 같은 순서(캠페인 → 성과 — 뒤집으면 방금 들어온
+     캠페인의 성과를 이번 회차에 놓친다). 끝나면 이벤트로 페이지 스토어에
+     "다시 읽어라"를 알린다 — 레일은 어떤 페이지의 스토어에도 접근할 수 없다. */
+  const handleRefresh = async () => {
+    if (isSyncing || injectedStore) return;
+    setIsSyncing(true);
+    const campaignsRes = await supabase.functions.invoke('sync-campaigns');
+    const performanceRes = campaignsRes.error ? null : await supabase.functions.invoke('sync-performance');
+    const failure = campaignsRes.error ?? performanceRes?.error;
+    setIsSyncing(false);
+    if (failure) {
+      notify(`Sync failed — ${failure.message}`, 'error');
+      return;
+    }
+    window.dispatchEvent(new Event('paidads:refresh'));
+    refreshRuns();
+    notify('Sync complete');
+  };
 
   return (
     <Box
@@ -220,6 +316,7 @@ export function PaidAdsRail({ sx }) {
             boxShadow: theme.customShadows.sm,
             [`& .${WIDTH_CLASS}`]: { width: EXPANDED_ROW_WIDTH },
             [`& .${LABEL_CLASS}`]: { opacity: 1 },
+            [`& .${SYNCED_CLASS}`]: { height: 24, opacity: 1 },
           },
         },
         '@media (prefers-reduced-motion: reduce)': {
@@ -296,10 +393,44 @@ export function PaidAdsRail({ sx }) {
           '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
         }) }
       >
+        {/* 레퍼런스의 하단 블록 순서 그대로: Last synced → Refresh → Settings.
+            (레퍼런스의 "Open Google Sheet"만 없다 — 그쪽은 데이터 원천이 시트
+            하나라 그 행이 있고, 우리 원천은 Meta·TikTok 광고 관리자 둘이라
+            대응되는 단일 링크가 없다. 캠페인 단위 딥링크는 Drawer의 Ads
+            Manager 링크가 담당한다.) */}
+        { lastSuccessAt && (
+          <Typography
+            variant="caption"
+            className={ SYNCED_CLASS }
+            sx={ theme => ({
+              display: 'block',
+              px: 1.25,
+              color: 'text.secondary',
+              whiteSpace: 'nowrap',
+              height: 0,
+              opacity: 0,
+              overflow: 'hidden',
+              transition: theme.transitions.create(['height', 'opacity'], { duration: 150 }),
+              '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+            }) }
+          >
+            { `Last synced ${new Date(lastSuccessAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}` }
+          </Typography>
+        ) }
+        {/* 행은 항상 그린다 — 스토어가 주입된 환경(Storybook)에서는 핸들러만
+            조용히 빠진다. 행 자체를 숨기면 스토리가 레퍼런스와 다른 레일을
+            보여주게 된다. */}
+        <RailButton
+          icon={ <RefreshIcon /> }
+          label={ isSyncing ? 'Syncing…' : 'Refresh' }
+          onClick={ handleRefresh }
+          isBusy={ isSyncing }
+        />
         { UTILITY_ITEMS.map(({ to, label, icon }) => (
           <RailRow key={ to } to={ to } icon={ icon } label={ label } isActive={ isPathActive(to) } />
         )) }
       </Box>
+      <SnackbarComponent />
     </Box>
   );
 }

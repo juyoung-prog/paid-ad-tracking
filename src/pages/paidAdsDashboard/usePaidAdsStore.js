@@ -142,6 +142,16 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     return () => { isCancelled = true; };
   }, [isEnabled, fetchAll, applyResult]);
 
+  /* 레일의 Refresh처럼 **페이지 밖**에서 동기화를 돌린 쪽이 "데이터 다시 읽어라"를
+     알릴 통로. 레일은 어떤 페이지 스토어에도 접근할 수 없으므로(각 페이지가
+     자기 스토어 인스턴스를 소유한다) 이벤트로만 신호를 보낸다. */
+  useEffect(() => {
+    if (!isEnabled) return undefined;
+    const onExternalRefresh = () => { refresh(); };
+    window.addEventListener('paidads:refresh', onExternalRefresh);
+    return () => window.removeEventListener('paidads:refresh', onExternalRefresh);
+  }, [isEnabled, refresh]);
+
   /**
    * 계획을 통째로 저장한다(이름·메모 + 항목 전부). 항목은 지우고 다시 넣는다 —
    * 개별 행을 추적해 diff하는 것보다 단순하고, 계획은 한 번에 몇 줄 규모라
