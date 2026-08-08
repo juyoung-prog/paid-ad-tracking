@@ -20,7 +20,7 @@ import Typography from '@mui/material/Typography';
  * 있지 않다.
  *
  * Props:
- * @param {Array<{ label: string, value: number|string, sub?: string, delta?: {text: string, direction?: 'up'|'down'|'flat', tone?: 'good'|'bad'|'neutral'}, isAlert?: boolean, separator?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 "across reported campaigns"처럼 값 아래 붙는 부가 설명(선택). delta는 비교 기준 한 줄로, **실제로 계산 가능한 비교가 있을 때만** 넘긴다(없으면 생략 — 지어내지 않는다). separator:true면 앞에 세로 구분선(1px)을 두어 알림성 항목처럼 나머지와 분리한다(Influencer 레퍼런스의 ALERTS 앞 구분선과 동일). onClick이 있는 항목만 클릭 가능해진다 [Required]
+ * @param {Array<{ label: string, value: number|string, sub?: string, delta?: {text: string, direction?: 'up'|'down'|'flat', tone?: 'good'|'bad'|'neutral'}, isAlert?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 "across reported campaigns"처럼 값 아래 붙는 부가 설명(선택). delta는 비교 기준 한 줄로, **실제로 계산 가능한 비교가 있을 때만** 넘긴다(없으면 생략 — 지어내지 않는다). 항목 사이 세로 구분선은 자동이다(레퍼런스가 모든 KPI 사이에 둔다). onClick이 있는 항목만 클릭 가능해진다 [Required]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
@@ -51,14 +51,15 @@ export function KpiBar({ items, sx }) {
     // Dashboard(live, /beautymaster)를 Playwright로 열어 getComputedStyle로
     // 잰 값이다 — 일반 항목 사이 간격이 정확히 32px, 정렬은 flex-start였다.
     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 4, overflowX: 'auto', ...sx }}>
-      {items.map((item) => (
+      {items.map((item, index) => (
         <Fragment key={item.label}>
-          {item.separator && (
-            // 레퍼런스의 ALERTS 앞 구분선을 그대로 측정한 값: 1px 폭,
-            // 24px 높이, 앞뒤로 컨테이너 gap(32px) 위에 추가 mx:1(8px)씩
-            // 더해서 양쪽 40px 간격이 나온다(레퍼런스 실측: credit→divider
-            // 40px, divider→alerts 40px).
-            <Box sx={{ width: '1px', height: 24, alignSelf: 'center', backgroundColor: 'divider', mx: 1 }} />
+          {/* 구분선은 **모든 항목 사이**에 자동으로 긋는다 — 레퍼런스가 네 KPI
+              사이 전부에 세로선을 둔다(13-1ref 실측). 예전엔 항목별 opt-in
+              (separator prop)이었는데 어떤 호출부도 쓰지 않아서, 결과적으로
+              레퍼런스에 있는 선이 우리 화면에만 없었다. 높이는 라벨+숫자
+              블록을 덮는 40px. */}
+          {index > 0 && (
+            <Box sx={{ width: '1px', height: 40, alignSelf: 'center', backgroundColor: 'divider' }} />
           )}
           <Box
             onClick={item.onClick}
@@ -98,30 +99,28 @@ export function KpiBar({ items, sx }) {
               }),
             }}
           >
-            {/* 라벨이 숫자 "위"에 온다 — 실제 Influencer Tracking Dashboard
-                레퍼런스 이미지로 확인한 배치. 이전엔 숫자 옆에 나란히 뒀는데
-                (03-visual-direction.md의 글로 된 스펙만 보고 추정한 배치라
-                실제와 달랐다), 실제 레퍼런스는 라벨-숫자를 세로로 쌓는다.
+            {/* 라벨이 숫자 "위"에 온다 — 레퍼런스(influencer tracking dashboard)
+                실측 배치. 스타일도 실측값 그대로다: 12px / 400 / 문장형.
 
-                라벨은 테마의 label 토큰(13/600 uppercase)을 쓴다. 예전엔 11px
-                (0.6875rem)을 이 파일에만 박아뒀는데, 그 값은 앱 어디에도 없는
-                고아 크기였다 — 표 컬럼 헤더와 같은 역할(값 위의 이름표)이니
-                같은 토큰을 쓴다. */}
+                한때 label 토큰(13/600 대문자)으로 바꿨다가 되돌렸다 — "표 컬럼
+                헤더와 같은 역할이니 같은 토큰"이라는 논리였는데, 레퍼런스의 KPI
+                라벨은 보통 굵기 문장형("Agreement")이다. 이 프로젝트의 1순위
+                규칙은 "같은 회사 툴군처럼 보이기"라 일반화보다 실측이 먼저다
+                (실사용 지적: "무조건 똑같이"). */}
             <Typography
-              variant="label"
+              variant="caption"
               component="span"
               sx={{
                 display: 'block',
+                fontWeight: 400,
                 whiteSpace: 'nowrap',
                 color: item.isAlert ? 'error.main' : 'text.secondary',
               }}
             >
               {item.label}
             </Typography>
-            {/* 값은 display 토큰(28px). 예전엔 h4(24px)였는데, 그건 "문서가
-                요구한 32px는 과하다"는 판단으로 고른 공유 스케일의 근사값이었지
-                이 자리를 위해 정한 값이 아니었다 — $93,276.65가 옆 목록의
-                16px 캠페인명에 눌렸다. 32와 24 사이를 이 역할의 값으로 고정한다. */}
+            {/* 값은 display 토큰(24px) — 레퍼런스 KPI 실측값. 한때 28px로
+                올렸다가 되돌렸다(테마의 display 주석 참고). */}
             <Typography
               variant="display"
               component="span"
