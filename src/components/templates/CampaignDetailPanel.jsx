@@ -144,7 +144,11 @@ export function CampaignDetailPanel({
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* 바깥으로 나가는 문 두 개 — Dashboard 편집 드로어와 같은 쌍이다.
+        {/* 바깥으로 나가는 문만 남긴다 — Close 버튼은 뺐다: 우상단 ✕,
+            바깥 클릭, ESC까지 닫는 길이 이미 셋이라 네 번째는 자리만 먹는다
+            (실사용 지적). 이 줄의 버튼은 전부 "다른 곳으로 간다"로 통일된다.
+
+            Dashboard 편집 드로어와 같은 쌍이다.
             View ad는 실제 게시물(creativeUrl, 사람이 입력한 링크), Ads Manager는
             플랫폼 관리 화면(외부 id로 결정론적 생성, Meta만 — TikTok은 캠페인
             단위 딥링크가 안정적으로 구성되지 않아 호출부가 안 넘긴다).
@@ -189,7 +193,6 @@ export function CampaignDetailPanel({
               Edit on Dashboard
             </Button>
           )}
-          <Button size="small" onClick={onClose}>Close</Button>
         </Box>
       </Box>
     </Drawer>
