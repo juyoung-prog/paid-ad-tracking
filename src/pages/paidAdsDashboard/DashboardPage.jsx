@@ -32,7 +32,6 @@ import { AlertBanner } from '../../components/data-display/AlertBanner';
 import { PacingIndicator } from '../../components/data-display/PacingIndicator';
 import { CampaignTable } from '../../components/data-display/CampaignTable';
 import { CampaignThumbnail } from '../../components/media/CampaignThumbnail';
-import { LastUpdatedBar } from '../../components/layout/LastUpdatedBar';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
@@ -41,7 +40,6 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
-import { supabase } from '../../lib/supabase';
 import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl } from './paidAdsPageUtils';
 import { money, moneyWhole } from '../../utils/format';
 import { useViewUrlSync } from './useViewUrlSync';
@@ -224,7 +222,7 @@ export function DashboardPage() {
   // 유틸리티 화면)에만 격리돼 있으면 낡은 spend로 pacing을 판단하게 된다.
   // 스토어가 주입된 환경(Storybook)에서는 백엔드가 없으므로 조회하지 않는다.
   const injectedStore = useContext(PaidAdsStoreContext);
-  const { lastSuccessAt, recentFailures } = useSyncRuns(!injectedStore);
+  const { recentFailures } = useSyncRuns(!injectedStore);
 
   /* 초기값은 localStorage에서만 읽는다. URL이 있으면 useViewUrlSync가 마운트
      직후 덮어쓴다 — 우선순위는 URL > localStorage > 기본값이다. */
@@ -545,10 +543,6 @@ export function DashboardPage() {
     (c) => !c.campaignGroup && c.manualStatus !== MANUAL_STATUS.ARCHIVED,
   );
 
-  const lastUpdatedAt = campaigns.length
-    ? campaigns.reduce((latest, c) => (c.updatedAt > latest ? c.updatedAt : latest), campaigns[0].updatedAt)
-    : null;
-
   // 카드 그리드에서 실집행 예산을 보려면 지금까지는 Drawer를 열어야 했다 —
   // performanceRecords에 이미 있는 값을 카드에도 그대로 넘긴다.
   const spendFor = (campaignId) => {
@@ -597,28 +591,6 @@ export function DashboardPage() {
   const isDrawerDirty = () =>
     JSON.stringify(editCampaignValues) !== JSON.stringify(originalCampaignSnapshot) ||
     JSON.stringify(performanceValues) !== JSON.stringify(originalPerformanceSnapshot);
-
-  /* 헤더의 "Sync now". Settings에도 같은 동작이 있지만, 데이터가 안 맞아 보일 때
-     사용자가 있는 곳은 이 목록 화면이고 바로 왼쪽에 "Last synced"가 있다 —
-     의심이 드는 자리에 해결 수단을 둔다.
-
-     캠페인을 먼저 맞춘 뒤 성과를 가져온다(Settings와 동일) — 순서가 바뀌면 방금
-     들어온 캠페인의 성과를 이번 회차에 놓친다. */
-  const [isSyncing, setIsSyncing] = useState(false);
-  const handleSyncNow = async () => {
-    if (isSyncing) return;
-    setIsSyncing(true);
-    const campaignsRes = await supabase.functions.invoke('sync-campaigns');
-    const performanceRes = campaignsRes.error ? null : await supabase.functions.invoke('sync-performance');
-    const failure = campaignsRes.error ?? performanceRes?.error;
-    setIsSyncing(false);
-    if (failure) {
-      notify(`Sync failed — ${failure.message}`, 'error');
-      return;
-    }
-    await refresh();
-    notify('Sync complete');
-  };
 
   const requestCloseDrawer = () => {
     if (isDrawerDirty()) {
@@ -785,14 +757,6 @@ export function DashboardPage() {
               label={`Sync failed (${recentFailures.length})`}
             />
           )}
-          {/* 기준 시각은 동기화 성공 시각(lastSuccessAt)이 우선 — 예전엔 캠페인
-              updatedAt 최댓값이라, 동기화가 죽어도 캠페인을 편집만 하면 갱신돼
-              오히려 신선해 보였다. 동기화 기록이 없는 환경(Storybook, 연결 전)
-              에서만 기존 값으로 대체한다. */}
-          <LastUpdatedBar
-            label={lastSuccessAt ? 'Last synced' : 'Last updated'}
-            lastUpdatedAt={lastSuccessAt ?? lastUpdatedAt}
-          />
           <IconButton
             size="small"
             onClick={(event) => setBellAnchorEl(event.currentTarget)}
@@ -836,26 +800,12 @@ export function DashboardPage() {
               )}
             </Box>
           </Popover>
-          {/* 예전엔 여기가 "New Campaign"이었다. 뺀 이유: 이 앱은 광고 플랫폼의
-              거울이라 캠페인의 원본이 항상 Meta/TikTok에 있다. 여기서 만든
-              캠페인은 external_campaign_id가 없어 sync-performance가 걸러내므로
-              (`.not('external_campaign_id','is',null)`) 성과가 영원히 자동으로
-              안 들어오는 반쪽짜리가 되고, 나중에 진짜 캠페인이 동기화되면 중복이
-              된다. 실제로 전체 170건이 전부 동기화본이고 수동 생성은 0건이었다 —
-              쓰이지도 않으면서 화면에서 가장 강한 요소였다.
-
-              대신 바로 왼쪽 "Last synced"와 짝이 되는 동작을 둔다. 데이터가 안
-              맞아 보일 때 실제로 원하는 건 "다시 가져와"인데 그 버튼은 Settings에
-              묻혀 있었다. 매일 크론이 도는 보조 동작이라 강조는 낮춘다. */}
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={handleSyncNow}
-            disabled={isSyncing}
-            sx={{ gap: 0.75, boxShadow: 'none' }}
-          >
-            {isSyncing ? 'Syncing…' : 'Sync now'}
-          </Button>
+          {/* 예전엔 여기에 "Last synced"와 "Sync now"가 있었다(그 전에는 New
+              Campaign — 이 앱은 캠페인을 만들지 않아 뺐다). 레일 하단 유틸리티
+              블록에 같은 정보·같은 동작이 생기면서 화면에 둘씩 중복됐고, 레퍼런스
+              (influencer tracking dashboard)도 이 자리에 동기화 UI가 없다 —
+              그쪽은 처음부터 레일 하단이 그 역할이다. 헤더에는 벨(알림)만 남긴다.
+              벨은 동기화가 아니라 이 앱 고유의 알림 진입점이다. */}
         </Box>
       </Box>
 
