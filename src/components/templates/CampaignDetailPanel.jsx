@@ -128,8 +128,8 @@ export function CampaignDetailPanel({
           />
         )}
 
-        {/* 표에서 뺀 지표(Reach·Plays·Comments·Shares·Follows·Visits)가 전부
-            여기 있다. 값이 없는 항목은 이 컴포넌트가 알아서 숨긴다. */}
+        {/* 전 지표를 세로로 한눈에 — 표에도 같은 값이 있지만 여기서는 한
+            캠페인만 놓고 읽는다. 값이 없는 항목은 이 컴포넌트가 알아서 숨긴다. */}
         <PlatformMetricList metrics={performance} sx={{ mb: 3 }} />
 
         {!performance && (

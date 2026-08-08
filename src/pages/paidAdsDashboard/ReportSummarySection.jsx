@@ -250,9 +250,8 @@ function goalExtraColumns(goalValue) {
   switch (goalValue) {
     case GOAL.AWARENESS:
       return [
-        /* Reach는 뺐다 — Impressions와 강하게 붙어 다니는 값이고, 둘의 비(빈도)를
-           이 표에서 직접 쓰는 판단이 없다. 상세 패널에는 그대로 남는다. */
         metricColumn('Impressions', (r) => r.impressions, fmtNumber, { width: 140, note: NOTE.impressions }),
+        metricColumn('Reach', (r) => r.reach, fmtNumber, { width: 104, note: NOTE.reach }),
         metricColumn('CPM', (r) => r.cpm, fmtCurrency, { width: 104, note: NOTE.cpm, hasBenchmark: true }),
       ];
     case GOAL.TRAFFIC:
@@ -302,11 +301,8 @@ const fmtSeconds = seconds;
 // width는 라벨이 한 줄에 들어가는 최소치로 잡은 고정값이다 — 표마다 auto로
 // 맞추면 goal 표끼리 같은 컬럼의 폭이 달라져서, 세로로 훑을 때 그룹 구분선이
 // 섹션마다 지그재그로 밀린다(실화면 스크린샷 리뷰로 발견).
-/* Plays(총 재생수)는 뺐다 — 영상 광고에서는 Impressions와 사실상 같은 축이라
-   같은 표에 절대 숫자를 하나 더 얹을 뿐이었다. 소재가 얼마나 붙잡았는지는
-   Hook·Hold·Watch가 비율로 말하고, 완전 시청 **건수**는 Completed가 남는다.
-   빠진 값은 캠페인 상세 패널(PlatformMetricList)에 그대로 있다. */
 const CREATIVE_VIDEO_COLUMNS = [
+  metricColumn('Plays', (r) => r.videoPlays, fmtNumber, { width: 96, note: `Video plays. ${NOTE.videoPlays}` }),
   // Hook Rate = 초반 시청 / 노출, Hold Rate = 완전 시청 / 초반 시청.
   /* 폭 104 → 124. 헤더에 기준선(`med 21.89%`)이 붙으면서 104px로는 라벨·ⓘ·
      기준선이 세 줄로 쪼개졌다(실화면 12-12). 기준선이 들어갈 자리를 준다. */
@@ -319,25 +315,27 @@ const CREATIVE_VIDEO_COLUMNS = [
 /* 폭은 "라벨 한 줄 + (있으면) ⓘ + 좌우 패딩"이 들어가는 최소치로 잡는다.
    헤더에 nowrap을 걸었기 때문에 부족하면 줄바꿈 대신 옆 컬럼을 침범한다.
 
-   ## Comments·Shares·Follows·Visits를 왜 뺐나
-   한때 이 넷을 토글로 접었다 폈다 할 수 있게 뒀는데, **토글을 눌러도 화면이
-   안 변했다**(실사용 신고). 데이터가 없어서가 아니다 — Awareness 39건 중
-   comments 29·follows 26건에 값이 있다. 문제는 위치였다: 접힌 표가 이미
-   1,584px이고 화면 콘텐츠 폭이 1,648px이라, 펴면 388px이 통째로 오른쪽 화면
-   밖으로 나갔다. 있으나 마나 한 컨트롤이었다.
+   ## 전 컬럼을 보여준다 — 가로 스크롤은 결함이 아니다
 
-   그리고 이 다섯은 **캠페인 상세(드로어)의 PlatformMetricList가 이미 전부**
-   보여준다. 표에서 행을 클릭하면 그리로 간다. 거기는 폭 제약이 없고 값 없는
-   지표는 알아서 숨기므로 원래 그 자리가 맞다. 표는 "캠페인끼리 비교"가 일이고,
-   화면 밖에 있는 컬럼은 비교에 아무 기여를 못 한다.
+   이 다섯 중 넷(Comments·Shares·Follows·Visits)을 한동안 표에서 빼고 상세
+   패널에만 뒀다. "Follows·Visits는 TikTok 전용이라 Meta 행 67%에서 항상
+   '—'"라는 이유였는데, 결국 만든 사람조차 "왜 Likes에서 끝나나"를 다시
+   물었다 — ⓘ 툴팁 하나로는 어디 갔는지 알 수 없었다.
 
-   Likes만 남긴다 — 화면 안에 들어오고, 39건 중 36건에 값이 있어 실제로
-   훑어 비교된다. */
+   결정적으로, **이 도구의 사용자가 매일 쓰는 Meta 광고 관리자가 가로 스크롤
+   테이블이다**(실화면 13-12) — '—' 셀도 그대로 두고, 첫 컬럼을 고정한 채
+   옆으로 넘긴다. 그게 이 도구 카테고리의 표준 문법이고, 우리도 같은 장치가
+   이미 있다(Campaign sticky + 스크롤 그림자). 스크롤을 없애겠다고 데이터를
+   클릭 뒤로 숨기는 쪽이 오히려 비표준이었다.
+
+   전부 비어 있는 컬럼은 keep()이 표 단위로 자동으로 걷어낸다 — Meta만 있는
+   표에서는 Follows·Visits가 알아서 빠진다. */
 const CREATIVE_ENGAGEMENT_COLUMNS = [
-  metricColumn('Likes', (r) => r.likes, fmtNumber, {
-    width: 88,
-    note: 'Comments, shares, follows and profile visits are on the campaign detail — click a row.',
-  }),
+  metricColumn('Likes', (r) => r.likes, fmtNumber, { width: 88 }),
+  metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 96 }),
+  metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88 }),
+  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 108, note: NOTE.follows }),
+  metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { width: 96, note: `Profile visits. ${NOTE.profileVisits}` }),
 ];
 /**
  * 컬럼 폭 체계. tableLayout:'fixed' + colgroup으로 강제한다.

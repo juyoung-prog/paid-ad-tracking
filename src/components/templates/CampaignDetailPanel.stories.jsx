@@ -23,7 +23,7 @@ const CAMPAIGN = {
   creativeUrl: '',
 };
 
-/** TikTok은 follows·profileVisits까지 준다 — 표에서 뺀 지표가 여기 다 보이는지 확인용. */
+/** TikTok은 follows·profileVisits까지 준다 — 전 지표가 세로로 다 보이는지 확인용. */
 const PERFORMANCE = {
   id: 'p-1',
   campaignId: 'c-1',
@@ -73,9 +73,10 @@ DashboardPage 상태에 얽혀 있기도 하다.
 여기서는 읽기만 한다. 고칠 게 있으면 \`Edit on Dashboard\`로 간다 — 당하는 이동이
 아니라 고르는 이동이 된다.
 
-### 표에서 뺀 지표가 여기 있다
-\`Reach · Plays · Comments · Shares · Follows · Visits\`는 표 폭을 위해 뺐고, 전부 이
-패널의 \`PlatformMetricList\`에 있다. 값이 없는 항목은 그 컴포넌트가 알아서 숨긴다.
+### 전 지표를 세로로 한눈에
+표에도 같은 값이 있지만(전 컬럼 노출 + 가로 스크롤 — Meta 광고 관리자와 같은
+문법), 이 패널은 **한 캠페인만** 놓고 읽는 자리다. 값이 없는 항목은
+\`PlatformMetricList\`가 알아서 숨긴다.
         `,
       },
     },
@@ -111,7 +112,7 @@ function Harness({ campaign, performance }) {
  * - 계획 예산이 0으로 저장돼 있어도 일일예산×기간으로 복원된 값이 뜬다
  *   (effectiveBudgetPlanned, $25 × 57일 = $1,425)
  * - Budget Pacing 블록이 나온다
- * - 표에서 뺀 `Reach · Plays · Comments · Shares · Follows · Visits`가 모두 보인다
+ * - `Reach · Plays · Comments · Shares · Follows · Visits`까지 전 지표가 보인다
  * - `Avg Watch`는 `1.01s` — TikTok이 준 소수를 그대로 쓴다
  */
 export const WithPerformance = {
