@@ -20,7 +20,6 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RestoreIcon from '@mui/icons-material/Restore';
@@ -212,7 +211,6 @@ export function DashboardPage() {
     error,
     refresh,
     updateCampaign,
-    deleteCampaign,
     upsertPerformanceRecord,
   } = usePaidAdsStore();
 
@@ -238,13 +236,13 @@ export function DashboardPage() {
   const [editCampaignValues, setEditCampaignValues] = useState(emptyCampaignValues);
   const [performanceValues, setPerformanceValues] = useState({});
   const [bellAnchorEl, setBellAnchorEl] = useState(null);
-  // 삭제는 되돌릴 수 없어서(수정처럼 "미저장 변경 취소"가 안 됨) 바로 지우지
-  // 않고 확인 Dialog를 한 번 거친다 — 기존 미저장 변경 확인(discardTarget)과
-  // 같은 톤이지만 별도 state로 둔다: 저건 "닫아도 되나"고 이건 "정말 지워도
-  // 되나"라 의미가 달라서 하나로 합치면 조건 분기가 헷갈린다.
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  /* Delete 버튼은 있다가 뺐다(실사용 결정). 이 앱의 캠페인은 전부 동기화본이라
+     지워도 다음 동기화 때 external_campaign_id 대조로 **되살아나는데**, Event
+     태그·업로드 썸네일·메모 같은 사람이 채운 값만 영구히 사라진 채 맨몸으로
+     돌아온다 — 경고 없는 함정이었다. 플랫폼에서 지워져 남은 유령 캠페인은
+     Archive가 대신한다(화면에서 빠지고, 데이터는 남고, 되돌릴 수 있다). */
   const [isBulkTagOpen, setIsBulkTagOpen] = useState(false);
-  // 쓰기 진행 중 재진입 가드 — 저장/삭제가 도는 동안 같은 요청이 두 번 나가는 것을 막는다.
+  // 쓰기 진행 중 재진입 가드 — 저장이 도는 동안 같은 요청이 두 번 나가는 것을 막는다.
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -636,34 +634,18 @@ export function DashboardPage() {
     notify('Campaign details saved');
   };
 
-  const handleConfirmDelete = async () => {
-    if (isSubmitting) return;
-    setIsSubmitting(true);
-    // 확인 다이얼로그를 먼저 닫는다 — await 뒤에 닫으면 열린 채로 남아 두 번째
-    // 클릭이 그대로 나가고, 두 번째 삭제도 "성공"으로 판정돼 스낵바가 두 번 뜬다.
-    setDeleteConfirmOpen(false);
-    const isDeleted = await deleteCampaign(selectedCampaignId);
-    setIsSubmitting(false);
-    if (!isDeleted) {
-      notify('Delete failed — the campaign is unchanged.', 'error');
-      return;
-    }
-    setSelectedCampaignId(null);
-    notify('Campaign deleted');
-  };
-
   /**
-   * End early / Archive / 복귀 — manualStatus(status SSOT의 유일한 수동
-   * override)를 실제로 설정하는 UI 경로. 지금까지 표시·탭 분류·알림은 이
-   * 상태를 아는데 설정할 방법이 없어서, budget_pacing 알림("지금도 돈이
-   * 나가는 중")을 보고 Drawer를 열어도 할 수 있는 조치가 없었다 — 개념
-   * 모델에만 있는 동사였다. 삭제와 달리 manualStatus를 비우면(Restore)
+   * Archive / 복귀 — manualStatus(status SSOT의 유일한 수동 override)를
+   * 설정하는 UI 경로. manualStatus를 비우면(Restore) 날짜 계산으로
    * 되돌아가므로 확인 Dialog 없이 스낵바로만 알린다.
+   * (한때 End early도 여기서 걸었지만 버튼을 뺐다 — 실제 광고를 멈추지
+   * 않는데 멈춘 것처럼 읽히는 함정. 이미 달린 ended_early 표식의 해제는
+   * 여전히 이 경로다.)
    *
    * 저장 성공 시 편집 폼과 스냅샷의 manualStatus도 같이 맞춘다 — 안 맞추면
    * 이후 "Save Campaign Details"가 폼에 남은 옛 manualStatus로 방금 바꾼
-   * 상태를 조용히 되돌린다(예: End early 직후 이름을 고쳐 저장하면 캠페인이
-   * 다시 active가 되는 버그).
+   * 상태를 조용히 되돌린다(예: Archive 직후 이름을 고쳐 저장하면 캠페인이
+   * 목록에 되살아나는 버그).
    */
   const handleSetManualStatus = async (manualStatus) => {
     const result = await updateCampaign(selectedCampaignId, { manualStatus });
@@ -1175,24 +1157,6 @@ export function DashboardPage() {
         </DialogActions>
       </Dialog>
 
-      {/* 캠페인 삭제 확인 — 수정과 달리 되돌릴 방법이 없어서(Discard처럼 "그냥
-          닫으면 원래 저장값이 남아있는" 게 아니라 데이터 자체가 사라짐) 별도
-          Dialog로 한 번 더 확인한다. */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Delete this campaign?</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2" color="text.secondary">
-            {selectedCampaign?.name} and its performance data will be permanently deleted. This can't be undone.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
-          <Button color="error" onClick={handleConfirmDelete}>
-            Delete Campaign
-          </Button>
-        </DialogActions>
-      </Dialog>
-
       {/* 캠페인 상세 Drawer */}
       <Drawer anchor="right" open={Boolean(selectedCampaign)} onClose={requestCloseDrawer}>
         {selectedCampaign && (
@@ -1260,16 +1224,6 @@ export function DashboardPage() {
                     </IconButton>
                   </Tooltip>
                 )}
-                <Tooltip title="Delete Campaign">
-                  <IconButton
-                    size="small"
-                    color="error"
-                    onClick={() => setDeleteConfirmOpen(true)}
-                    aria-label="Delete Campaign"
-                  >
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
               </Box>
             </Box>
 
