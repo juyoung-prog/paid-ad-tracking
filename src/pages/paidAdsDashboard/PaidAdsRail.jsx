@@ -249,7 +249,7 @@ export function PaidAdsRail({ sx }) {
   /* 하단 유틸리티의 데이터. Storybook은 스토어를 주입하고 백엔드가 없으므로,
      주입 여부로 실조회를 끈다 — DashboardPage와 같은 판별. */
   const injectedStore = useContext(PaidAdsStoreContext);
-  const { lastSuccessAt, refresh: refreshRuns } = useSyncRuns(!injectedStore);
+  const { lastSuccessAt } = useSyncRuns(!injectedStore);
   const [isSyncing, setIsSyncing] = useState(false);
   const { notify, SnackbarComponent } = useSnackbar();
 
@@ -267,8 +267,9 @@ export function PaidAdsRail({ sx }) {
       notify(`Sync failed — ${failure.message}`, 'error');
       return;
     }
+    /* 이벤트 하나로 끝낸다 — 페이지 스토어와 useSyncRuns 인스턴스 전부가
+       이 신호를 듣는다(자기 것만 직접 refetch하면 다른 화면이 낡은 채 남는다). */
     window.dispatchEvent(new Event('paidads:refresh'));
-    refreshRuns();
     notify('Sync complete');
   };
 

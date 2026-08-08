@@ -1039,6 +1039,34 @@ Deno.serve(async (req) => {
     }
   }
 
+
+  /* 완전 성공을 sync_runs에 **함수가 직접** 기록한다.
+
+     이 테이블은 원래 cron 래퍼(invoke_sync_function)만 썼다 — pg_net이 비동기라
+     응답을 못 보는 호출 지점 대신, 요청 id를 남겨두고 checker가 나중에 결과를
+     기록하는 구조다. 그래서 브라우저에서 수동으로 부른 실행(레일 Refresh,
+     Settings Sync now)은 아무 기록도 안 남았고, 레일의 "Last synced"가 Refresh
+     버튼 바로 위에 있는데도 누른 뒤 시각이 그대로였다 — 고장으로 읽힌다
+     (실사용 점검으로 발견).
+
+     성공만 기록한다. 실패 기록은 이미 주인이 있다 — cron 실패는 checker가
+     남기고(조용한 실패라 기록이 꼭 필요), 수동 실패는 지켜보는 사용자에게
+     스낵바로 즉시 알린다. 여기서 207까지 기록하면 cron 경로에서 checker와
+     이중 기록이 되어 "Sync failed (N)" 칩이 한 사고를 두 번 센다.
+
+     기록 실패는 삼킨다 — 동기화 자체는 이미 성공했는데 로그 한 줄 때문에
+     실패로 보고하면 재시도가 멀쩡한 동기화를 또 돌린다. */
+  if (errors.length === 0) {
+    const { error: logError } = await admin.from('sync_runs').insert({
+      fn_name: 'sync-campaigns',
+      status: 'success',
+      status_code: 200,
+      response: 'self-reported on completion',
+      checked_at: new Date().toISOString(),
+    });
+    if (logError) console.error('sync_runs 자가 기록 실패(동기화는 성공)', logError.message);
+  }
+
   // 실패가 있으면 200으로 "성공"이라 말하지 않는다 — 예전 버전이 저장 결과를 보지 않고
   // 가져온 건수만 세는 바람에, 0건 저장하고도 10건 동기화했다고 보고했다.
   return new Response(JSON.stringify({ synced: results, errors }), {

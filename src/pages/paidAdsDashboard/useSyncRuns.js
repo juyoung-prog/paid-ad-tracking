@@ -73,6 +73,17 @@ export function useSyncRuns(isEnabled = true) {
     return () => { isCancelled = true; };
   }, [isEnabled, fetchRuns, applyResult]);
 
+  /* 수동 동기화(레일 Refresh, Settings Sync now)가 끝나면 쏘는 이벤트.
+     이 훅은 화면마다 인스턴스가 따로라(레일의 Last synced, Dashboard의 실패
+     칩, Settings의 기록), 동기화를 돌린 쪽만 자기 인스턴스를 refetch하면
+     나머지 화면이 낡은 값으로 남는다 — 전부가 같은 신호를 듣는다. */
+  useEffect(() => {
+    if (!isEnabled) return undefined;
+    const onExternalRefresh = () => { refresh(); };
+    window.addEventListener('paidads:refresh', onExternalRefresh);
+    return () => window.removeEventListener('paidads:refresh', onExternalRefresh);
+  }, [isEnabled, refresh]);
+
   const lastSuccessAt = runs.find((r) => r.status === 'success')?.checkedAt ?? null;
 
   // 마지막 성공 이후의 실패만 보여준다. 이미 뒤이어 성공한 실패까지 계속 띄우면

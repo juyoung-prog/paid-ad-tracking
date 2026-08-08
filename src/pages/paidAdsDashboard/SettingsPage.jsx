@@ -93,9 +93,9 @@ const EXPIRY_WARNING_DAYS = 14;
 export function SettingsPage() {
   // campaigns·today는 선불 잔액이 며칠치인지 계산하는 데 쓴다(진행중 캠페인의
   // 일일 예산 합이 분모).
-  const { adAccounts, campaigns, today, refresh: refreshStore } = usePaidAdsStore();
+  const { adAccounts, campaigns, today } = usePaidAdsStore();
   const { connections, isLoading, error, refresh: refreshConnections } = useConnections();
-  const { lastSuccessAt, recentFailures, refresh: refreshRuns } = useSyncRuns();
+  const { lastSuccessAt, recentFailures } = useSyncRuns();
   const [syncState, setSyncState] = useState({ isRunning: false, message: null, severity: 'info' });
 
   const accountById = new Map(adAccounts.map((a) => [a.id, a]));
@@ -139,7 +139,11 @@ export function SettingsPage() {
       return;
     }
 
-    await Promise.all([refreshStore(), refreshConnections(), refreshRuns()]);
+    /* 스토어·동기화 기록은 이벤트로 갱신한다 — 레일의 Last synced 같은 다른
+       화면 인스턴스까지 같은 신호를 들어야 낡은 값이 안 남는다(직접 refetch는
+       자기 인스턴스만 갱신한다). 연결 목록은 이 화면 전용이라 직접 부른다. */
+    window.dispatchEvent(new Event('paidads:refresh'));
+    await refreshConnections();
     setSyncState({
       isRunning: false,
       message: `Sync complete — ${performanceRes?.data?.synced ?? 0} performance record${(performanceRes?.data?.synced ?? 0) === 1 ? '' : 's'} updated`,
