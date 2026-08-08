@@ -117,6 +117,7 @@ export const ALERT_TYPE = Object.freeze({
  * @property {'ended_early'|'archived'|null} manualStatus - 유일한 수동 override. status SSOT 규칙 참고
  * @property {string|null} creativeUrl - URL, Ads Manager 소재/캠페인 링크 또는 실제 영상/게시물 링크. "View Ad" 외부 링크로만 쓰임(사람이 타이핑)
  * @property {string|null} thumbnailUrl - 이미지(업로드 전용, data URI 또는 정적 파일 경로). CampaignThumbnail 미리보기로만 쓰임(없으면 플랫폼색 이니셜 대체) — creativeUrl과는 별개 값
+ * @property {string|null} adLink - 소비자가 보는 실제 광고 게시물 링크(서버 소유 — 동기화가 썸네일과 같은 광고에서 뽑아 채움). View ad는 creativeUrl(수동) 우선, 없으면 이 값
  * @property {string|null} notes
  * @property {string} createdAt - ISO 8601 datetime
  * @property {string} updatedAt - ISO 8601 datetime

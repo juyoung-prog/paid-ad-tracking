@@ -80,6 +80,8 @@ export function CampaignDetailPanel({
   if (!campaign) return null;
 
   const spend = performance?.spend ?? null;
+  // 수동 링크(creativeUrl)가 있으면 그쪽 우선 — 사람이 굳이 입력한 데는 이유가 있다.
+  const viewAdHref = campaign.creativeUrl || campaign.adLink || null;
   const planned = effectiveBudgetPlanned(campaign);
   const pacing = calcBudgetPacing(campaign, spend ?? 0, today);
   const showPacing = spend != null && (planned != null || campaign.budgetDaily != null);
@@ -149,10 +151,10 @@ export function CampaignDetailPanel({
             성과가 이상해 보일 때 다음 행동이 "원본을 열어 확인"이라, 그 문이
             이 패널에 없으면 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {campaign.creativeUrl && (
+          {viewAdHref && (
             <Button
               component="a"
-              href={campaign.creativeUrl}
+              href={viewAdHref}
               target="_blank"
               rel="noopener noreferrer"
               variant="outlined"

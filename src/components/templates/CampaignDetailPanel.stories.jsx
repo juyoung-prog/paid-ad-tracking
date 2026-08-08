@@ -74,8 +74,12 @@ DashboardPage 상태에 얽혀 있기도 하다.
 아니라 고르는 이동이 된다.
 
 ### 바깥으로 나가는 문 두 개
-\`View ad\`(실제 게시물 — campaign.creativeUrl)와 \`Ads Manager\`(플랫폼 관리
-화면 — Meta만, 호출부가 adsManagerUrl로 계산해 \`adsManagerHref\`로 넘긴다).
+\`View ad\`는 **소비자가 보는 실제 광고 게시물**로 간다 — creativeUrl(수동 입력)이
+있으면 그쪽 우선, 없으면 동기화가 채운 adLink(썸네일과 같은 광고에서 뽑은
+게시물 주소: Meta는 부스팅 원본 게시물 permalink 또는 미리보기 링크, TikTok은
+Spark 광고의 공개 영상 주소 — 업로드 소재 다크 광고는 공개 게시물이 없어 null).
+\`Ads Manager\`는 플랫폼 관리 화면(Meta만, 호출부가 adsManagerUrl로 계산해
+\`adsManagerHref\`로 넘긴다).
 성과가 이상해 보일 때 다음 행동은 "원본을 열어 확인"이라, 이 문이 없으면
 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. 링크 규칙은 pages 레이어의
 것이라 이 컴포넌트는 href를 받기만 한다 — 컴포넌트가 pages를 임포트하면 의존
@@ -142,14 +146,14 @@ export const NoPerformance = {
  * 외부 링크가 둘 다 있는 캠페인.
  *
  * 확인 포인트:
- * - `View ad` — creativeUrl이 있을 때만 나타난다
+ * - `View ad` — creativeUrl(수동, 우선) 또는 adLink(동기화)가 있을 때 나타난다
  * - `Ads Manager` — adsManagerHref가 넘어왔을 때만(Meta 캠페인) 나타난다
  * - 둘 다 새 탭(target=_blank)이고, 없는 링크는 빈 버튼 대신 아예 안 그린다
  */
 export const WithExternalLinks = {
   render: () => (
     <Harness
-      campaign={{ ...CAMPAIGN, id: 'c-3', platform: PLATFORM.META, creativeUrl: 'https://www.facebook.com/beautymaster/posts/123' }}
+      campaign={{ ...CAMPAIGN, id: 'c-3', platform: PLATFORM.META, creativeUrl: '', adLink: 'https://www.facebook.com/1234567890/posts/9876543210' }}
       performance={PERFORMANCE}
       adsManagerHref="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123&selected_campaign_ids=456"
     />

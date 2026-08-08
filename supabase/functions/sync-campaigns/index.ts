@@ -223,6 +223,7 @@ type CampaignRow = {
   budget_daily: number | null;
   goal: string;
   thumbnail_url: string | null;
+  ad_link: string | null;
 };
 
 function toISODate(value: Date) {
@@ -344,9 +345,15 @@ async function fetchMetaCampaigns(accessToken: string, externalAccountId: string
  * 동기화 전체가 "실패"로 표시되면 예산·성과가 멀쩡히 들어왔는데도 사용자가
  * 잘못된 신호를 받는다.
  */
-async function fetchMetaThumbnails(accessToken: string, externalAccountId: string): Promise<Map<string, string>> {
-  const byCampaign = new Map<string, string>();
-  const fields = 'campaign_id,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url}';
+/** 캠페인당 대표 광고 하나에서 뽑은 소재 정보 — 썸네일과 공개 링크가 같은 광고에서 나온다. */
+type CreativeInfo = { thumb: string | null; link: string | null };
+
+async function fetchMetaThumbnails(accessToken: string, externalAccountId: string): Promise<Map<string, CreativeInfo>> {
+  const byCampaign = new Map<string, CreativeInfo>();
+  /* effective_object_story_id — 이 광고가 부스팅한 실제 게시물("페이지id_게시물id").
+     소비자가 보는 링크는 이걸로 만든다. 다크 광고(게시물 없이 만든 광고)는 이
+     값이 없어서 preview_shareable_link(공유 가능한 미리보기)로 대체한다. */
+  const fields = 'campaign_id,preview_shareable_link,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url,effective_object_story_id}';
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/ads?fields=${fields}&limit=200&access_token=${accessToken}`;
 
@@ -358,10 +365,16 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
       return byCampaign;
     }
     for (const ad of json.data ?? []) {
-      const thumb = ad?.creative?.thumbnail_url;
       const campaignId = ad?.campaign_id != null ? String(ad.campaign_id) : null;
-      // 먼저 만난 광고의 소재를 쓴다 — 이후 광고로 덮지 않는다.
-      if (thumb && campaignId && !byCampaign.has(campaignId)) byCampaign.set(campaignId, thumb);
+      // 먼저 만난 광고의 소재를 쓴다 — 이후 광고로 덮지 않는다. 링크도 같은
+      // 광고에서 뽑아야 화면의 썸네일과 링크가 같은 소재를 가리킨다.
+      if (!campaignId || byCampaign.has(campaignId)) continue;
+      const thumb = ad?.creative?.thumbnail_url ?? null;
+      const storyId = ad?.creative?.effective_object_story_id;
+      const link = storyId
+        ? `https://www.facebook.com/${String(storyId).replace('_', '/posts/')}`
+        : (ad?.preview_shareable_link ?? null);
+      if (thumb || link) byCampaign.set(campaignId, { thumb, link });
     }
     url = json.paging?.next ?? null;
   }
@@ -474,7 +487,7 @@ function mapMetaCampaign(
   item: any,
   base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
   stores: StoreIndex,
-  thumbnails?: Map<string, string>,
+  creatives?: Map<string, CreativeInfo>,
 ): CampaignRow {
   const createdAt = new Date(item.created_time ?? Date.now());
   // Meta의 status는 ACTIVE/PAUSED/ARCHIVED/DELETED.
@@ -496,7 +509,8 @@ function mapMetaCampaign(
     budget_planned: Number(item.lifetime_budget ?? 0) / 100,
     budget_daily: item.daily_budget != null ? Number(item.daily_budget) / 100 : null,
     goal: mapMetaGoal(item.objective),
-    thumbnail_url: thumbnails?.get(String(item.id)) ?? null,
+    thumbnail_url: creatives?.get(String(item.id))?.thumb ?? null,
+    ad_link: creatives?.get(String(item.id))?.link ?? null,
   };
 }
 
@@ -595,8 +609,8 @@ async function fetchTikTokPages(path: string, accessToken: string, advertiserId:
  * 여기서 얻는 CDN 주소도 서명 만료가 있어서 Meta와 같은 갱신 규칙을 탄다
  * (data: URI가 아닌 저장값은 매 동기화마다 덮는다).
  */
-async function fetchTikTokThumbnails(accessToken: string, advertiserId: string): Promise<Map<string, string>> {
-  const byCampaign = new Map<string, string>();
+async function fetchTikTokThumbnails(accessToken: string, advertiserId: string): Promise<Map<string, CreativeInfo>> {
+  const byCampaign = new Map<string, CreativeInfo>();
   const ads = await fetchTikTokPages('ad/get', accessToken, advertiserId);
   if (ads.length === 0) return byCampaign;
 
@@ -605,9 +619,13 @@ async function fetchTikTokThumbnails(accessToken: string, advertiserId: string):
   for (const ad of ads) {
     const campaignId = String(ad?.campaign_id ?? '');
     if (!campaignId || clueByCampaign.has(campaignId)) continue;
-    if (ad?.video_id) clueByCampaign.set(campaignId, { videoId: String(ad.video_id) });
-    else if ((ad?.image_ids ?? []).length) clueByCampaign.set(campaignId, { imageId: String(ad.image_ids[0]) });
-    else if (ad?.tiktok_item_id) clueByCampaign.set(campaignId, { itemId: String(ad.tiktok_item_id) });
+    /* itemId는 썸네일 단서(3순위)이자 **공개 링크의 유일한 재료**다 — Spark
+       광고(게시물 부스팅)만 갖는다. 업로드 소재 다크 광고는 공개 게시물이
+       존재하지 않아 링크가 없다. 썸네일 단서와 별개로 항상 담아둔다. */
+    const itemId = ad?.tiktok_item_id ? String(ad.tiktok_item_id) : undefined;
+    if (ad?.video_id) clueByCampaign.set(campaignId, { videoId: String(ad.video_id), itemId });
+    else if ((ad?.image_ids ?? []).length) clueByCampaign.set(campaignId, { imageId: String(ad.image_ids[0]), itemId });
+    else if (itemId) clueByCampaign.set(campaignId, { itemId });
   }
 
   // 업로드 소재는 라이브러리를 통째로 읽어 id → 주소 맵을 만든다. 개별 info
@@ -628,20 +646,25 @@ async function fetchTikTokThumbnails(accessToken: string, advertiserId: string):
   }
 
   for (const [campaignId, clue] of clueByCampaign) {
+    // Spark 광고면 공개 영상 주소가 있다. @_ 자리는 TikTok이 실제 작성자로
+    // 리다이렉트한다(oEmbed 조회도 같은 주소를 쓴다).
+    const link = clue.itemId ? `https://www.tiktok.com/@_/video/${clue.itemId}` : null;
+    let thumb: string | null = null;
     if (clue.videoId && videoPoster.has(clue.videoId)) {
-      byCampaign.set(campaignId, videoPoster.get(clue.videoId)!);
+      thumb = videoPoster.get(clue.videoId)!;
     } else if (clue.imageId && imageUrl.has(clue.imageId)) {
-      byCampaign.set(campaignId, imageUrl.get(clue.imageId)!);
+      thumb = imageUrl.get(clue.imageId)!;
     } else if (clue.itemId) {
       try {
         const res = await fetchWithTimeout(`https://www.tiktok.com/oembed?url=${encodeURIComponent(`https://www.tiktok.com/@_/video/${clue.itemId}`)}`);
         const json = await res.json();
-        if (json?.thumbnail_url) byCampaign.set(campaignId, json.thumbnail_url);
+        if (json?.thumbnail_url) thumb = json.thumbnail_url;
       } catch (err) {
         // 게시물이 비공개/삭제됐거나 oEmbed가 막힌 경우 — 그 캠페인만 이니셜로 남는다.
         console.error('TikTok oEmbed 실패(무시하고 계속)', { itemId: clue.itemId, err: String(err) });
       }
     }
+    if (thumb || link) byCampaign.set(campaignId, { thumb, link });
   }
   return byCampaign;
 }
@@ -781,7 +804,7 @@ function mapTikTokCampaign(
   base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
   stores: StoreIndex,
   adGroupBudgets?: Map<string, { daily: number | null; total: number | null }>,
-  thumbnails?: Map<string, string>,
+  creatives?: Map<string, CreativeInfo>,
 ): CampaignRow {
   const createdAt = new Date(item.create_time ?? Date.now());
   const range =
@@ -813,7 +836,8 @@ function mapTikTokCampaign(
        objective도 함께 읽어 두는 건 TikTok이 필드명을 바꿔도 조용히 기본값으로
        무너지지 않게 하려는 안전장치다. */
     goal: mapTikTokGoal(item.objective_type ?? item.objective),
-    thumbnail_url: thumbnails?.get(String(item.campaign_id)) ?? null,
+    thumbnail_url: creatives?.get(String(item.campaign_id))?.thumb ?? null,
+    ad_link: creatives?.get(String(item.campaign_id))?.link ?? null,
   };
 }
 
@@ -906,9 +930,9 @@ Deno.serve(async (req) => {
       await syncTikTokBilling(admin, conn.access_token, conn.account_id, externalAccountId);
     }
 
-    let thumbnails: Map<string, string> | undefined;
+    let creatives: Map<string, CreativeInfo> | undefined;
     if (raw.length > 0) {
-      thumbnails =
+      creatives =
         conn.platform === 'meta'
           ? await fetchMetaThumbnails(conn.access_token, externalAccountId)
           : await fetchTikTokThumbnails(conn.access_token, externalAccountId);
@@ -916,8 +940,8 @@ Deno.serve(async (req) => {
 
     const rows: CampaignRow[] = raw.map((item: any) =>
       conn.platform === 'meta'
-        ? mapMetaCampaign(item, base, stores, thumbnails)
-        : mapTikTokCampaign(item, base, stores, adGroupBudgets, thumbnails)
+        ? mapMetaCampaign(item, base, stores, creatives)
+        : mapTikTokCampaign(item, base, stores, adGroupBudgets, creatives)
     );
     if (rows.length === 0) continue;
 
@@ -1012,6 +1036,11 @@ Deno.serve(async (req) => {
            두는 것보다 가볍고, 저장 형식이 실제로 갈려 있어 판정이 흔들리지 않는다. */
         const isUserUploaded = String(current.thumbnail_url ?? '').startsWith('data:');
         if (!isUserUploaded && row.thumbnail_url) patch.thumbnail_url = row.thumbnail_url;
+        /* 광고 링크도 썸네일과 같은 규칙 — 서버 소유 값이라 계산됐으면 매번
+           덮는다(사용자 편집이 없는 컬럼이다. 수동 링크는 별도 필드 creative_url
+           이고 화면이 그쪽을 우선한다). null로는 안 덮는다 — 부분 조회 실패가
+           멀쩡한 링크를 지우면 안 된다. */
+        if (row.ad_link) patch.ad_link = row.ad_link;
 
         const { error: updateError } = await admin
           .from('campaigns')

@@ -1019,7 +1019,8 @@ export function DashboardPage() {
             alertBadges: alertBadgesFor(c.id),
             overlapNote: overlapNoteFor(c.id),
             thumbnailUrl: c.thumbnailUrl,
-            creativeUrl: c.creativeUrl,
+            // View Ad 아이콘 — 수동 링크 우선, 없으면 동기화가 채운 게시물 링크
+            creativeUrl: c.creativeUrl || c.adLink,
           }));
           /* Now 탭에서 Action Required로 끌어올릴 알림은 "지금 손대야 하는" 것만이다.
              missing_performance는 제외한다 — Recently Ended 그룹의 존재 이유가 바로

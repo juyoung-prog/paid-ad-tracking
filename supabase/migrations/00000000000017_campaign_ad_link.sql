@@ -1,0 +1,13 @@
+-- 소비자가 보는 실제 광고 게시물 링크.
+--
+-- creative_url(사람이 손으로 넣는 링크)과 별개다 — 그건 거의 비어 있고, 화면의
+-- "View ad"가 실제로 필요한 건 플랫폼이 이미 알고 있는 게시물 주소다. 동기화가
+-- 썸네일을 뽑는 그 광고(캠페인당 첫 광고)에서 같이 뽑아 채운다:
+--   Meta   — creative.effective_object_story_id("페이지_게시물") → 게시물 permalink.
+--            없으면(다크 광고) ad.preview_shareable_link.
+--   TikTok — Spark 광고의 tiktok_item_id → 공개 영상 주소. 업로드 소재 다크
+--            광고는 공개 게시물이 존재하지 않아 null.
+--
+-- 서버 소유 값이라 사용자 편집이 없고, 동기화가 매번 덮어쓴다(썸네일과 동일).
+-- creative_url이 입력돼 있으면 화면은 그쪽을 우선한다(수동 > 자동).
+alter table campaigns add column if not exists ad_link text;

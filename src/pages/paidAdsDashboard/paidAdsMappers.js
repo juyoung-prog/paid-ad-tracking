@@ -82,6 +82,8 @@ export function rowToCampaign(row) {
     manualStatus: row.manual_status ?? null,
     creativeUrl: row.creative_url ?? null,
     thumbnailUrl: row.thumbnail_url ?? null,
+    // 서버 소유(동기화가 채움) — campaignToRow에 넣지 않는다(사용자 저장이 덮으면 안 됨)
+    adLink: row.ad_link ?? null,
     externalCampaignId: row.external_campaign_id ?? null,
     notes: row.notes ?? null,
     createdAt: row.created_at,
