@@ -20,7 +20,7 @@ import Typography from '@mui/material/Typography';
  * 있지 않다.
  *
  * Props:
- * @param {Array<{ label: string, value: number|string, sub?: string, delta?: {text: string, direction?: 'up'|'down'|'flat', tone?: 'good'|'bad'|'neutral'}, isAlert?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 "across reported campaigns"처럼 값 아래 붙는 부가 설명(선택). delta는 비교 기준 한 줄로, **실제로 계산 가능한 비교가 있을 때만** 넘긴다(없으면 생략 — 지어내지 않는다). 항목 사이 세로 구분선은 자동이다(레퍼런스가 모든 KPI 사이에 둔다). onClick이 있는 항목만 클릭 가능해진다 [Required]
+ * @param {Array<{ label: string, value: number|string, sub?: string, delta?: {text: string, direction?: 'up'|'down'|'flat', tone?: 'good'|'bad'|'neutral'}, isAlert?: boolean, onClick?: function }>} items - KPI 항목 배열. value는 숫자뿐 아니라 "$8,200" 같은 포맷된 문자열도 가능하다. sub는 값 **옆 같은 줄**에 작게 붙는 부가 설명(레퍼런스의 "of 82" 자리) — 짧아야 한다, 길면 옆 항목을 민다. delta는 비교 기준 한 줄로, **실제로 계산 가능한 비교가 있을 때만** 넘긴다(없으면 생략 — 지어내지 않는다). 항목 사이 세로 구분선은 자동이다(레퍼런스가 모든 KPI 사이에 둔다). onClick이 있는 항목만 클릭 가능해진다 [Required]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
@@ -36,13 +36,6 @@ import Typography from '@mui/material/Typography';
  * />
  */
 export function KpiBar({ items, sx }) {
-  // sub 줄 자리 예약은 **이 바에 sub를 쓰는 항목이 하나라도 있을 때만** 한다.
-  // 무조건 예약하면 sub가 전혀 없는 화면(Dashboard 툴바)에도 22px짜리 빈 줄이
-  // 영구히 붙고, separator 구분선이 그만큼 커진 박스 기준으로 중앙 정렬돼
-  // 숫자열과 광학적으로 어긋난다. 탭 전환 시 높이가 흔들리던 문제는 같은 바
-  // 안에서만 생기므로 이 조건으로 충분하다.
-  const reservesSubLine = items.some((item) => item.sub);
-
   return (
     // 항목이 줄바꿈되면 라벨이 두 줄로 꺾여 못생겨 보이므로(각 항목에
     // flexShrink:0 + whiteSpace:nowrap 적용) 대신 화면이 정말 좁으면 줄바꿈이
@@ -120,17 +113,34 @@ export function KpiBar({ items, sx }) {
               {item.label}
             </Typography>
             {/* 값은 display 토큰(24px) — 레퍼런스 KPI 실측값. 한때 28px로
-                올렸다가 되돌렸다(테마의 display 주석 참고). */}
-            <Typography
-              variant="display"
-              component="span"
-              sx={{
-                whiteSpace: 'nowrap',
-                color: item.isAlert ? 'error.main' : 'text.primary',
-              }}
-            >
-              {item.value}
-            </Typography>
+                올렸다가 되돌렸다(테마의 display 주석 참고).
+
+                sub는 값 **옆 같은 줄**에 붙는다 — 레퍼런스의 "82 of 82" 해부다.
+                예전엔 값 아래 별도 줄이어서 sub가 있는 항목만 3줄이 됐고, 바
+                전체가 레퍼런스보다 세로로 두꺼워 훑는 리듬이 달랐다(실사용
+                검토). 같은 줄이니 sub 유무가 바 높이를 흔들지도 않아, 아래
+                줄이던 시절 필요했던 자리 예약(reservesSubLine)도 없앴다. */}
+            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 0.75 }}>
+              <Typography
+                variant="display"
+                component="span"
+                sx={{
+                  whiteSpace: 'nowrap',
+                  color: item.isAlert ? 'error.main' : 'text.primary',
+                }}
+              >
+                {item.value}
+              </Typography>
+              {item.sub && (
+                <Typography
+                  variant="caption"
+                  component="span"
+                  sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}
+                >
+                  {item.sub}
+                </Typography>
+              )}
+            </Box>
             {/* 비교 기준 — "$8.63"만으로는 그게 좋은지 나쁜지 화면이 답하지
                 못한다. 다만 이 앱의 성과 레코드는 캠페인당 누적 1건이라 시계열이
                 없다: "지난 30일 대비" 같은 기간 비교는 **계산할 수 없다**.
@@ -156,18 +166,6 @@ export function KpiBar({ items, sx }) {
                     색각 이상 사용자에게는 증감이 사라진다. */}
                 {item.delta.direction === 'up' ? '▲ ' : item.delta.direction === 'down' ? '▼ ' : ''}
                 {item.delta.text}
-              </Typography>
-            )}
-            {/* sub 줄은 이 바에 sub를 쓰는 항목이 있을 때만 자리를 잡는다 —
-                한 항목만 sub가 있어도 나머지가 같은 높이를 유지해야, 탭 전환처럼
-                항목 구성이 바뀔 때 sticky 툴바 높이가 널뛰지 않는다. */}
-            {reservesSubLine && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{ mt: 0.5, whiteSpace: 'nowrap', visibility: item.sub ? 'visible' : 'hidden' }}
-              >
-                {item.sub || ' '}
               </Typography>
             )}
           </Box>

@@ -460,7 +460,9 @@ export function DashboardPage() {
      세는지 말해준다. 검사 범위는 HIGH_SEVERITY_TYPES 세 가지다 — 예전 문장은
      "budgets are pacing within range"라고만 해서 나머지 둘을 빠뜨렸다. */
   const kpiItems = [
-    countKpi('Needs Attention', highSeverityAlerts.length, 'now', 'budget · timing · reporting'),
+    /* sub가 이제 값 옆 인라인이라 짧아야 한다 — 'budget · timing · reporting'
+       28자는 옆 항목을 밀었다. 세 영역을 다 검사한다는 사실만 남긴다. */
+    countKpi('Needs Attention', highSeverityAlerts.length, 'now', 'across all checks'),
     countKpi('Live Now', activeCount, 'active'),
     countKpi('Recently Ended', recentlyEndedCount, 'now', `last ${RECENTLY_ENDED_DAYS} days`),
   ];

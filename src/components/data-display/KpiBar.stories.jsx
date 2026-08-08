@@ -23,7 +23,7 @@ KPI 숫자 요약 바. label/value 배열을 받는 범용 컴포넌트로, Dash
 - 항목 간 구분선으로 시각적으로 분리
 - 숫자는 tabular-nums로 자릿수 변화에도 레이아웃 고정
 - isAlert 항목은 error 컬러로 강조
-- sub로 값 아래 부가 설명 추가 가능(예: "across reported campaigns") — sub 줄은 없어도 항상 자리를 예약해, sub 있는 항목이 생기고 사라질 때(탭 전환 등) 바 높이가 흔들리지 않는다
+- sub는 값 **옆 같은 줄**에 작게 붙는다 — 레퍼런스의 "82 of 82"에서 "of 82" 자리다. 예전엔 값 아래 별도 줄이어서 sub 있는 항목만 3줄이 됐고 바가 레퍼런스보다 두꺼웠다. 인라인이라 **짧아야 한다** — 길면 옆 항목을 민다
 - delta로 비교 기준 한 줄 추가 가능 — 아래 "왜 delta인가" 참고
 
 ### 스타일은 레퍼런스 실측값이다
@@ -114,16 +114,20 @@ export const WithDelta = {
 };
 
 /**
- * sub로 값 아래에 부가 설명을 붙일 수 있다 — /reports의 "Avg. CPM" 항목이
- * 이 패턴을 쓴다("성과가 보고된 캠페인만 기준으로 계산됨"을 항상 보이게).
+ * sub — 값 옆 인라인 접미. 레퍼런스의 "82 of 82" 해부 그대로다.
+ *
+ * 확인 포인트:
+ * - sub가 값과 **같은 줄, 같은 베이스라인**에 붙는가 ("6 last 14 days")
+ * - sub 없는 항목과 있는 항목의 높이가 같은가 (예전 아래-줄 방식은 달랐다)
+ * - sub는 짧아야 한다 — 여기 예시가 실제 화면이 쓰는 최장 길이다
  */
 export const WithSubLabel = {
   args: {
     items: [
-      { label: 'Campaigns', value: 11 },
-      { label: 'Planned Budget', value: '$12,800' },
-      { label: 'Total Spend', value: '$2,580.50' },
-      { label: 'Avg. CPM', value: '$8.39', sub: 'across reported campaigns' },
+      { label: 'Needs Attention', value: 0, sub: 'across all checks' },
+      { label: 'Live Now', value: 4 },
+      { label: 'Recently Ended', value: 6, sub: 'last 14 days' },
+      { label: 'Avg. CPM', value: '$8.39', sub: 'mean of 170' },
     ],
   },
 };

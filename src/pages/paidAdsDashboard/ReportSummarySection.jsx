@@ -1244,12 +1244,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, plans = []
                   {
                     label: 'Avg. CPM',
                     value: summary.avgCPM != null ? money(summary.avgCPM) : EMPTY_CELL,
-                    /* 모집단과 계산 방식을 밝힌다. 이 값은 **전체 캠페인의 평균**
-                       인데, 바로 아래 goal별 표의 헤더에는 **그 표만의 중앙값**이
-                       붙는다(Awareness med $2.68). 같은 화면에 3배 차이나는 두
-                       CPM이 놓이는데 무엇이 다른지 화면이 말하지 않으면 둘 중
-                       하나가 틀린 것으로 읽힌다(실화면 12-11). */
-                    sub: `mean across ${summary.totalCampaigns} campaigns · tables below show each goal's median`,
+                    /* "mean"을 밝히는 이유: 아래 goal별 표 제목엔 **그 표만의
+                       중앙값**(median CPM $2.94)이 붙어서, 계산 방식을 안 적으면
+                       3배 차이나는 두 CPM 중 하나가 틀린 것으로 읽힌다(실화면
+                       12-11). 중앙값 쪽 안내는 표 제목이 스스로 "median"이라
+                       말하므로 여기서 반복하지 않는다 — sub는 인라인이라 짧아야
+                       한다. */
+                    sub: `mean of ${summary.totalCampaigns}`,
                     delta: cpmDelta,
                   },
                 ]
