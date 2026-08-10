@@ -87,6 +87,24 @@ const SECTION_TITLE_SX = { display: 'block', mb: 1.5, color: 'text.primary' };
 /** 제목 옆 범위 텍스트 — 제목과 같은 줄, 한 단 약하게 */
 const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
 
+/**
+ * 타임라인을 그리는 phase 수 상한. 이 차트는 "Coming Soon → Now Open → Grand
+ * Opening → 1 Month Deals"처럼 **몇 단계짜리 이벤트**를 전제로 설계됐다 — 행마다
+ * 이름 한 줄 + 막대 한 줄을 쓰고, 시작일마다 마일스톤 점선을 긋는 문법이 전부
+ * 그 전제 위에 있다.
+ *
+ * 부스팅 게시물을 통째로 묶은 그룹(실데이터 "noname", 79 phases)이 들어오면
+ * 전제가 무너진다: 축이 몇 년으로 늘어나 막대가 전부 최소폭(1.5%)이 되고, 막대 안
+ * 텍스트는 첫 글자만 남고, 점선 수십 개가 배경을 도배한다(issue/i-1, i-2).
+ * 이 상태의 차트는 정보가 0이므로 그리지 않고, 같은 데이터를 가진 표로 보낸다
+ * (Plan 탭 Budget Breakdown / Performance 탭 goal별 표 — 접근성 주석과 같은 경로).
+ *
+ * 15인 이유: 실제 이벤트는 phase가 한 자릿수고, 다음으로 큰 잡동사니 그룹이
+ * 수십 개라 그 사이 어디든 안전하다. 행 15개(≈770px)는 아직 한두 화면 안에서
+ * 스캔되는 높이이기도 하다.
+ */
+const PHASE_TIMELINE_MAX_PHASES = 15;
+
 /** 시간 순 index를 채움 불투명도로. phase가 하나뿐이면 가장 옅은 값을 쓴다. */
 function phaseFillAlpha(index, total) {
   if (total <= 1) return PHASE_FILL_MIN_ALPHA;
@@ -1182,6 +1200,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
   // 타임라인 축·마일스톤 계산은 PhaseTimelineChart가 스스로 한다 — 두 탭이 같은
   // 차트를 쓰므로 계산도 컴포넌트 안에 두는 편이 두 벌로 갈라지지 않는다.
   const phases = activeCampaignGroup ? buildPhaseTimeline(planCampaigns) : [];
+  // 두 탭이 같은 판정을 공유한다 — 같은 Event인데 탭에 따라 차트가 나왔다
+  // 안 나왔다 하면 그것대로 혼란이다.
+  const isTimelineReadable = phases.length <= PHASE_TIMELINE_MAX_PHASES;
 
   const phaseMetaTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.META]?.total ?? 0), 0);
   const phaseTikTokTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.TIKTOK]?.total ?? 0), 0);
@@ -1407,8 +1428,16 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
           <Box sx={(theme) => ({ maxWidth: theme.layout.content.wide })}>
             {/* Event 타임라인 — Plan·Performance 두 탭이 같은 컴포넌트를 쓴다
                 (PhaseTimelineChart 주석 참고). 막대에는 기간과 함께 일일 예산·
-                총 예산이 붙는다. */}
-            <PhaseTimelineChart phases={phases} sx={{ mb: 4 }} />
+                총 예산이 붙는다. phase가 너무 많으면 차트 대신 안내 한 줄 —
+                PHASE_TIMELINE_MAX_PHASES 주석 참고. 안내에 phase 수를 굳이 안
+                적는 이유: 바로 아래 Budget Breakdown 제목이 이미 센다. */}
+            {isTimelineReadable ? (
+              <PhaseTimelineChart phases={phases} sx={{ mb: 4 }} />
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                Too many phases to draw on one timeline — every phase is in the table below.
+              </Typography>
+            )}
 
             {/* Budget Breakdown — phase 하나당 한 행(플랫폼별로 안 쪼갬). 각
                 phase가 어느 캠페인 하나에 대응하지 않고 여러 캠페인(플랫폼별)을
@@ -1577,7 +1606,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
               Follows·Hook Rate)를 뒀다가 뺐다 — 예산 옆에 놓을 수 있는 건 같은
               단위인 지출뿐이고, 나머지 지표는 바로 아래 goal별 표가 캠페인
               단위로 이미 다 보여준다. */}
-          {phases.length > 0 && (
+          {/* phase가 너무 많으면 섹션째 생략한다(PHASE_TIMELINE_MAX_PHASES 주석
+              참고). Plan 탭과 달리 안내 문구도 없다 — 여기서 차트가 하던 약속
+              (spend per phase)은 바로 아래 goal별 표가 캠페인 단위로 이미 다
+              지키고 있어서, "차트가 없다"는 안내는 제목만 남은 빈 섹션을 만든다. */}
+          {phases.length > 0 && isTimelineReadable && (
             <Box sx={{ mb: 4 }}>
               <Typography variant="title" sx={SECTION_TITLE_SX}>
                 Event timeline{' '}

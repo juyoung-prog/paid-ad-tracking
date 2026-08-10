@@ -272,6 +272,57 @@ export const EventTimeline = {
 };
 
 /**
+ * phase가 상한(PHASE_TIMELINE_MAX_PHASES=15)을 넘는 그룹 — 실계정의 "noname"
+ * (부스팅 게시물 96건, 79 phases) 재현. 이름이 전부 달라 phase로 안 합쳐지고,
+ * 기간이 길어 축이 늘어나면 막대가 전부 최소폭이 된다. 그 상태의 차트는 첫
+ * 글자만 남은 막대 + 점선 도배라 정보가 0이었다(issue/i-1, i-2) — 그리지 않는
+ * 것이 정상 동작이다.
+ *
+ * 확인 포인트:
+ * - Plan 탭: 타임라인 대신 `Too many phases...` 안내 한 줄, 바로 아래 Budget
+ *   Breakdown 표는 20행 전부 그대로 나온다
+ * - Performance 탭: Event timeline 섹션이 **제목까지 통째로** 없다 — 차트가
+ *   하던 약속(spend per phase)은 goal별 표가 이미 지키고 있어서, 안내만 남기면
+ *   빈 섹션이 된다
+ */
+export const TimelineOverload = {
+  name: 'Timeline hidden (too many phases)',
+  render: () => {
+    // 20건 — 상한(15)을 넘되 스토리 스크롤이 감당되는 크기. 두 달에 하나씩
+    // 부스팅해서 실데이터처럼 축이 몇 년으로 늘어난 상태를 만든다.
+    const campaigns = Array.from({ length: 20 }, (_, i) => {
+      const year = 2024 + Math.floor(i / 6);
+      const month = String(((i * 2) % 12) + 1).padStart(2, '0');
+      return {
+        id: `nn-${i}`,
+        name: `Instagram post: boosted caption #${i + 1} 🌟 Don’t miss...`,
+        campaignGroup: 'noname',
+        platform: PLATFORM.META,
+        accountId: 'meta-bm',
+        targetScope: TARGET_SCOPE.ALL_STORES,
+        targetStoreIds: [],
+        startDate: `${year}-${month}-05`,
+        endDate: `${year}-${month}-09`,
+        budgetPlanned: 0,
+        budgetDaily: 10,
+        goal: GOAL.ENGAGEMENT,
+        manualStatus: null,
+        creativeUrl: '',
+        createdAt: '2026-06-01T09:00:00Z',
+        updatedAt: '2026-07-20T09:00:00Z',
+      };
+    });
+    return (
+      <MemoryRouter>
+        <Box>
+          <ReportSummarySection campaigns={campaigns} performanceRecords={[]} />
+        </Box>
+      </MemoryRouter>
+    );
+  },
+};
+
+/**
  * Performance 표의 **행 상태 네 가지**를 한 화면에 모은다. 문서로만 설명하던
  * 분기를 실제로 그려서, 판정이 바뀌면 여기서 바로 드러나게 한다.
  *
