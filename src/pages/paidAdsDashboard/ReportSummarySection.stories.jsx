@@ -284,6 +284,10 @@ export const EventTimeline = {
  * - Performance 탭: Event timeline 섹션이 **제목까지 통째로** 없다 — 차트가
  *   하던 약속(spend per phase)은 goal별 표가 이미 지키고 있어서, 안내만 남기면
  *   빈 섹션이 된다
+ * - Performance 탭의 Engagement 섹션이 **표 없이** `No performance data yet.`
+ *   한 줄인가 — 성과 기록을 안 줘서 빈 컬럼 제거가 지표 컬럼을 전부 걷어낸다.
+ *   그 상태로 표를 그리면 Campaign·Platform 오른쪽에 컬럼 없는 빈 구간이 남는다
+ *   (실화면 i-3의 Awareness 섹션)
  */
 export const TimelineOverload = {
   name: 'Timeline hidden (too many phases)',

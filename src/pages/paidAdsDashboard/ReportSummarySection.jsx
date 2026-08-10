@@ -1713,6 +1713,29 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
           const headlineMedian = headlineValue != null
             ? `${headlineColumn.header} ${headlineColumn.format(headlineValue)}`
             : null;
+          /* 이 goal의 캠페인이 **전부** 성과 기록이 없으면 빈 컬럼 제거(keep)가
+             지표 컬럼을 하나도 남기지 않는다. 그 상태로 표를 그리면 Campaign·
+             Platform 두 칸만 있는 헤더 오른쪽에 컬럼 없는 빈 구간이 넓게 남고,
+             행마다 'No performance data yet'이 그 자리에 깔린다(실화면 i-3의
+             Awareness 섹션). 비교할 열이 하나도 없으면 그건 표가 아니라 문장
+             하나다 — 제목이 이미 개수를 세므로 상태만 한 줄로 말한다.
+             (행별로 갈릴 일이 없다: 컬럼이 없다는 건 전 행이 비었다는 뜻이다.) */
+          if (dataColumns.length === 0) {
+            return (
+              <Box key={value} sx={{ mb: 3 }}>
+                <Typography variant="title" sx={SECTION_TITLE_SX}>
+                  {label}{' '}
+                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                    — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}
+                  </Typography>
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  No performance data yet.
+                </Typography>
+              </Box>
+            );
+          }
+
           return (
             <Box key={value} sx={{ mb: 3 }}>
               <Typography variant="title" sx={SECTION_TITLE_SX}>
