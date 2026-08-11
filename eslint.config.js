@@ -8,7 +8,10 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // storybook-static: `pnpm build-storybook` 산출물. dist처럼 빌드 결과물인데
+  // 목록에 없어서, 로컬에서 스토리북을 한 번 빌드하면 lint가 번들 9천 건을
+  // 에러로 세기 시작한다(실측) — 진짜 에러가 그 밑에 묻힌다.
+  globalIgnores(['dist', 'storybook-static']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
