@@ -6,7 +6,6 @@ import IconButton from '@mui/material/IconButton';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
@@ -14,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { PacingIndicator } from '../data-display/PacingIndicator';
+import { ScrollArea } from '../container/ScrollArea';
 import { PlatformMetricList } from '../data-display/PlatformMetricList';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { calcBudgetPacing, effectiveBudgetPlanned, PLATFORM } from '../../data/schema';
@@ -253,8 +253,10 @@ export function CampaignDetailPanel({
             </Typography>
             {/* Reports의 Daily spend 표와 같은 문법(stickyHeader + maxHeight 스크롤,
                 tabular-nums, Total 행 굵게) — 같은 데이터가 화면마다 다른 모양이면
-                둘 중 하나가 틀린 것으로 읽힌다. */}
-            <TableContainer sx={{ maxHeight: 320 }}>
+                둘 중 하나가 틀린 것으로 읽힌다. TableContainer가 아니라 ScrollArea인
+                것도 같은 이유 — 스크롤이 남았다는 신호(아래 그림자)가 없으면 21일
+                짜리 표가 열 줄에서 끝난 것처럼 보인다(Reports에서 실사용 신고 i-9). */}
+            <ScrollArea label="Daily spend" maxHeight={320}>
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
@@ -297,7 +299,7 @@ export function CampaignDetailPanel({
                   </TableRow>
                 </TableBody>
               </Table>
-            </TableContainer>
+            </ScrollArea>
           </Box>
         )}
 

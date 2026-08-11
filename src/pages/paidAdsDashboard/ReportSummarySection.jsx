@@ -1709,8 +1709,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                 ) : (
                   /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더
                      고정). goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된
-                     축이라 끊기면 "그 주가 얼마였나"를 재조립해야 한다. */
-                  <TableContainer sx={{ mb: 2, maxHeight: 448, overflowX: 'auto', ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
+                     축이라 끊기면 "그 주가 얼마였나"를 재조립해야 한다.
+                     TableContainer가 아니라 ScrollArea인 이유(goal 표와 동일):
+                     기본 overflow는 넘쳤다는 신호를 주지 않아서, 43일짜리 표가
+                     열한 줄에서 딱 끝난 것처럼 보였다(실사용 신고 i-9). */
+                  <ScrollArea label="Daily spend by campaign" maxHeight={448} sx={{ mb: 2, ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
@@ -1780,7 +1783,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                         </TableRow>
                       </TableBody>
                     </Table>
-                  </TableContainer>
+                  </ScrollArea>
                 )}
               </Box>
             );

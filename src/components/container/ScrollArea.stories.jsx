@@ -24,6 +24,10 @@ export default {
 
 ### 기능
 - 남은 방향에만 가장자리 그림자를 띄우고, 끝에 닿으면 사라진다
+- \`maxHeight\`를 주면 세로 스크롤도 받고, 세로로 넘치면 **아래쪽 그림자**를 띄운다 —
+  없으면 가로와 같은 함정이 세로로 재발한다(43일짜리 Daily spend 표가 열한 줄에서
+  끝난 것처럼 보인 실사용 신고). 위쪽 그림자는 일부러 없다 — 스크롤을 시작한
+  사람에게만 생기는 상태라 발견 신호가 아니고, sticky 헤더 위에 얹으려면 헤더를 덮어야 한다
 - 그림자는 검정 알파 그라디언트라 색을 더하지 않고, 클릭도 가로채지 않는다
 - \`startOffset\`으로 좌측 그림자 위치를 안쪽으로 밀 수 있다 — 표의 고정(sticky) 열처럼
   스크롤해도 제자리에 있는 요소가 앞을 덮고 있을 때, 그림자는 그 요소의 오른쪽 경계에
@@ -45,6 +49,10 @@ export default {
       control: { type: 'number', min: 0, max: 400 },
       description: '좌측 그림자를 그릴 x 위치(px). 고정 열 폭 등',
     },
+    maxHeight: {
+      control: { type: 'number', min: 0, max: 1000 },
+      description: '세로 최대 높이(px). 주면 세로 스크롤도 이 영역이 받고, 넘치면 아래쪽 그림자를 띄운다',
+    },
     sx: { control: 'object', description: '추가 스타일 오버라이드' },
   },
 };
@@ -60,6 +68,23 @@ export const Default = {
       <Box sx={ { display: 'flex', gap: 2, width: 1200 } }>
         { [0, 1, 2, 3, 4, 5].map((i) => (
           <Placeholder.Box key={ i } label={ `Block ${i + 1}` } sx={ { width: 180, height: 120, flexShrink: 0 } } />
+        )) }
+      </Box>
+    </ScrollArea>
+  ),
+};
+
+/**
+ * maxHeight — 세로로 넘치는 목록. 아래쪽 그림자가 "더 볼 게 남았다"를 말하고,
+ * 끝까지 스크롤하면 사라진다. 스크롤을 시작하기 전에도 보이는 게 핵심이다 —
+ * 이 신호가 없으면 목록이 화면에 보이는 줄에서 끝난 것처럼 읽힌다.
+ */
+export const VerticalOverflow = {
+  render: () => (
+    <ScrollArea label="Vertically overflowing list" maxHeight={ 280 } sx={ { maxWidth: 360 } }>
+      <Box sx={ { display: 'flex', flexDirection: 'column', gap: 1.5, p: 1.5 } }>
+        { [0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+          <Placeholder.Box key={ i } label={ `Row ${i + 1}` } sx={ { height: 64 } } />
         )) }
       </Box>
     </ScrollArea>

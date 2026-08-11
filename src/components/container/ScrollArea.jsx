@@ -16,6 +16,7 @@ const EDGE_WIDTH = 24;
 const EDGE_GRADIENT = {
   start: 'linear-gradient(to right, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
   end: 'linear-gradient(to left, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
+  bottom: 'linear-gradient(to top, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
 };
 
 /**
@@ -45,6 +46,15 @@ const EDGE_GRADIENT = {
  * 되어버려서 페이지 기준으로 고정하려던 헤더가 그냥 같이 밀려 올라간다. 세로
  * 스크롤까지 여기서 받으면 헤더는 이 영역의 위쪽에 정확히 고정된다.
  *
+ * 세로로 넘칠 때는 **아래쪽에만** 그림자를 띄운다. 이 신호가 없으면 가로와
+ * 똑같은 함정이 세로로 재발한다 — Daily spend 표(43일)가 열한 줄에서 끝난
+ * 것처럼 보였다(실사용 신고 i-9: "07/10까지밖에 안 나와"). 위쪽 그림자는 일부러
+ * 없다: "위로 돌아갈 내용"은 이미 스크롤을 시작한 사람에게만 생기는 상태라
+ * 발견 신호가 아니고, sticky 헤더가 z-index로 떠 있어서 그 위에 그림자를
+ * 얹으려면 헤더보다 높이 올려 헤더를 덮는 수밖에 없다.
+ * 아래 그림자는 sticky 헤더보다 위에 그린다(zIndex) — 표의 sticky 셀들이
+ * 자체 z-index를 갖고 있어 기본 겹침으로는 그림자가 그 뒤에 숨는다.
+ *
  * Props:
  * @param {ReactNode} children - 스크롤될 내용 [Required]
  * @param {string} label - 스크롤 영역의 접근성 이름. 주면 role="region" + 키보드 포커스가 붙는다(WCAG 2.1.1: 스크롤 영역은 키보드로도 조작 가능해야 함) [Optional]
@@ -59,15 +69,22 @@ const EDGE_GRADIENT = {
  */
 export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) {
   const viewportRef = useRef(null);
-  const [edges, setEdges] = useState({ start: false, end: false });
+  const [edges, setEdges] = useState({ start: false, end: false, bottom: false });
 
   const syncEdges = useCallback(() => {
     const el = viewportRef.current;
     if (!el) return;
     // 소수점 폭(줌·스케일)에서 1px 미만 잔여로 그림자가 깜빡이지 않게 여유를 둔다.
     const maxScrollLeft = el.scrollWidth - el.clientWidth;
-    const next = { start: el.scrollLeft > 1, end: el.scrollLeft < maxScrollLeft - 1 };
-    setEdges((prev) => (prev.start === next.start && prev.end === next.end ? prev : next));
+    const maxScrollTop = el.scrollHeight - el.clientHeight;
+    const next = {
+      start: el.scrollLeft > 1,
+      end: el.scrollLeft < maxScrollLeft - 1,
+      bottom: el.scrollTop < maxScrollTop - 1,
+    };
+    setEdges((prev) => (
+      prev.start === next.start && prev.end === next.end && prev.bottom === next.bottom ? prev : next
+    ));
   }, []);
 
   useEffect(() => {
@@ -84,10 +101,13 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) 
 
   const edgeSx = (side) => (theme) => ({
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: EDGE_WIDTH,
-    ...(side === 'start' ? { left: startOffset } : { right: 0 }),
+    ...(side === 'bottom'
+      ? // 세로 그림자 — MUI stickyHeader 셀이 z-index 2로 떠 있어 그보다 위에
+        // 그린다. 가로 그림자는 sticky 고정 열 **뒤**로 숨는 게 맞아서(고정 열
+        // 위에 그림자가 지나가면 안 움직이는 열이 움직이는 것처럼 읽힘) 기본
+        // 겹침을 유지한다 — 같은 이유의 반대 방향 결정이다.
+        { left: 0, right: 0, bottom: 0, height: EDGE_WIDTH, zIndex: 3 }
+      : { top: 0, bottom: 0, width: EDGE_WIDTH, ...(side === 'start' ? { left: startOffset } : { right: 0 }) }),
     background: EDGE_GRADIENT[side],
     opacity: edges[side] ? 1 : 0,
     pointerEvents: 'none',
@@ -111,6 +131,7 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) 
       </Box>
       <Box aria-hidden sx={edgeSx('start')} />
       <Box aria-hidden sx={edgeSx('end')} />
+      {maxHeight != null && <Box aria-hidden sx={edgeSx('bottom')} />}
     </Box>
   );
 }
