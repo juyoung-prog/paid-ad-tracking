@@ -1,7 +1,7 @@
 import { MemoryRouter } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { ReportSummarySection } from './ReportSummarySection';
-import { mockCampaigns, mockPerformanceRecords } from '../../data/paidAdsMockData';
+import { mockCampaigns, mockPerformanceRecords, mockPerformanceDaily, spreadDailyOverCampaign } from '../../data/paidAdsMockData';
 import { PLATFORM, GOAL, TARGET_SCOPE } from '../../data/schema';
 
 /**
@@ -91,6 +91,15 @@ const groupedPerformance = groupedCampaigns
     conversions: null,
   }));
 
+/* 위 성과의 일별 분해 — Daily spend 표와 날짜 필터의 Spend 잘라내기가 이
+   데이터로 렌더된다. 시나리오 기준일(7/20) 이후에 시작하는 phase(g-6a/g-6b)는
+   합성 결과가 빈 배열이라 자연히 빠진다 — 실계정에서도 미래 캠페인엔 일별
+   데이터가 없다. */
+const groupedDaily = groupedPerformance.flatMap((record) => {
+  const campaign = groupedCampaigns.find((c) => c.id === record.campaignId);
+  return campaign ? spreadDailyOverCampaign(campaign, record) : [];
+});
+
 export default {
   title: 'Paid Ads Dashboard/Section/ReportSummarySection',
   parameters: {
@@ -108,6 +117,18 @@ Plan 탭은 Event를 선택하면 Gantt 타임라인 + Budget Breakdown 표로, 
 탭은 goal별로 다른 컬럼의 표(PerformanceReportTable이 아니라 schema.js
 getGoalMetricsRow() 기반 자체 렌더링)로 보여준다. 행 클릭 시 /dashboard?
 campaign={id}로 이동 — useNavigate를 쓰므로 스토리에서도 MemoryRouter로 감싼다.
+
+### 날짜 필터는 지표를 자른다
+날짜 범위는 두 겹으로 동작한다 — (1) 기간이 겹치는 캠페인만 남기고
+(campaignInDateRange), (2) **Spend를 일별 데이터(performanceDaily)로 범위만큼
+잘라** KPI에 보여준다(sub \`in selected dates\`). 예전엔 (1)뿐이라 어느 범위를
+골라도 걸린 캠페인의 누적 전체가 나왔다. 일별 데이터가 없는 캠페인(수동 등록,
+backfill 전)은 누적 spend로 섞고 그 개수를 KPI 옆에 밝힌다 — 조용히 빼면 합계가
+모자라고, 조용히 섞으면 기간보다 커 보인다.
+
+Performance 탭에는 날짜당 한 행짜리 **Daily spend 표**가 있다(타임라인의 phase
+축·goal 표의 캠페인 축이 답 못 하는 "하루에 얼마씩 나갔나"). 잘 수 없는 지표
+(CPM·CTR 등 누적 기반)는 날짜 필터가 걸려도 자른 척하지 않는다.
 
 ### 헤더는 한 줄이다
 컬럼 그룹 라벨 행(COST/PERFORMANCE/VIDEO/ENGAGEMENT)을 걷어냈다. 두 가지가
@@ -231,7 +252,7 @@ export const Default = {
   render: () => (
     <MemoryRouter>
       <Box>
-        <ReportSummarySection campaigns={mockCampaigns} performanceRecords={mockPerformanceRecords} />
+        <ReportSummarySection campaigns={mockCampaigns} performanceRecords={mockPerformanceRecords} performanceDaily={mockPerformanceDaily} />
       </Box>
     </MemoryRouter>
   ),
@@ -265,7 +286,37 @@ export const EventTimeline = {
   render: () => (
     <MemoryRouter>
       <Box>
-        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} />
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} />
+      </Box>
+    </MemoryRouter>
+  ),
+};
+
+/**
+ * 실사용 시나리오 재현 — Event(G10 Opening) + 날짜 범위(6/22~6/30)를 고른 상태.
+ * URL 파라미터로 진입한다(useViewUrlSync의 "URL > localStorage" 우선순위를 그대로
+ * 타는 경로라, 스토리가 내부 상태를 흉내 낼 필요가 없다).
+ *
+ * 이 스토리가 지키는 약속: **날짜 필터는 캠페인만 고르는 게 아니라 지표를
+ * 자른다.** 예전엔 campaignInDateRange(기간 겹침 판정)만 있어서 6/22~6/30을
+ * 골라도, 6/22~7/31을 골라도 걸린 캠페인의 누적 전체가 나왔다(실사용 지적:
+ * 어느 범위든 $352.89).
+ *
+ * 확인 포인트:
+ * - Total Spend가 누적 합이 아니라 **6/22~6/30 아홉 날의 합**인가 —
+ *   sub에 `in selected dates`가 붙는다
+ * - 계획 대비 delta(`n% of $X planned`)가 **없는가** — 잘린 지출을 이벤트 전체
+ *   계획과 비교하면 비교가 성립하지 않아 날짜 필터 중엔 떼어낸다
+ * - Daily spend 표가 6/22~6/30 아홉 행 + Total 행인가, 표의 Total이 KPI의
+ *   Total Spend와 같은 값인가
+ * - 범위를 6/22~7/31로 넓히면 두 값이 **함께 커지는가**(예전 버그: 그대로)
+ */
+export const DateFilteredSpend = {
+  name: 'Date filter slices spend',
+  render: () => (
+    <MemoryRouter initialEntries={['/?tab=performance&event=G10+Opening&from=2026-06-22&to=2026-06-30']}>
+      <Box>
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} />
       </Box>
     </MemoryRouter>
   ),
@@ -288,6 +339,8 @@ export const EventTimeline = {
  *   한 줄인가 — 성과 기록을 안 줘서 빈 컬럼 제거가 지표 컬럼을 전부 걷어낸다.
  *   그 상태로 표를 그리면 Campaign·Platform 오른쪽에 컬럼 없는 빈 구간이 남는다
  *   (실화면 i-3의 Awareness 섹션)
+ * - Performance 탭의 Daily spend 섹션이 표 없이 `No daily data ...` 한 줄인가 —
+ *   일별 데이터를 안 넘긴 스토리라, 섹션을 숨기는 대신 빈 상태를 말하는 게 정상이다
  */
 export const TimelineOverload = {
   name: 'Timeline hidden (too many phases)',

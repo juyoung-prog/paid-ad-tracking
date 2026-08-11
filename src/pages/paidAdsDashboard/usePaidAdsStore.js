@@ -9,6 +9,7 @@ import {
   campaignToRow,
   rowToPerformanceRecord,
   performanceRecordToRow,
+  rowToPerformanceDaily,
   rowToPlan,
 } from './paidAdsMappers';
 import { startOfToday, toLocalISODate } from './paidAdsPageUtils';
@@ -22,6 +23,7 @@ const EMPTY_STATE = {
   adAccounts: [],
   campaigns: [],
   performanceRecords: [],
+  performanceDaily: [],
   plans: [],
 };
 
@@ -32,6 +34,31 @@ const LATEST_PERFORMANCE_VIEW = 'performance_records_latest';
     TODAY(2026-07-20)를 써서 8월에 넣은 성과도 7/20로 기록되는 실버그가 있었다. */
 function todayISODate() {
   return toLocalISODate(new Date());
+}
+
+/**
+ * performance_daily 전체 읽기. 이 테이블만 페이지를 돌며 읽는 이유:
+ * 캠페인×날짜 단위라 행 수가 PostgREST의 max-rows(기본 1000)를 넘는다 —
+ * 한 번의 select는 1000행에서 조용히 잘리고, 잘린 날짜는 화면에서 "그날 지출
+ * 없음"으로 보인다. 반환 형태는 supabase 응답과 같은 { data, error }라
+ * fetchAll의 실패 판정을 그대로 통과한다.
+ */
+async function fetchAllPerformanceDaily() {
+  const PAGE_SIZE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    // 페이징이 안정적이려면 정렬이 고정돼야 한다(순서가 흔들리면 행이 중복되거나 빠진다).
+    const { data, error } = await supabase
+      .from('performance_daily')
+      .select('*')
+      .order('campaign_id')
+      .order('date')
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return { data: rows, error: null };
 }
 
 /**
@@ -81,16 +108,17 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   // effect 본문에서 동기적으로 setState하면 렌더가 연쇄로 도는 것을 막기 위함이다
   // (react-hooks/set-state-in-effect).
   const fetchAll = useCallback(async () => {
-    const [storesRes, accountsRes, campaignsRes, performanceRes, plansRes, planItemsRes] = await Promise.all([
+    const [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes] = await Promise.all([
       supabase.from('stores').select('*').order('id'),
       supabase.from('ad_accounts').select('*').order('id'),
       supabase.from('campaigns').select('*').order('start_date', { ascending: false }),
       supabase.from(LATEST_PERFORMANCE_VIEW).select('*'),
+      fetchAllPerformanceDaily(),
       supabase.from('plans').select('*').order('name'),
       supabase.from('plan_items').select('*').order('sort_order'),
     ]);
 
-    const failed = [storesRes, accountsRes, campaignsRes, performanceRes, plansRes, planItemsRes]
+    const failed = [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes]
       .find((r) => r.error);
     if (failed) {
       return {
@@ -106,6 +134,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
         adAccounts: (accountsRes.data ?? []).map(rowToAdAccount),
         campaigns: (campaignsRes.data ?? []).map(rowToCampaign),
         performanceRecords: (performanceRes.data ?? []).map(rowToPerformanceRecord),
+        performanceDaily: (dailyRes.data ?? []).map(rowToPerformanceDaily),
         // 계획은 항목과 함께 한 덩어리로 만든다 — 화면이 두 배열을 조인하지
         // 않도록(조인 로직이 화면마다 갈리면 같은 계획이 다르게 보인다).
         plans: (plansRes.data ?? []).map((row) => rowToPlan(row, planItemsRes.data ?? [])),
@@ -323,6 +352,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       ...prev,
       campaigns: prev.campaigns.filter((c) => c.id !== campaignId),
       performanceRecords: prev.performanceRecords.filter((p) => p.campaignId !== campaignId),
+      performanceDaily: prev.performanceDaily.filter((p) => p.campaignId !== campaignId),
     }));
     return true;
   }, []);
@@ -415,6 +445,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     campaigns: state.campaigns,
     plans: state.plans,
     performanceRecords: state.performanceRecords,
+    performanceDaily: state.performanceDaily,
     adAccounts: state.adAccounts,
     alerts,
     today,

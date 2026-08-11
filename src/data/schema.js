@@ -145,6 +145,23 @@ export const ALERT_TYPE = Object.freeze({
  */
 
 /**
+ * 캠페인×날짜 단위 일별 성과(performance_daily, API 전용). PerformanceRecord가
+ * "그 시점까지의 누적 스냅샷"이라 만들 수 없는 시계열 축을 담당한다 — Reports의
+ * 날짜 필터가 지표를 실제로 자를 수 있는 유일한 근거.
+ *
+ * 가산 가능한 지표만 있다. reach가 없는 건 실수가 아니다 — 일별 reach의 합은
+ * 기간 reach가 아니라서(같은 사람이 여러 날 보이면 중복) 저장하지 않는다.
+ *
+ * @typedef {Object} PerformanceDaily
+ * @property {string} id - UUID v4 PK
+ * @property {string} campaignId - FK → Campaign.id
+ * @property {string} date - YYYY-MM-DD (그 지표가 발생한 날)
+ * @property {number} spend - USD 소수점 2자리
+ * @property {number|null} impressions
+ * @property {number|null} clicks
+ */
+
+/**
  * @typedef {Object} Alert
  * @property {string} id - UUID v4 PK
  * @property {string} campaignId - FK → Campaign.id
@@ -1024,6 +1041,102 @@ export function getReportSummary(campaigns, performanceRecords) {
     avgCPM,
     avgCTR,
   };
+}
+
+/** 날짜가 필터 범위 안인지. ISO(YYYY-MM-DD) 문자열은 사전순 비교가 곧 날짜 비교다. */
+function isDateInRange(date, range) {
+  if (!range) return true;
+  if (range.start && date < range.start) return false;
+  if (range.end && date > range.end) return false;
+  return true;
+}
+
+/**
+ * 일별 행들을 (범위로 잘라) 합산한다.
+ *
+ * spend는 항상 숫자(테이블 not null), impressions/clicks는 전부 null이면 null로
+ * 남긴다 — "그 기간 노출 0"과 "지표를 못 받았다"는 다르고, 후자를 0으로 찍으면
+ * 화면이 거짓말을 한다(sync-performance의 sumInteractions와 같은 원칙).
+ *
+ * @param {PerformanceDaily[]} dailyRows
+ * @param {{ start?: string, end?: string }} [range]
+ * @returns {{ spend: number, impressions: number|null, clicks: number|null }}
+ */
+export function sumDailyMetrics(dailyRows, range) {
+  const inRange = dailyRows.filter((r) => isDateInRange(r.date, range));
+  const sumOrNull = (values) => (values.some((v) => v != null)
+    ? values.reduce((sum, v) => sum + (v ?? 0), 0)
+    : null);
+  return {
+    spend: inRange.reduce((sum, r) => sum + r.spend, 0),
+    impressions: sumOrNull(inRange.map((r) => r.impressions)),
+    clicks: sumOrNull(inRange.map((r) => r.clicks)),
+  };
+}
+
+/**
+ * 필터된 캠페인 집합의 "기간 안 실지출". Reports의 Spend KPI가 날짜 필터를
+ * 걸었을 때 사용한다.
+ *
+ * 캠페인별로 두 갈래다:
+ *  - 일별 데이터가 있으면 → 범위로 잘라 합산. 범위 안에 행이 없으면 0 —
+ *    그 기간엔 정말 지출이 없었다는 뜻이라 fallback하지 않는다.
+ *  - 일별 데이터가 아예 없으면(수동 등록, 아직 backfill 전) → 누적 spend를
+ *    그대로 더하고 fallbackCount를 센다. 그 캠페인을 0으로 빼면 "기간 합계"가
+ *    조용히 모자라고, 누적을 섞으면 합계가 기간보다 크다 — 어느 쪽이든 숫자만
+ *    으로는 거짓이라, 섞되 **몇 건이 섞였는지 화면에 표기할 근거**를 돌려준다.
+ *
+ * @param {Campaign[]} campaigns - 이미 필터된 캠페인 집합
+ * @param {PerformanceRecord[]} performanceRecords - 캠페인당 누적 1건
+ * @param {PerformanceDaily[]} performanceDaily
+ * @param {{ start?: string, end?: string }} [range]
+ * @returns {{ spend: number, fallbackCount: number }}
+ */
+export function getRangedSpend(campaigns, performanceRecords, performanceDaily, range) {
+  const dailyByCampaign = new Map();
+  for (const row of performanceDaily) {
+    const list = dailyByCampaign.get(row.campaignId) ?? [];
+    list.push(row);
+    dailyByCampaign.set(row.campaignId, list);
+  }
+
+  let spend = 0;
+  let fallbackCount = 0;
+  for (const campaign of campaigns) {
+    const dailyRows = dailyByCampaign.get(campaign.id);
+    if (dailyRows?.length) {
+      spend += sumDailyMetrics(dailyRows, range).spend;
+      continue;
+    }
+    const record = performanceRecords.find((r) => r.campaignId === campaign.id);
+    if (record?.spend != null && record.spend > 0) {
+      spend += record.spend;
+      fallbackCount += 1;
+    }
+  }
+  return { spend, fallbackCount };
+}
+
+/**
+ * 여러 캠페인의 일별 행을 날짜 하나당 한 행으로 합쳐 시간순으로 돌려준다 —
+ * Reports의 Daily spend 표가 그대로 렌더한다.
+ *
+ * @param {PerformanceDaily[]} dailyRows - 이미 캠페인 필터를 거친 행들
+ * @param {{ start?: string, end?: string }} [range]
+ * @returns {Array<{ date: string, spend: number, impressions: number|null, clicks: number|null }>}
+ */
+export function buildDailySpendRows(dailyRows, range) {
+  const byDate = new Map();
+  for (const row of dailyRows) {
+    if (!isDateInRange(row.date, range)) continue;
+    const acc = byDate.get(row.date) ?? { date: row.date, spend: 0, impressions: null, clicks: null };
+    acc.spend += row.spend;
+    // null 규칙은 sumDailyMetrics와 동일 — 하나라도 값이 있으면 합, 전부 null이면 null.
+    if (row.impressions != null) acc.impressions = (acc.impressions ?? 0) + row.impressions;
+    if (row.clicks != null) acc.clicks = (acc.clicks ?? 0) + row.clicks;
+    byDate.set(row.date, acc);
+  }
+  return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }
 
 /**

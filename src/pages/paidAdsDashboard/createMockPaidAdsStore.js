@@ -4,6 +4,7 @@ import {
   mockAdAccounts,
   mockCampaigns,
   mockPerformanceRecords,
+  mockPerformanceDaily,
 } from '../../data/paidAdsMockData';
 import { MOCK_TODAY } from './paidAdsPageUtils';
 
@@ -39,6 +40,7 @@ export function createMockPaidAdsStore(overrides = {}) {
     adAccounts: mockAdAccounts,
     campaigns,
     performanceRecords,
+    performanceDaily: overrides.performanceDaily ?? mockPerformanceDaily,
     alerts: generateAlerts(campaigns, performanceRecords, MOCK_TODAY, mockAdAccounts),
     // 계획은 기본으로 비워 둔다 — "아직 계획이 없는 이벤트"가 실제로 흔한
     // 상태이고, 계획이 필요한 스토리만 overrides로 넣게 한다.

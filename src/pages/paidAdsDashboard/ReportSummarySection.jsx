@@ -24,9 +24,9 @@ import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl } from './paidAdsPageUtils';
-import { money, moneyWhole, count, percent, seconds } from '../../utils/format';
+import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendRows, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
+import { money, moneyWhole, count, percent, seconds, dateMed } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
@@ -1021,6 +1021,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
  * Props:
  * @param {Campaign[]} campaigns - 캠페인 목록 [Required]
  * @param {PerformanceRecord[]} performanceRecords - 성과 레코드 목록 [Required]
+ * @param {PerformanceDaily[]} performanceDaily - 캠페인×날짜 일별 성과. 날짜 필터가 Spend를 실제로 자르고 Daily spend 표를 그리는 근거 [Optional, 기본값: []]
  * @param {boolean} isLoading - 데이터 로드 중 여부. true면 표 대신 스켈레톤 [Optional, 기본값: false]
  * @param {string|null} error - 백엔드 오류 메시지. 있으면 상단에 오류 배너 [Optional, 기본값: null]
  * @param {function} onRetry - 오류 배너의 Retry 클릭 시 실행할 함수 [Optional]
@@ -1029,7 +1030,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
  * Example usage:
  * <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
  */
-export function ReportSummarySection({ campaigns, performanceRecords, adAccounts = [], plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
+export function ReportSummarySection({ campaigns, performanceRecords, performanceDaily = [], adAccounts = [], plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
   const navigate = useNavigate();
   const theme = useTheme();
   /* 기본 탭은 Performance다. 이 화면 이름이 Reports이고, 보고서에 오는 사람의
@@ -1125,6 +1126,31 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
   const summary = useMemo(
     () => getReportSummary(filteredCampaigns, performanceRecords.filter((r) => filteredCampaigns.some((c) => c.id === r.campaignId))),
     [filteredCampaigns, performanceRecords]
+  );
+
+  /* 날짜 필터가 걸렸는지. 걸렸을 때만 Spend를 일별 데이터로 자른다 — 안 걸렸을
+     땐 누적 스냅샷 합(summary.totalSpend)이 그대로 정답이고, 일별 합으로
+     바꾸면 아직 backfill 안 된 캠페인이 조용히 빠진다. */
+  const hasDateFilter = Boolean(dateRange.start || dateRange.end);
+
+  const filteredDaily = useMemo(() => {
+    const ids = new Set(filteredCampaigns.map((c) => c.id));
+    return performanceDaily.filter((r) => ids.has(r.campaignId));
+  }, [performanceDaily, filteredCampaigns]);
+
+  /* 기간 안 실지출. campaignInDateRange는 **캠페인을 고르는** 필터라(기간 겹침
+     판정) 지표를 자르지 않는다 — 그래서 6/22~6/30을 골라도 걸린 캠페인의 전체
+     누적이 나왔다(실사용 지적: 어느 범위를 골라도 $352.89). 자르는 건 여기다. */
+  const rangedSpend = useMemo(
+    () => (hasDateFilter ? getRangedSpend(filteredCampaigns, performanceRecords, filteredDaily, dateRange) : null),
+    [hasDateFilter, filteredCampaigns, performanceRecords, filteredDaily, dateRange]
+  );
+
+  /* Daily spend 표의 행 — 필터에 걸린 캠페인들의 일별 지출을 날짜당 한 행으로.
+     날짜 필터가 있으면 그 범위만, 없으면 캠페인 기간 전체를 보여준다. */
+  const dailySpendRows = useMemo(
+    () => buildDailySpendRows(filteredDaily, hasDateFilter ? dateRange : undefined),
+    [filteredDaily, hasDateFilter, dateRange]
   );
 
   /**
@@ -1259,16 +1285,32 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
                   { label: 'Campaigns', value: summary.totalCampaigns },
                   {
                     label: 'Total Spend',
-                    value: money(summary.totalSpend),
-                    /* 계획이 있을 때만 붙는다. 계획 없이 "얼마 썼다"만 크게
-                       띄우면 화면이 그 숫자가 많은지 적은지에 답하지 못한다. */
-                    delta:
-                      planComparison?.planned > 0
-                        ? {
-                            text: `${percent(summary.totalSpend / planComparison.planned)} of ${moneyWhole(planComparison.planned)} planned`,
-                            tone: summary.totalSpend > planComparison.planned ? 'bad' : 'neutral',
-                          }
-                        : undefined,
+                    /* 날짜 필터가 걸리면 일별 데이터로 자른 값이다(rangedSpend
+                       주석 참고). sub가 기준을 밝힌다 — 같은 라벨이 두 기준의
+                       값을 말하면 어느 쪽도 믿을 수 없게 된다. */
+                    value: money(rangedSpend ? rangedSpend.spend : summary.totalSpend),
+                    sub: rangedSpend ? 'in selected dates' : undefined,
+                    /* 계획 대비는 날짜 필터가 없을 때만 붙는다. 기간을 자른
+                       지출을 이벤트 전체 계획과 비교하면 "계획의 12%"가 절약이
+                       아니라 그냥 창이 좁다는 뜻이 된다 — 비교가 성립하지 않는다.
+                       대신 그 자리에 일별 데이터가 없어 누적으로 섞인 캠페인
+                       수를 밝힌다(조용히 섞으면 합계가 기간보다 커 보인다). */
+                    delta: rangedSpend
+                      ? (rangedSpend.fallbackCount > 0
+                          ? {
+                              text: `${rangedSpend.fallbackCount} campaign${rangedSpend.fallbackCount === 1 ? '' : 's'} without daily data — lifetime spend included`,
+                              tone: 'neutral',
+                            }
+                          : undefined)
+                      : (planComparison?.planned > 0
+                          ? {
+                              /* 계획이 있을 때만 붙는다. 계획 없이 "얼마 썼다"만
+                                 크게 띄우면 화면이 그 숫자가 많은지 적은지에
+                                 답하지 못한다. */
+                              text: `${percent(summary.totalSpend / planComparison.planned)} of ${moneyWhole(planComparison.planned)} planned`,
+                              tone: summary.totalSpend > planComparison.planned ? 'bad' : 'neutral',
+                            }
+                          : undefined),
                   },
                   {
                     label: 'Avg. CPM',
@@ -1371,6 +1413,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
             /* 링크 규칙(adsManagerUrl)은 pages 레이어의 것이라 여기서 계산해
                넘긴다 — 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다. */
             adsManagerHref={adsManagerUrl(detailCampaign, detailAccount)}
+            billingHref={billingUrl(detailAccount)}
             onClose={() => setDetailCampaignId(null)}
             onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
           />
@@ -1630,6 +1673,75 @@ export function ReportSummarySection({ campaigns, performanceRecords, adAccounts
               />
             </Box>
           )}
+
+          {/* Daily spend — 날짜당 한 행. goal별 표(캠페인 축)와 위 타임라인
+              (phase 축)이 답하지 못하는 "그래서 하루에 얼마씩 나갔나"를 맡는다
+              (실사용 요청: 이벤트의 데일리 지출이 보고 싶은데 어느 범위를
+              골라도 누적만 나왔다). 행이 없으면 섹션을 숨기지 않고 한 줄로
+              말한다 — 첫 동기화 전의 정상 상태가 고장으로 읽히지 않게. */}
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="title" sx={SECTION_TITLE_SX}>
+              Daily spend{' '}
+              <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                — {dailySpendRows.length} {dailySpendRows.length === 1 ? 'day' : 'days'}
+                {hasDateFilter ? ' in selected dates' : ''}
+              </Typography>
+            </Typography>
+            {dailySpendRows.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No daily data for these campaigns yet — it arrives with the next sync.
+              </Typography>
+            ) : (
+              /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더 고정).
+                 goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된 축이라 끊기면
+                 "그 주가 얼마였나"를 페이지를 오가며 재조립해야 한다. */
+              <TableContainer sx={{ mb: 2, maxHeight: 384, maxWidth: 560, overflowX: 'auto' }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Spend</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {dailySpendRows.map((row) => (
+                      <TableRow key={row.date}>
+                        <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                          {dateMed(row.date)}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{money(row.spend)}</TableCell>
+                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {row.impressions != null ? count(row.impressions) : EMPTY_CELL}
+                        </TableCell>
+                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                          {row.clicks != null ? count(row.clicks) : EMPTY_CELL}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Budget Breakdown과 같은 합계 행 문법(fontWeight 700). */}
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        {money(dailySpendRows.reduce((sum, r) => sum + r.spend, 0))}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        {dailySpendRows.some((r) => r.impressions != null)
+                          ? count(dailySpendRows.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
+                          : EMPTY_CELL}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                        {dailySpendRows.some((r) => r.clicks != null)
+                          ? count(dailySpendRows.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
+                          : EMPTY_CELL}
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
 
         {GOAL_META.map(({ value, label }) => {
           const rowsForGoal = goalRows.filter((r) => r.goal === value);

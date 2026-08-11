@@ -285,6 +285,57 @@ export const mockPerformanceRecords = [
 ];
 
 // ============================================================
+// PerformanceDaily — 성과 레코드가 있는 캠페인의 일별 분해(합성)
+// ============================================================
+
+/**
+ * 누적 spend를 캠페인 기간(시나리오 기준일 2026-07-20 이전까지)에 균등 분배해
+ * 일별 행을 합성한다. 마지막 날이 반올림 오차를 흡수해 일별 합 = 누적이 정확히
+ * 맞는다 — Reports의 기간 필터 스토리가 "잘린 합"과 "누적"을 대조해 보여주는
+ * 데이터라, 둘이 어긋나면 스토리 자체가 버그처럼 보인다.
+ * impressions/clicks도 같은 방식으로 나눈다(내림 후 마지막 날 보정).
+ *
+ * 스토리가 자기 로컬 캠페인으로 일별 데이터를 합성할 때도 이 함수를 쓴다 —
+ * 같은 로직을 스토리마다 복제하면 "합=누적" 보정이 한쪽만 고쳐진다.
+ */
+export function spreadDailyOverCampaign(campaign, record) {
+  const MOCK_TODAY_ISO = '2026-07-20'; // paidAdsPageUtils의 MOCK_TODAY와 같은 날 (pages를 역참조하지 않으려 상수로)
+  const start = new Date(`${campaign.startDate}T00:00:00Z`);
+  const endISO = campaign.endDate < MOCK_TODAY_ISO ? campaign.endDate : MOCK_TODAY_ISO;
+  const end = new Date(`${endISO}T00:00:00Z`);
+  const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+  if (days <= 0) return [];
+
+  const perDaySpend = Math.floor((record.spend / days) * 100) / 100;
+  const perDayImpressions = record.impressions != null ? Math.floor(record.impressions / days) : null;
+  const perDayClicks = record.clicks != null ? Math.floor(record.clicks / days) : null;
+
+  return Array.from({ length: days }, (_, i) => {
+    const d = new Date(start);
+    d.setUTCDate(d.getUTCDate() + i);
+    const isLast = i === days - 1;
+    return {
+      id: `daily-${campaign.id}-${i}`,
+      campaignId: campaign.id,
+      date: d.toISOString().slice(0, 10),
+      spend: isLast ? Math.round((record.spend - perDaySpend * (days - 1)) * 100) / 100 : perDaySpend,
+      impressions: perDayImpressions != null
+        ? (isLast ? record.impressions - perDayImpressions * (days - 1) : perDayImpressions)
+        : null,
+      clicks: perDayClicks != null
+        ? (isLast ? record.clicks - perDayClicks * (days - 1) : perDayClicks)
+        : null,
+    };
+  });
+}
+
+/** @type {import('./schema').PerformanceDaily[]} */
+export const mockPerformanceDaily = mockPerformanceRecords.flatMap((record) => {
+  const campaign = mockCampaigns.find((c) => c.id === record.campaignId);
+  return campaign ? spreadDailyOverCampaign(campaign, record) : [];
+});
+
+// ============================================================
 // Alert — 실제 트리거 조건에 맞게 3가지 유형만 생성
 // new_store_reminder는 Alert 엔티티에 넣지 않는다 (visual-direction 결정:
 // 캠페인에 종속된 알림이 아니라 /stores 페이지 내 안내 문구로만 처리)

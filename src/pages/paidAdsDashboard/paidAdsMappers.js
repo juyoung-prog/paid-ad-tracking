@@ -177,6 +177,21 @@ export function rowToPerformanceRecord(row) {
 }
 
 /**
+ * 일별 성과 행(performance_daily). 읽기 전용 — 일별 데이터는 sync-performance만
+ * 쓰므로 역방향(toRow) 매퍼가 없다.
+ */
+export function rowToPerformanceDaily(row) {
+  return {
+    id: row.id,
+    campaignId: row.campaign_id,
+    date: row.date,
+    spend: num(row.spend) ?? 0,
+    impressions: num(row.impressions),
+    clicks: num(row.clicks),
+  };
+}
+
+/**
  * 프론트 모델 → DB 행. 화면에서 저장하는 값은 항상 source='manual'이다 —
  * API 동기화(source='api')와 같은 날짜라도 별개 행으로 공존해야
  * 자동 동기화가 사용자가 손으로 넣은 값을 덮어쓰지 않는다.
