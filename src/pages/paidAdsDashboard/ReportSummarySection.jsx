@@ -1409,6 +1409,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
           <CampaignDetailPanel
             campaign={detailCampaign}
             performance={performanceRecords.find((r) => r.campaignId === detailCampaign.id)}
+            /* 캠페인 단위 일별 — 본문의 Daily spend 표는 필터 집합의 합이라,
+               기간이 겹치는 캠페인을 가르는 건 이 패널의 몫이다. */
+            dailyRows={performanceDaily.filter((r) => r.campaignId === detailCampaign.id)}
             accountLabel={detailAccount?.label}
             /* 링크 규칙(adsManagerUrl)은 pages 레이어의 것이라 여기서 계산해
                넘긴다 — 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다. */

@@ -298,10 +298,11 @@ export const mockPerformanceRecords = [
  * 스토리가 자기 로컬 캠페인으로 일별 데이터를 합성할 때도 이 함수를 쓴다 —
  * 같은 로직을 스토리마다 복제하면 "합=누적" 보정이 한쪽만 고쳐진다.
  */
-export function spreadDailyOverCampaign(campaign, record) {
-  const MOCK_TODAY_ISO = '2026-07-20'; // paidAdsPageUtils의 MOCK_TODAY와 같은 날 (pages를 역참조하지 않으려 상수로)
+export function spreadDailyOverCampaign(campaign, record, todayISO = '2026-07-20') {
+  // 기본값은 paidAdsPageUtils의 MOCK_TODAY와 같은 날(pages를 역참조하지 않으려
+  // 상수로). 다른 기준일로 시나리오를 짜는 스토리는 세 번째 인자로 넘긴다.
   const start = new Date(`${campaign.startDate}T00:00:00Z`);
-  const endISO = campaign.endDate < MOCK_TODAY_ISO ? campaign.endDate : MOCK_TODAY_ISO;
+  const endISO = campaign.endDate < todayISO ? campaign.endDate : todayISO;
   const end = new Date(`${endISO}T00:00:00Z`);
   const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
   if (days <= 0) return [];

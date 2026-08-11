@@ -3,6 +3,12 @@ import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
@@ -11,7 +17,7 @@ import { PacingIndicator } from '../data-display/PacingIndicator';
 import { PlatformMetricList } from '../data-display/PlatformMetricList';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { calcBudgetPacing, effectiveBudgetPlanned, PLATFORM } from '../../data/schema';
-import { money, moneyWhole, dateRange } from '../../utils/format';
+import { money, moneyWhole, count, dateRange, dateMed, EMPTY } from '../../utils/format';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -59,6 +65,7 @@ function Row({ label, value }) {
  * Props:
  * @param {object} campaign - 캠페인 [Required]
  * @param {object} performance - 이 캠페인의 성과 레코드. 없으면 성과 블록을 안 그린다 [Optional]
+ * @param {Array} dailyRows - **이 캠페인의** 일별 성과(PerformanceDaily[]). 호출부가 캠페인으로 걸러 넘긴다. 비면 섹션째 안 그린다 — 수동 등록 캠페인은 일별 데이터가 영영 없어서, 상시 빈 상태 문구는 안내가 아니라 소음이 된다 [Optional, 기본값: []]
  * @param {string} accountLabel - 광고 계정 표시명 [Optional]
  * @param {string} adsManagerHref - 플랫폼 광고 관리자에서 이 캠페인을 여는 링크. **호출부가 계산해서 넘긴다** — 링크 규칙(adsManagerUrl)은 pages 레이어에 있고, 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다 [Optional]
  * @param {string} billingHref - 이 캠페인이 속한 계정의 청구 내역(Meta: Billing & payments → Payment activity)으로 가는 링크. adsManagerHref와 같은 이유로 호출부(billingUrl)가 계산해 넘긴다 [Optional]
@@ -72,6 +79,7 @@ function Row({ label, value }) {
 export function CampaignDetailPanel({
   campaign,
   performance,
+  dailyRows = [],
   accountLabel,
   adsManagerHref,
   billingHref,
@@ -84,6 +92,9 @@ export function CampaignDetailPanel({
   const spend = performance?.spend ?? null;
   // 수동 링크(creativeUrl)가 있으면 그쪽 우선 — 사람이 굳이 입력한 데는 이유가 있다.
   const viewAdHref = campaign.creativeUrl || campaign.adLink || null;
+  // 호출부가 정렬을 보장하지 않으므로 여기서 시간순으로 고정한다 — 일별 표가
+  // 뒤죽박죽이면 "언제부터 줄었나"를 읽을 수 없다. 원본은 건드리지 않는다.
+  const sortedDaily = [...dailyRows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const planned = effectiveBudgetPlanned(campaign);
   const pacing = calcBudgetPacing(campaign, spend ?? 0, today);
   const showPacing = spend != null && (planned != null || campaign.budgetDaily != null);
@@ -223,6 +234,71 @@ export function CampaignDetailPanel({
             spend={spend}
             sx={{ mb: 3 }}
           />
+        )}
+
+        {/* 이 캠페인만의 일별 지출 — Reports의 Daily spend 표는 필터에 걸린
+            캠페인들의 **합**이라, 같은 플랫폼에서 기간이 겹치는 캠페인이 있으면
+            캠페인 하나를 집어 볼 방법이 없었다(실사용 요청). 캠페인 단위 일별은
+            캠페인 상세의 질문이므로 이 패널이 맡는다.
+            Spend 줄(누적)과 이 표의 Total이 같은 값이어야 정상이다 — 어긋나면
+            일별 backfill이 덜 됐거나 플랫폼 사후 정정이 반영 중이라는 신호라,
+            일부러 둘 다 보이게 둔다. */}
+        {sortedDaily.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              Daily spend{' '}
+              <Typography component="span" variant="body2" color="text.secondary">
+                — {sortedDaily.length} {sortedDaily.length === 1 ? 'day' : 'days'}
+              </Typography>
+            </Typography>
+            {/* Reports의 Daily spend 표와 같은 문법(stickyHeader + maxHeight 스크롤,
+                tabular-nums, Total 행 굵게) — 같은 데이터가 화면마다 다른 모양이면
+                둘 중 하나가 틀린 것으로 읽힌다. */}
+            <TableContainer sx={{ maxHeight: 320 }}>
+              <Table size="small" stickyHeader>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Spend</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {sortedDaily.map((row) => (
+                    <TableRow key={row.date}>
+                      <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                        {dateMed(row.date)}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{money(row.spend)}</TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {row.impressions != null ? count(row.impressions) : EMPTY}
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {row.clicks != null ? count(row.clicks) : EMPTY}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {money(sortedDaily.reduce((sum, r) => sum + r.spend, 0))}
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {sortedDaily.some((r) => r.impressions != null)
+                        ? count(sortedDaily.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
+                        : EMPTY}
+                    </TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      {sortedDaily.some((r) => r.clicks != null)
+                        ? count(sortedDaily.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
+                        : EMPTY}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
         )}
 
         {/* 전 지표를 세로로 한눈에 — 표에도 같은 값이 있지만 여기서는 한

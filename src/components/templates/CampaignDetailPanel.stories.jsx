@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CampaignDetailPanel } from './CampaignDetailPanel';
 import { PLATFORM, GOAL, TARGET_SCOPE } from '../../data/schema';
+import { spreadDailyOverCampaign } from '../../data/paidAdsMockData';
 
 const TODAY = new Date('2026-08-07');
 
@@ -103,13 +104,26 @@ Billing & payments → Payment activity를 또 찾아 들어가야 했다. 인�
 표에도 같은 값이 있지만(전 컬럼 노출 + 가로 스크롤 — Meta 광고 관리자와 같은
 문법), 이 패널은 **한 캠페인만** 놓고 읽는 자리다. 값이 없는 항목은
 \`PlatformMetricList\`가 알아서 숨긴다.
+
+### 이 캠페인만의 Daily spend
+\`dailyRows\`(PerformanceDaily[], 호출부가 캠페인으로 걸러 넘김)가 있으면 날짜당
+한 행짜리 일별 지출 표를 그린다. Reports 본문의 Daily spend 표는 **필터에 걸린
+캠페인들의 합**이라, 같은 플랫폼에서 기간이 겹치는 캠페인이 있으면 하나를 집어
+볼 방법이 없었다(실사용 요청) — 캠페인 단위 일별은 캠페인 상세의 질문이므로 이
+패널이 맡는다. 표의 Total과 위 Spend 줄(누적 스냅샷)은 같은 값이어야 정상이고,
+어긋나면 backfill 미완/플랫폼 사후 정정의 신호라 둘 다 보이게 둔다. 비면
+섹션째 안 그린다 — 수동 등록 캠페인은 일별이 영영 없어 상시 문구는 소음이다.
         `,
       },
     },
   },
 };
 
-function Harness({ campaign, performance, adsManagerHref, billingHref }) {
+/* 시나리오 기준일(8/7)까지의 일별 합성 — 누적 spend를 균등 분배하므로
+   표의 Total이 위 Spend 줄(632.98)과 정확히 같아야 정상이다. */
+const DAILY_ROWS = spreadDailyOverCampaign(CAMPAIGN, PERFORMANCE, '2026-08-07');
+
+function Harness({ campaign, performance, dailyRows, adsManagerHref, billingHref }) {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <Box sx={{ minWidth: 320 }}>
@@ -120,6 +134,7 @@ function Harness({ campaign, performance, adsManagerHref, billingHref }) {
         <CampaignDetailPanel
           campaign={campaign}
           performance={performance}
+          dailyRows={dailyRows}
           accountLabel="TikTok Unified"
           adsManagerHref={adsManagerHref}
           billingHref={billingHref}
@@ -142,9 +157,24 @@ function Harness({ campaign, performance, adsManagerHref, billingHref }) {
  * - Budget Pacing 블록이 나온다
  * - `Reach · Plays · Comments · Shares · Follows · Visits`까지 전 지표가 보인다
  * - `Avg Watch`는 `1.01s` — TikTok이 준 소수를 그대로 쓴다
+ * - **Daily spend 표** — 날짜당 한 행(7/6~8/7), 표 안 스크롤(stickyHeader),
+ *   Total이 위 Spend 줄($632.98)과 같은 값이다. Reports의 Daily spend 표는
+ *   필터 집합의 합이라 캠페인 하나만 가르는 건 이 패널의 몫이다
  */
 export const WithPerformance = {
-  render: () => <Harness campaign={CAMPAIGN} performance={PERFORMANCE} />,
+  render: () => <Harness campaign={CAMPAIGN} performance={PERFORMANCE} dailyRows={DAILY_ROWS} />,
+};
+
+/**
+ * 일별 데이터가 없는 캠페인 — 수동 등록이거나 아직 backfill 전이다.
+ *
+ * 확인 포인트: Daily spend 섹션이 **제목까지 통째로 없다.** 수동 등록 캠페인은
+ * 일별 데이터가 영영 없어서, 상시 빈 상태 문구는 안내가 아니라 소음이 된다
+ * (Reports 본문 표가 빈 상태를 문구로 말하는 것과 반대인 이유 — 거기는 동기화
+ * 전의 일시적 상태라 "고장 아님"을 말할 필요가 있다).
+ */
+export const NoDailyData = {
+  render: () => <Harness campaign={CAMPAIGN} performance={PERFORMANCE} dailyRows={[]} />,
 };
 
 /**
