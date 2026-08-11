@@ -61,6 +61,7 @@ function Row({ label, value }) {
  * @param {object} performance - 이 캠페인의 성과 레코드. 없으면 성과 블록을 안 그린다 [Optional]
  * @param {string} accountLabel - 광고 계정 표시명 [Optional]
  * @param {string} adsManagerHref - 플랫폼 광고 관리자에서 이 캠페인을 여는 링크. **호출부가 계산해서 넘긴다** — 링크 규칙(adsManagerUrl)은 pages 레이어에 있고, 컴포넌트가 pages를 임포트하면 의존 방향이 뒤집힌다 [Optional]
+ * @param {string} billingHref - 이 캠페인이 속한 계정의 청구 내역(Meta: Billing & payments → Payment activity)으로 가는 링크. adsManagerHref와 같은 이유로 호출부(billingUrl)가 계산해 넘긴다 [Optional]
  * @param {Date} today - 페이싱 계산 기준일 [Optional, 기본값: new Date()]
  * @param {function} onClose - 닫기 핸들러 [Required]
  * @param {function} onEdit - "Edit on Dashboard" 핸들러 (campaignId) => void [Optional]
@@ -73,6 +74,7 @@ export function CampaignDetailPanel({
   performance,
   accountLabel,
   adsManagerHref,
+  billingHref,
   today = new Date(),
   onClose,
   onEdit,
@@ -86,8 +88,21 @@ export function CampaignDetailPanel({
   const pacing = calcBudgetPacing(campaign, spend ?? 0, today);
   const showPacing = spend != null && (planned != null || campaign.budgetDaily != null);
 
+  /* 테마 기본 드로어 폭(440)을 이 패널에서만 넓힌다.
+     440에서는 문 네 개(View ad · Ads Manager · Billing · Edit on Dashboard)가
+     한 줄에 안 들어가 마지막 하나가 혼자 다음 줄로 접혔다 — 실측 합계
+     523px(104+143+92+160 + 간격 24)에 좌우 여백 48을 더하면 571이 필요하다.
+     580은 그 위로 잡은 값이다. 라벨을 늘리거나 버튼을 더하면 이 값도 같이
+     봐야 한다(`Payment activity`를 `Billing`으로 줄인 것도 같은 이유).
+     형제인 Dashboard 편집 드로어는 440 그대로다 — 거기는 문이 셋이라 440에서
+     이미 한 줄이고, 폼 필드 폭을 건드릴 이유가 없다. */
   return (
-    <Drawer anchor="right" open onClose={onClose}>
+    <Drawer
+      anchor="right"
+      open
+      onClose={onClose}
+      PaperProps={{ sx: { width: { xs: '100%', sm: 580 } } }}
+    >
       <Box sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5, mb: 2 }}>
           <CampaignThumbnail
@@ -125,7 +140,16 @@ export function CampaignDetailPanel({
             플랫폼 관리 화면(외부 id로 결정론적 생성, Meta만 — TikTok은 캠페인
             단위 딥링크가 안정적으로 구성되지 않아 호출부가 안 넘긴다).
             성과가 이상해 보일 때 다음 행동이 "원본을 열어 확인"이라, 그 문이
-            이 패널에 없으면 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다. */}
+            이 패널에 없으면 표 → 패널까지 와 놓고 다시 Dashboard를 거쳐야 한다.
+
+            Billing은 방향이 다른 세 번째 문이다 — 위 둘이 "광고가 어떻게
+            나갔나"라면 이건 "얼마가 청구됐나"다. 리포트를 보다 인보이스를
+            뽑아야 할 때 Ads Manager로 가도 거기서 Billing & payments →
+            Payment activity를 또 찾아 들어가야 해서, 그 경로를 링크가 대신한다.
+            인보이스는 계정 단위 문서라 링크도 캠페인이 아니라 계정으로 간다.
+            라벨이 착지점 이름("Payment activity")이 아니라 상위 메뉴명인 이유는
+            폭이다 — 네 개를 한 줄에 두려면 이만큼 짧아야 하고, Meta의 좌측
+            메뉴가 실제로 "Billing & payments"라 도착해서도 말이 맞는다. */}
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 2 }}>
           {viewAdHref && (
             <Button
@@ -153,6 +177,20 @@ export function CampaignDetailPanel({
               sx={{ boxShadow: 'none' }}
             >
               Ads Manager
+            </Button>
+          )}
+          {billingHref && (
+            <Button
+              component="a"
+              href={billingHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="outlined"
+              size="small"
+              endIcon={<OpenInNewIcon sx={(t) => ({ fontSize: t.iconSize.inline })} />}
+              sx={{ boxShadow: 'none' }}
+            >
+              Billing
             </Button>
           )}
           {onEdit && (

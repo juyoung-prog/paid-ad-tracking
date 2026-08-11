@@ -38,7 +38,7 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
-import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl } from './paidAdsPageUtils';
+import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
 import { money, moneyWhole } from '../../utils/format';
 import { useViewUrlSync } from './useViewUrlSync';
 import { BulkEventTagDialog } from '../../components/templates/BulkEventTagDialog';
@@ -556,10 +556,11 @@ export function DashboardPage() {
   const selectedCampaign = campaignsWithStatus.find((c) => c.id === selectedCampaignId);
   // 사람이 입력한 링크가 없을 때 쓰는 대체 링크(광고 관리자). 저장값 기준이라
   // 편집 중인 폼 값이 아니라 selectedCampaign을 본다.
-  const selectedCampaignAdsManagerUrl = adsManagerUrl(
-    selectedCampaign,
-    adAccounts.find((a) => a.id === selectedCampaign?.accountId)
-  );
+  const selectedCampaignAccount = adAccounts.find((a) => a.id === selectedCampaign?.accountId);
+  const selectedCampaignAdsManagerUrl = adsManagerUrl(selectedCampaign, selectedCampaignAccount);
+  // 청구 내역은 계정 단위 문서라 캠페인이 아니라 계정으로 간다(Reports 드로어와
+  // 같은 문 — 형제 드로어끼리 액션 줄의 문법을 맞춘다).
+  const selectedCampaignBillingUrl = billingUrl(selectedCampaignAccount);
 
   // Save & Next의 목적지 — 지금 보고 있는 리스트(filteredCampaigns) 순서에서
   // 성과 레코드가 아직 없는 다음 캠페인. 성과 입력은 이 앱의 일일 핵심 반복
@@ -1266,6 +1267,20 @@ export function DashboardPage() {
                   sx={{ boxShadow: 'none' }}
                 >
                   Ads Manager
+                </Button>
+              )}
+              {selectedCampaignBillingUrl && (
+                <Button
+                  component="a"
+                  href={selectedCampaignBillingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="outlined"
+                  size="small"
+                  endIcon={<OpenInNewIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />}
+                  sx={{ boxShadow: 'none' }}
+                >
+                  Billing
                 </Button>
               )}
             </Box>

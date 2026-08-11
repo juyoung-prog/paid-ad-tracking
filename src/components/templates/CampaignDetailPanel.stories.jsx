@@ -73,7 +73,7 @@ DashboardPage 상태에 얽혀 있기도 하다.
 여기서는 읽기만 한다. 고칠 게 있으면 \`Edit on Dashboard\`로 간다 — 당하는 이동이
 아니라 고르는 이동이 된다.
 
-### 바깥으로 나가는 문 두 개
+### 바깥으로 나가는 문 세 개
 \`View ad\`는 **소비자가 보는 실제 광고 게시물**로 간다 — creativeUrl(수동 입력)이
 있으면 그쪽 우선, 없으면 동기화가 채운 adLink(썸네일과 같은 광고에서 뽑은
 게시물 주소: Meta는 부스팅 원본 게시물 permalink 또는 미리보기 링크, TikTok은
@@ -85,6 +85,20 @@ Spark 광고의 공개 영상 주소 — 업로드 소재 다크 광고는 공�
 것이라 이 컴포넌트는 href를 받기만 한다 — 컴포넌트가 pages를 임포트하면 의존
 방향이 뒤집힌다.
 
+\`Billing\`(\`billingHref\`, 호출부가 billingUrl로 계산)는 방향이 다른 세 번째
+문이다 — 위 둘이 "광고가 어떻게 나갔나"라면 이건 "얼마가 청구됐나"다.
+리포트를 보다 인보이스를 뽑아야 할 때 Ads Manager를 열어도 거기서
+Billing & payments → Payment activity를 또 찾아 들어가야 했다. 인보이스는
+**계정 단위** 문서라 이 링크만 캠페인이 아니라 계정으로 간다(Meta는 청구 허브에
+그 계정이 선택된 상태, TikTok은 광고주 결제 화면까지).
+
+### 폭이 고정이다
+패널 폭은 \`560\`(좁은 화면에선 전체 폭). 예전엔 지정이 없어 내용물이 폭을
+정했는데, 그러면 액션 줄이 캠페인마다 다른 지점에서 접혀 같은 패널의 버튼
+배치가 열 때마다 달라졌다. 560은 문 네 개가 한 줄에 들어가는 폭이다 —
+라벨을 늘리거나 버튼을 더하면 이 값도 같이 봐야 한다(\`Payment activity\`를
+\`Billing\`으로 줄인 이유이기도 하다).
+
 ### 전 지표를 세로로 한눈에
 표에도 같은 값이 있지만(전 컬럼 노출 + 가로 스크롤 — Meta 광고 관리자와 같은
 문법), 이 패널은 **한 캠페인만** 놓고 읽는 자리다. 값이 없는 항목은
@@ -95,7 +109,7 @@ Spark 광고의 공개 영상 주소 — 업로드 소재 다크 광고는 공�
   },
 };
 
-function Harness({ campaign, performance, adsManagerHref }) {
+function Harness({ campaign, performance, adsManagerHref, billingHref }) {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <Box sx={{ minWidth: 320 }}>
@@ -108,6 +122,7 @@ function Harness({ campaign, performance, adsManagerHref }) {
           performance={performance}
           accountLabel="TikTok Unified"
           adsManagerHref={adsManagerHref}
+          billingHref={billingHref}
           today={TODAY}
           onClose={() => setIsOpen(false)}
           onEdit={() => {}}
@@ -143,12 +158,15 @@ export const NoPerformance = {
 };
 
 /**
- * 외부 링크가 둘 다 있는 캠페인.
+ * 외부 링크가 셋 다 있는 캠페인.
  *
  * 확인 포인트:
  * - `View ad` — creativeUrl(수동, 우선) 또는 adLink(동기화)가 있을 때 나타난다
  * - `Ads Manager` — adsManagerHref가 넘어왔을 때만(Meta 캠페인) 나타난다
- * - 둘 다 새 탭(target=_blank)이고, 없는 링크는 빈 버튼 대신 아예 안 그린다
+ * - `Billing` — billingHref가 넘어왔을 때만. 계정의 청구 내역
+ *   (Meta: Billing & payments → Payment activity)으로 간다 — 인보이스를 뽑는 자리다
+ * - 전부 새 탭(target=_blank)이고, 없는 링크는 빈 버튼 대신 아예 안 그린다
+ * - **문 네 개가 한 줄**에 들어간다(패널 폭 560 고정). 라벨을 늘리면 접힌다
  */
 export const WithExternalLinks = {
   render: () => (
@@ -156,6 +174,7 @@ export const WithExternalLinks = {
       campaign={{ ...CAMPAIGN, id: 'c-3', platform: PLATFORM.META, creativeUrl: '', adLink: 'https://www.facebook.com/1234567890/posts/9876543210' }}
       performance={PERFORMANCE}
       adsManagerHref="https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=123&selected_campaign_ids=456"
+      billingHref="https://business.facebook.com/billing_hub/payment_activity?asset_id=123"
     />
   ),
 };

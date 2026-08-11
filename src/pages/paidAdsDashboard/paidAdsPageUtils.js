@@ -168,6 +168,44 @@ export function adsManagerUrl(campaign, account) {
 }
 
 /**
+ * 청구 내역(인보이스)을 여는 링크.
+ *
+ * 인보이스는 **광고 계정** 단위 문서다 — 캠페인 하나만 잘라 발행되지 않는다.
+ * 그래서 캠페인이 아니라 계정을 받는다(adsManagerUrl과 다른 점).
+ *
+ * 왜 별도 문이 필요한가: 기존 세 개(View ad / Ads Manager / Edit on Dashboard)는
+ * 전부 "광고가 어떻게 나갔나"로 가는 문이라, 정산 때 필요한 "얼마가 청구됐고
+ * 영수증은 어디 있나"에는 아무 문도 열리지 않았다. Ads Manager를 열어도
+ * 거기서 다시 Billing & payments → Payment activity까지 사람이 찾아 들어가야
+ * 한다 — 그 두 단계를 링크가 대신한다.
+ *
+ * Meta는 Business의 청구 허브(Billing & payments)에서 Payment activity 탭이
+ * 곧 결제·인보이스 목록이고, asset_id로 그 계정이 선택된 상태까지 간다.
+ * TikTok은 광고주의 결제 화면까지 연다 — Ads Manager 링크와 같은 비대칭이다
+ * (계정까지만, 문서 한 건까지는 아님). 라벨이 일반형 "Payment activity"라
+ * 목록으로 여는 것이 거짓말이 되지 않는다.
+ *
+ * @param {object} account - platform, externalAccountId를 가진 광고 계정
+ * @returns {string|null} 계정 식별자를 모르면 null — 추측해서 열지 않는다
+ */
+export function billingUrl(account) {
+  if (!account?.externalAccountId) return null;
+
+  if (account.platform === 'meta') {
+    // adsManagerUrl과 같은 정규화 — 저장값은 "act_123..." 형태로 올 수 있는데
+    // 청구 허브의 asset_id는 숫자 id를 받는다.
+    const accountId = String(account.externalAccountId).replace(/^act_/, '');
+    return `https://business.facebook.com/billing_hub/payment_activity?asset_id=${encodeURIComponent(accountId)}`;
+  }
+
+  if (account.platform === 'tiktok') {
+    return `https://ads.tiktok.com/i18n/account/payment?aadvid=${encodeURIComponent(String(account.externalAccountId))}`;
+  }
+
+  return null;
+}
+
+/**
  * 이 화면군의 서체 규칙 — influencer tracking dashboard(레퍼런스)의 SAAS_FONT와
  * 같은 스택이다.
  *
