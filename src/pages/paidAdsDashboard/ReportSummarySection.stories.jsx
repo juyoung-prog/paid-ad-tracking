@@ -126,9 +126,13 @@ campaign={id}로 이동 — useNavigate를 쓰므로 스토리에서도 MemoryRo
 backfill 전)은 누적 spend로 섞고 그 개수를 KPI 옆에 밝힌다 — 조용히 빼면 합계가
 모자라고, 조용히 섞으면 기간보다 커 보인다.
 
-Performance 탭에는 날짜당 한 행짜리 **Daily spend 표**가 있다(타임라인의 phase
-축·goal 표의 캠페인 축이 답 못 하는 "하루에 얼마씩 나갔나"). 잘 수 없는 지표
-(CPM·CTR 등 누적 기반)는 날짜 필터가 걸려도 자른 척하지 않는다.
+Performance 탭에는 **Daily spend 표**(날짜 × 캠페인 피벗)가 있다 — 캠페인마다
+spend 컬럼이 서고(이름 말줄임 + 툴팁, 플랫폼 둘째 줄) 오른쪽에 Total·
+Impressions·Clicks가 붙는다. 처음엔 날짜당 합계 한 줄 + 캠페인별은 상세
+드로어였는데 "각 캠페인별 데일리는 어디 있나"가 바로 나왔다(실사용 지적) —
+클릭 뒤에 숨기지 않는다. 컬럼이 12개를 넘거나 1개뿐이면 합계 모드로 접는다.
+집행 없는 날은 $0.00이 아니라 '—'다. 잘 수 없는 지표(CPM·CTR 등 누적 기반)는
+날짜 필터가 걸려도 자른 척하지 않는다.
 
 ### 헤더는 한 줄이다
 컬럼 그룹 라벨 행(COST/PERFORMANCE/VIDEO/ENGAGEMENT)을 걷어냈다. 두 가지가
@@ -307,8 +311,9 @@ export const EventTimeline = {
  *   sub에 `in selected dates`가 붙는다
  * - 계획 대비 delta(`n% of $X planned`)가 **없는가** — 잘린 지출을 이벤트 전체
  *   계획과 비교하면 비교가 성립하지 않아 날짜 필터 중엔 떼어낸다
- * - Daily spend 표가 6/22~6/30 아홉 행 + Total 행인가, 표의 Total이 KPI의
- *   Total Spend와 같은 값인가
+ * - Daily spend 표가 6/22~6/30 아홉 행 + Total 행인가, **캠페인별 컬럼**
+ *   (Coming Soon Meta/TikTok — 이름 같아도 플랫폼 캡션으로 구분)이 서고
+ *   Total 컬럼 합이 KPI의 Total Spend와 같은 값인가
  * - 범위를 6/22~7/31로 넓히면 두 값이 **함께 커지는가**(예전 버그: 그대로)
  */
 export const DateFilteredSpend = {

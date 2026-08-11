@@ -1118,25 +1118,56 @@ export function getRangedSpend(campaigns, performanceRecords, performanceDaily, 
 }
 
 /**
- * 여러 캠페인의 일별 행을 날짜 하나당 한 행으로 합쳐 시간순으로 돌려준다 —
- * Reports의 Daily spend 표가 그대로 렌더한다.
+ * 날짜 × 캠페인 피벗 — Reports의 Daily spend 표가 그대로 렌더한다.
  *
+ * 처음엔 날짜당 합계 한 줄이었는데, "각 캠페인별 데일리는 어디 있나"가 바로
+ * 나왔다(실사용 지적). 캠페인별은 상세 드로어에 있었지만 클릭해야 보였고,
+ * 원하는 건 클릭 전에 한 표에서 나란히 비교하는 것이었다 — 그래서 캠페인이
+ * 컬럼이 된다.
+ *
+ * columns에는 **범위 안에 일별 행이 있는 캠페인만** 올린다. 없는 캠페인
+ * (수동 등록, backfill 전)을 '—'로 가득한 컬럼으로 세우면 표만 넓어진다 —
+ * 그 사실은 KPI 옆 fallback 표기가 이미 말한다. 순서는 시작일 오름차순 —
+ * 타임라인의 막대 순서와 같은 시간 축이라 두 화면이 같은 순서로 읽힌다.
+ *
+ * 셀 값이 undefined인 날(그 캠페인이 그날 집행 없음)은 화면에서 '—'로 그린다.
+ * $0.00은 "0을 측정했다"는 주장이라 쓰지 않는다.
+ *
+ * @param {Campaign[]} campaigns - 이미 필터를 거친 캠페인들
  * @param {PerformanceDaily[]} dailyRows - 이미 캠페인 필터를 거친 행들
  * @param {{ start?: string, end?: string }} [range]
- * @returns {Array<{ date: string, spend: number, impressions: number|null, clicks: number|null }>}
+ * @returns {{
+ *   columns: Array<{ campaignId: string, name: string, platform: string }>,
+ *   rows: Array<{ date: string, byCampaign: Object<string, number>, total: number, impressions: number|null, clicks: number|null }>,
+ *   totalByCampaign: Object<string, number>,
+ *   grandTotal: number,
+ * }}
  */
-export function buildDailySpendRows(dailyRows, range) {
+export function buildDailySpendMatrix(campaigns, dailyRows, range) {
+  const rowsInRange = dailyRows.filter((r) => isDateInRange(r.date, range));
+  const withData = new Set(rowsInRange.map((r) => r.campaignId));
+  const columns = campaigns
+    .filter((c) => withData.has(c.id))
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : a.platform.localeCompare(b.platform)))
+    .map((c) => ({ campaignId: c.id, name: c.name, platform: c.platform }));
+
   const byDate = new Map();
-  for (const row of dailyRows) {
-    if (!isDateInRange(row.date, range)) continue;
-    const acc = byDate.get(row.date) ?? { date: row.date, spend: 0, impressions: null, clicks: null };
-    acc.spend += row.spend;
+  for (const row of rowsInRange) {
+    const acc = byDate.get(row.date) ?? { date: row.date, byCampaign: {}, total: 0, impressions: null, clicks: null };
+    acc.byCampaign[row.campaignId] = (acc.byCampaign[row.campaignId] ?? 0) + row.spend;
+    acc.total += row.spend;
     // null 규칙은 sumDailyMetrics와 동일 — 하나라도 값이 있으면 합, 전부 null이면 null.
     if (row.impressions != null) acc.impressions = (acc.impressions ?? 0) + row.impressions;
     if (row.clicks != null) acc.clicks = (acc.clicks ?? 0) + row.clicks;
     byDate.set(row.date, acc);
   }
-  return [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const rows = [...byDate.values()].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+  const totalByCampaign = {};
+  for (const col of columns) {
+    totalByCampaign[col.campaignId] = rows.reduce((sum, r) => sum + (r.byCampaign[col.campaignId] ?? 0), 0);
+  }
+  return { columns, rows, totalByCampaign, grandTotal: rows.reduce((sum, r) => sum + r.total, 0) };
 }
 
 /**

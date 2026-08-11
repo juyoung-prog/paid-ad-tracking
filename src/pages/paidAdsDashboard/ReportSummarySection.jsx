@@ -24,7 +24,7 @@ import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendRows, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
+import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds, dateMed } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
@@ -1146,11 +1146,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
     [hasDateFilter, filteredCampaigns, performanceRecords, filteredDaily, dateRange]
   );
 
-  /* Daily spend 표의 행 — 필터에 걸린 캠페인들의 일별 지출을 날짜당 한 행으로.
+  /* Daily spend 표 — 날짜 × 캠페인 피벗(buildDailySpendMatrix 주석 참고).
      날짜 필터가 있으면 그 범위만, 없으면 캠페인 기간 전체를 보여준다. */
-  const dailySpendRows = useMemo(
-    () => buildDailySpendRows(filteredDaily, hasDateFilter ? dateRange : undefined),
-    [filteredDaily, hasDateFilter, dateRange]
+  const dailyMatrix = useMemo(
+    () => buildDailySpendMatrix(filteredCampaigns, filteredDaily, hasDateFilter ? dateRange : undefined),
+    [filteredCampaigns, filteredDaily, hasDateFilter, dateRange]
   );
 
   /**
@@ -1677,74 +1677,114 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
             </Box>
           )}
 
-          {/* Daily spend — 날짜당 한 행. goal별 표(캠페인 축)와 위 타임라인
-              (phase 축)이 답하지 못하는 "그래서 하루에 얼마씩 나갔나"를 맡는다
-              (실사용 요청: 이벤트의 데일리 지출이 보고 싶은데 어느 범위를
-              골라도 누적만 나왔다). 행이 없으면 섹션을 숨기지 않고 한 줄로
-              말한다 — 첫 동기화 전의 정상 상태가 고장으로 읽히지 않게. */}
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="title" sx={SECTION_TITLE_SX}>
-              Daily spend{' '}
-              <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                — {dailySpendRows.length} {dailySpendRows.length === 1 ? 'day' : 'days'}
-                {hasDateFilter ? ' in selected dates' : ''}
-              </Typography>
-            </Typography>
-            {dailySpendRows.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No daily data for these campaigns yet — it arrives with the next sync.
-              </Typography>
-            ) : (
-              /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더 고정).
-                 goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된 축이라 끊기면
-                 "그 주가 얼마였나"를 페이지를 오가며 재조립해야 한다. */
-              <TableContainer sx={{ mb: 2, maxHeight: 384, maxWidth: 560, overflowX: 'auto' }}>
-                <Table size="small" stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Spend</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {dailySpendRows.map((row) => (
-                      <TableRow key={row.date}>
-                        <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                          {dateMed(row.date)}
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{money(row.spend)}</TableCell>
-                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {row.impressions != null ? count(row.impressions) : EMPTY_CELL}
-                        </TableCell>
-                        <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
-                          {row.clicks != null ? count(row.clicks) : EMPTY_CELL}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {/* Budget Breakdown과 같은 합계 행 문법(fontWeight 700). */}
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                        {money(dailySpendRows.reduce((sum, r) => sum + r.spend, 0))}
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                        {dailySpendRows.some((r) => r.impressions != null)
-                          ? count(dailySpendRows.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
-                          : EMPTY_CELL}
-                      </TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
-                        {dailySpendRows.some((r) => r.clicks != null)
-                          ? count(dailySpendRows.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
-                          : EMPTY_CELL}
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            )}
-          </Box>
+          {/* Daily spend — 날짜 × 캠페인 피벗. goal별 표(캠페인 축)와 위
+              타임라인(phase 축)이 답하지 못하는 "그래서 캠페인마다 하루에
+              얼마씩 나갔나"를 맡는다. 처음엔 날짜당 합계 한 줄 + 캠페인별은
+              상세 드로어였는데, "각 캠페인별 데일리는 어디 있나"가 바로
+              나왔다(실사용 지적) — 클릭 뒤에 숨기지 않고 이 표가 캠페인을
+              컬럼으로 세워 나란히 보여준다. 행이 없으면 섹션을 숨기지 않고
+              한 줄로 말한다 — 첫 동기화 전의 정상 상태가 고장으로 읽히지 않게. */}
+          {(() => {
+            /* 캠페인 컬럼은 이벤트 하나를 골랐을 때의 규모(한 자릿수)를 전제로
+               한다 — 필터 없이 캠페인 수백 건이 걸리면 컬럼 수백 개짜리 표가
+               되므로 합계 모드로 접는다(PHASE_TIMELINE_MAX_PHASES와 같은 종류의
+               상한). 컬럼이 하나뿐일 때도 합계 모드다 — 캠페인 컬럼과 Total이
+               같은 값을 두 번 말하게 된다. */
+            const showPerCampaign = dailyMatrix.columns.length > 1 && dailyMatrix.columns.length <= 12;
+            const tnum = { fontVariantNumeric: 'tabular-nums' };
+            return (
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="title" sx={SECTION_TITLE_SX}>
+                  Daily spend{' '}
+                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                    — {dailyMatrix.rows.length} {dailyMatrix.rows.length === 1 ? 'day' : 'days'}
+                    {hasDateFilter ? ' in selected dates' : ''}
+                    {showPerCampaign ? ` · ${dailyMatrix.columns.length} campaigns` : ''}
+                  </Typography>
+                </Typography>
+                {dailyMatrix.rows.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    No daily data for these campaigns yet — it arrives with the next sync.
+                  </Typography>
+                ) : (
+                  /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더
+                     고정). goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된
+                     축이라 끊기면 "그 주가 얼마였나"를 재조립해야 한다. */
+                  <TableContainer sx={{ mb: 2, maxHeight: 448, overflowX: 'auto', ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
+                    <Table size="small" stickyHeader>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                          {showPerCampaign && dailyMatrix.columns.map((col) => (
+                            /* 캠페인 이름은 길다("G10_Coming Soon_0617~0707") —
+                               한 줄 말줄임 + 전체 이름은 툴팁. 같은 phase가
+                               Meta/TikTok 쌍으로 오므로 플랫폼을 둘째 줄에 밝혀
+                               같은 이름 컬럼 둘이 구분되게 한다. */
+                            <TableCell key={col.campaignId} align="right" sx={{ fontWeight: 600 }}>
+                              <Tooltip title={col.name}>
+                                <Box sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ml: 'auto' }}>
+                                  {col.name}
+                                </Box>
+                              </Tooltip>
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                {PLATFORM_LABEL[col.platform] ?? col.platform}
+                              </Typography>
+                            </TableCell>
+                          ))}
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>{showPerCampaign ? 'Total' : 'Spend'}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {dailyMatrix.rows.map((row) => (
+                          <TableRow key={row.date}>
+                            <TableCell sx={{ ...tnum, whiteSpace: 'nowrap' }}>{dateMed(row.date)}</TableCell>
+                            {showPerCampaign && dailyMatrix.columns.map((col) => (
+                              /* 값이 없는 날 = 그 캠페인이 그날 집행 없음.
+                                 $0.00은 "0을 측정했다"는 주장이라 '—'로 그린다. */
+                              <TableCell key={col.campaignId} align="right" sx={tnum}>
+                                {row.byCampaign[col.campaignId] != null ? money(row.byCampaign[col.campaignId]) : EMPTY_CELL}
+                              </TableCell>
+                            ))}
+                            <TableCell align="right" sx={{ ...tnum, ...(showPerCampaign ? { fontWeight: 600 } : {}) }}>
+                              {money(row.total)}
+                            </TableCell>
+                            <TableCell align="right" sx={tnum}>
+                              {row.impressions != null ? count(row.impressions) : EMPTY_CELL}
+                            </TableCell>
+                            <TableCell align="right" sx={tnum}>
+                              {row.clicks != null ? count(row.clicks) : EMPTY_CELL}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                        {/* Budget Breakdown과 같은 합계 행 문법(fontWeight 700). */}
+                        <TableRow>
+                          <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                          {showPerCampaign && dailyMatrix.columns.map((col) => (
+                            <TableCell key={col.campaignId} align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                              {money(dailyMatrix.totalByCampaign[col.campaignId] ?? 0)}
+                            </TableCell>
+                          ))}
+                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>{money(dailyMatrix.grandTotal)}</TableCell>
+                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                            {dailyMatrix.rows.some((r) => r.impressions != null)
+                              ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
+                              : EMPTY_CELL}
+                          </TableCell>
+                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                            {dailyMatrix.rows.some((r) => r.clicks != null)
+                              ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
+                              : EMPTY_CELL}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Box>
+            );
+          })()}
 
         {GOAL_META.map(({ value, label }) => {
           const rowsForGoal = goalRows.filter((r) => r.goal === value);
