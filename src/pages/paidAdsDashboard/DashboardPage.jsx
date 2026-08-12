@@ -45,12 +45,21 @@ import { BulkEventTagDialog } from '../../components/templates/BulkEventTagDialo
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useSnackbar } from '../../hooks/useSnackbar';
 
+/* Planned 탭은 뺐다 — 이 계정 운영 방식(플랫폼에서 만든 뒤 동기화)에서는
+   planned 상태가 사실상 안 생겨서(같은 근거로 Starting Soon KPI도 이미 뺐다,
+   아래 4차 주석 참고) 탭이 영원히 "Planned (0)" 비활성으로 자리만 차지했다.
+   드물게 생기는 planned 캠페인은 This Period의 Starting Soon 그룹과 All 탭이
+   받는다. 상태 자체는 스키마에 살아 있으므로 all 목록에는 남긴다. */
 const TAB_GROUPS = {
   all: ['active', 'planned', 'ended', 'ended_early', 'archived'],
   active: ['active'],
-  planned: ['planned'],
   ended: ['ended', 'ended_early', 'archived'],
 };
+
+// 저장된 뷰(localStorage/URL)에는 없어진 탭 값이 남아 있을 수 있다(위에서
+// 제거한 'planned' 등). 그대로 두면 TAB_GROUPS[tab]이 undefined라 필터에서
+// 터지므로, 복원 경로 양쪽에서 모르는 값은 기본 탭으로 되돌린다.
+const sanitizeTab = (t) => (t === 'now' || TAB_GROUPS[t] ? t : 'now');
 
 /**
  * "Now" 뷰(기본 탭)의 시간 창. 실데이터 기준 전체 137건 중 130건이 종료
@@ -223,7 +232,7 @@ export function DashboardPage() {
 
   /* 초기값은 localStorage에서만 읽는다. URL이 있으면 useViewUrlSync가 마운트
      직후 덮어쓴다 — 우선순위는 URL > localStorage > 기본값이다. */
-  const [tab, setTab] = useState(() => loadLastView()?.tab || 'now');
+  const [tab, setTab] = useState(() => sanitizeTab(loadLastView()?.tab));
   const [groupValues, setGroupValues] = useState(() => {
     const saved = loadLastView();
     return { platform: saved?.platform ?? '', store: saved?.store ?? '', campaignGroup: saved?.event ?? '' };
@@ -364,7 +373,7 @@ export function DashboardPage() {
       to: dateRange.end ?? '',
     },
     (next) => {
-      setTab(next.tab || 'now');
+      setTab(sanitizeTab(next.tab));
       setGroupValues((v) => ({ ...v, platform: next.platform, store: next.store, campaignGroup: next.event }));
       setDateRange({ start: next.from, end: next.to });
     },
@@ -392,7 +401,6 @@ export function DashboardPage() {
   // 보일 행 수와 배지 숫자가 항상 일치하게 한다.
   const nowCount = campaignsWithStatus.filter((c) => isInNowView(c, today) && matchesGroupFilters(c)).length;
   const activeCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'active' && matchesGroupFilters(c)).length;
-  const plannedCount = campaignsWithStatus.filter((c) => c.effectiveStatus === 'planned' && matchesGroupFilters(c)).length;
   const endedCount = campaignsWithStatus.filter((c) => TAB_GROUPS.ended.includes(c.effectiveStatus) && matchesGroupFilters(c)).length;
   const allCount = campaignsWithStatus.filter((c) => matchesGroupFilters(c)).length;
 
@@ -800,7 +808,7 @@ export function DashboardPage() {
           보정도 같이 필요 없어졌다. */}
       <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
         {/* 예전엔 Platform·Event·기간 필터(FilterBar)를 좌측 280px 고정
-            사이드바에, 상태(Active/Planned/Ended) 필터는 상단 탭에 따로
+            사이드바에, 상태(Active/Ended) 필터는 상단 탭에 따로
             뒀었다 — 근데 그러면 "이 리스트를 좁히는 컨트롤"이 물리적으로
             서로 다른 두 구역(왼쪽 컬럼 vs 위쪽 탭바)에 나뉘어 있어서 하나의
             필터링 파이프라인이 아니라 두 개의 분리된 시스템처럼 보였다(실사용
@@ -834,7 +842,6 @@ export function DashboardPage() {
                 정보 자체는 그대로 읽힌다. */}
             <Tab label={`This Period (${nowCount})`} value="now" sx={{ textTransform: 'none' }} />
             <Tab label={`Active (${activeCount})`} value="active" disabled={activeCount === 0} sx={{ textTransform: 'none' }} />
-            <Tab label={`Planned (${plannedCount})`} value="planned" disabled={plannedCount === 0} sx={{ textTransform: 'none' }} />
             <Tab label={`Ended (${endedCount})`} value="ended" disabled={endedCount === 0} sx={{ textTransform: 'none' }} />
             <Tab label={`All (${allCount})`} value="all" sx={{ textTransform: 'none' }} />
           </Tabs>
@@ -1068,7 +1075,6 @@ export function DashboardPage() {
           if (campaignRows.length === 0) {
             const elsewhere = [
               { tab: 'active', label: 'Active', count: activeCount },
-              { tab: 'planned', label: 'Planned', count: plannedCount },
               { tab: 'ended', label: 'Ended', count: endedCount },
             ].filter((t) => t.tab !== tab && t.count > 0);
 
@@ -1100,7 +1106,7 @@ export function DashboardPage() {
               <CampaignTable
                 rows={campaignRows}
                 allCampaigns={campaigns}
-                isStatusRedundant={tab === 'active' || tab === 'planned'}
+                isStatusRedundant={tab === 'active'}
                 onRowClick={openCampaignDrawer}
               />
             );
