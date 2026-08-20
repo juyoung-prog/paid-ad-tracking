@@ -224,6 +224,11 @@ export function CampaignDetailPanel({
           <Row label="Planned budget" value={planned != null ? moneyWhole(planned) : null} />
           <Row label="Daily budget" value={campaign.budgetDaily != null ? `${moneyWhole(campaign.budgetDaily)}/day` : null} />
           <Row label="Spend" value={spend != null ? money(spend) : null} />
+          {/* 배달 지표(Reach·Impressions)는 소재 반응을 다루는 아래 Platform
+              Metrics와 성격이 달라 예산·집행 블록에 둔다. Reach 컬럼이 없는
+              goal 표에서 드로어로 들어오면 여기가 유일한 확인 지점이다. */}
+          <Row label="Reach" value={performance?.reach != null ? count(performance.reach) : null} />
+          <Row label="Impressions" value={performance?.impressions != null ? count(performance.impressions) : null} />
         </Box>
 
         {showPacing && (
