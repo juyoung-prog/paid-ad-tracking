@@ -290,6 +290,10 @@ function goalExtraColumns(goalValue) {
         metricColumn('Engagements', (r) => r.engagements, fmtNumber, { width: 140, note: NOTE.engagements }),
         metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { width: 128, note: NOTE.engagementRate, hasBenchmark: true }),
         metricColumn('Impressions', (r) => r.impressions, fmtNumber, { width: 140, note: NOTE.impressions }),
+        /* Reach는 goal과 무관하게 항상 집계되는데 이 표에만 없어서 "engagement면
+           reach가 안 잡히나"라는 오해를 낳았다(사용자 질문, 2026-08-20).
+           Impressions 옆에 두면 노출↔도달 비(빈도)도 한눈에 잡힌다. */
+        metricColumn('Reach', (r) => r.reach, fmtNumber, { width: 104, note: NOTE.reach }),
       ];
     case GOAL.CONVERSION:
     case GOAL.STORE_VISIT:
