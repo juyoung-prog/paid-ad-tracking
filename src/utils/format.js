@@ -180,6 +180,35 @@ export function dateRange(startIso, endIso) {
 }
 
 /**
+ * 기간의 진행 일수 — **양끝 포함**. 캠페인은 시작일과 종료일 모두 집행되는
+ * 날이므로 8/1–8/3은 2일이 아니라 3일이다(일일예산 × 일수 계산과 일치).
+ *
+ * rangeDays('2026-08-01', '2026-08-03')  // '3 days'
+ * rangeDays('2026-08-01', '2026-08-01')  // '1 day'
+ */
+export function rangeDays(startIso, endIso) {
+  const a = parts(startIso);
+  const b = parts(endIso);
+  if (!a || !b) return EMPTY;
+  // Date.UTC로 계산해 DST·타임존과 무관하게 정확한 일수를 얻는다.
+  const days = Math.round((Date.UTC(b.y, b.m - 1, b.d) - Date.UTC(a.y, a.m - 1, a.d)) / 86_400_000) + 1;
+  if (days < 1) return EMPTY;
+  return days === 1 ? '1 day' : `${days} days`;
+}
+
+/**
+ * 기간 + 진행 일수를 한 번에. 기간을 보는 사람은 결국 "며칠짜리인가"를 암산
+ * 하게 되므로, 캠페인 기간 표기 자리에서는 이 함수를 기본으로 쓴다.
+ *
+ * dateRangeWithDays('2026-08-04', '2026-08-14')  // 'Aug 4 – Aug 14 (11 days)'
+ */
+export function dateRangeWithDays(startIso, endIso) {
+  const range = dateRange(startIso, endIso);
+  const days = rangeDays(startIso, endIso);
+  return days === EMPTY ? range : `${range} (${days})`;
+}
+
+/**
  * 타임스탬프(ISO datetime) -> 'Aug 6, 2026, 10:45 PM'. 동기화 시각처럼 시·분이
  * 의미를 갖는 자리에만 쓴다. 여기는 시각까지 있는 값이라 Date 파싱이 안전하다.
  */

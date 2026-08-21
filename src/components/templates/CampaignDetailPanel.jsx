@@ -17,7 +17,7 @@ import { ScrollArea } from '../container/ScrollArea';
 import { PlatformMetricList } from '../data-display/PlatformMetricList';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { calcBudgetPacing, effectiveBudgetPlanned, PLATFORM } from '../../data/schema';
-import { money, moneyWhole, count, dateRange, dateMed, EMPTY } from '../../utils/format';
+import { money, moneyWhole, count, dateRangeWithDays, dateMed, EMPTY } from '../../utils/format';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -219,7 +219,7 @@ export function CampaignDetailPanel({
         <Divider sx={{ mb: 2 }} />
 
         <Box sx={{ mb: 2 }}>
-          <Row label="Dates" value={dateRange(campaign.startDate, campaign.endDate)} />
+          <Row label="Dates" value={dateRangeWithDays(campaign.startDate, campaign.endDate)} />
           {/* 계획 예산은 정수, 집행은 2자리 (utils/format.js 규칙) */}
           <Row label="Planned budget" value={planned != null ? moneyWhole(planned) : null} />
           <Row label="Daily budget" value={campaign.budgetDaily != null ? `${moneyWhole(campaign.budgetDaily)}/day` : null} />

@@ -6,7 +6,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { TARGET_SCOPE, PLATFORM, campaignGroupKey } from '../../data/schema';
-import { money, moneyWhole, dateRange } from '../../utils/format';
+import { money, moneyWhole, dateRangeWithDays } from '../../utils/format';
 
 const STATUS_META = {
   planned: { label: 'Planned', color: 'grey.500' },
@@ -418,7 +418,7 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
                     color="text.secondary"
                     sx={{ mt: isStatusRedundant ? 0 : 0.5, fontVariantNumeric: 'tabular-nums' }}
                   >
-                    {[dateRange(row.startDate, row.endDate), formatBudget(row)]
+                    {[dateRangeWithDays(row.startDate, row.endDate), formatBudget(row)]
                       .filter(Boolean)
                       .join(' · ')}
                     {/* 페이스만 색을 갖는다 — 초과는 지금 돈이 새는 중이라 눈에

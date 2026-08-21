@@ -26,7 +26,7 @@ import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
-import { money, moneyWhole, count, percent, seconds, dateMed } from '../../utils/format';
+import { money, moneyWhole, count, percent, seconds, dateMed, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
@@ -1586,6 +1586,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                       <TableCell sx={{ whiteSpace: 'nowrap' }}>{c.name}</TableCell>
                       <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                         {shortDate(c.startDate)}–{shortDate(c.endDate)}
+                        {rangeDays(c.startDate, c.endDate) !== EMPTY_CELL && ` (${rangeDays(c.startDate, c.endDate)})`}
                       </TableCell>
                       <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>
                         {c.budgetDaily != null ? `${moneyWhole(c.budgetDaily)}/day` : EMPTY_CELL}
