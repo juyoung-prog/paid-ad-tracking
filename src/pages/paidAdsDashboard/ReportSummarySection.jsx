@@ -261,6 +261,15 @@ const NOTE = {
   profileVisits: 'Profile visits from the ad. TikTok only.',
 };
 
+/* CPE·Engagements는 goal과 무관하게 모든 표에 붙는다(사용자 요청, 2026-08-26).
+   원래 Engagement 표 전용이었는데, engagements는 goal과 무관하게 집계되는
+   값이라(Meta post_engagement) Awareness·Traffic 캠페인에서도 "참여당
+   얼마였나"는 유효한 질문이다 — Reach를 Engagement 표에 넣을 때와 같은 논리.
+   상수로 빼서 Engagement 표(goalExtraColumns)와 공통 블록이 같은 정의를 쓴다.
+   engagements가 아예 안 오는 표에서는 keep()이 두 컬럼 다 자동으로 걷어낸다. */
+const CPE_COLUMN = metricColumn('CPE', (r) => r.cpe, fmtCurrency, { width: 104, note: NOTE.cpe, hasBenchmark: true });
+const ENGAGEMENTS_COLUMN = metricColumn('Engagements', (r) => r.engagements, fmtNumber, { width: 140, note: NOTE.engagements });
+
 // goal별로 Campaign/Platform/Spend(공통) 다음에 붙는 2~3개 컬럼 — 그 목적에서
 // 실제로 판단 근거가 되는 지표만 고른다(예: Engagement 목표 캠페인에 CTR/CPC를
 // 보여줘봤자 "참여가 잘 됐는지"는 알 수 없다).
@@ -286,8 +295,8 @@ function goalExtraColumns(goalValue) {
          화면에 없으면 0.08%가 어디서 온 숫자인지 확인할 길이 없다(실화면
          13-9 리뷰). */
       return [
-        metricColumn('CPE', (r) => r.cpe, fmtCurrency, { width: 104, note: NOTE.cpe, hasBenchmark: true }),
-        metricColumn('Engagements', (r) => r.engagements, fmtNumber, { width: 140, note: NOTE.engagements }),
+        CPE_COLUMN,
+        ENGAGEMENTS_COLUMN,
         metricColumn('Eng. Rate', (r) => r.engagementRate, fmtPercent, { width: 128, note: NOTE.engagementRate, hasBenchmark: true }),
         metricColumn('Impressions', (r) => r.impressions, fmtNumber, { width: 140, note: NOTE.impressions }),
         /* Reach는 goal과 무관하게 항상 집계되는데 이 표에만 없어서 "engagement면
@@ -1809,7 +1818,17 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
              "Engagement"와도 헷갈렸다. */
           const keep = (columns) => columns.filter((c) => !isColumnEmpty(c, rowsForGoal));
           const goalCols = goalExtraColumns(value);
-          const costCols = keep([SPEND_COLUMN, ...goalCols.filter((c) => COST_METRIC_HEADERS.has(c.header))]);
+          /* CPE·Engagements는 goal 컬럼에 이미 있는 표(Engagement)를 빼고
+             모든 표에 붙는다(사용자 요청, 2026-08-26) — CPE는 단가라 Cost
+             그룹 끝(Spend·CPM 다음), Engagements는 소셜 그룹 맨 앞(총합 →
+             Likes·Comments·Shares 내역 순, Impressions 다음 Reach와 같은
+             "합계 먼저" 배치). 값이 전부 빈 표에서는 keep()이 걷어낸다. */
+          const hasGoalColumn = (header) => goalCols.some((c) => c.header === header);
+          const costCols = keep([
+            SPEND_COLUMN,
+            ...goalCols.filter((c) => COST_METRIC_HEADERS.has(c.header)),
+            ...(hasGoalColumn('CPE') ? [] : [CPE_COLUMN]),
+          ]);
           const perfCols = keep(goalCols.filter((c) => !COST_METRIC_HEADERS.has(c.header)));
           /* goal 컬럼도 이제 자기 폭을 직접 갖는다. 예전엔 영역 총폭(goalRegion
              560)을 컬럼 수로 나눠 썼는데, 그러면 컬럼이 적은 표(Awareness는 3개)
@@ -1822,7 +1841,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
             { key: 'cost', columns: costCols },
             { key: 'perf', columns: perfCols },
             { key: 'video', columns: keep(CREATIVE_VIDEO_COLUMNS) },
-            { key: 'social', columns: keep(CREATIVE_ENGAGEMENT_COLUMNS) },
+            { key: 'social', columns: keep([...(hasGoalColumn('Engagements') ? [] : [ENGAGEMENTS_COLUMN]), ...CREATIVE_ENGAGEMENT_COLUMNS]) },
           ].filter((g) => g.columns.length > 0);
           const dataColumns = columnGroups.flatMap((g) => g.columns.map((col, colIndex) => ({ ...col, group: g.key, isGroupStart: colIndex === 0 })));
           /* 컬럼 폭의 합 = 표의 **최소** 폭. 화면이 이보다 넓으면 컬럼들이 남는

@@ -87,7 +87,9 @@ const groupedPerformance = groupedCampaigns
     profileVisits: 200 + i * 40,
     hookViews: 6000 + i * 900,
     heldViews: 900 + i * 120,
-    engagements: null,
+    // Traffic 표에서도 공통 CPE(Cost 그룹)·Engagements(소셜 그룹) 컬럼이
+    // 렌더되는 경로 확인용 — 전부 null이면 keep()이 두 컬럼을 걷어낸다.
+    engagements: 620 + i * 90,
     conversions: null,
   }));
 
@@ -115,7 +117,10 @@ export default {
 이미 골랐으면 Store로 또 좁힐 일이 실질적으로 없다(실사용 피드백으로 제거).
 Plan 탭은 Event를 선택하면 Gantt 타임라인 + Budget Breakdown 표로, Performance
 탭은 goal별로 다른 컬럼의 표(PerformanceReportTable이 아니라 schema.js
-getGoalMetricsRow() 기반 자체 렌더링)로 보여준다. 행 클릭 시 /dashboard?
+getGoalMetricsRow() 기반 자체 렌더링)로 보여준다. **CPE와 Engagements(총합)는
+goal과 무관하게 모든 표에 붙는다** — CPE는 Cost 그룹 끝, Engagements는 소셜
+그룹 맨 앞(총합 → Likes·Comments·Shares 내역 순). engagements가 아예 없는
+표에서는 빈 컬럼 제거 규칙(keep)이 자동으로 걷어낸다. 행 클릭 시 /dashboard?
 campaign={id}로 이동 — useNavigate를 쓰므로 스토리에서도 MemoryRouter로 감싼다.
 
 ### 날짜 필터는 지표를 자른다
