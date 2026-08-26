@@ -247,7 +247,7 @@ const NOTE = {
   clicks: 'Link clicks. Meta counts link_click, TikTok counts click.',
   ctr: 'Clicks ÷ impressions.',
   cpc: 'Spend ÷ clicks. Lower is cheaper.',
-  engagements: 'Likes + comments + shares. Meta reports this as post_engagement.',
+  engagements: 'Likes + comments + shares — same definition on both platforms. Not Meta\'s "post engagement", which also counts video views and clicks.',
   engagementRate: 'Engagements ÷ impressions.',
   conversions: 'Actions the platform counted for this campaign objective.',
   cpa: 'Spend ÷ conversions. Lower is cheaper.',

@@ -127,7 +127,7 @@ sequenceDiagram
 | `heldViews` | `video_p100_watched_actions` | `video_views_p100` |
 | `avgWatchSeconds` | `video_avg_time_watched_actions` | `average_video_play` |
 | `likes` / `comments` / `shares` | `actions` 중 `post_reaction` / `comment` / `post` | `likes` / `comments` / `shares` |
-| `engagements` | `post_engagement` | `likes` + `comments` + `shares` (합산) |
+| `engagements` | `actions` 중 `post_reaction`+`comment`+`post` 합산 | `likes` + `comments` + `shares` (합산) |
 | `follows` | — (캠페인 레벨 대응 지표 없음) | `follows` |
 | `profileVisits` | — | `profile_visits` |
 | `conversions` | `actions` 중 `offsite_conversion` 등 | `conversion` |
@@ -150,8 +150,13 @@ sequenceDiagram
 `report/integrated/get`에 `report_type=BASIC`, `data_level=AUCTION_CAMPAIGN`,
 `dimensions=['campaign_id']`, `query_lifetime=true`로 요청한다(누적 스냅샷 — Meta insights와 의미를 맞춤).
 
-- TikTok에는 Meta의 `post_engagement` 같은 캠페인 레벨 단일 합계 지표가 없어 상호작용 3종을 더해 근사한다.
-  셋 다 응답에 없으면 `null`로 둔다 — "상호작용 0"과 "지표 미수신"을 구분하기 위함.
+- `engagements`는 양 플랫폼 모두 상호작용 3종의 합이다. Meta의 `post_engagement`는
+  최상위 필드로는 오지 않고(`actions` 배열 안의 action_type으로만 옴), 값도 영상 조회와
+  클릭까지 포함해서 TikTok의 3종 합과 전혀 다른 양이라 쓰지 않는다(2026-08-26 실측 —
+  G10_Coming Soon Meta: post_engagement 18,791 중 18,782가 video_view).
+- Meta는 값이 0인 action_type을 `actions` 배열에서 아예 빼고 준다. 배열이 왔는데 항목이
+  없으면 **측정된 0**으로 해석하고, 배열 자체가 없을 때만 `null`(미수신)로 둔다.
+  TikTok은 셋 다 응답에 없으면 `null` — "상호작용 0"과 "지표 미수신"을 구분하기 위함.
 - TikTok은 HTTP 200에 body의 `code`로 실패를 알리고, `metrics` 배열에 해당 계정이 지원하지 않는
   지표명이 하나라도 있으면 리포트 전체가 실패한다. 실제 계정 첫 연결 시 `code`를 보고 목록을 확정할 것
   (`sync-performance/index.ts`의 `TIKTOK_METRICS`).

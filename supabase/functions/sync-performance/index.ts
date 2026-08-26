@@ -77,7 +77,7 @@ async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountI
     'campaign_id',
     'impressions', 'reach', 'clicks', 'spend',
     'video_play_actions', 'video_p25_watched_actions', 'video_p100_watched_actions',
-    'video_avg_time_watched_actions', 'post_engagement', 'actions',
+    'video_avg_time_watched_actions', 'actions',
   ].join(',');
 
   const byCampaign = new Map<string, any>();
@@ -113,9 +113,17 @@ function metaAction(raw: any, field: string, actionType?: string) {
 
 // 우리 필드 ↔ Meta Insights 필드 매핑 (05-api-integration.md 표와 동일)
 function mapMetaInsight(raw: any): Metrics {
-  const likes = metaAction(raw, 'actions', 'post_reaction');
-  const comments = metaAction(raw, 'actions', 'comment');
-  const shares = metaAction(raw, 'actions', 'post');
+  /* Meta는 값이 0인 action_type을 actions 배열에서 **아예 빼고** 준다. 그래서
+     "배열은 왔는데 항목이 없다"는 못 받은 게 아니라 **측정된 0**이다 — 실측
+     (2026-08-26): G10_Coming Soon Meta는 video_view 18,782·link_click 9가
+     배열에 있는데 post_reaction/comment/post만 없었다(반응 0인 도달 광고).
+     이걸 null로 두면 화면이 '—'(모름)를 그리는데 진실은 0이라, 배열이 온
+     경우에만 빠진 항목을 0으로 해석한다. 진짜 "못 받음"(배열 자체가 없음)은
+     여전히 null이다 — sumInteractions의 0/null 구분 원칙 그대로. */
+  const hasActions = Array.isArray(raw.actions);
+  const likes = metaAction(raw, 'actions', 'post_reaction') ?? (hasActions ? 0 : null);
+  const comments = metaAction(raw, 'actions', 'comment') ?? (hasActions ? 0 : null);
+  const shares = metaAction(raw, 'actions', 'post') ?? (hasActions ? 0 : null);
 
   return {
     impressions: num(raw.impressions),
@@ -129,9 +137,14 @@ function mapMetaInsight(raw: any): Metrics {
     likes,
     comments,
     shares,
-    // Meta는 캠페인 레벨 합계(post_engagement)를 직접 주므로 그걸 쓴다.
-    // 없으면 구성 요소를 더해 근사한다.
-    engagements: num(raw.post_engagement) ?? sumInteractions([likes, comments, shares]),
+    /* 좋아요+댓글+공유 합 — TikTok과 같은 정의. 한때 최상위 post_engagement
+       필드를 우선 쓰는 코드가 있었는데("Meta가 캠페인 레벨 합계를 직접 준다"는
+       주석과 함께), 실측으로 확인해 보니 그 필드는 **최상위로는 절대 안 오고**
+       actions 배열 안의 action_type으로만 온다 — 즉 죽은 경로였다. 되살리면
+       안 된다: Meta의 post_engagement는 영상 조회까지 포함해서(위 실측 사례는
+       18,791 중 18,782가 video_view) TikTok의 좋아요+댓글+공유와 전혀 다른
+       양이 되고, CPE가 플랫폼 간에 조용히 어긋난다. */
+    engagements: sumInteractions([likes, comments, shares]),
     // Meta 캠페인 레벨에는 팔로우/프로필 방문에 대응하는 지표가 없다.
     follows: null,
     profile_visits: null,
@@ -263,8 +276,8 @@ async function fetchTikTokReport(accessToken: string, advertiserId: string, camp
 // 있어 같은 컬럼에 서로 다른 의미가 섞였다(실측 6초 2,119 vs 완전 시청 484 — 4배 차이).
 // 그대로 두면 플랫폼 간 비교가 조용히 틀린다.
 //
-// engagements: TikTok은 Meta의 post_engagement 같은 단일 합계 지표를 캠페인 레벨에서
-// 주지 않으므로 좋아요/댓글/공유를 더해 근사한다.
+// engagements: 양 플랫폼 모두 좋아요/댓글/공유 합으로 계산한다 — Meta도 단일
+// 합계 지표를 캠페인 레벨 최상위 필드로는 주지 않는다(mapMetaInsight 주석 참고).
 function mapTikTokReport(raw: any): Metrics {
   const likes = num(raw.likes);
   const comments = num(raw.comments);

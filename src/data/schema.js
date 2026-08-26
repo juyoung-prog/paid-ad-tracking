@@ -138,7 +138,7 @@ export const ALERT_TYPE = Object.freeze({
  * @property {number|null} likes - Tier 3 · 상호작용 구성 요소
  * @property {number|null} comments - Tier 3 · 상호작용 구성 요소
  * @property {number|null} shares - Tier 3 · 상호작용 구성 요소
- * @property {number|null} engagements - Tier 3 · goal=engagement일 때만. likes+comments+shares 합(Meta는 post_engagement)
+ * @property {number|null} engagements - Tier 3 · goal=engagement일 때만. likes+comments+shares 합 — 양 플랫폼 동일 정의(Meta의 post_engagement는 영상 조회·클릭까지 포함하는 다른 양이라 쓰지 않는다)
  * @property {number|null} follows - Tier 3 · 팔로우 획득. TikTok 전용(Meta 캠페인 레벨에 대응 지표 없음)
  * @property {number|null} profileVisits - Tier 3 · 프로필 방문. TikTok 전용
  * @property {number|null} conversions - Tier 4 · goal=conversion|store_visit일 때만

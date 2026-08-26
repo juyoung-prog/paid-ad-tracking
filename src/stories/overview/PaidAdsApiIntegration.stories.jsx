@@ -67,7 +67,7 @@ const fieldMapping = [
   { ours: 'spend', meta: 'spend', tiktok: 'spend' },
   { ours: 'hookViews', meta: 'video_p25_watched_actions (근사치)', tiktok: 'video_watched_2s' },
   { ours: 'heldViews', meta: 'video_p100_watched_actions', tiktok: 'video_watched_6s' },
-  { ours: 'engagements', meta: 'post_engagement', tiktok: 'engagement' },
+  { ours: 'engagements', meta: 'actions 합산 (post_reaction+comment+post)', tiktok: 'likes+comments+shares 합산' },
   { ours: 'conversions', meta: 'actions 중 offsite_conversion 등', tiktok: 'conversion' },
 ];
 
