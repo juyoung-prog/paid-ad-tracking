@@ -138,7 +138,8 @@ export function StoreListSection({ stores, campaigns, today = new Date(), onAddS
   return (
     <Box sx={sx}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+        {/* 섹션 제목은 크기 스케일(h6)이 아니라 역할 토큰(title, 18px)을 쓴다 — design-system.md */}
+        <Typography variant="title" sx={{ fontWeight: 700 }}>
           Stores ({stores.length})
         </Typography>
         <Button variant="contained" size="small" onClick={handleOpenAdd} sx={{ boxShadow: 'none' }}>

@@ -255,7 +255,8 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
             {/* 좌측 — 캠페인명(Hero) + 메타(플랫폼·계정·타겟) */}
             <Box sx={{ minWidth: 0, flex: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                {/* body1(16px)은 운영 화면 밀도에 안 맞는다(design-system.md) — 행의 강조는 body2 + 600 */}
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {row.name}
                 </Typography>
                 {row.creativeUrl && (

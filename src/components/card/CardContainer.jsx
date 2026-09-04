@@ -97,7 +97,7 @@ const CardContainer = forwardRef(function CardContainer({
       case 'filled':
         return {
           ...base,
-          backgroundColor: 'grey.100',
+          backgroundColor: 'surface.muted',
           border: 'none',
         };
 

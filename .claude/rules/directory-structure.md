@@ -21,14 +21,29 @@ src/
 │   ├── navigation/      # 내비게이션 (GNB, NavMenu 등)
 │   ├── overlay-feedback/ # 오버레이 (Dialog 등)
 │   ├── scroll/          # 스크롤 기반 인터랙션
-│   ├── templates/       # 페이지 템플릿
-│   └── typography/      # 타이포그래피
+│   ├── templates/       # 페이지 템플릿 (CampaignForm, PerformanceForm, FilterBar 등)
+│   ├── typography/      # 타이포그래피
+│   └── storybookDocumentation/ # 스토리북 문서 전용 (DocumentTitle, SectionTitle, TreeNode)
 ├── common/ui/           # 공통 유틸리티 UI (Placeholder, Indicator 등)
+├── pages/               # 라우트 진입점 (paidAdsDashboard/)
+├── hooks/               # 커스텀 훅 (useSnackbar 등)
 ├── stories/             # Storybook 전용 (style, overview, page, template)
-├── styles/              # 테마, 글로벌 스타일
-├── utils/               # 유틸리티 함수
-└── data/                # 데이터 파일
+├── styles/themes/       # 테마 (default.js)
+├── utils/               # 유틸리티 함수 (format 등)
+├── lib/                 # 외부 서비스 클라이언트 (supabase)
+└── data/                # 데이터 파일 (schema.js, 택소노미)
 ```
+
+## Paid Ads Dashboard 배치
+
+- **화면 조립**: `src/pages/paidAdsDashboard/` — DashboardPage(목록·드로어),
+  ReportSummarySection(리포트), SettingsPage, 그리고 그 화면 전용 훅/매퍼
+  (usePaidAdsStore, paidAdsMappers, useSyncRuns 등)는 페이지 폴더에 함께 둔다
+- **데이터 규칙**: `src/data/schema.js`가 단일 원천 — 지표 계산(calcCPM/calcHookRate 등),
+  상태 SSOT, 알림 생성이 전부 여기 있고 컴포넌트는 계산을 직접 만들지 않는다
+- **백엔드 연동**: `supabase/functions/`(sync-campaigns, sync-performance)가 플랫폼
+  API 수집을 전담 — 지표 필드 매핑은 `docs/paid-ads-dashboard/api-integration/` 문서와
+  일치해야 한다
 
 ## 파일 배치 규칙
 

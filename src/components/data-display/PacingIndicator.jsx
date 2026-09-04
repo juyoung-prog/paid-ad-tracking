@@ -89,7 +89,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           sx={{
             height: 6,
             borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             '& .MuiLinearProgress-bar': { backgroundColor: pacing.color },
           }}
         />
@@ -109,7 +109,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           sx={{
             height: 6,
             borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             '& .MuiLinearProgress-bar': { backgroundColor: 'grey.500' },
           }}
         />
@@ -132,7 +132,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
             sx={{
               height: 6,
               borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
-              backgroundColor: 'grey.100',
+              backgroundColor: 'surface.muted',
               '& .MuiLinearProgress-bar': { backgroundColor: pacing.color },
             }}
           />

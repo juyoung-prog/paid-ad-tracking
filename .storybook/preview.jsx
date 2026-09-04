@@ -3,6 +3,8 @@ import CssBaseline from '@mui/material/CssBaseline';
 
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/inter';
+// 본문 서체 — 앱(main.jsx)과 동일하게 로드해야 스토리와 실화면 서체가 일치한다 (FONTS.md)
+import 'pretendard/dist/web/variable/pretendardvariable.css';
 import { defaultTheme } from '../src/styles/themes';
 
 // Google Fonts 로드 (Material Symbols)

@@ -110,7 +110,7 @@ export function AlertBanner({ alerts, onAlertClick, onDismiss, sx }) {
                 px: 1.5,
                 borderLeft: '3px solid',
                 borderColor: color,
-                backgroundColor: 'grey.50',
+                backgroundColor: 'surface.sunken',
                 // 상태 표시 배너 — mui-theme.md 역할표의 4px 행(Alert 배너)과
                 // 같은 분류. DashboardPage의 Event 요약 스트립과 같은 값.
                 borderRadius: (theme) => `${theme.shape.radius.control}px`,

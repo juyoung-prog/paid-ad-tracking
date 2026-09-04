@@ -84,7 +84,8 @@ export function CampaignCard({
   return (
     <CustomCard isInteractive={Boolean(onClick)} onClick={onClick} contentPadding="md" sx={sx}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', mb: 0.75 }}>
-        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+        {/* body1(16px)은 운영 화면 밀도에 안 맞는다(design-system.md) — 목록의 강조는 body2 + 600 */}
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
           {name}
         </Typography>
         <Chip

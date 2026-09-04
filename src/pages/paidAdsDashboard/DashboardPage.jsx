@@ -1181,7 +1181,8 @@ export function DashboardPage() {
                 size={56}
               />
               <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {/* 패널 제목은 크기 스케일(h6)이 아니라 역할 토큰(title, 18px)을 쓴다 — design-system.md */}
+                <Typography variant="title" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {editCampaignValues.name}
                 </Typography>
               </Box>

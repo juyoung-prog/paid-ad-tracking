@@ -371,7 +371,7 @@ export function FileDropzone({
       <Box sx={{ textAlign: 'center' }}>
         {variant !== 'minimal' && (
           <Typography
-            variant="body1"
+            variant="body2"
             sx={{
               fontWeight: 600,
               color: isDragActive ? 'accent.main' : 'text.primary',
