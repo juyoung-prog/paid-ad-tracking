@@ -5,6 +5,8 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Button from '@mui/material/Button';
+import Collapse from '@mui/material/Collapse';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import LinearProgress from '@mui/material/LinearProgress';
 import Skeleton from '@mui/material/Skeleton';
 import Tab from '@mui/material/Tab';
@@ -40,6 +42,28 @@ const PLATFORM_LABEL = {
 // 마지막 뷰가 서로를 덮어쓰면 안 된다.
 // v2 — Dashboard와 같은 이유로 저장 형태가 평평한 맵으로 바뀌었다.
 const REPORT_VIEW_STORAGE_KEY = 'paidAdsReports:lastView:v2';
+
+/* Daily spend 표의 접힘 상태. 기본은 접힘 — 날짜 수십 행이 goal 표 위를
+   길게 차지해서 "성과 표 보려고 매번 스크롤한다"가 나왔다. 펼친 사람은 다음
+   방문에도 펼쳐진 채로 보게 localStorage에 남긴다(탭·필터와 같은 원칙). */
+const DAILY_SPEND_OPEN_STORAGE_KEY = 'paidAdsReports:dailySpendOpen:v1';
+
+function loadDailySpendOpen() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(DAILY_SPEND_OPEN_STORAGE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveDailySpendOpen(isOpen) {
+  try {
+    window.localStorage.setItem(DAILY_SPEND_OPEN_STORAGE_KEY, isOpen ? '1' : '0');
+  } catch {
+    /* 저장 실패는 조용히 — 이번 세션 안에서는 state가 이미 맞다 */
+  }
+}
 
 function loadLastReportView() {
   if (typeof window === 'undefined') return null;
@@ -1065,6 +1089,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
+  const [isDailySpendOpen, setIsDailySpendOpen] = useState(loadDailySpendOpen);
   /* 상세를 볼 캠페인. **id만** 들고 있는다 — 객체를 담아두면 동기화로 목록이
      갱신됐을 때 패널만 옛 값을 계속 보여준다. */
   const [detailCampaignId, setDetailCampaignId] = useState(null);
@@ -1706,99 +1731,153 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                같은 값을 두 번 말하게 된다. */
             const showPerCampaign = dailyMatrix.columns.length > 1 && dailyMatrix.columns.length <= 12;
             const tnum = { fontVariantNumeric: 'tabular-nums' };
+            const toggleDailySpend = () => {
+              setIsDailySpendOpen((prev) => {
+                saveDailySpendOpen(!prev);
+                return !prev;
+              });
+            };
             return (
               <Box sx={{ mb: 4 }}>
-                <Typography variant="title" sx={SECTION_TITLE_SX}>
-                  Daily spend{' '}
-                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                    — {dailyMatrix.rows.length} {dailyMatrix.rows.length === 1 ? 'day' : 'days'}
-                    {hasDateFilter ? ' in selected dates' : ''}
-                    {showPerCampaign ? ` · ${dailyMatrix.columns.length} campaigns` : ''}
+                {/* 제목 행 전체가 토글이다(ref/issue22-1·2, Meta Business Suite의
+                    Comments/Messages 행과 같은 문법) — 제목은 왼쪽, 화살표는 오른쪽
+                    끝에 붙고 접힘 ∨ / 펼침 ∧ 로 뒤집힌다. 행 아래 구분선이 접힌
+                    상태에서도 "여기 섹션 하나가 있다"를 남긴다. 제목이 요약(일수·
+                    캠페인 수)을 이미 말하므로 접힌 채로도 무엇이 접혀 있나가 읽힌다.
+                    시맨틱은 button + aria-expanded. */}
+                <Box
+                  component="button"
+                  type="button"
+                  onClick={toggleDailySpend}
+                  aria-expanded={isDailySpendOpen}
+                  aria-controls="report-daily-spend-body"
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 1.5,
+                    width: '100%',
+                    px: 0,
+                    py: 1.25,
+                    mb: isDailySpendOpen ? 1.5 : 0,
+                    border: 0,
+                    borderBottom: '1px solid',
+                    borderBottomColor: 'divider',
+                    background: 'none',
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    font: 'inherit',
+                    color: 'text.primary',
+                    '&:focus-visible': {
+                      outline: 'none',
+                      boxShadow: (theme) => `0 0 0 3px ${theme.palette.accent.ring}`,
+                      borderRadius: 1,
+                    },
+                  }}
+                >
+                  <Typography variant="title" component="span" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
+                    Daily spend{' '}
+                    <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
+                      — {dailyMatrix.rows.length} {dailyMatrix.rows.length === 1 ? 'day' : 'days'}
+                      {hasDateFilter ? ' in selected dates' : ''}
+                      {showPerCampaign ? ` · ${dailyMatrix.columns.length} campaigns` : ''}
+                    </Typography>
                   </Typography>
-                </Typography>
-                {dailyMatrix.rows.length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    No daily data for these campaigns yet — it arrives with the next sync.
-                  </Typography>
-                ) : (
-                  /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더
-                     고정). goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된
-                     축이라 끊기면 "그 주가 얼마였나"를 재조립해야 한다.
-                     TableContainer가 아니라 ScrollArea인 이유(goal 표와 동일):
-                     기본 overflow는 넘쳤다는 신호를 주지 않아서, 43일짜리 표가
-                     열한 줄에서 딱 끝난 것처럼 보였다(실사용 신고 i-9). */
-                  <ScrollArea label="Daily spend by campaign" maxHeight={448} sx={{ mb: 2, ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
-                    <Table size="small" stickyHeader>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
-                          {showPerCampaign && dailyMatrix.columns.map((col) => (
-                            /* 캠페인 이름은 길다("G10_Coming Soon_0617~0707") —
-                               한 줄 말줄임 + 전체 이름은 툴팁. 같은 phase가
-                               Meta/TikTok 쌍으로 오므로 플랫폼을 둘째 줄에 밝혀
-                               같은 이름 컬럼 둘이 구분되게 한다. */
-                            <TableCell key={col.campaignId} align="right" sx={{ fontWeight: 600 }}>
-                              <Tooltip title={col.name}>
-                                <Box sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ml: 'auto' }}>
-                                  {col.name}
-                                </Box>
-                              </Tooltip>
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                {PLATFORM_LABEL[col.platform] ?? col.platform}
-                              </Typography>
-                            </TableCell>
-                          ))}
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>{showPerCampaign ? 'Total' : 'Spend'}</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
-                          <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {dailyMatrix.rows.map((row) => (
-                          <TableRow key={row.date}>
-                            <TableCell sx={{ ...tnum, whiteSpace: 'nowrap' }}>{dateMed(row.date)}</TableCell>
+                  <ExpandMoreIcon
+                    fontSize="small"
+                    sx={{
+                      flexShrink: 0,
+                      color: 'text.secondary',
+                      transform: isDailySpendOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      transition: (theme) => theme.transitions.create('transform', { duration: theme.transitions.duration.shortest }),
+                    }}
+                  />
+                </Box>
+                <Collapse in={isDailySpendOpen} id="report-daily-spend-body" unmountOnExit>
+                  {dailyMatrix.rows.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      No daily data for these campaigns yet — it arrives with the next sync.
+                    </Typography>
+                  ) : (
+                    /* 날짜가 수십 행이라 표 안에서 스크롤한다(stickyHeader로 헤더
+                       고정). goal 표처럼 페이지로 끊지 않는 이유: 날짜는 연속된
+                       축이라 끊기면 "그 주가 얼마였나"를 재조립해야 한다.
+                       TableContainer가 아니라 ScrollArea인 이유(goal 표와 동일):
+                       기본 overflow는 넘쳤다는 신호를 주지 않아서, 43일짜리 표가
+                       열한 줄에서 딱 끝난 것처럼 보였다(실사용 신고 i-9). */
+                    <ScrollArea label="Daily spend by campaign" maxHeight={448} sx={{ mb: 2, ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
                             {showPerCampaign && dailyMatrix.columns.map((col) => (
-                              /* 값이 없는 날 = 그 캠페인이 그날 집행 없음.
-                                 $0.00은 "0을 측정했다"는 주장이라 '—'로 그린다. */
-                              <TableCell key={col.campaignId} align="right" sx={tnum}>
-                                {row.byCampaign[col.campaignId] != null ? money(row.byCampaign[col.campaignId]) : EMPTY_CELL}
+                              /* 캠페인 이름은 길다("G10_Coming Soon_0617~0707") —
+                                 한 줄 말줄임 + 전체 이름은 툴팁. 같은 phase가
+                                 Meta/TikTok 쌍으로 오므로 플랫폼을 둘째 줄에 밝혀
+                                 같은 이름 컬럼 둘이 구분되게 한다. */
+                              <TableCell key={col.campaignId} align="right" sx={{ fontWeight: 600 }}>
+                                <Tooltip title={col.name}>
+                                  <Box sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ml: 'auto' }}>
+                                    {col.name}
+                                  </Box>
+                                </Tooltip>
+                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                                  {PLATFORM_LABEL[col.platform] ?? col.platform}
+                                </Typography>
                               </TableCell>
                             ))}
-                            <TableCell align="right" sx={{ ...tnum, ...(showPerCampaign ? { fontWeight: 600 } : {}) }}>
-                              {money(row.total)}
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>{showPerCampaign ? 'Total' : 'Spend'}</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
+                            <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {dailyMatrix.rows.map((row) => (
+                            <TableRow key={row.date}>
+                              <TableCell sx={{ ...tnum, whiteSpace: 'nowrap' }}>{dateMed(row.date)}</TableCell>
+                              {showPerCampaign && dailyMatrix.columns.map((col) => (
+                                /* 값이 없는 날 = 그 캠페인이 그날 집행 없음.
+                                   $0.00은 "0을 측정했다"는 주장이라 '—'로 그린다. */
+                                <TableCell key={col.campaignId} align="right" sx={tnum}>
+                                  {row.byCampaign[col.campaignId] != null ? money(row.byCampaign[col.campaignId]) : EMPTY_CELL}
+                                </TableCell>
+                              ))}
+                              <TableCell align="right" sx={{ ...tnum, ...(showPerCampaign ? { fontWeight: 600 } : {}) }}>
+                                {money(row.total)}
+                              </TableCell>
+                              <TableCell align="right" sx={tnum}>
+                                {row.impressions != null ? count(row.impressions) : EMPTY_CELL}
+                              </TableCell>
+                              <TableCell align="right" sx={tnum}>
+                                {row.clicks != null ? count(row.clicks) : EMPTY_CELL}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                          {/* Budget Breakdown과 같은 합계 행 문법(fontWeight 700). */}
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
+                            {showPerCampaign && dailyMatrix.columns.map((col) => (
+                              <TableCell key={col.campaignId} align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                                {money(dailyMatrix.totalByCampaign[col.campaignId] ?? 0)}
+                              </TableCell>
+                            ))}
+                            <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>{money(dailyMatrix.grandTotal)}</TableCell>
+                            <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                              {dailyMatrix.rows.some((r) => r.impressions != null)
+                                ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
+                                : EMPTY_CELL}
                             </TableCell>
-                            <TableCell align="right" sx={tnum}>
-                              {row.impressions != null ? count(row.impressions) : EMPTY_CELL}
-                            </TableCell>
-                            <TableCell align="right" sx={tnum}>
-                              {row.clicks != null ? count(row.clicks) : EMPTY_CELL}
+                            <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
+                              {dailyMatrix.rows.some((r) => r.clicks != null)
+                                ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
+                                : EMPTY_CELL}
                             </TableCell>
                           </TableRow>
-                        ))}
-                        {/* Budget Breakdown과 같은 합계 행 문법(fontWeight 700). */}
-                        <TableRow>
-                          <TableCell sx={{ fontWeight: 700 }}>Total</TableCell>
-                          {showPerCampaign && dailyMatrix.columns.map((col) => (
-                            <TableCell key={col.campaignId} align="right" sx={{ ...tnum, fontWeight: 700 }}>
-                              {money(dailyMatrix.totalByCampaign[col.campaignId] ?? 0)}
-                            </TableCell>
-                          ))}
-                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>{money(dailyMatrix.grandTotal)}</TableCell>
-                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
-                            {dailyMatrix.rows.some((r) => r.impressions != null)
-                              ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.impressions ?? 0), 0))
-                              : EMPTY_CELL}
-                          </TableCell>
-                          <TableCell align="right" sx={{ ...tnum, fontWeight: 700 }}>
-                            {dailyMatrix.rows.some((r) => r.clicks != null)
-                              ? count(dailyMatrix.rows.reduce((sum, r) => sum + (r.clicks ?? 0), 0))
-                              : EMPTY_CELL}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
-                )}
+                        </TableBody>
+                      </Table>
+                    </ScrollArea>
+                  )}
+                </Collapse>
               </Box>
             );
           })()}
