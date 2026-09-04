@@ -1,4 +1,5 @@
 import Box from "@mui/material/Box";
+import { useTheme } from "@mui/material/styles";
 import Typography from "@mui/material/Typography";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -149,15 +150,23 @@ export const FillUsage = {
 	parameters: {
 		layout: "padded",
 	},
-	render: () => {
-		const fillExamples = [
-			{ icon: "favorite", label: "Like", activeColor: "#e91e63" },
-			{ icon: "bookmark", label: "Bookmark", activeColor: "#1976d2" },
-			{ icon: "star", label: "Favorite", activeColor: "#ffc107" },
-			{ icon: "thumb_up", label: "Recommend", activeColor: "#0000FF" },
-			{ icon: "check_circle", label: "Complete", activeColor: "#2e7d32" },
-			{ icon: "visibility", label: "Visible", activeColor: "#263238" },
-		];
+	render: () => <FillUsageDocs />,
+};
+
+/* useTheme는 훅이라 render 화살표 함수 안에서 직접 부르면 rules-of-hooks에
+   걸린다(Shape.stories와 같은 패턴으로 분리). 활성 색은 머티리얼 기본
+   팔레트(#e91e63, #1976d2 등)가 아니라 이 테마의 토큰에서 가져온다 —
+   스토리북이 대시보드에 없는 색을 보여주면 안 된다. */
+function FillUsageDocs() {
+	const theme = useTheme();
+	const fillExamples = [
+		{ icon: "favorite", label: "Like", activeColor: theme.palette.error.main },
+		{ icon: "bookmark", label: "Bookmark", activeColor: theme.palette.accent.main },
+		{ icon: "star", label: "Favorite", activeColor: theme.palette.warning.main },
+		{ icon: "thumb_up", label: "Recommend", activeColor: theme.palette.primary.main },
+		{ icon: "check_circle", label: "Complete", activeColor: theme.palette.success.main },
+		{ icon: "visibility", label: "Visible", activeColor: theme.palette.secondary.main },
+	];
 
 		return (
 			<>
@@ -259,7 +268,8 @@ const [isLiked, setIsLiked] = useState(false);
   className="material-symbols-outlined"
   style={{
     fontVariationSettings: \`'FILL' \${isLiked ? 1 : 0}\`,
-    color: isLiked ? '#e91e63' : 'inherit',
+    // 활성 색은 하드코딩하지 않고 테마 토큰을 쓴다 (예: error.main = ${theme.palette.error.main})
+    color: isLiked ? theme.palette.error.main : 'inherit',
     cursor: 'pointer'
   }}
   onClick={() => setIsLiked(!isLiked)}
@@ -269,6 +279,5 @@ const [isLiked, setIsLiked] = useState(false);
 					</Box>
 				</PageContainer>
 			</>
-		);
-	},
-};
+	);
+}

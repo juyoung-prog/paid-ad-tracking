@@ -100,7 +100,9 @@ export const Transparent = {
           <Box
             sx={{
               height: 400,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              /* 투명 GNB를 보여주려면 어두운 면이 필요하다 — 테마 밖 보라
+                 그라디언트(#667eea) 대신 팔레트의 secondary(blueGrey 900)를 쓴다. */
+              backgroundColor: 'secondary.main',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',

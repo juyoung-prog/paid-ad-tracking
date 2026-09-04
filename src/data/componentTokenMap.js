@@ -55,10 +55,10 @@ const componentTokenMap = {
       },
       shape: {
         items: [
-          { token: 'borderRadius', role: '버튼 모서리 곡률' },
+          { token: 'radius.control', role: '버튼 모서리 곡률' },
         ],
         affects: '버튼 외곽선 모서리',
-        howToUse: 'theme.shape.borderRadius (현재: 0px)',
+        howToUse: 'theme.shape.radius.control (현재: 4px — 상호작용 컨트롤 재분류, MuiButton override)',
       },
       shadows: {
         items: [
@@ -167,10 +167,10 @@ const componentTokenMap = {
       },
       shape: {
         items: [
-          { token: 'borderRadius', role: '필드 모서리' },
+          { token: 'radius.control', role: '필드 모서리' },
         ],
         affects: 'outlined, filled variant 모서리',
-        howToUse: 'theme.shape.borderRadius',
+        howToUse: 'theme.shape.radius.control (현재: 4px — MuiOutlinedInput override)',
       },
       transitions: {
         items: [
@@ -220,10 +220,10 @@ const componentTokenMap = {
       },
       shape: {
         items: [
-          { token: 'borderRadius', role: '필드 및 메뉴 모서리' },
+          { token: 'radius.control', role: '필드 및 메뉴 모서리' },
         ],
         affects: '모서리 곡률',
-        howToUse: 'theme.shape.borderRadius',
+        howToUse: 'theme.shape.radius.control (현재: 4px — MuiOutlinedInput override 공유)',
       },
       shadows: {
         items: [
@@ -416,10 +416,10 @@ const componentTokenMap = {
       },
       shape: {
         items: [
-          { token: 'borderRadius', role: 'Alert 모서리' },
+          { token: 'radius.control', role: 'Alert 모서리' },
         ],
         affects: '외곽 모서리',
-        howToUse: 'theme.shape.borderRadius',
+        howToUse: 'theme.shape.radius.control (현재: 4px — MuiAlert override)',
       },
       spacing: {
         items: [

@@ -8,15 +8,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import { useTheme } from '@mui/material/styles';
-import {
-  blue,
-  blueGrey,
-  grey,
-  red,
-  orange,
-  green,
-  lightBlue,
-} from '@mui/material/colors';
+import { blueGrey, grey } from '@mui/material/colors';
 import {
   DocumentTitle,
   PageContainer,
@@ -371,15 +363,51 @@ primary.main은 쓰지 마 — 선택 상태의 기준색은 accent야."
   },
 };
 
-/** 1. Color Palette - 원시 색상 */
-export const Palette = {
-  name: '1. Color Palette',
-  render: () => (
+/* useTheme는 훅이라 render 화살표 함수 안에서 직접 부르면 rules-of-hooks에
+   걸린다 — Shape.stories와 같은 이유로 정식 컴포넌트로 분리한다. */
+function PaletteDocs() {
+  const theme = useTheme();
+
+  /* 커스텀 원색 — 이 테마의 Primary·상태 색상은 MUI 기본 팔레트(blue/red/
+     orange/green/lightBlue)가 아니다. Brand Blue(#0000FF)의 채도에 맞춰
+     재조정한 커스텀 값이라(테마 파일 palette 주석 참고), 예전처럼 MUI 기본
+     스케일을 "Primary의 기반"으로 문서화하면 화면과 문서가 다른 색을 말한다. */
+  const customRamps = [
+    { name: 'Brand Blue', description: 'Primary — CTA, 브랜드 아이덴티티', colors: [
+      { label: 'light', value: theme.palette.primary.light },
+      { label: 'main', value: theme.palette.primary.main },
+      { label: 'dark', value: theme.palette.primary.dark },
+      { label: 'accent.main', value: theme.palette.accent.main },
+      { label: 'accent.dark', value: theme.palette.accent.dark },
+    ] },
+    { name: 'Error', description: '오류·삭제·위험 (커스텀 — MUI red 아님)', colors: [
+      { label: 'light', value: theme.palette.error.light },
+      { label: 'main', value: theme.palette.error.main },
+      { label: 'dark', value: theme.palette.error.dark },
+    ] },
+    { name: 'Warning', description: '주의·경고 (커스텀 — MUI orange 아님)', colors: [
+      { label: 'light', value: theme.palette.warning.light },
+      { label: 'main', value: theme.palette.warning.main },
+      { label: 'dark', value: theme.palette.warning.dark },
+    ] },
+    { name: 'Success', description: '성공·완료·활성 (커스텀 — MUI green 아님)', colors: [
+      { label: 'light', value: theme.palette.success.light },
+      { label: 'main', value: theme.palette.success.main },
+      { label: 'dark', value: theme.palette.success.dark },
+    ] },
+    { name: 'Info', description: '정보·안내 (커스텀 청록 — primary와 색상군 분리)', colors: [
+      { label: 'light', value: theme.palette.info.light },
+      { label: 'main', value: theme.palette.info.main },
+      { label: 'dark', value: theme.palette.info.dark },
+    ] },
+  ];
+
+  return (
     <>
       <DocumentTitle
         title="Color Palette"
         status="Available"
-        note="MUI default color palette"
+        note="Raw color sources actually used by the theme"
         brandName="Design System"
         systemName="Starter Kit"
         version="1.0"
@@ -389,20 +417,39 @@ export const Palette = {
           Color Palette (원시 색상)
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={ { mb: 4 } }>
-          MUI에서 제공하는 기본 색상 팔레트입니다. 이 색상들을 조합하여 테마를 구성합니다.
+          테마가 실제로 조합에 쓰는 원천 색상입니다. Primary와 상태 색상은 MUI 기본
+          팔레트가 아니라 Brand Blue(#0000FF) 채도에 맞춘 커스텀 값이고, MUI 스케일
+          중에는 Grey·Blue Grey만 사용합니다.
         </Typography>
 
         <Divider sx={ { mb: 4 } } />
 
-        <PaletteScale name="Blue" colorObj={ blue } description="Primary 색상의 기반" />
-        <PaletteScale name="Blue Grey" colorObj={ blueGrey } description="Secondary 색상의 기반" />
-        <PaletteScale name="Grey" colorObj={ grey } description="텍스트, 배경, 보더" />
-        <PaletteScale name="Red" colorObj={ red } description="Error 상태" />
-        <PaletteScale name="Orange" colorObj={ orange } description="Warning 상태" />
-        <PaletteScale name="Green" colorObj={ green } description="Success 상태" />
-        <PaletteScale name="Light Blue" colorObj={ lightBlue } description="Info 상태" />
+        <SectionTitle
+          title="커스텀 원색"
+          description="테마 파일에 직접 정의된 색 — 역할별 상세(light/main/dark 용도)는 2. Semantic Tokens 참고"
+        />
 
-        <SectionTitle title="명도 가이드" />
+        { customRamps.map((ramp) => (
+          <Box key={ ramp.name } sx={ { mb: 4 } }>
+            <Typography variant="h6" sx={ { fontWeight: 600, mb: 0.5 } }>{ ramp.name }</Typography>
+            <Typography variant="body2" color="text.secondary" sx={ { mb: 2 } }>{ ramp.description }</Typography>
+            <Box sx={ { display: 'flex', flexWrap: 'wrap', gap: 1 } }>
+              { ramp.colors.map((c) => (
+                <SingleColorBlock key={ c.label } name={ c.label } color={ c.value } hasBorder={ c.label === 'light' } />
+              )) }
+            </Box>
+          </Box>
+        )) }
+
+        <SectionTitle
+          title="MUI 스케일 (실사용분만)"
+          description="MUI 기본 팔레트 중 테마가 실제로 참조하는 두 스케일"
+        />
+
+        <PaletteScale name="Grey" colorObj={ grey } description="텍스트·배경·보더, surface.sunken/muted(grey.50/100)의 원천" />
+        <PaletteScale name="Blue Grey" colorObj={ blueGrey } description="Secondary 색상의 기반 (secondary.main = blueGrey[900])" />
+
+        <SectionTitle title="명도 가이드" description="Grey·Blue Grey 스케일을 고를 때의 기준" />
 
         <TableContainer>
           <Table size="small">
@@ -432,7 +479,13 @@ export const Palette = {
         </TableContainer>
       </PageContainer>
     </>
-  ),
+  );
+}
+
+/** 1. Color Palette - 원시 색상 */
+export const Palette = {
+  name: '1. Color Palette',
+  render: () => <PaletteDocs />,
 };
 
 /** 2. Semantic Tokens - 역할별 색상 */
@@ -552,7 +605,7 @@ export const Usage = {
         <Box
           component="pre"
           sx={ {
-            backgroundColor: '#f5f5f5',
+            backgroundColor: 'grey.100',
             p: 2,
             fontSize: 12,
             fontFamily: 'monospace',
@@ -577,7 +630,7 @@ export const Usage = {
         <Box
           component="pre"
           sx={ {
-            backgroundColor: '#f5f5f5',
+            backgroundColor: 'grey.100',
             p: 2,
             fontSize: 12,
             fontFamily: 'monospace',

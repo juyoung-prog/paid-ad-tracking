@@ -31,6 +31,9 @@ export const Default = {
         info: theme.palette.info,
         text: theme.palette.text,
         background: theme.palette.background,
+        // 커스텀 토큰 — 상호작용 액센트와 면 위계 (테마 palette 주석 참고)
+        accent: theme.palette.accent,
+        surface: theme.palette.surface,
         action: theme.palette.action,
         divider: theme.palette.divider,
         grey: theme.palette.grey,
@@ -56,6 +59,10 @@ export const Default = {
         button: theme.typography.button,
         caption: theme.typography.caption,
         overline: theme.typography.overline,
+        // 역할 토큰 — h1~h6이 크기 스케일이라면 이 셋은 역할이다
+        display: theme.typography.display,
+        title: theme.typography.title,
+        label: theme.typography.label,
       },
       spacing: {
         unit: 8,
@@ -68,6 +75,9 @@ export const Default = {
         'spacing(8)': theme.spacing(8),
       },
       shape: theme.shape,
+      // 커스텀 확장 — 콘텐츠 폭·아이콘 크기 토큰 (createTheme 밖에서 부착)
+      layout: theme.layout,
+      iconSize: theme.iconSize,
       breakpoints: {
         values: theme.breakpoints.values,
       },
@@ -103,7 +113,7 @@ export const Default = {
             Theme Structure
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={ { mb: 3 } }>
-            클릭하여 펼치기/접기 | <code>src/styles/theme.js</code>
+            클릭하여 펼치기/접기 | <code>src/styles/themes/default.js</code>
           </Typography>
 
           <Box sx={ { p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 } }>
@@ -156,6 +166,10 @@ export const TableView = {
           { key: 'text.secondary', value: theme.palette.text.secondary },
           { key: 'background.default', value: theme.palette.background.default },
           { key: 'background.paper', value: theme.palette.background.paper },
+          { key: 'accent.main', value: theme.palette.accent.main },
+          { key: 'accent.tint', value: theme.palette.accent.tint },
+          { key: 'surface.sunken', value: theme.palette.surface.sunken },
+          { key: 'surface.muted', value: theme.palette.surface.muted },
           { key: 'divider', value: theme.palette.divider },
         ],
       },
@@ -173,6 +187,9 @@ export const TableView = {
           { key: 'body1.fontSize', value: theme.typography.body1.fontSize },
           { key: 'body2.fontSize', value: theme.typography.body2.fontSize },
           { key: 'caption.fontSize', value: theme.typography.caption.fontSize },
+          { key: 'display.fontSize', value: theme.typography.display.fontSize },
+          { key: 'title.fontSize', value: theme.typography.title.fontSize },
+          { key: 'label.fontSize', value: theme.typography.label.fontSize },
         ],
       },
       {
@@ -192,6 +209,9 @@ export const TableView = {
         description: '모양 토큰',
         data: [
           { key: 'borderRadius', value: `${theme.shape.borderRadius}px` },
+          { key: 'radius.control', value: `${theme.shape.radius.control}px` },
+          { key: 'radius.container', value: `${theme.shape.radius.container}px` },
+          { key: 'radius.inlay', value: `${theme.shape.radius.inlay}px` },
         ],
       },
       {
@@ -256,7 +276,7 @@ export const TableView = {
                   </Box>
                 </Box>
                 <Box component="tbody">
-                  { table.data.map((row, index) => {
+                  { table.data.map((row) => {
                     const isColor = typeof row.value === 'string' && (
                       row.value.startsWith('#') ||
                       row.value.startsWith('rgb')
