@@ -120,11 +120,11 @@ sequenceDiagram
 |---|---|---|
 | `impressions` | `impressions` | `impressions` |
 | `reach` | `reach` | `reach` |
-| `clicks` | `clicks` (또는 `link_click`) | `clicks` |
+| `clicks` | `actions` 중 `link_click` | `clicks` |
 | `spend` | `spend` | `spend` |
 | `videoPlays` | `video_play_actions` | `video_play_actions` |
-| `hookViews` | `video_p25_watched_actions` (근사치) | `video_watched_2s` |
-| `heldViews` | `video_p100_watched_actions` | `video_views_p100` |
+| `hookViews` | `actions` 중 `video_view` (3초 재생) | `video_watched_2s` (2초 시청) |
+| `heldViews` | `video_p100_watched_actions` (완전 시청) | `video_views_p100` (완전 시청) |
 | `avgWatchSeconds` | `video_avg_time_watched_actions` | `average_video_play` |
 | `likes` / `comments` / `shares` | `actions` 중 `post_reaction` / `comment` / `post` | `likes` / `comments` / `shares` |
 | `engagements` | `actions` 중 `post_reaction`+`comment`+`post` 합산 | `likes` + `comments` + `shares` (합산) |
@@ -132,9 +132,20 @@ sequenceDiagram
 | `profileVisits` | — | `profile_visits` |
 | `conversions` | `actions` 중 `offsite_conversion` 등 | `conversion` |
 
-**`heldViews`는 "완전 시청"이다.** 한때 TikTok만 `video_watched_6s`(6초 시청)를 넣어
-같은 컬럼에 플랫폼마다 다른 의미가 섞였다 — 실측으로 6초 2,119 vs 완전 시청 484로
-4배 이상 차이가 나서 플랫폼 간 비교가 조용히 틀렸다. 지금은 양쪽 다 완전 시청이다.
+**`hookViews`/`heldViews`/`clicks`는 각 플랫폼 광고 관리자의 정의를 그대로 담는다.**
+대시보드 사용자는 광고 관리자 화면을 나란히 놓고 보므로, 같은 이름의 숫자는 그 화면과
+일치해야 한다(실사용 발견 2026-09: Hook rate가 대시보드 69.54% vs Meta 화면 80%).
+- Hook rate = `hookViews ÷ videoPlays`(분모가 impressions가 아니라 **재생 수**),
+  Hold rate = `heldViews ÷ hookViews`(완주 ÷ 훅 시청) — Meta 화면과 실측 대조로 확정한
+  식이다(`schema.js` calc 함수). Hold는 ThruPlay÷재생수(57%)·p95÷재생수(4.69%)를
+  차례로 시도해 반증했고, 완주÷훅시청 = 4,003÷72,946 = 5.49%가 화면과 정확히 일치했다.
+- hook의 분자는 플랫폼별로 다른 지표다(Meta 3초/TikTok 2초 — 위 표의 괄호). 플랫폼 간
+  직접 비교는 UI 각주가 막는다. 한때 Meta hook에 `video_p25`를 썼는데 계산은 맞아도
+  광고 관리자와 다른 숫자가 나와 "대시보드가 틀렸다"로 읽혔다.
+- Meta `clicks`도 최상위 `clicks`(모든 클릭)가 아니라 `link_click`이다 — 광고 관리자의
+  "Link clicks" 컬럼과 맞추고, CTR/CPC도 여기서 파생되므로 같이 맞는다.
+- 지표 매핑을 바꾼 뒤에는 `sync-performance`를 body `{"full": true}`로 1회 호출해
+  창 밖 캠페인까지 전부 새 정의로 재수집해야 한다.
 
 **파생 지표는 저장하지 않는다.** TikTok은 `ctr`/`cpc`/`cpm`/`frequency`/
 `cost_per_1000_reached`/`conversion_rate`/`cost_per_conversion`을 전부 주지만,

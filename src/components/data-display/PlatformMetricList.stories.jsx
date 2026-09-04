@@ -20,7 +20,8 @@ PerformanceForm과 짝을 이루는 반대편이라 입력 필드가 아니라 �
 구분이 안 되기 때문이다. 하나도 없으면 아무것도 그리지 않는다.
 
 Hook Rate / Hold Rate는 저장된 값이 아니라 schema.js의 calcHookRate/calcHoldRate로
-계산한 파생 지표다. Hook Rate 기준이 플랫폼마다 달라(TikTok 2초 / Meta 25% 시청)
+계산한 파생 지표다 — Meta 광고 관리자와 같은 정의(hook rate = 훅시청 ÷ video plays,
+hold rate = 완주 ÷ 훅시청). 훅시청의 기준이 플랫폼마다 달라(Meta 3초 / TikTok 2초 재생)
 그 사실을 값 위 캡션에 함께 표시한다 — 같은 이름의 숫자를 그대로 비교하면 틀리기 때문.
         `,
       },
@@ -37,7 +38,7 @@ Hook Rate / Hold Rate는 저장된 값이 아니라 schema.js의 calcHookRate/ca
 export const Default = {
   args: {
     metrics: {
-      // Hook Rate는 impressions가 있어야 계산된다(hookViews / impressions).
+      // Hook Rate는 videoPlays(hookViews ÷ videoPlays), Hold Rate는 hookViews(heldViews ÷ hookViews)가 있어야 계산된다.
       impressions: 327786,
       hookViews: 22723,
       videoPlays: 325147,

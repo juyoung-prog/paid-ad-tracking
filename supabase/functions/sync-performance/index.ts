@@ -76,7 +76,7 @@ async function fetchMetaInsightsByCampaign(accessToken: string, externalAccountI
   const fields = [
     'campaign_id',
     'impressions', 'reach', 'clicks', 'spend',
-    'video_play_actions', 'video_p25_watched_actions', 'video_p100_watched_actions',
+    'video_play_actions', 'video_p100_watched_actions',
     'video_avg_time_watched_actions', 'actions',
   ].join(',');
 
@@ -128,10 +128,21 @@ function mapMetaInsight(raw: any): Metrics {
   return {
     impressions: num(raw.impressions),
     reach: num(raw.reach),
-    clicks: num(raw.clicks),
+    /* 최상위 clicks(모든 클릭)가 아니라 link_click을 쓴다. 대시보드 사용자는
+       Meta 광고 관리자의 "Link clicks" 컬럼과 나란히 비교하고, CTR/CPC도 이
+       값에서 파생되므로 여기가 어긋나면 셋이 같이 어긋난다. Clicks 컬럼
+       툴팁도 처음부터 link_click이라고 안내해 왔다(코드만 달랐다). */
+    clicks: metaAction(raw, 'actions', 'link_click') ?? (hasActions ? 0 : null),
     spend: num(raw.spend) ?? 0,
     video_plays: metaAction(raw, 'video_play_actions'),
-    hook_views: metaAction(raw, 'video_p25_watched_actions'),
+    /* hook은 광고 관리자의 Hook rate 분자와 같은 지표를 쓴다 — 3초 재생
+       (actions의 video_view). 한때 video_p25(25% 지점)를 썼는데, 대시보드와
+       Meta 화면이 같은 이름으로 다른 숫자를 보여줬다(실사용 발견: Hook 69.54%
+       vs Meta 80%). Hook rate 분모는 impressions가 아니라 video_plays,
+       Hold rate는 완주 ÷ 훅 시청이다 — 실측 대조(G10 1 Month Deals)로 확정:
+       화면의 Hold 5.49% = p100 4,003 ÷ 3초 재생 72,946. ThruPlay÷plays(57%)와
+       p95÷plays(4.69%)는 둘 다 반증됨. schema.js calcHookRate/calcHoldRate 참조. */
+    hook_views: metaAction(raw, 'actions', 'video_view') ?? (hasActions ? 0 : null),
     held_views: metaAction(raw, 'video_p100_watched_actions'),
     avg_watch_seconds: metaAction(raw, 'video_avg_time_watched_actions'),
     likes,
@@ -171,9 +182,11 @@ async function fetchMetaDailyByCampaign(
 ): Promise<{ byCampaign: Map<string, DailyRow[]>; errorMessage: string | null }> {
   const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
   const byCampaign = new Map<string, DailyRow[]>();
+  // clicks는 최상위 필드가 아니라 actions의 link_click에서 뽑는다 — 스냅샷
+  // (mapMetaInsight)과 같은 정의여야 두 테이블의 클릭이 서로 어긋나지 않는다.
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/insights` +
-    `?level=campaign&fields=campaign_id,spend,impressions,clicks` +
+    `?level=campaign&fields=campaign_id,spend,impressions,actions` +
     `&time_increment=1&time_range=${timeRange}&limit=500&access_token=${accessToken}`;
 
   let page = 0;
@@ -192,7 +205,7 @@ async function fetchMetaDailyByCampaign(
         date: String(row.date_start),
         spend: num(row.spend) ?? 0,
         impressions: num(row.impressions),
-        clicks: num(row.clicks),
+        clicks: metaAction(row, 'actions', 'link_click') ?? (Array.isArray(row.actions) ? 0 : null),
       });
       byCampaign.set(String(row.campaign_id), list);
     }
@@ -271,10 +284,13 @@ async function fetchTikTokReport(accessToken: string, advertiserId: string, camp
 
 // 우리 필드 ↔ TikTok Report 필드 매핑 (05-api-integration.md 표 기준).
 //
-// held_views는 video_watched_6s가 아니라 video_views_p100을 쓴다. 이 컬럼은 스키마상
-// "완전 시청"이고 Meta는 video_p100_watched_actions를 넣는데, TikTok만 6초 시청을 넣고
-// 있어 같은 컬럼에 서로 다른 의미가 섞였다(실측 6초 2,119 vs 완전 시청 484 — 4배 차이).
-// 그대로 두면 플랫폼 간 비교가 조용히 틀린다.
+// hook/held는 **플랫폼이 자기 화면에서 쓰는 정의**를 그대로 담는다 — TikTok은
+// 2초 시청(video_watched_2s)과 완전 시청(video_views_p100), Meta는 3초 재생과
+// ThruPlay(mapMetaInsight 참조). 같은 컬럼에 플랫폼별로 다른 정의가 담기는 건
+// 의도다: 대시보드 사용자는 각 플랫폼 광고 관리자와 나란히 비교하므로 그 화면과
+// 숫자가 일치하는 게 우선이고, 플랫폼 간 직접 비교는 UI가 각주로 막는다
+// (한때 6s vs p100처럼 **문서화 없이** 섞인 적이 있었는데 그것과는 다르다 —
+// 지금은 정의가 플랫폼별로 명시돼 있다).
 //
 // engagements: 양 플랫폼 모두 좋아요/댓글/공유 합으로 계산한다 — Meta도 단일
 // 합계 지표를 캠페인 레벨 최상위 필드로는 주지 않는다(mapMetaInsight 주석 참고).
@@ -380,6 +396,15 @@ Deno.serve(async (req) => {
   const admin = supabaseAdmin();
   const today = new Date().toISOString().slice(0, 10);
 
+  /* { full: true }를 body로 주면 스냅샷 대상 선정에서 "이미 기록이 있고 창을
+     지난 캠페인은 건너뛴다" 최적화를 끄고 전부 다시 받는다. 지표 **매핑이
+     바뀌었을 때** 쓰는 1회성 재수집 경로다 — 매핑이 바뀌면 기존 기록은 값이
+     있어도 옛 정의의 숫자라서, 창 밖 캠페인은 이 경로 없이는 영영 새 정의로
+     안 바뀐다(2026-09: hook/held/clicks를 광고 관리자 정의로 바꿀 때 처음 사용).
+     cron은 body 없이 부르므로 평소 실행에는 영향이 없다. */
+  const body = await req.json().catch(() => ({}));
+  const fullResync = body?.full === true;
+
   // 종료 후 POST_END_SYNC_DAYS일이 지난 캠페인은 더 안 부른다 — 값이 더 안 변하는데
   // 매일 호출하면 플랫폼 rate limit만 갉아먹는다.
   const cutoff = new Date();
@@ -426,7 +451,7 @@ Deno.serve(async (req) => {
   // 이 두 번째 조건이 없으면, 연동을 시작한 시점에 이미 끝나 있던 캠페인은 영원히
   // 빈칸으로 남는다(실제로 31건 중 26건이 그 상태였다).
   const campaigns = (allCampaigns ?? []).filter(
-    (c) => c.end_date >= cutoffDate || !hasRecord.has(c.id)
+    (c) => fullResync || c.end_date >= cutoffDate || !hasRecord.has(c.id)
   );
 
   // campaigns와 connections 사이에는 직접 FK가 없다(둘 다 ad_accounts를 가리킨다).
@@ -514,8 +539,10 @@ Deno.serve(async (req) => {
   //      만들 수 없는 축이다(연동 전 구간에 스냅샷이 없다).
   //  (b) 이미 있으면 진행 중/종료 POST_END_SYNC_DAYS일 이내만 → **최근 7일
   //      재수집**. 플랫폼이 지표를 사후 정정하므로 같은 날을 덮어쓴다.
+  // fullResync면 전 캠페인을 backfill 모드로 다시 받는다 — 지표 매핑이 바뀌면
+  // 이미 있는 일별 행도 옛 정의의 숫자라서 최근 7일 재수집으로는 안 고쳐진다.
   const dailyTargets = (allCampaigns ?? []).filter(
-    (c) => !hasDaily.has(c.id) || c.end_date >= cutoffDate
+    (c) => fullResync || !hasDaily.has(c.id) || c.end_date >= cutoffDate
   );
 
   const pendingDaily: { campaign_id: string; date: string; spend: number; impressions: number | null; clicks: number | null }[] = [];
@@ -540,7 +567,7 @@ Deno.serve(async (req) => {
 
     const targets = metaDailyTargets.filter((c) => c.account_id === accountId);
     const since = targets
-      .map((c) => (hasDaily.has(c.id) ? (c.start_date > cutoffDate ? c.start_date : cutoffDate) : c.start_date))
+      .map((c) => (hasDaily.has(c.id) && !fullResync ? (c.start_date > cutoffDate ? c.start_date : cutoffDate) : c.start_date))
       .reduce((min, d) => (d < min ? d : min));
     const clampedSince = since < metaMinSince ? metaMinSince : since;
 
@@ -555,7 +582,7 @@ Deno.serve(async (req) => {
       const rows = result.byCampaign.get(String(c.external_campaign_id)) ?? [];
       // 재수집 모드는 최근 창만 남긴다 — 계정 창이 backfill 캠페인 때문에
       // 길어졌을 때 이미 있는 전 기간을 매일 다시 쓰지 않기 위함이다.
-      const lowerBound = hasDaily.has(c.id) ? cutoffDate : null;
+      const lowerBound = hasDaily.has(c.id) && !fullResync ? cutoffDate : null;
       for (const r of rows) {
         if (lowerBound && r.date < lowerBound) continue;
         pendingDaily.push({ campaign_id: c.id, ...r });
@@ -569,7 +596,7 @@ Deno.serve(async (req) => {
     const advertiserId = externalIdByAccount.get(c.account_id);
     if (!accessToken || !advertiserId) { skip('daily_no_connection'); continue; }
 
-    const isBackfill = !hasDaily.has(c.id);
+    const isBackfill = !hasDaily.has(c.id) || fullResync;
     const since = isBackfill ? c.start_date : (c.start_date > cutoffDate ? c.start_date : cutoffDate);
     // 종료된 캠페인의 뒷날짜까지 물어보지 않는다 — 창이 늘어나면 chunk 수만 는다.
     const until = c.end_date < today ? c.end_date : today;

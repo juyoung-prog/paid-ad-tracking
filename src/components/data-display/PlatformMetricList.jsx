@@ -23,7 +23,7 @@ const FIELDS = [
     key: 'hookRate',
     label: 'Hook Rate',
     format: fmtPercent,
-    derive: (m) => calcHookRate(m.hookViews ?? null, m.impressions ?? null),
+    derive: (m) => calcHookRate(m.hookViews ?? null, m.videoPlays ?? null),
   },
   {
     key: 'holdRate',
@@ -88,11 +88,13 @@ export function PlatformMetricList({ metrics, title = 'Platform Metrics', sx }) 
 
       {/* Hook Rate의 기준이 플랫폼마다 다르다는 걸 숨기면, 같은 이름의 숫자를
           그대로 비교하게 되고 그 비교는 틀린다. 값 옆에서 바로 알려준다.
-          (Meta는 2초 연속 시청 지표가 이 계정에서 값이 하나도 안 와 p25만 쓸 수 있다.) */}
+          정의는 각 플랫폼 광고 관리자와 같다(분모: video plays) — 대시보드와
+          플랫폼 화면이 같은 이름으로 다른 숫자를 보여주면 안 된다. */}
       { hasHookRate && (
         <Typography variant="caption" color="text.secondary" sx={ { display: 'block', mb: 1.5 } }>
-          Hook Rate is defined differently per platform — TikTok counts a 2-second view,
-          Meta counts 25% of the video. Avoid comparing the two directly.
+          Hook Rate is defined differently per platform — Meta counts a 3-second play,
+          TikTok a 2-second play, each divided by video plays as in its Ads Manager.
+          Avoid comparing the two directly.
         </Typography>
       ) }
 

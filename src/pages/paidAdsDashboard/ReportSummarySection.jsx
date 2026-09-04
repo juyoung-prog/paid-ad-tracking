@@ -253,8 +253,8 @@ const NOTE = {
   cpa: 'Spend ÷ conversions. Lower is cheaper.',
   cpe: 'Spend ÷ engagements. Lower is cheaper.',
   videoPlays: 'Total plays, with no minimum watch time.',
-  hookRate: 'Platform-specific: TikTok counts a 2-second view, Meta counts 25% of the video.',
-  holdRate: 'Share of hook views that watched to completion — based on the platform-specific hook definition.',
+  hookRate: 'Hook views ÷ video plays, matching each platform\'s Ads Manager. Hook view is platform-specific: Meta counts a 3-second play, TikTok a 2-second play.',
+  holdRate: 'Full watches ÷ hook views, matching Meta\'s Ads Manager Hold rate — of viewers hooked, how many stayed to the end.',
   heldViews: 'Views that reached 100% of the video.',
   avgWatch: 'Average seconds watched per play.',
   follows: 'New followers attributed to the campaign. TikTok only — Meta has no campaign-level equivalent.',
@@ -2041,9 +2041,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
               )}
               {hasPlatformSpecificMetric && isMixedPlatform && (
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                  This table mixes Meta and TikTok. Hook Rate and Hold Rate use platform-specific
-                  definitions (TikTok counts a 2-second view, Meta counts 25% of the video) — compare
-                  them within a platform, not across.
+                  This table mixes Meta and TikTok. Hook Rate uses each platform&apos;s own
+                  definition (Meta counts a 3-second play, TikTok a 2-second play), and Hold Rate
+                  builds on it (full watches ÷ hook views) — compare them within a platform, not across.
                 </Typography>
               )}
             </Box>

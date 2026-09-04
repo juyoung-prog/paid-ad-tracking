@@ -132,7 +132,7 @@ export const ALERT_TYPE = Object.freeze({
  * @property {number|null} clicks - Tier 1 · 공통 필수 (링크 클릭수)
  * @property {number} spend - Tier 1 · 공통 필수, USD 소수점 2자리
  * @property {number|null} videoPlays - Tier 2 · 영상 지표 (전체 재생수, 시청 조건 없음)
- * @property {number|null} hookViews - Tier 2 · 영상 지표 (3초/2초 조회수)
+ * @property {number|null} hookViews - Tier 2 · 영상 지표. 플랫폼별 훅 정의: Meta 3초 재생(actions.video_view) / TikTok 2초 시청(video_watched_2s)
  * @property {number|null} heldViews - Tier 2 · 영상 지표 (완전시청수). Meta video_p100_watched_actions / TikTok video_views_p100
  * @property {number|null} avgWatchSeconds - Tier 2 · 영상 지표 (평균 재생 시간, 초)
  * @property {number|null} likes - Tier 3 · 상호작용 구성 요소
@@ -282,18 +282,28 @@ export function calcCPC(spend, clicks) {
 }
 
 /**
- * Hook Rate(3초/2초 조회 비율)를 계산한다.
+ * Hook Rate(훅 시청 ÷ 재생 수)를 계산한다.
+ *
+ * 분모는 노출(impressions)이 아니라 **video plays**다 — Meta/TikTok 광고
+ * 관리자의 Hook rate가 재생 수 기준이라, 노출로 나누면 대시보드와 플랫폼
+ * 화면이 같은 이름으로 다른 숫자를 보여준다(실사용에서 69.54% vs 80%로 발견).
+ * 분자는 플랫폼이 정의한다: Meta 3초 재생, TikTok 2초 재생.
  * @param {number|null} hookViews
- * @param {number|null} impressions
+ * @param {number|null} videoPlays
  * @returns {number|null}
  */
-export function calcHookRate(hookViews, impressions) {
-  if (!impressions || hookViews == null) return null;
-  return hookViews / impressions;
+export function calcHookRate(hookViews, videoPlays) {
+  if (!videoPlays || hookViews == null) return null;
+  return hookViews / videoPlays;
 }
 
 /**
- * Hold Rate(훅 이후 완전시청 비율)를 계산한다.
+ * Hold Rate(완전 시청 ÷ 훅 시청)를 계산한다.
+ *
+ * Meta 광고 관리자의 Hold rate와 같은 식이다 — 실측 대조(2026-09, G10
+ * 1 Month Deals)로 확정: 화면의 5.49% = 완주 4,003 ÷ 3초 재생 72,946.
+ * ThruPlay÷재생수(57%)·p95÷재생수(4.69%) 등 다른 후보는 반증됨.
+ * "훅에 걸린 사람 중 끝까지 남은 비율"이라는 원래 의미 그대로다.
  * @param {number|null} heldViews
  * @param {number|null} hookViews
  * @returns {number|null}
@@ -1206,7 +1216,7 @@ export function getCampaignMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
-    hookRate: calcHookRate(record?.hookViews ?? null, impressions),
+    hookRate: calcHookRate(record?.hookViews ?? null, record?.videoPlays ?? null),
     holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
 }
@@ -1259,7 +1269,7 @@ export function getGoalMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
-    hookRate: calcHookRate(record?.hookViews ?? null, impressions),
+    hookRate: calcHookRate(record?.hookViews ?? null, record?.videoPlays ?? null),
     holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
 }
