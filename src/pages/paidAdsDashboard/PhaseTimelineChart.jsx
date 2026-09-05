@@ -43,6 +43,31 @@ function splitNamePrefix(name) {
   return match ? { prefix: match[1], rest: match[2] } : { prefix: name ?? '', rest: '' };
 }
 
+/** 이름 끝의 기간 접미사 — `_0617~0707`, ` _0706 ~ 0801`, `-0710-0831` */
+const DATE_SUFFIX_PATTERN = /[\s_\-–—]*\d{4}\s*[~\-–—]\s*\d{4}\s*$/;
+/** 이름 앞의 매장·이벤트 코드 — `G10_`, `BF2 `, `G01-` (schema.js의 매장 코드 규칙과 같은 꼴) */
+const CODE_PREFIX_PATTERN = /^[A-Za-z]{1,3}\d{1,3}[\s_\-–—]+/;
+
+/**
+ * 표시용 이름. 이 계정의 계획 캠페인은 `G10_Coming Soon_0617~0707`처럼 매장 코드와
+ * 기간을 이름에 담는데, 그 둘은 이 차트에서 이미 다른 자리가 말한다(코드는 Event
+ * 필터, 기간은 막대와 둘째 줄). 첫 줄에는 사람이 부르는 이름("Coming Soon")만 남기고
+ * 원본 전체는 둘째 줄과 title로 보낸다 — 행마다 굵기 배치가 달라지지 않게 모든
+ * 행이 같은 규칙을 탄다. 벗겨낸 뒤 아무것도 안 남으면 원본을 그대로 쓴다.
+ *
+ * @param {string} name - 원본 캠페인 이름
+ * @returns {string}
+ */
+function displayName(name) {
+  const cleaned = (name ?? '')
+    .replace(DATE_SUFFIX_PATTERN, '')
+    .replace(CODE_PREFIX_PATTERN, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || name || '';
+}
+
 /**
  * phase 막대 옆에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —
  * "하루 얼마씩 쓰는 캠페인인가"와 "이 단계에 총 얼마가 걸려 있나"는 서로 다른
@@ -51,13 +76,15 @@ function splitNamePrefix(name) {
  * 개념이 없어 0으로 저장된다).
  *
  * @param {{ totalDaily: number|null, totalBudget: number }} phase
- * @returns {string} 예: "$120/day · $3,600" — 둘 다 없으면 빈 문자열
+ * @returns {string} 예: "$120/day · $3,600 planned" — 둘 다 없으면 빈 문자열
  */
 function formatPhaseBudget(phase) {
   const parts = [];
   // 계획 예산이라 정수 표기 (utils/format.js의 moneyWhole 규칙)
   if (phase.totalDaily) parts.push(`${moneyWhole(phase.totalDaily)}/day`);
-  if (phase.totalBudget > 0) parts.push(moneyWhole(phase.totalBudget));
+  // "planned"를 붙인다 — 옆에 실지출("… spent")이 오면 단위 없는 금액 둘이
+  // 나란히 서서 어느 쪽이 계획인지 읽을 수 없었다.
+  if (phase.totalBudget > 0) parts.push(`${moneyWhole(phase.totalBudget)} planned`);
   return parts.join(' · ');
 }
 
@@ -86,9 +113,14 @@ const MIN_MONTH_LABEL_PCT = 7;
 /** 이보다 좁은 막대는 양 끝 날짜를 따로 못 적어 한 줄로 합친다 */
 const MIN_TWO_LABEL_PCT = 12;
 
-/** 막대 두께와 끝점 지름 — 얇은 막대, 라벨은 막대 밖 */
+/** 막대 두께와 끝점 지름 — 얇은 막대, 작은 끝점, 라벨은 막대 밖 */
 const BAR_HEIGHT = 6;
-const DOT_SIZE = 10;
+const DOT_SIZE = 8;
+
+/** hover 강조가 잡을 클래스 — 행에 마우스가 올라가면 막대·끝점·날짜가 accent로 */
+const BAR_CLASS = 'ptc-bar';
+const DOT_CLASS = 'ptc-dot';
+const DATE_CLASS = 'ptc-date';
 
 /**
  * 타임라인 양 끝에 붙은 라벨이 차트 밖으로 잘리지 않도록 정렬 기준을 바꾼다.
@@ -103,12 +135,17 @@ function edgeAwareShift(pct) {
 }
 
 /**
- * 컬럼 폭 — 세 열이 한 그리드를 이룬다. 왼쪽 두 열(이름 · 플랫폼/예산)이 합쳐
- * 약 3, 타임라인이 7이다. 처음엔 1.2:1:3(≈4.2:5.8)이었는데 시간 축이 주인공인
- * 차트에서 텍스트 열이 절반 가까이 먹어 막대가 짧아 보였다(실사용 지적). 왼쪽
- * 열은 최소폭만 보장하고 이름은 넘치면 말줄임(전체는 title).
+ * 컬럼 폭 — 세 열이 한 그리드를 이룬다. 왼쪽 두 열(이름 320px · 플랫폼/예산
+ * 300px)은 **고정폭**이고, 남는 폭은 전부 타임라인이 가진다.
+ *
+ * 한때 비율(fr)로 나눴는데(1.6:1.6:6.8), 비율은 화면이 넓어질수록 텍스트 열까지
+ * 같이 늘려서 넓은 모니터에서 왼쪽 두 열이 700px 넘게 먹었다 — 글자는 더 길어질
+ * 게 없는데 시간 축만 손해였다(실사용 지적). 텍스트 열은 내용이 들어가는 폭이면
+ * 충분하고(예산 줄 `$25/day · $4,400 planned · $3,168.00 spent`가 300px에 든다),
+ * 화면이 넓어지며 생기는 여유는 막대가 길어지는 데 써야 한다. 이름은 넘치면
+ * 말줄임(전체는 title).
  */
-const GRID_TEMPLATE = 'minmax(180px, 1.6fr) minmax(150px, 1.4fr) minmax(360px, 7fr)';
+const GRID_TEMPLATE = '320px 300px minmax(360px, 1fr)';
 
 /**
  * 타임라인 격자 — 주 눈금은 거의 안 보이는 선, 월 경계만 divider 단계.
@@ -280,6 +317,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
           sx={{
             display: 'grid',
             gridTemplateColumns: GRID_TEMPLATE,
+            // 헤더와 첫 행 사이 숨 쉴 틈(5px) — 열 이름이 첫 행 글자에 붙어 보였다
+            pb: 0.625,
             borderBottom: '1px solid',
             borderColor: 'divider',
           }}
@@ -332,53 +371,67 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
           const width = Math.max(endPct - startPct, 0);
           const emphasized = isEmphasized(p);
           const barColor = emphasized ? 'chart.barEmphasis' : 'chart.bar';
-          const { prefix, rest } = splitNamePrefix(p.name);
+          /* 첫 줄은 부르는 이름. `타입: 캡션` 꼴(부스팅 게시물)은 캡션이 이름이다 —
+             타입("Instagram post")은 같은 무리 전부가 공유하므로 구분에 쓸모가
+             없고, 원본 전체가 둘째 줄에 남아 타입도 거기서 읽힌다. 그 외에는
+             코드·기간을 벗긴 이름이다. 모든 행이 같은 규칙: 첫 줄 표시 이름,
+             둘째 줄 기간·일수·원본 이름. */
+          const { rest } = splitNamePrefix(p.name);
+          const primaryName = displayName(rest || p.name);
+          const isNameShortened = primaryName !== p.name;
           const details = [formatPhaseBudget(p), barSuffix?.(p)].filter(Boolean).join(' · ');
           const isLast = index === phases.length - 1;
+          const metaSx = { fontSize: 11, lineHeight: 1.6, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' };
           const dateLabelSx = {
             position: 'absolute',
-            top: `calc(50% + ${DOT_SIZE / 2 + 4}px)`,
+            top: `calc(50% + ${DOT_SIZE / 2 + 3}px)`,
             fontSize: 11,
-            color: emphasized ? 'text.primary' : 'text.secondary',
+            // 강조 막대여도 끝 날짜는 조용히 — 파랑 막대가 이미 말한다. hover에서만 진해진다.
+            color: 'text.secondary',
             whiteSpace: 'nowrap',
             fontVariantNumeric: 'tabular-nums',
           };
           return (
             <Box
               key={p.key}
-              sx={{
+              sx={(theme) => ({
                 display: 'grid',
                 gridTemplateColumns: GRID_TEMPLATE,
                 borderBottom: isLast ? 0 : '1px solid',
                 borderColor: 'divider',
-              }}
+                /* hover — 이 행의 막대만 accent로. 파랑은 강조·hover에만 쓴다.
+                   마우스 있는 기기에서만: 터치에서는 탭 뒤 hover가 눌어붙는다. */
+                '@media (hover: hover)': {
+                  [`&:hover .${BAR_CLASS}`]: { backgroundColor: theme.palette.chart.barEmphasis },
+                  [`&:hover .${DOT_CLASS}`]: { borderColor: theme.palette.chart.barEmphasis },
+                  [`&:hover .${DATE_CLASS}`]: { color: theme.palette.text.primary },
+                },
+              })}
             >
-              {/* 이름 — 굵은 건 "이게 무엇인가"(타입 접두사, 없으면 이름 전체),
-                  보통 굵기는 "그중 어느 것인가"(캡션 조각). 부스팅 게시물끼리
-                  굵은 접두사를 공유하므로 세지 않아도 한 무리로 묶여 보인다.
-                  둘째 줄은 기간과 일수 — 막대 끝 날짜와 같은 값이지만 여기는
-                  글자로 읽는 자리다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
+              {/* 이름 — 첫 줄은 세미볼드 표시 이름, 둘째 줄은 기간·일수와(코드·기간을
+                  벗겼다면) 원본 이름. 모든 행이 같은 두 줄이라 훑을 때 리듬이
+                  안 깨진다. 전체 원본은 title로도 남긴다. */}
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }} title={p.name}>
                 <Typography
                   component="div"
-                  title={p.name}
-                  sx={{ fontSize: 13, fontWeight: 400, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
                 >
-                  <Box component="span" sx={{ fontWeight: 600 }}>{prefix}</Box>
-                  {rest && ` · ${rest}`}
+                  {primaryName}
                 </Typography>
-                <Typography component="div" sx={{ fontSize: 12, lineHeight: 1.5, color: 'text.secondary', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                <Typography component="div" sx={metaSx}>
                   {dateMed(p.startDate)} – {dateMed(p.endDate)} · {rangeDays(p.startDate, p.endDate)}
+                  {isNameShortened && ` · ${p.name}`}
                 </Typography>
               </Box>
 
-              {/* 플랫폼 · 예산 · (Performance 탭) 지출 — 막대 안에 있던 숫자가
-                  전부 여기로 왔다. 막대 폭과 무관하게 항상 온전히 읽힌다. */}
+              {/* 플랫폼 · 계획 예산 · (Performance 탭) 실지출 — 막대 안에 있던
+                  숫자가 전부 여기로 왔다. 막대 폭과 무관하게 항상 온전히 읽히고,
+                  "planned"/"spent"가 계획과 실적을 가른다. */}
               <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
                 <Typography component="div" sx={{ fontSize: 13, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {p.platformLabel || '—'}
                 </Typography>
-                <Typography component="div" title={details || undefined} sx={{ fontSize: 12, lineHeight: 1.5, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+                <Typography component="div" title={details || undefined} sx={metaSx}>
                   {details || ' '}
                 </Typography>
               </Box>
@@ -387,6 +440,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
               <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider' }}>
                 <TimelineGrid ticks={ticks} monthStarts={monthStarts} pct={pct} />
                 <Box
+                  className={BAR_CLASS}
                   sx={{
                     position: 'absolute',
                     top: '50%',
@@ -401,6 +455,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
                 {[startPct, endPct].map((x, i) => (
                   <Box
                     key={i}
+                    className={DOT_CLASS}
                     sx={{
                       position: 'absolute',
                       top: '50%',
@@ -417,15 +472,15 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
                   />
                 ))}
                 {width < MIN_TWO_LABEL_PCT ? (
-                  <Typography component="div" sx={{ ...dateLabelSx, left: `${startPct}%`, transform: edgeAwareShift(startPct) }}>
+                  <Typography component="div" className={DATE_CLASS} sx={{ ...dateLabelSx, left: `${startPct}%`, transform: edgeAwareShift(startPct) }}>
                     {p.startDate === p.endDate ? dateMed(p.startDate) : `${dateMed(p.startDate)} – ${dateMed(p.endDate)}`}
                   </Typography>
                 ) : (
                   <>
-                    <Typography component="div" sx={{ ...dateLabelSx, left: `${startPct}%`, transform: 'translateX(-4px)' }}>
+                    <Typography component="div" className={DATE_CLASS} sx={{ ...dateLabelSx, left: `${startPct}%`, transform: 'translateX(-4px)' }}>
                       {dateMed(p.startDate)}
                     </Typography>
-                    <Typography component="div" sx={{ ...dateLabelSx, left: `${endPct}%`, transform: 'translateX(calc(-100% + 4px))' }}>
+                    <Typography component="div" className={DATE_CLASS} sx={{ ...dateLabelSx, left: `${endPct}%`, transform: 'translateX(calc(-100% + 4px))' }}>
                       {dateMed(p.endDate)}
                     </Typography>
                   </>

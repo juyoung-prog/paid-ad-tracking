@@ -1747,7 +1747,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                   const spend = performanceByPhaseKey.get(phase.key)?.spend;
                   // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에
                   // 의미 없는 기호가 매달려 라벨만 길어진다.
-                  return spend != null ? `Spend ${fmtCurrency(spend)}` : null;
+                  return spend != null ? `${fmtCurrency(spend)} spent` : null;
                 }}
               />
             </Box>

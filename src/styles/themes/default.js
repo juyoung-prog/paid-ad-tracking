@@ -126,13 +126,13 @@ const palette = {
    */
   chart: {
     /** 기본 막대 — 흰 배경 위 옅은 중립 회색 */
-    bar: '#D1D5DB',
-    /** 선택·강조 막대 — accent와 같은 파랑 */
+    bar: '#C7CBD1',
+    /** 선택·강조·hover 막대 — accent와 같은 파랑 */
     barEmphasis: '#2563EB',
-    /** 날짜 격자(주 단위) — 거의 보이지 않는 선 */
-    grid: '#F3F4F6',
-    /** 월 경계 격자 — divider와 같은 단계 */
-    gridStrong: '#E5E7EB',
+    /** 날짜 격자(주 단위) — 거의 보이지 않는 선. 막대(#C7CBD1)와 두 단 차이를 둔다 */
+    grid: '#EEF0F3',
+    /** 월 경계 격자 — divider보다 살짝 진한 선 */
+    gridStrong: '#DDE1E6',
   },
 
   /**
