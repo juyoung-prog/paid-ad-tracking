@@ -12,6 +12,9 @@ import 'pretendard/dist/web/variable/pretendardvariable.css'
 // 레퍼런스의 SaasShell이 셸 루트에 Inter를 걸고 그 안의 모든 텍스트 요소에
 // 상속을 강제하므로(PaidAdsShell도 동일), 그 폰트 파일이 실제로 필요하다.
 import '@fontsource-variable/inter'
+// Carbon 테마(styles/themes/carbon.js)의 서체. Design 버튼으로 전환했을 때만 쓰이지만
+// 그 순간 로드하면 글꼴이 늦게 갈아끼워지는 깜빡임이 생기므로 앱 진입에서 미리 싣는다.
+import '@fontsource-variable/ibm-plex-sans'
 import './index.css'
 import App from './App.jsx'
 

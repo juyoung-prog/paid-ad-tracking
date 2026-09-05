@@ -26,9 +26,12 @@ sx={{ color: 'text.secondary' }}
 ```
 
 `primary.main`(#0000FF)은 브랜드 값으로만 남기고 화면에서 직접 쓰지 않는다.
-**예외(이 프로젝트): 차트의 데이터 잉크** — Phase 타임라인·Daily spend 막대의
-테두리/채움은 `primary.main`을 쓴다(흰 배경 대비 8.59:1, `ReportSummarySection.jsx`
-주석 참고). 상호작용(선택·활성·포커스·버튼)은 여전히 accent다.
+차트의 데이터 잉크는 `chart.*` 토큰이다 — 막대는 기본이 중립 회색(`chart.bar`),
+파랑(`chart.barEmphasis`)은 선택·강조된 것 하나에만 쓴다. 격자는 `chart.grid` /
+`chart.gridStrong`. 상호작용(선택·활성·포커스·버튼)은 여전히 accent다.
+
+면은 그림자가 아니라 1px `divider` 경계선 + 여백으로 나눈다. 섹션(타임라인·표)은
+`radius.container` 카드 한 장이고 그림자는 없다(ref/re1.png 방향).
 
 `text.disabled`는 AA 미달이라 비활성 컨트롤 전용이다. 상태색은 success/warning/error
 셋만 쓴다 (예외: 정보 안내 Alert의 `severity="info"`는 허용).
@@ -37,7 +40,7 @@ sx={{ color: 'text.secondary' }}
 ```jsx
 // 제목·KPI·그룹 헤더는 이 프로젝트의 역할 토큰(테마 변형)을 먼저 쓴다
 <Typography variant="title" component="h2">섹션 제목</Typography>  // 18px 600 (h3로 매핑됨)
-<Typography variant="display">$93,276</Typography>                 // 24px 700, tabular-nums
+<Typography variant="display">$93,276</Typography>                 // 24px 600, tabular-nums
 <Typography variant="label">GROUP HEADER</Typography>              // 13px 600, uppercase
 
 // 역할 토큰에 없는 세부 크기는 시맨틱 태그 + sx의 px로
@@ -65,6 +68,25 @@ sx={{ mb: 4 }}       // 섹션 사이 (32px)
 #### 아이콘
 - @mui/icons-material, pixelarticons 아이콘 우선 사용
 - `src/stories/style/Icons.stories.jsx` 참고
+
+### 3. 디자인 시스템은 두 벌, 컴포넌트는 토큰만 (CRITICAL)
+
+테마가 두 개다 — `src/styles/themes/default.js`(프로젝트 기본)와 `carbon.js`(IBM Carbon
+White). 대시보드 레일의 **Design** 버튼과 Storybook 툴바의 **Design** 스위치로 오간다
+(`DesignSystemProvider`, 선택은 localStorage). 비교 단계가 끝나 하나로 정하면 나머지는
+지운다 — 안 쓰는 테마는 확인 비용만 남긴다(Linear 근사 테마를 만들었다가 이 이유로 뺐다).
+
+- 컴포넌트는 값을 모른다. 색·서체·radius·그림자는 반드시 theme 토큰으로 읽는다 —
+  hex 리터럴, `'2px'` 같은 radius 문자열, 셸 폰트 문자열은 한쪽 테마에서만 맞는 값이라
+  전환하면 깨진다.
+- 새 토큰은 **모든 테마에 같은 키로** 추가한다(accent·surface·shape.radius·layout·
+  iconSize·customShadows·chart·typography.display/title/label/shellFontFamily가 현재 공통 키).
+  한쪽에만 넣으면 다른 쪽에서 `undefined`가 되어 조용히 깨진다.
+- 컴포넌트 라이브러리를 늘리지 않는다. Carbon은 `@carbon/react`가 아니라 MUI 테마
+  override로 재현한다 — 화면마다 두 벌을 만들면 전환 버튼의 의미가 없다.
+- Carbon 값의 원천은 IBM 토큰 패키지(`@carbon/colors`·`themes`·`type`·`motion`·`layout`)다.
+  `carbon.js`에 hex나 px를 손으로 적지 않는다 — 손으로 적은 값은 v10/v11이 섞인다.
+- 새 화면·컴포넌트는 Storybook 툴바에서 모든 테마를 확인한다.
 
 ## 스타일링 규칙
 

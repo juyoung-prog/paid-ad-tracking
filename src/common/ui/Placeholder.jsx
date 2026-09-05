@@ -179,7 +179,7 @@ function PlaceholderText({ variant = 'body', width, sx, ...props }) {
         height: preset.height,
         width: width || preset.width,
         backgroundColor: 'grey.300',
-        borderRadius: '2px',
+        borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
         ...sx,
       } }
       { ...props }
@@ -219,7 +219,7 @@ function PlaceholderLine({ length = 'full', sx, ...props }) {
         height: 14,
         width: lengthMap[length] || length,
         backgroundColor: 'grey.300',
-        borderRadius: '2px',
+        borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
         ...sx,
       } }
       { ...props }

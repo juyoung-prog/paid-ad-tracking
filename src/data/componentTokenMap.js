@@ -58,7 +58,7 @@ const componentTokenMap = {
           { token: 'radius.control', role: '버튼 모서리 곡률' },
         ],
         affects: '버튼 외곽선 모서리',
-        howToUse: 'theme.shape.radius.control (현재: 4px — 상호작용 컨트롤 재분류, MuiButton override)',
+        howToUse: 'theme.shape.radius.control (현재: 6px — 상호작용 컨트롤 재분류, MuiButton override)',
       },
       shadows: {
         items: [
@@ -170,7 +170,7 @@ const componentTokenMap = {
           { token: 'radius.control', role: '필드 모서리' },
         ],
         affects: 'outlined, filled variant 모서리',
-        howToUse: 'theme.shape.radius.control (현재: 4px — MuiOutlinedInput override)',
+        howToUse: 'theme.shape.radius.control (현재: 6px — MuiOutlinedInput override)',
       },
       transitions: {
         items: [
@@ -223,7 +223,7 @@ const componentTokenMap = {
           { token: 'radius.control', role: '필드 및 메뉴 모서리' },
         ],
         affects: '모서리 곡률',
-        howToUse: 'theme.shape.radius.control (현재: 4px — MuiOutlinedInput override 공유)',
+        howToUse: 'theme.shape.radius.control (현재: 6px — MuiOutlinedInput override 공유)',
       },
       shadows: {
         items: [
@@ -367,7 +367,7 @@ const componentTokenMap = {
           { token: '16px (커스텀)', role: '칩 모서리 (pill 형태)' },
         ],
         affects: '둥근 모서리',
-        howToUse: 'theme.components.MuiChip (현재: 4px)',
+        howToUse: 'theme.components.MuiChip (현재: 6px — radius.control)',
       },
       spacing: {
         items: [
@@ -419,7 +419,7 @@ const componentTokenMap = {
           { token: 'radius.control', role: 'Alert 모서리' },
         ],
         affects: '외곽 모서리',
-        howToUse: 'theme.shape.radius.control (현재: 4px — MuiAlert override)',
+        howToUse: 'theme.shape.radius.control (현재: 6px — MuiAlert override)',
       },
       spacing: {
         items: [

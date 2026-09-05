@@ -222,11 +222,13 @@ export function billingUrl(account) {
  * 셸(PaidAdsShell)과 로그인(LoginPage)이 함께 쓴다 — 로그인은 인증 전이라 셸
  * 밖에 렌더되는데, 사용자가 처음 보는 화면이라 여기만 다른 서체면 첫인상부터
  * 어긋난다.
+ *
+ * 서체 값 자체는 테마(typography.shellFontFamily)가 정한다 — Default는 Inter,
+ * Carbon은 IBM Plex Sans. 그래서 상수가 아니라 theme을 받는 sx 함수다:
+ *   sx={(theme) => ({ ...paidAdsFontSx(theme) })}
  */
-const PAID_ADS_FONT = '"Inter Variable", Inter, "Pretendard Variable", Pretendard, sans-serif';
-
-export const PAID_ADS_FONT_SX = {
-  fontFamily: PAID_ADS_FONT,
+export const paidAdsFontSx = (theme) => ({
+  fontFamily: theme.typography.shellFontFamily,
   /* 테마의 h1~h6·subtitle은 fontFamily(Outfit)를 직접 들고 있어서 루트에 폰트를
      걸어도 상속을 받지 않는다. 레퍼런스(SaasShell)와 동일하게 안쪽 모든 텍스트
      요소에 상속을 강제해 화면 전체를 한 서체로 통일한다 — 이걸 빼면 제목만
@@ -238,7 +240,7 @@ export const PAID_ADS_FONT_SX = {
   // 위의 inherit 규칙이 역효과를 낸다 — 버튼 안의 Typography가 셸 폰트가 아니라
   // 버튼의 Arial을 물려받는다(레퍼런스가 겪은 문제).
   '& button, & input, & select, & textarea, & optgroup': { fontFamily: 'inherit' },
-};
+});
 
 /**
  * 'YYYY-MM-DD' -> 'M/D'. 차트 축·막대 라벨처럼 폭이 좁은 자리에서 쓴다.

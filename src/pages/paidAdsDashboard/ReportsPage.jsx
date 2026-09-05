@@ -15,7 +15,7 @@ import { ReportSummarySection } from './ReportSummarySection';
 export function ReportsPage() {
   // plans/savePlan은 Plan 탭의 계획 편집이 쓴다 — 계획은 캠페인과 별개
   // 객체라 같은 스토어에서 나란히 내려준다.
-  const { campaigns, performanceRecords, performanceDaily, adAccounts, plans, savePlan, deletePlan, isLoading, error, refresh } = usePaidAdsStore();
+  const { campaigns, performanceRecords, performanceDaily, adAccounts, plans, savePlan, deletePlan, isLoading, error, refresh, today } = usePaidAdsStore();
 
   return (
     <ReportSummarySection
@@ -29,6 +29,7 @@ export function ReportsPage() {
       isLoading={isLoading}
       error={error}
       onRetry={refresh}
+      today={today}
     />
   );
 }

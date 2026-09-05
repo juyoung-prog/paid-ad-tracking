@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -9,10 +8,15 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
+/**
+ * 상태는 **칩이 아니라 8px 점 + 라벨**이다 — CampaignTable과 같은 문법. 채도 높은
+ * 초록 filled Chip이 15행마다 반복되면 화면에서 가장 강한 요소가 "전부 Active"라는
+ * 중복 정보가 된다(2026-09 리디자인, 색 절제). 점만 상태색, 글자는 보조색.
+ */
 const STATUS_META = {
-  active: { label: 'Active', color: 'success.main', variant: 'filled' },
-  planned: { label: 'Planned', color: 'grey.500', variant: 'outlined' },
-  closed: { label: 'Closed', color: 'grey.400', variant: 'outlined' },
+  active: { label: 'Active', color: 'success.main' },
+  planned: { label: 'Planned', color: 'grey.500' },
+  closed: { label: 'Closed', color: 'grey.400' },
 };
 
 const REGION_LABEL = { GA: 'Georgia', FL: 'Florida' };
@@ -112,16 +116,20 @@ export function StoreTable({ stores, campaignCounts, onRowClick, sx }) {
                 )}
                 <TableCell>{REGION_LABEL[store.region] ?? store.region}</TableCell>
                 <TableCell>
-                  <Chip
-                    label={statusMeta.label}
-                    size="small"
-                    variant={statusMeta.variant}
-                    sx={{
-                      ...(statusMeta.variant === 'filled'
-                        ? { backgroundColor: statusMeta.color, color: 'common.white' }
-                        : { borderColor: statusMeta.color, color: statusMeta.color }),
-                    }}
-                  />
+                  <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        backgroundColor: statusMeta.color,
+                        flexShrink: 0,
+                      }}
+                    />
+                    <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+                      {statusMeta.label}
+                    </Typography>
+                  </Box>
                 </TableCell>
                 {campaignCounts && (
                   <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>

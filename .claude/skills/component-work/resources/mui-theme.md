@@ -56,10 +56,10 @@ shadows: [
 같은 구조 표면은 그대로 0으로 두고, 실제로 라운딩이 필요한 역할에만 컴포넌트 레벨
 override 또는 로컬 sx로 값을 준다. 전체 화면이 하나의 radius로 통일되면 안 된다.
 
-Button은 한때 구조 표면과 묶여 0이었는데 **상호작용 컨트롤(4px)로 재분류**했다 —
+Button은 한때 구조 표면과 묶여 0이었는데 **상호작용 컨트롤(control radius)로 재분류**했다 —
 이 시스템 스스로 "클릭 가능한 상호작용 객체 → control radius"라는 기준으로 레일
-내비 행·KPI 포커스를 4px로 분류해 왔는데, 가장 상호작용적인 객체인 버튼만 표면
-취급이라 4px 입력 필드 바로 옆 0px Save 버튼처럼 한 폼 안에 모서리 문법이 두 개였다
+내비 행·KPI 포커스를 control radius로 분류해 왔는데, 가장 상호작용적인 객체인 버튼만 표면
+취급이라 둥근 입력 필드 바로 옆 0px Save 버튼처럼 한 폼 안에 모서리 문법이 두 개였다
 (실사용 피드백으로 재분류). 각진 인상은 Card/Paper/Dialog(여전히 0)가 담당한다.
 
 ```jsx
@@ -89,13 +89,13 @@ raw CSS-in-JS라 숫자를 그대로 써도 된다 (예: 아래 `MuiChip`, `MuiO
 |---|---|---|
 | **0px** (기본) | Card, Paper, Dialog 등 구조 표면 전체. 반복되는 dense row/list 컨테이너는 화면 성격상 항상 flat 유지 | `shape.borderRadius: 0` (아무 것도 안 함) |
 | **3px** (`radius.inlay`) | 컨트롤 *안*의 미세 요소(버튼 안 키캡 등) · 높이 6px 진행 막대(LinearProgress — 절반 값이라 풀 필이 된다: PacingIndicator, Reports Budget by Platform) | 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.inlay}px` `` |
-| **4px** (`radius.control`) | Button · ToggleButton(세그먼트) · Input/Select(TextField, Select) · Chip/Badge · 상태 표시가 필요한 Alert 배너(MuiAlert·AlertBanner 행) · Skeleton(rounded) · document-like 화면의 컨테이너(Accordion 등) | 전역 성격이면 `components.MuiButton` / `MuiToggleButton` / `MuiAlert` / `MuiSkeleton` / `MuiOutlinedInput` / `MuiChip` 오버라이드, 개별 화면 성격이면 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.control}px` `` ('4px' 리터럴 금지, 토큰 참조) |
-| **6px** (`radius.container`) | 하나의 분석 단위로 스캔되어야 하는 카드형 컨테이너(예: KPI 카드, 차트/테이블 컨테이너, 참조 카드) | 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.container}px` `` |
+| **6px** (`radius.control`) | Button · ToggleButton(세그먼트) · Input/Select(TextField, Select) · Chip/Badge · 상태 표시가 필요한 Alert 배너(MuiAlert·AlertBanner 행) · Skeleton(rounded) · document-like 화면의 컨테이너(Accordion 등) | 전역 성격이면 `components.MuiButton` / `MuiToggleButton` / `MuiAlert` / `MuiSkeleton` / `MuiOutlinedInput` / `MuiChip` 오버라이드, 개별 화면 성격이면 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.control}px` `` ('6px' 리터럴 금지, 토큰 참조) |
+| **8px** (`radius.container`) | 하나의 분석 단위로 스캔되어야 하는 카드형 컨테이너(예: Reports의 섹션 카드 — 타임라인·표, 참조 카드). 1px divider 테두리, 그림자 없음 | 로컬 sx — `` borderRadius: theme => `${theme.shape.radius.container}px` `` |
 | **50%** | Avatar | MUI 기본값, 손대지 않음 |
 
 ### 선택 상태 색 — accent 하나
 
-`palette.accent`(#0000B2)가 **활성·선택·포커스**를 전부 담당한다. `primary.main`(#0000FF)은
+`palette.accent`(#2563EB, 절제된 UI 파랑)가 **활성·선택·포커스**를 전부 담당한다. `primary.main`(#0000FF)은
 브랜드 색으로만 남는다. "선택됨"을 표현하는 컨트롤은 예외 없이 accent를 쓴다 — 테마에
 override가 있는 것(MuiTabs·MuiTab·MuiToggleButton·MuiMenuItem·MuiButton)과, 컴포넌트
 로컬 sx로 그리는 것(CardContainer·NavMenu·FilterBar 칩·CarouselIndicator 등) 모두.
@@ -131,9 +131,9 @@ box-shadow를 추가로 얹지 않는다.
 
 ```jsx
 components: {
-  MuiButton: { styleOverrides: { root: { borderRadius: shape.radius.control } } }, // 4px — 상호작용 컨트롤
+  MuiButton: { styleOverrides: { root: { borderRadius: shape.radius.control } } }, // 6px — 상호작용 컨트롤
   MuiCard:   { styleOverrides: { root: { borderRadius: 0 } } },
-  MuiChip:   { styleOverrides: { root: { borderRadius: 4 } } },
+  MuiChip:   { styleOverrides: { root: { borderRadius: shape.radius.control } } },
   MuiOutlinedInput: { styleOverrides: { root: { borderRadius: 4 } } }, // TextField + Select
 }
 ```

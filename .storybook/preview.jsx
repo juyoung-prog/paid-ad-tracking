@@ -1,11 +1,14 @@
-import { ThemeProvider } from '@mui/material/styles';
+import { useGlobals } from 'storybook/preview-api';
 import CssBaseline from '@mui/material/CssBaseline';
 
 import '@fontsource-variable/outfit';
 import '@fontsource-variable/inter';
+// Carbon 테마 서체 — 앱(main.jsx)과 동일
+import '@fontsource-variable/ibm-plex-sans';
 // 본문 서체 — 앱(main.jsx)과 동일하게 로드해야 스토리와 실화면 서체가 일치한다 (FONTS.md)
 import 'pretendard/dist/web/variable/pretendardvariable.css';
-import { defaultTheme } from '../src/styles/themes';
+import { themeMeta } from '../src/styles/themes';
+import { DesignSystemDecorator, DESIGN_SYSTEM_GLOBAL } from './DesignSystemDecorator';
 
 // Google Fonts 로드 (Material Symbols)
 // Outfit Variable은 @fontsource-variable/outfit로 셀프 호스팅한다
@@ -27,6 +30,20 @@ googleFonts.forEach((font) => {
 
 /** @type { import('@storybook/react-vite').Preview } */
 const preview = {
+  globalTypes: {
+    [DESIGN_SYSTEM_GLOBAL]: {
+      description: '디자인 시스템 — 앱 레일의 Design 버튼과 같은 전환',
+      toolbar: {
+        title: 'Design',
+        icon: 'paintbrush',
+        items: Object.entries(themeMeta).map(([value, meta]) => ({ value, title: meta.name })),
+        dynamicTitle: true,
+      },
+    },
+  },
+  initialGlobals: {
+    [DESIGN_SYSTEM_GLOBAL]: 'default',
+  },
   parameters: {
     controls: {
       matchers: {
@@ -67,14 +84,22 @@ const preview = {
     },
   },
   decorators: [
-    (Story) => (
-      <ThemeProvider theme={defaultTheme}>
-        <CssBaseline />
-        <div style={{ width: '100%', paddingTop: '40px' }}>
-          <Story />
-        </div>
-      </ThemeProvider>
-    ),
+    (Story) => {
+      // Storybook 훅은 데코레이터 함수 본문에서만 부를 수 있다(안쪽 컴포넌트에서
+      // 부르면 "preview hooks can only be called inside decorators" 오류).
+      const [globals, updateGlobals] = useGlobals();
+      return (
+        <DesignSystemDecorator
+          globalValue={globals[DESIGN_SYSTEM_GLOBAL]}
+          onThemeNameChange={(next) => updateGlobals({ [DESIGN_SYSTEM_GLOBAL]: next })}
+        >
+          <CssBaseline />
+          <div style={{ width: '100%', paddingTop: '40px' }}>
+            <Story />
+          </div>
+        </DesignSystemDecorator>
+      );
+    },
   ],
 };
 

@@ -1,7 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import { PaidAdsRail, RAIL_WIDTH } from './PaidAdsRail';
-import { PAID_ADS_FONT_SX } from './paidAdsPageUtils';
+import { paidAdsFontSx } from './paidAdsPageUtils';
 
 
 /**
@@ -24,15 +24,15 @@ import { PAID_ADS_FONT_SX } from './paidAdsPageUtils';
 export function PaidAdsShell() {
   return (
     <Box
-      sx={ {
+      sx={ theme => ({
         display: 'flex',
         height: '100dvh',
         // 펼친 레일이 본문 위에 겹치도록 기준점을 잡고, z-index를 셸 안으로 가둔다
         position: 'relative',
         isolation: 'isolate',
         backgroundColor: 'background.default',
-        ...PAID_ADS_FONT_SX,
-      } }
+        ...paidAdsFontSx(theme),
+      }) }
     >
       {/* 레일 자리 확보 — 레일이 펼쳐져도 본문이 밀리지 않게 흐름에 폭만 남긴다 */}
       <Box aria-hidden sx={ { width: RAIL_WIDTH, flexShrink: 0 } } />

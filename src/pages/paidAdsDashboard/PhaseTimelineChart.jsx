@@ -1,20 +1,10 @@
-import { alpha, useTheme } from '@mui/material/styles';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 
-import { shortDate } from './paidAdsPageUtils';
-import { moneyWhole } from '../../utils/format';
+import { toLocalISODate } from './paidAdsPageUtils';
+import { moneyWhole, dateMed, rangeDays } from '../../utils/format';
 
-/**
- * phase 막대에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —
- * "하루 얼마씩 쓰는 캠페인인가"와 "이 단계에 총 얼마가 걸려 있나"는 서로 다른
- * 질문이고, 예산을 결정할 때 둘 다 필요하다. 값이 없는 쪽은 통째로 생략한다
- * (0을 "$0"으로 찍으면 "0으로 계획했다"로 읽힌다 — 동기화 캠페인은 계획 예산
- * 개념이 없어 0으로 저장된다).
- *
- * @param {{ totalDaily: number|null, totalBudget: number }} phase
- * @returns {string} 예: "$120/day · $3,600" — 둘 다 없으면 빈 문자열
- */
 /**
  * 이름 앞의 타입 접두사를 떼는 패턴 — `Instagram post: <캡션>`의 `Instagram post`.
  *
@@ -35,9 +25,9 @@ import { moneyWhole } from '../../utils/format';
  * 실데이터의 최장 접두사는 14자('Instagram post')다.
  *
  * 뒷부분을 `.` 대신 `[\s\S]`로 받는 이유: 캡션에 줄바꿈이 그대로 들어온 이름이
- * 19건 있는데("🍁🍁 Hey, Bm customers 🍁🍁\n🤩Don't..."), `.`은 개행을 못 먹어서
- * 그 19건만 조용히 분리에 실패했다(실측으로 발견). 접두사 쪽은 반대로 개행을
- * 막는다 — 개행을 넘어간 덩어리는 타입 이름일 수 없다.
+ * 19건 있는데, `.`은 개행을 못 먹어서 그 19건만 조용히 분리에 실패했다(실측으로
+ * 발견). 접두사 쪽은 반대로 개행을 막는다 — 개행을 넘어간 덩어리는 타입 이름일
+ * 수 없다.
  */
 const NAME_PREFIX_PATTERN = /^([^:\n]{1,24}):\s*([\s\S]+)$/;
 
@@ -53,28 +43,16 @@ function splitNamePrefix(name) {
   return match ? { prefix: match[1], rest: match[2] } : { prefix: name ?? '', rest: '' };
 }
 
-/** 축 눈금 라벨이 겹치지 않는 최소 간격(타임라인 폭 대비 %) */
-const MIN_TICK_GAP_PCT = 4;
-
-/** 막대 높이. 이름이 막대 밖으로 나가면서 안에는 숫자 한 줄만 남아 낮아졌다. */
-const BAR_HEIGHT = 24;
-
-/** 이름 줄 높이 — 막대는 이 아래에 놓인다. */
-const NAME_HEIGHT = 20;
-
 /**
- * 타임라인 양 끝에 붙은 라벨이 차트 밖으로 잘리지 않도록 정렬 기준을 바꾼다.
- * 감싸는 Box의 여백은 고정인데 라벨 길이는 가변이라, 끝에 가까우면 안쪽으로 눕힌다.
+ * phase 막대 옆에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —
+ * "하루 얼마씩 쓰는 캠페인인가"와 "이 단계에 총 얼마가 걸려 있나"는 서로 다른
+ * 질문이고, 예산을 결정할 때 둘 다 필요하다. 값이 없는 쪽은 통째로 생략한다
+ * (0을 "$0"으로 찍으면 "0으로 계획했다"로 읽힌다 — 동기화 캠페인은 계획 예산
+ * 개념이 없어 0으로 저장된다).
  *
- * @param {number} pct - 왼쪽에서의 위치(%)
- * @returns {string} CSS transform 값
+ * @param {{ totalDaily: number|null, totalBudget: number }} phase
+ * @returns {string} 예: "$120/day · $3,600" — 둘 다 없으면 빈 문자열
  */
-function edgeAwareShift(pct) {
-  if (pct < 12) return 'none';
-  if (pct > 88) return 'translateX(-100%)';
-  return 'translateX(-50%)';
-}
-
 function formatPhaseBudget(phase) {
   const parts = [];
   // 계획 예산이라 정수 표기 (utils/format.js의 moneyWhole 규칙)
@@ -83,207 +61,379 @@ function formatPhaseBudget(phase) {
   return parts.join(' · ');
 }
 
+const MS_PER_DAY = 86_400_000;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** 'YYYY-MM-DD' -> 1970-01-01 기준 일수. UTC로 계산해 DST·타임존과 무관하다. */
+function dayOf(iso) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / MS_PER_DAY);
+}
+
+/** 일수 -> 'YYYY-MM-DD' */
+function isoOf(day) {
+  return new Date(day * MS_PER_DAY).toISOString().slice(0, 10);
+}
+
+/** 축 눈금 후보 간격(일). 작은 것부터 시도해 눈금 수가 상한 안에 드는 첫 값을 쓴다. */
+const TICK_STEP_CANDIDATES = [1, 2, 7, 14, 28];
+/** 눈금 하나가 차지해야 하는 최소 폭(px) — 11px 라벨 "Aug 26"(≈38px) + 숨 쉴 틈 */
+const MIN_TICK_SPACING_PX = 60;
+/** 축 폭을 아직 모를 때(첫 렌더)의 눈금 수 상한 */
+const FALLBACK_MAX_TICKS = 12;
+/** 이보다 좁은 월 구간에는 월 라벨을 적지 않는다(라벨이 다음 달 라벨과 겹친다) */
+const MIN_MONTH_LABEL_PCT = 7;
+/** 이보다 좁은 막대는 양 끝 날짜를 따로 못 적어 한 줄로 합친다 */
+const MIN_TWO_LABEL_PCT = 12;
+
+/** 막대 두께와 끝점 지름 — 얇은 막대, 라벨은 막대 밖 */
+const BAR_HEIGHT = 6;
+const DOT_SIZE = 10;
+
+/**
+ * 타임라인 양 끝에 붙은 라벨이 차트 밖으로 잘리지 않도록 정렬 기준을 바꾼다.
+ *
+ * @param {number} pct - 왼쪽에서의 위치(%)
+ * @returns {string} CSS transform 값
+ */
+function edgeAwareShift(pct) {
+  if (pct < 10) return 'none';
+  if (pct > 90) return 'translateX(-100%)';
+  return 'translateX(-50%)';
+}
+
+/**
+ * 컬럼 폭 — 세 열이 한 그리드를 이룬다. 왼쪽 두 열(이름 · 플랫폼/예산)이 합쳐
+ * 약 3, 타임라인이 7이다. 처음엔 1.2:1:3(≈4.2:5.8)이었는데 시간 축이 주인공인
+ * 차트에서 텍스트 열이 절반 가까이 먹어 막대가 짧아 보였다(실사용 지적). 왼쪽
+ * 열은 최소폭만 보장하고 이름은 넘치면 말줄임(전체는 title).
+ */
+const GRID_TEMPLATE = 'minmax(180px, 1.6fr) minmax(150px, 1.4fr) minmax(360px, 7fr)';
+
+/**
+ * 타임라인 격자 — 주 눈금은 거의 안 보이는 선, 월 경계만 divider 단계.
+ * 헤더가 아니라 **각 행 안에** 그린다. 행마다 그리면 "한 행의 배경"으로 읽혀
+ * 막대와 같은 층에 놓이고, 행 경계선과도 자연스럽게 끊긴다.
+ */
+function TimelineGrid({ ticks, monthStarts, pct }) {
+  return (
+    <>
+      {ticks.map((day) => (
+        <Box
+          key={`t-${day}`}
+          aria-hidden
+          sx={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(day)}%`, borderLeft: '1px solid', borderColor: 'chart.grid' }}
+        />
+      ))}
+      {monthStarts.map((day) => (
+        <Box
+          key={`m-${day}`}
+          aria-hidden
+          sx={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(day)}%`, borderLeft: '1px solid', borderColor: 'chart.gridStrong' }}
+        />
+      ))}
+    </>
+  );
+}
+
 /**
  * PhaseTimelineChart 컴포넌트
  *
- * Event(캠페인 그룹)를 구성하는 phase들을 실제 기간에 맞춰 가로 막대로 배치하는
- * 타임라인(Gantt). 새 차트 라이브러리 없이 순수 % 위치 계산만으로 그린다 —
- * 이 화면의 다른 막대들(PacingIndicator·Budget by Platform)이 쓰는 접근과 같다.
+ * Event(캠페인 그룹)를 구성하는 phase들을 실제 기간에 맞춰 얇은 가로 막대로
+ * 배치하는 타임라인(Gantt). 새 차트 라이브러리 없이 순수 % 위치 계산만으로
+ * 그린다 — 이 화면의 다른 막대들(PacingIndicator·Budget by Platform)이 쓰는
+ * 접근과 같다.
  *
  * Plan 탭과 Performance 탭이 **같은 컴포넌트를 공유한다.** 예전엔 Performance가
- * 별도의 "지표별 비교 막대"(이름 | 막대 | 값)를 그려서, 같은 Event를 골라도 탭에
- * 따라 완전히 다른 그림이 나왔다(실사용 피드백). 같은 데이터를 두 가지 시각
- * 문법으로 말하면 둘을 머릿속에서 다시 맞춰야 한다 — 시간 축 하나로 통일하고,
- * 탭별로 다른 정보는 막대 라벨 뒤에 덧붙인다(barSuffix).
+ * 별도의 "지표별 비교 막대"를 그려서, 같은 Event를 골라도 탭에 따라 완전히 다른
+ * 그림이 나왔다(실사용 피드백). 같은 데이터를 두 가지 시각 문법으로 말하면 둘을
+ * 머릿속에서 다시 맞춰야 한다 — 시간 축 하나로 통일하고, 탭별로 다른 정보는
+ * 플랫폼/예산 열 뒤에 덧붙인다(barSuffix).
  *
- * 각 phase의 시작일에는 수직 점선을 긋고, 그 날짜를 **축 눈금으로** 적는다.
- * 예전엔 점선 위에 phase 이름을 단 라벨을 띄웠는데, 바로 아래 막대가 같은
- * 이름을 다시 말하고 있어서 정보량이 0이었다(게다가 길어서 잘렸고, 회색 배경
- * + 라운딩 때문에 누를 수 있는 Chip처럼 보였다 — 거짓 어포던스). 라벨을 걷고
- * 날짜만 축으로 내리면 같은 자리에서 "언제"라는 새 정보가 생긴다. 축이 양 끝
- * 두 개뿐일 때 중간 막대의 시점을 눈대중으로 재야 했던 것도 같이 풀린다.
+ * ## 표 + 막대 (2026-09 리디자인, ref/re1.png)
  *
- * 이름은 막대 **밖 위**에 둔다. 막대 안에 넣으면 좁은 막대에서 잘려서 "이게
- * 무슨 단계인지" 자체를 잃는다("Instagram post: CO…"). 밖으로 빼면 폭과 무관하게
- * 항상 온전하고, 굵기가 다른 두 단(이름 / 숫자)으로 갈려 한 줄에 몰린 긴
- * 문자열보다 훨씬 빨리 읽힌다. 대신 막대 높이를 줄여(24px) 늘어난 줄을 상쇄한다.
+ * 왼쪽 두 열은 표다 — Campaign(이름 + 기간·일수), Platform / Budget / Spend.
+ * 오른쪽이 시간 축인데, 막대 **안에는 아무 글자도 없다.** 예전엔 24px 막대 안에
+ * 기간·예산·지출을 한 줄로 욱여넣어서 좁은 막대에서는 첫 글자만 남았고, 이름은
+ * 막대 위에 떠 있어 행마다 높이가 달랐다. 이제 숫자는 전부 왼쪽 열이 말하고,
+ * 막대는 "언제부터 언제까지"만 말한다. 막대 양 끝 아래에 시작·종료일을 작게
+ * 적는다 — 축 눈금이 주 단위라 정확한 날짜는 막대가 스스로 밝혀야 한다.
  *
- * 접근성: 시각 전용 구성(절대위치 + %)이라 표/목록 같은 의미 구조가 없다.
- * 스크린리더에 억지 구조를 씌우기보다 이 블록을 aria-hidden으로 숨기고, 같은
- * 데이터를 담은 표(Plan 탭의 Budget Breakdown, Performance 탭의 goal별 표)로
- * 보낸다.
+ * 막대는 기본이 **중립 회색**이고 파랑은 강조된 phase 하나에만 쓴다(오늘 진행
+ * 중이거나 emphasizedKey로 지목된 것). 전에는 막대마다 primary(#0000FF) 테두리
+ * + 시간 순 채도 램프였는데, 램프는 "무엇이 강조인가"를 말하지 못하면서
+ * 화면에서 가장 시끄러운 요소였다. 축 위에는 월 라벨과 주 단위 눈금, 그 아래로
+ * 옅은 세로 격자가 행을 관통한다 — 막대가 어느 주에 걸치는지 눈으로 재지 않아도
+ * 된다.
+ *
+ * 예전의 마일스톤 점선(각 phase 시작일)은 뺐다 — 격자 + 막대 끝 날짜가 같은
+ * 정보를 더 조용히 준다.
+ *
+ * 접근성: 왼쪽 두 열은 평문이라 그대로 읽힌다. 막대·격자·축 라벨은 시각
+ * 전용(절대위치 + %)이라 aria-hidden으로 숨기고, 기간은 이름 아래 텍스트가
+ * 말한다. 같은 데이터의 표(Plan 탭 Budget Breakdown, Performance 탭 goal별 표)도
+ * 바로 아래 있다.
  *
  * Props:
- * @param {Array<{key: string, name: string, platformLabel: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number, fillAlpha: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required] (key는 정규화된 묶음 키, name은 표시용 원본 이름, platformLabel은 이 막대가 덮는 플랫폼)
- * @param {function} barSuffix - 막대 라벨 끝에 덧붙일 문자열을 돌려주는 함수 (phase) => string|null [Optional]
+ * @param {Array<{key: string, name: string, platformLabel: string, startDate: string, endDate: string, totalDaily: number|null, totalBudget: number}>} phases - buildPhaseTimeline()이 만든 phase 배열 [Required] (key는 정규화된 묶음 키, name은 표시용 원본 이름, platformLabel은 이 막대가 덮는 플랫폼)
+ * @param {function} barSuffix - 플랫폼/예산 열 끝에 덧붙일 문자열을 돌려주는 함수 (phase) => string|null [Optional]
+ * @param {Date|string} today - 기준일. 이 날짜에 진행 중인 phase의 막대가 강조(파랑)된다 [Optional]
+ * @param {string} emphasizedKey - 강조할 phase의 key. today보다 우선한다 [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <PhaseTimelineChart phases={phases} />
+ * <PhaseTimelineChart phases={phases} today={today} />
  * <PhaseTimelineChart phases={phases} barSuffix={(p) => `Spend $${spendByPhase[p.name]}`} />
  */
-export function PhaseTimelineChart({ phases, barSuffix, sx }) {
-  const theme = useTheme();
+export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx }) {
+  /* 축의 실제 폭(px). 눈금 간격은 %가 아니라 픽셀로 정해야 한다 — 같은 75일짜리
+     축이 Performance 탭(전폭)에서는 주 단위가 맞고 Plan 탭(1120px 안)에서는
+     2주 단위여야 라벨이 안 겹친다. 첫 렌더에는 0이라 상한 상수로 대신한다. */
+  const axisRef = useRef(null);
+  const [axisWidth, setAxisWidth] = useState(0);
+  const measure = useCallback(() => {
+    if (axisRef.current) setAxisWidth(axisRef.current.clientWidth);
+  }, []);
+  useEffect(() => {
+    const el = axisRef.current;
+    if (!el) return undefined;
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure]);
+
   if (phases.length === 0) return null;
+
+  const todayIso = today instanceof Date ? toLocalISODate(today) : today ?? null;
 
   const timelineStart = phases.reduce((min, p) => (p.startDate < min ? p.startDate : min), phases[0].startDate);
   const timelineEnd = phases.reduce((max, p) => (p.endDate > max ? p.endDate : max), phases[0].endDate);
-  const timelineRangeMs = new Date(timelineEnd) - new Date(timelineStart) || 1;
-  const timelinePct = (iso) => ((new Date(iso) - new Date(timelineStart)) / timelineRangeMs) * 100;
+  const startDay = dayOf(timelineStart);
+  const endDay = dayOf(timelineEnd);
+  const spanDays = Math.max(endDay - startDay, 1);
 
-  /* 마일스톤 = 각 phase의 시작일(실사용 확인 완료 — 종료일 기준은 이벤트마다
-     의미가 달라 일반화하기 어렵고, 시작일은 "다음 단계로 넘어가는 시점"이라는
-     뜻이 항상 동일하다). 같은 날 시작하는 phase가 여러 개면 점선 하나로 합친다.
+  /* 축은 데이터보다 조금 넓다 — 끝점 원과 날짜 라벨이 셀 가장자리에 붙지 않게.
+     양쪽 여유는 전체 기간의 3%(최소 이틀). */
+  const pad = Math.max(2, Math.round(spanDays * 0.03));
+  const axisStart = startDay - pad;
+  const axisSpan = spanDays + pad * 2;
+  const pct = (day) => ((day - axisStart) / axisSpan) * 100;
+  const pctOf = (iso) => pct(dayOf(iso));
 
-     타임라인 양 끝과 겹치는 점선은 긋지 않는다 — 첫 phase의 시작일은 곧 축의
-     원점이라 그 자리의 세로 점선이 "구간 경계"가 아니라 차트의 왼쪽 테두리(혹은
-     y축)처럼 읽힌다. 이 차트에는 y축이 없으므로 없는 축을 암시하게 된다. 날짜
-     자체는 축 눈금이 그대로 말한다. */
-  const candidateDates = [...new Set(phases.map((p) => p.startDate))]
-    .filter((date) => date !== timelineStart && date !== timelineEnd)
-    .sort();
+  /* 눈금 — 첫 phase 시작일부터 일정 간격. 간격은 눈금 하나가 MIN_TICK_SPACING_PX
+     이상을 갖는 가장 촘촘한 값(1·2·7·14·28일). 타임라인 끝 날짜는 항상 눈금이다 —
+     축의 범위는 눈금이 말해야 한다. 마지막 정규 눈금이 끝과 너무 가까우면(한 칸의
+     85% 미만) 라벨이 끝 라벨과 겹치므로 그 눈금을 끝 눈금으로 대체한다. */
+  const maxTicks = axisWidth > 0 ? Math.max(2, Math.floor(axisWidth / MIN_TICK_SPACING_PX)) : FALLBACK_MAX_TICKS;
+  const step = TICK_STEP_CANDIDATES.find((s) => Math.ceil(spanDays / s) + 1 <= maxTicks) ?? TICK_STEP_CANDIDATES.at(-1);
+  const ticks = [];
+  for (let day = startDay; day <= endDay; day += step) ticks.push(day);
+  if (endDay - ticks[ticks.length - 1] >= step * 0.85) ticks.push(endDay);
+  else ticks[ticks.length - 1] = endDay;
 
-  /* 축 눈금 = 타임라인 양 끝 + 마일스톤 날짜. 날짜가 서로 너무 가까우면 라벨이
-     겹치므로 최소 간격 미만은 버린다 — 양 끝은 축의 범위를 말하므로 예외 없이
-     남기고, 중간 눈금만 앞 눈금과 끝 눈금 양쪽으로 간격을 확인한다. */
-  const axisTicks = [...new Set([timelineStart, ...candidateDates, timelineEnd])]
-    .sort()
-    .reduce((kept, date) => {
-      const pct = timelinePct(date);
-      if (kept.length === 0) return [{ date, pct }];
-      if (date === timelineEnd) return [...kept, { date, pct }];
-      const tooCloseToPrev = pct - kept[kept.length - 1].pct < MIN_TICK_GAP_PCT;
-      const tooCloseToEnd = 100 - pct < MIN_TICK_GAP_PCT;
-      return tooCloseToPrev || tooCloseToEnd ? kept : [...kept, { date, pct }];
-    }, []);
+  /* 월 구간 — 라벨은 각 달의 시작(첫 달은 타임라인 시작)에, 경계선은 1일에.
+     첫 달의 1일은 축 밖이라 선을 긋지 않는다. 너무 좁은 구간은 라벨을 건너뛴다. */
+  const months = [];
+  {
+    const first = new Date(startDay * MS_PER_DAY);
+    let y = first.getUTCFullYear();
+    let m = first.getUTCMonth();
+    while (Date.UTC(y, m, 1) / MS_PER_DAY <= endDay) {
+      const monthStartDay = Math.round(Date.UTC(y, m, 1) / MS_PER_DAY);
+      const nextStartDay = Math.round(Date.UTC(y, m + 1, 1) / MS_PER_DAY);
+      const labelDay = Math.max(monthStartDay, startDay);
+      const widthPct = pct(Math.min(nextStartDay, endDay)) - pct(labelDay);
+      months.push({
+        key: `${y}-${m}`,
+        label: `${MONTHS[m]} ${y}`,
+        labelDay,
+        boundaryDay: monthStartDay > startDay ? monthStartDay : null,
+        showLabel: widthPct >= MIN_MONTH_LABEL_PCT,
+      });
+      m += 1;
+      if (m === 12) { m = 0; y += 1; }
+    }
+  }
+  const monthStarts = months.map((mo) => mo.boundaryDay).filter((d) => d != null);
 
-  /* 점선은 축 눈금이 살아남은 날짜에만 긋는다. 간격 때문에 눈금이 버려진 자리에
-     점선만 남기면 "이 선의 날짜는 축이 말한다"는 전제가 깨진 날짜 없는 선이 된다. */
-  const tickDates = new Set(axisTicks.map((t) => t.date));
-  const milestoneDates = candidateDates.filter((date) => tickDates.has(date));
+  const isEmphasized = (p) => {
+    if (emphasizedKey != null) return p.key === emphasizedKey;
+    return Boolean(todayIso && p.startDate <= todayIso && todayIso <= p.endDate);
+  };
+
+  const headCellSx = {
+    px: 2,
+    pt: 1.5,
+    pb: 1,
+    fontSize: 12,
+    color: 'text.secondary',
+    alignSelf: 'end',
+  };
 
   return (
-    /* 바깥 Box(px)는 실제 여백을 만들고, 안쪽 Box(position:relative)는 패딩 없이
-       그 안에서만 %로 위치를 계산한다 — absolute 자식의 left:%는 가장 가까운
-       position:relative 조상의 "패딩을 포함한" 박스 기준으로 계산돼서, 같은 Box에
-       padding과 absolute 자식을 같이 두면 padding이 % 계산에 반영되지 않는다
-       (실제로 확인한 버그 — 마일스톤 라벨이 padding을 줬는데도 화면 밖으로
-       잘렸었다). 두 겹으로 나눠야 바깥 padding이 안쪽 %기준 폭 자체를 줄인다. */
-    <Box aria-hidden="true" sx={{ px: 12, pt: 2, pb: 3, ...sx }}>
-      {/* 막대 영역과 축을 형제로 나눈다 — 마일스톤 점선을 top:0/bottom:0으로
-          "막대 영역 전체"에 정확히 걸기 위해서다. 예전처럼 축까지 한 relative
-          안에 두면 점선 끝을 픽셀로 빼줘야 하고, 축 여백을 건드릴 때마다 어긋난다.
-          두 Box의 폭이 같으므로 %기준은 그대로 공유된다. */}
-      <Box sx={{ position: 'relative' }}>
-        {/* 마일스톤 — 점선만 긋는다. 날짜는 아래 축이 말한다. */}
-        {milestoneDates.map((date) => (
-          <Box
-            key={date}
-            sx={{
-              position: 'absolute',
-              left: `${timelinePct(date)}%`,
-              top: 0,
-              bottom: 0,
-              borderLeft: '2px dashed',
-              borderColor: 'divider',
-            }}
-          />
-        ))}
-
-        {phases.map((p) => {
-          /* 최소 폭(1.5%)을 보정한 만큼 왼쪽으로 되민다 — 타임라인 끝에서 시작하는
-             하루짜리 phase가 축 너머(100~101.5%)에 그려지면 "종료일을 지나서도
-             돌았다"로 읽힌다. 막대의 오른쪽 끝은 절대 축 끝을 넘지 않는다. */
-          const rawLeft = timelinePct(p.startDate);
-          const width = Math.max(timelinePct(p.endDate) - rawLeft, 1.5);
-          const left = Math.min(rawLeft, 100 - width);
-          /* 플랫폼 표기는 이름과 한 덩어리다 — 둘 다 "이 막대가 무엇인가"를
-             말하고, 막대 안의 숫자들은 전부 이 플랫폼(들) 기준이다. */
-          const { prefix, rest } = splitNamePrefix(p.name);
-          const heading = [p.name, p.platformLabel].filter(Boolean).join(' · ');
-          const barText = [
-            `${shortDate(p.startDate)}–${shortDate(p.endDate)}`,
-            formatPhaseBudget(p),
-            barSuffix?.(p),
-          ].filter(Boolean).join(' · ');
-          return (
-            <Box key={p.key} sx={{ position: 'relative', height: NAME_HEIGHT + BAR_HEIGHT, mb: 1 }}>
-              {/* 이름은 막대 왼쪽 끝에 맞춘다. 막대가 오른쪽 끝에서 시작하면
-                  이름이 차트 밖으로 나가므로 그때만 막대 오른쪽 끝 기준으로
-                  눕힌다(축 눈금과 같은 규칙). 잘림 방지가 목적이라 폭 제한과
-                  말줄임은 두지 않는다 — 넘치면 바깥 여백(px:12)으로 흐른다. */}
-              {/* body2(14px) + 굵기로 막대 안 caption(12px)과 두 단을 만든다 —
-                  한 줄에 몰려 한 굵기로 흐르던 예전 라벨이 안 읽혔던 이유가
-                  위계 부재였다. NAME_HEIGHT(20)는 body2의 줄높이와 맞춘 값.
-
-                  줄 안에서 다시 굵기를 나눈다: 굵은 건 "이게 무엇인가"(타입
-                  접두사, 없으면 이름 전체), 보통 굵기는 "그중 어느 것인가"(캡션
-                  조각)와 플랫폼이다. 부스팅 게시물끼리 굵은 접두사를 공유하므로
-                  세지 않아도 한 무리로 묶여 보인다. */}
+    /* 좁은 화면에서는 표처럼 가로 스크롤 — 열을 접거나 막대를 숨기지 않는다 */
+    <Box sx={{ overflowX: 'auto', ...sx }}>
+      <Box sx={{ minWidth: 740 }}>
+        {/* 헤더 행 — 열 이름 둘 + 축(월 라벨 / 주 눈금) */}
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: GRID_TEMPLATE,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Typography component="div" sx={headCellSx}>Campaign</Typography>
+          <Typography component="div" sx={headCellSx}>Platform / Budget / Spend</Typography>
+          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider' }}>
+            {months.map((mo) => mo.showLabel && (
               <Typography
-                variant="body2"
+                key={mo.key}
+                component="div"
                 sx={{
                   position: 'absolute',
-                  top: 0,
-                  left: left > 60 ? `${left + width}%` : `${left}%`,
-                  transform: left > 60 ? 'translateX(-100%)' : 'none',
-                  whiteSpace: 'nowrap',
-                  fontWeight: 400,
+                  top: 10,
+                  left: `${pct(mo.labelDay)}%`,
+                  pl: 1,
+                  fontSize: 13,
+                  fontWeight: 600,
                   color: 'text.primary',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                <Box component="span" sx={{ fontWeight: 600 }}>{prefix}</Box>
-                {rest && ` · ${rest}`}
-                {p.platformLabel && ` · ${p.platformLabel}`}
+                {mo.label}
               </Typography>
-              <Box
-                // 막대가 좁으면 숫자가 잘린다 — 전체 문자열을 title로 남긴다.
-                title={`${heading} · ${barText}`}
+            ))}
+            {ticks.map((day) => (
+              <Typography
+                key={day}
+                component="div"
                 sx={{
                   position: 'absolute',
-                  top: NAME_HEIGHT,
-                  left: `${left}%`,
-                  width: `${width}%`,
-                  height: BAR_HEIGHT,
-                  bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
-                  border: '1px solid',
-                  borderColor: 'primary.main',
-                  // 차트형 컨테이너(하나의 분석 단위로 스캔되는 phase 막대) 역할
-                  borderRadius: `${theme.shape.radius.container}px`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  px: 1,
-                  overflow: 'hidden',
+                  bottom: 8,
+                  left: `${pct(day)}%`,
+                  transform: edgeAwareShift(pct(day)),
+                  fontSize: 11,
+                  color: 'text.secondary',
+                  whiteSpace: 'nowrap',
+                  fontVariantNumeric: 'tabular-nums',
                 }}
               >
-                <Typography variant="caption" noWrap sx={{ color: 'text.primary' }}>
-                  {barText}
+                {dateMed(isoOf(day))}
+              </Typography>
+            ))}
+          </Box>
+        </Box>
+
+        {phases.map((p, index) => {
+          const startPct = pctOf(p.startDate);
+          const endPct = pctOf(p.endDate);
+          const width = Math.max(endPct - startPct, 0);
+          const emphasized = isEmphasized(p);
+          const barColor = emphasized ? 'chart.barEmphasis' : 'chart.bar';
+          const { prefix, rest } = splitNamePrefix(p.name);
+          const details = [formatPhaseBudget(p), barSuffix?.(p)].filter(Boolean).join(' · ');
+          const isLast = index === phases.length - 1;
+          const dateLabelSx = {
+            position: 'absolute',
+            top: `calc(50% + ${DOT_SIZE / 2 + 4}px)`,
+            fontSize: 11,
+            color: emphasized ? 'text.primary' : 'text.secondary',
+            whiteSpace: 'nowrap',
+            fontVariantNumeric: 'tabular-nums',
+          };
+          return (
+            <Box
+              key={p.key}
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: GRID_TEMPLATE,
+                borderBottom: isLast ? 0 : '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              {/* 이름 — 굵은 건 "이게 무엇인가"(타입 접두사, 없으면 이름 전체),
+                  보통 굵기는 "그중 어느 것인가"(캡션 조각). 부스팅 게시물끼리
+                  굵은 접두사를 공유하므로 세지 않아도 한 무리로 묶여 보인다.
+                  둘째 줄은 기간과 일수 — 막대 끝 날짜와 같은 값이지만 여기는
+                  글자로 읽는 자리다. */}
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
+                <Typography
+                  component="div"
+                  title={p.name}
+                  sx={{ fontSize: 13, fontWeight: 400, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                >
+                  <Box component="span" sx={{ fontWeight: 600 }}>{prefix}</Box>
+                  {rest && ` · ${rest}`}
                 </Typography>
+                <Typography component="div" sx={{ fontSize: 12, lineHeight: 1.5, color: 'text.secondary', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                  {dateMed(p.startDate)} – {dateMed(p.endDate)} · {rangeDays(p.startDate, p.endDate)}
+                </Typography>
+              </Box>
+
+              {/* 플랫폼 · 예산 · (Performance 탭) 지출 — 막대 안에 있던 숫자가
+                  전부 여기로 왔다. 막대 폭과 무관하게 항상 온전히 읽힌다. */}
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
+                <Typography component="div" sx={{ fontSize: 13, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {p.platformLabel || '—'}
+                </Typography>
+                <Typography component="div" title={details || undefined} sx={{ fontSize: 12, lineHeight: 1.5, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' }}>
+                  {details || ' '}
+                </Typography>
+              </Box>
+
+              {/* 막대 — 얇은 트랙 + 양 끝 원. 라벨은 막대 밖(아래). */}
+              <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider' }}>
+                <TimelineGrid ticks={ticks} monthStarts={monthStarts} pct={pct} />
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: `${startPct}%`,
+                    width: `${width}%`,
+                    height: BAR_HEIGHT,
+                    transform: `translateY(-${BAR_HEIGHT * 1.5}px)`,
+                    borderRadius: `${BAR_HEIGHT / 2}px`,
+                    backgroundColor: barColor,
+                  }}
+                />
+                {[startPct, endPct].map((x, i) => (
+                  <Box
+                    key={i}
+                    sx={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: `${x}%`,
+                      width: DOT_SIZE,
+                      height: DOT_SIZE,
+                      transform: `translate(-50%, calc(-50% - ${BAR_HEIGHT}px))`,
+                      borderRadius: '50%',
+                      backgroundColor: 'background.paper',
+                      border: '2px solid',
+                      borderColor: barColor,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                ))}
+                {width < MIN_TWO_LABEL_PCT ? (
+                  <Typography component="div" sx={{ ...dateLabelSx, left: `${startPct}%`, transform: edgeAwareShift(startPct) }}>
+                    {p.startDate === p.endDate ? dateMed(p.startDate) : `${dateMed(p.startDate)} – ${dateMed(p.endDate)}`}
+                  </Typography>
+                ) : (
+                  <>
+                    <Typography component="div" sx={{ ...dateLabelSx, left: `${startPct}%`, transform: 'translateX(-4px)' }}>
+                      {dateMed(p.startDate)}
+                    </Typography>
+                    <Typography component="div" sx={{ ...dateLabelSx, left: `${endPct}%`, transform: 'translateX(calc(-100% + 4px))' }}>
+                      {dateMed(p.endDate)}
+                    </Typography>
+                  </>
+                )}
               </Box>
             </Box>
           );
         })}
-      </Box>
-
-      {/* 축 — 양 끝 + 마일스톤 날짜. 절대위치라 눈금이 실제 시점 위에 선다
-          (space-between으로 늘어놓으면 위치가 데이터와 무관해진다). */}
-      <Box sx={{ position: 'relative', height: 28, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-        {axisTicks.map((tick) => (
-          <Typography
-            key={tick.date}
-            variant="caption"
-            color="text.secondary"
-            sx={{
-              position: 'absolute',
-              top: 8,
-              left: `${tick.pct}%`,
-              transform: edgeAwareShift(tick.pct),
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {shortDate(tick.date)}
-          </Typography>
-        ))}
       </Box>
     </Box>
   );

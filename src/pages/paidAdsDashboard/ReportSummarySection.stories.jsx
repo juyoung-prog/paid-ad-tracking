@@ -3,6 +3,7 @@ import Box from '@mui/material/Box';
 import { ReportSummarySection } from './ReportSummarySection';
 import { mockCampaigns, mockPerformanceRecords, mockPerformanceDaily, spreadDailyOverCampaign } from '../../data/paidAdsMockData';
 import { PLATFORM, GOAL, TARGET_SCOPE } from '../../data/schema';
+import { MOCK_TODAY } from './paidAdsPageUtils';
 
 /**
  * Gantt 타임라인은 Event(campaignGroup)를 골라야 나타나는데, mockCampaigns에는
@@ -293,9 +294,32 @@ export const Default = {
 export const EventTimeline = {
   name: 'Event Timeline (Gantt)',
   render: () => (
-    <MemoryRouter>
+    /* Event를 URL로 고른 채 연다 — 예전엔 localStorage에 남은 마지막 뷰에 기대서,
+       처음 여는 브라우저에서는 타임라인이 아예 안 보였다. */
+    <MemoryRouter initialEntries={['/?tab=performance&event=G10+Opening']}>
       <Box>
-        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} />
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} today={MOCK_TODAY} />
+      </Box>
+    </MemoryRouter>
+  ),
+};
+
+/**
+ * Plan 탭 — 같은 Event의 계획 타임라인·Budget Breakdown. Performance 탭과 **같은
+ * 차트**(PhaseTimelineChart)가 나와야 한다. 계획 문서(plans)가 없으므로 "No plan
+ * for G10 Opening yet" 안내 + Create plan 버튼이 위에 붙는다.
+ *
+ * 확인 포인트:
+ * - 타임라인 카드와 Budget Breakdown 카드가 같은 폭(layout.content.wide) 안에 서는가
+ * - 오늘(MOCK_TODAY 7/20)에 진행 중인 phase 막대만 파랑이고 나머지는 회색인가
+ * - Budget Breakdown의 행 순서가 타임라인 막대 순서(시작일순)와 같은가
+ */
+export const PlanTab = {
+  name: 'Plan tab (timeline + budget)',
+  render: () => (
+    <MemoryRouter initialEntries={['/?tab=plan&event=G10+Opening']}>
+      <Box>
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} today={MOCK_TODAY} />
       </Box>
     </MemoryRouter>
   ),
@@ -326,7 +350,7 @@ export const DateFilteredSpend = {
   render: () => (
     <MemoryRouter initialEntries={['/?tab=performance&event=G10+Opening&from=2026-06-22&to=2026-06-30']}>
       <Box>
-        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} />
+        <ReportSummarySection campaigns={groupedCampaigns} performanceRecords={groupedPerformance} performanceDaily={groupedDaily} today={MOCK_TODAY} />
       </Box>
     </MemoryRouter>
   ),

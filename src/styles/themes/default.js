@@ -7,11 +7,18 @@
  * ## 핵심 철학
  * - **Flat by default**: shape.borderRadius 0 — Card/Paper/Dialog 등 구조 표면은 각짐
  * - **Role-based radius**: 전역 shape을 올리지 않고 상호작용 컨트롤
- *   (Button/Input/Select/Chip, 4px)·분석·참조 카드형 컨테이너(6px) 등 역할
+ *   (Button/Input/Select/Chip, 6px)·분석·참조 카드형 컨테이너(8px) 등 역할
  *   단위로만 예외를 둠 (resources/mui-theme.md 참고)
- * - **Dimmed Shadow**: offset 없이 blur만 사용하는 은은한 그림자
+ * - **Dimmed Shadow**: offset 없이 blur만 사용하는 은은한 그림자 — 그것도 최소한만.
+ *   면의 위계는 그림자가 아니라 1px 옅은 경계선과 여백이 만든다
  * - **Pure White**: 깔끔한 흰색 배경
- * - **Brand Blue**: Primary 색상 #0000FF
+ * - **Brand Blue**: Primary 색상 #0000FF — 브랜드 값으로만 남고 화면의 파랑은 accent다
+ *
+ * ## 2026-09 리디자인 (ref/re1.png)
+ * 절제된 SaaS 대시보드 방향으로 토큰을 옮겼다 — 흰 배경, 얇은 옅은 회색 경계선,
+ * 최소한의 그림자, 절제된 파랑 액센트, 중립 서체 + 흐린 보조 텍스트. 무엇이
+ * 바뀌었는지는 각 토큰의 주석에 적혀 있다. 컴포넌트는 토큰만 읽으므로 화면
+ * 코드는 대부분 손대지 않고 이 파일이 인상을 바꾼다.
  */
 
 import { createTheme } from '@mui/material/styles';
@@ -64,11 +71,16 @@ const palette = {
     contrastText: '#FFFFFF',
   },
 
-  // 텍스트 색상
+  /**
+   * 텍스트 색상 — 검정의 투명도가 아니라 **중립 회색 두 단계**다.
+   * 읽는 글자(primary)는 거의 검정에 가까운 잉크, 보조 글자(secondary)는 확실히
+   * 흐린 회색(4.8:1, AA 통과)이라 라벨·메타·표 헤더가 값보다 한 단 뒤로 물러난다.
+   * 예전 rgba(0,0,0,0.6)은 본문과 보조의 차이가 작아 "전부 같은 급"으로 읽혔다.
+   */
   text: {
-    primary: 'rgba(0, 0, 0, 0.87)',
-    secondary: 'rgba(0, 0, 0, 0.6)',
-    disabled: 'rgba(0, 0, 0, 0.38)',
+    primary: '#111827',
+    secondary: '#6B7280',
+    disabled: '#9CA3AF',
   },
 
   // 배경 색상
@@ -84,24 +96,43 @@ const palette = {
    * 자리마다 파랑이 다르면 안 된다. 칩 테두리·내비 배경·메뉴 선택이 #0000FF고
    * 탭 밑줄·활성 글자가 #0000B2면 같은 "선택됨"인데 색이 두 개인 셈이다.
    *
-   * 기준을 낮은 쪽(#0000B2)으로 잡는다. primary.main은 채도 100%라 화면에서
-   * 가장 강한 요소가 되는데, 목록이 주인공인 화면에서 컨트롤이 그 자리를
-   * 가져가면 안 된다. 브랜드 색 자체는 primary에 그대로 남는다.
+   * 값은 절제된 UI 파랑(#2563EB, 흰 배경 대비 5.2:1 — 글자로도 AA 통과)이다.
+   * 한때 브랜드 남색(#0000B2)이었는데, 채도가 높고 어두워 탭·버튼·활성 내비가
+   * 화면에서 가장 무거운 요소가 됐다. 목록·숫자가 주인공인 화면에서 파랑은
+   * "지금 선택된 것"만 조용히 가리켜야 한다. 브랜드 색 자체는 primary에 남는다.
    */
   accent: {
-    main: '#0000B2',
+    main: '#2563EB',
     /** 채운 표면(contained 버튼)의 hover — main보다 한 단 어둡게 */
-    dark: '#000080',
+    dark: '#1D4ED8',
     /** 선택 배경 — 채우지 않고 옅게 깐다 */
-    tint: 'rgba(0, 0, 178, 0.08)',
+    tint: 'rgba(37, 99, 235, 0.08)',
     /** 선택 배경 hover */
-    tintHover: 'rgba(0, 0, 178, 0.14)',
+    tintHover: 'rgba(37, 99, 235, 0.14)',
     /**
      * 포커스 외곽 링 — 테두리는 1px로 두고 번짐으로만 알린다.
      * 굵기를 바꾸면 레이아웃이 1px 흔들리므로 두께는 비포커스와 같게 유지한다.
-     * 0.18은 링이 테두리만큼 도드라져 컨트롤이 목록보다 강해 보였다.
      */
-    ring: 'rgba(0, 0, 178, 0.09)',
+    ring: 'rgba(37, 99, 235, 0.16)',
+  },
+
+  /**
+   * 차트 데이터 잉크 — 타임라인 막대, 진행 막대, 날짜 격자.
+   *
+   * 막대는 기본이 **중립 회색**이고 파랑은 선택·강조된 것 하나에만 쓴다 —
+   * 모든 막대가 파랑이면 강조가 성립하지 않는다(레퍼런스 ref/re1.png). 예전엔
+   * 막대가 primary.main(#0000FF) 테두리 + 채도 램프였는데, 그 자체가 화면에서
+   * 가장 시끄러운 요소였다.
+   */
+  chart: {
+    /** 기본 막대 — 흰 배경 위 옅은 중립 회색 */
+    bar: '#D1D5DB',
+    /** 선택·강조 막대 — accent와 같은 파랑 */
+    barEmphasis: '#2563EB',
+    /** 날짜 격자(주 단위) — 거의 보이지 않는 선 */
+    grid: '#F3F4F6',
+    /** 월 경계 격자 — divider와 같은 단계 */
+    gridStrong: '#E5E7EB',
   },
 
   /**
@@ -115,12 +146,16 @@ const palette = {
    */
   surface: {
     default: '#FFFFFF',
-    sunken: grey[50],
-    muted: grey[100],
+    sunken: '#F9FAFB',
+    muted: '#F3F4F6',
   },
 
-  // 구분선
-  divider: 'rgba(0, 0, 0, 0.12)',
+  /**
+   * 구분선 — 옅은 중립 회색 1px. 표 행, 카드 테두리, 툴바 하단, 타임라인 월
+   * 경계가 전부 이 한 값이다. 예전 rgba(0,0,0,0.12)보다 한 단 옅어서 선이
+   * 콘텐츠와 경쟁하지 않는다.
+   */
+  divider: '#E5E7EB',
 
   // 액션 상태
   action: {
@@ -172,6 +207,20 @@ const typography = {
 
   // 헤딩 폰트 패밀리
   headingFontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
+
+  /**
+   * Paid Ads 셸(PaidAdsShell·LoginPage)의 서체. 전역 fontFamily(Pretendard)와
+   * 다르다 — 레퍼런스(influencer tracking dashboard)의 SaasShell이 Inter를
+   * 쓰고, 이 프로젝트의 1순위 목표가 "같은 회사 툴군처럼 보이기"라서다.
+   *
+   * 예전엔 paidAdsPageUtils에 문자열로 박혀 있었는데, 디자인 시스템 전환
+   * (Default ↔ Carbon)을 넣으면서 테마로 올렸다 — 셸 서체가 테마 밖에 있으면
+   * Carbon으로 바꿔도 글꼴만 Inter로 남는다. 셸은 이 키를 읽을 뿐 값을 모른다.
+   *
+   * Pretendard는 셀프 호스팅하지 않는다(레퍼런스와 동일 — Inter에 한글 글리프가
+   * 없어 한글은 스택 뒤 OS 폰트로 떨어진다).
+   */
+  shellFontFamily: '"Inter Variable", Inter, "Pretendard Variable", Pretendard, sans-serif',
 
   // 폰트 크기 기준
   fontSize: 14,
@@ -286,7 +335,7 @@ const typography = {
    */
   display: {
     fontFamily: '"Outfit Variable", "Pretendard Variable", Pretendard, sans-serif',
-    fontWeight: 700,
+    fontWeight: 600,         // 700 → 600: 24px에서 700은 굵기가 색처럼 튀었다(ref/re1.png는 세미볼드)
     fontSize: '1.5rem',      // 24px — 레퍼런스 실측값
     lineHeight: 1.2,
     letterSpacing: '-0.01em',
@@ -360,10 +409,10 @@ const shape = {
    */
   radius: {
     /** 버튼·입력·셀렉트·칩 등 상호작용 컨트롤. MuiButton/MuiOutlinedInput/MuiChip이 쓰는 값과 같다 */
-    control: 4,
-    /** 분석·참조용 카드형 컨테이너 (구조 표면인 Card/Paper는 여전히 0) */
-    container: 6,
-    /** 컨트롤 *안에* 들어가는 미세 요소 — 버튼 안 단축키 힌트 키캡 등 */
+    control: 6,
+    /** 분석·참조용 카드형 컨테이너 — 섹션 카드(타임라인·표) (구조 표면인 Card/Paper는 여전히 0) */
+    container: 8,
+    /** 컨트롤 *안에* 들어가는 미세 요소 — 버튼 안 단축키 힌트 키캡, 6px 진행 막대 */
     inlay: 3,
   },
 };
@@ -371,12 +420,17 @@ const shape = {
 // ============================================================
 // 5. Shadow Tokens (그림자 토큰)
 // ============================================================
+/**
+ * 그림자는 최소한만 — 떠 있는 것(메뉴·팝오버·드로어)만 쓰고 카드·버튼·툴바는
+ * 경계선으로 나눈다. 값도 한 단 옅게 내렸다(0.06~0.12 → 0.04~0.10): 레퍼런스의
+ * 면은 그림자 없이 1px 선으로만 구분되고, 그림자가 있는 곳조차 거의 안 보인다.
+ */
 const customShadows = {
   none: 'none',
-  sm: '0 0 12px rgba(0, 0, 0, 0.06)',
-  md: '0 0 16px rgba(0, 0, 0, 0.08)',
-  lg: '0 0 20px rgba(0, 0, 0, 0.10)',
-  xl: '0 0 24px rgba(0, 0, 0, 0.12)',
+  sm: '0 0 8px rgba(17, 24, 39, 0.04)',
+  md: '0 0 12px rgba(17, 24, 39, 0.06)',
+  lg: '0 0 16px rgba(17, 24, 39, 0.08)',
+  xl: '0 0 24px rgba(17, 24, 39, 0.10)',
 };
 
 // ============================================================
@@ -435,6 +489,9 @@ const components = {
     styleOverrides: {
       body: {
         scrollbarWidth: 'thin',
+        // 얇은 중립 서체가 13px에서 번지지 않게 — 레퍼런스의 또렷한 소형 텍스트
+        WebkitFontSmoothing: 'antialiased',
+        MozOsxFontSmoothing: 'grayscale',
       },
     },
   },
@@ -483,10 +540,23 @@ const components = {
     // 이미 4px). 버튼은 가장 상호작용적인 객체인데 혼자 표면 취급이라, 4px
     // 입력 필드 바로 옆 0px Save 버튼처럼 한 폼 안에 모서리 문법이 두 개였다.
     // 각진 인상 자체는 Card/Paper/Dialog(여전히 0)가 담당하므로 유지된다.
+    //
+    // 2026-09 리디자인에서 그림자는 결국 전역으로 뗐다. "그림자는 최소한만"이
+    // 시스템 전체의 결정이 됐고(customShadows 주석), 화면마다 boxShadow:'none'을
+    // 다시 붙이는 건 그 결정이 테마에 없다는 증거였다. 남아 있는 로컬
+    // sx={{ boxShadow: 'none' }}은 이제 무해한 중복이다.
     styleOverrides: {
       root: {
         borderRadius: shape.radius.control,
         textTransform: 'none',
+        fontWeight: 500,
+        boxShadow: 'none',
+        '&:hover': { boxShadow: 'none' },
+        '&:active': { boxShadow: 'none' },
+      },
+      sizeSmall: {
+        fontSize: '0.8125rem', // 13px — 운영 화면 컨트롤 스케일
+        padding: '5px 12px',
       },
       // hover는 MUI가 그러듯 마우스가 있는 기기에서만 켠다 — 가드가 없으면
       // 터치에서 탭한 뒤 hover 상태가 눌어붙어 색이 남는다.
@@ -496,9 +566,11 @@ const components = {
           '&:hover': { backgroundColor: palette.accent.dark },
         },
       },
+      // 테두리는 accent를 옅게 — 진한 파란 상자는 텍스트 링크보다 무겁다.
+      // hover에서만 테두리가 accent로 차오른다(레퍼런스 Export CSV).
       outlinedPrimary: {
         color: palette.accent.main,
-        borderColor: palette.accent.main,
+        borderColor: 'rgba(37, 99, 235, 0.35)',
         '@media (hover: hover)': {
           '&:hover': { backgroundColor: palette.accent.tint, borderColor: palette.accent.main },
         },
@@ -539,7 +611,13 @@ const components = {
   MuiOutlinedInput: {
     styleOverrides: {
       root: {
-        borderRadius: 4,
+        borderRadius: shape.radius.control,
+        // 기본 테두리는 MUI의 rgba(0,0,0,0.23)이 아니라 옅은 중립 회색 — 필터
+        // 셀렉트·날짜 필드가 세그먼트 버튼(divider 테두리)과 같은 무게로 놓인다.
+        '& .MuiOutlinedInput-notchedOutline': { borderColor: palette.grey[300] },
+        '@media (hover: hover)': {
+          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: palette.grey[400] },
+        },
         /* MUI 기본 포커스는 테두리를 2px로 굵히고 순수 파랑을 쓴다.
            굵기가 바뀌면 레이아웃이 1px 흔들리고, 컨트롤이 목록보다 강해진다.
            두께는 1px로 두고 바깥에 옅은 링을 둘러 상태를 알린다. */
@@ -569,7 +647,7 @@ const components = {
   MuiChip: {
     styleOverrides: {
       root: {
-        borderRadius: 4,
+        borderRadius: shape.radius.control,
       },
       // compact 모드: small 사이즈 패딩 축소 (운영 툴 정보 밀도 기준)
       sizeSmall: {
@@ -593,6 +671,11 @@ const components = {
       root: {
         borderRadius: shape.radius.control,
         textTransform: 'none',
+        // 세그먼트는 필터 셀렉트와 같은 높이(36px)·같은 글자(13px 500)로 나란히 선다
+        fontSize: '0.8125rem',
+        fontWeight: 500,
+        paddingTop: 7,
+        paddingBottom: 7,
         /* 선택 상태도 accent다. 이 override가 없으면 MUI 기본값(회색
            action.selected 배경 + text.primary)으로 렌더돼서, 탭·레일·메뉴가 전부
            accent로 "선택됨"을 말하는 화면에서 세그먼트 필터만 회색으로 갈린다 —
@@ -621,6 +704,46 @@ const components = {
       root: {
         borderRadius: shape.radius.control,
       },
+      /* 정보 안내(severity="info")는 색면이 아니라 **한 단 낮은 면 + 경계선**이다.
+         청록 틴트 배너는 목록 위에서 가장 채도 높은 면이 돼 "문제가 있다"로
+         읽혔는데, 실제로는 "N개 캠페인에 Event 태그가 없다" 같은 조용한
+         안내다(DashboardPage). 색은 경고(warning/error)에만 남긴다. */
+      standardInfo: {
+        backgroundColor: palette.surface.sunken,
+        color: palette.text.primary,
+        border: `1px solid ${palette.divider}`,
+        '& .MuiAlert-icon': { color: palette.text.secondary },
+      },
+    },
+  },
+  /* 떠 있는 메뉴는 그림자 대신 경계선이 윤곽을 잡고, 그림자는 거의 안 보이는
+     정도만 — 레퍼런스의 드롭다운. */
+  MuiMenu: {
+    styleOverrides: {
+      paper: {
+        border: `1px solid ${palette.divider}`,
+        borderRadius: shape.radius.container,
+        boxShadow: customShadows.md,
+      },
+    },
+  },
+  MuiPopover: {
+    styleOverrides: {
+      paper: {
+        border: `1px solid ${palette.divider}`,
+        borderRadius: shape.radius.container,
+        boxShadow: customShadows.md,
+      },
+    },
+  },
+  MuiTooltip: {
+    styleOverrides: {
+      tooltip: {
+        fontSize: '0.75rem',
+        borderRadius: shape.radius.control,
+        backgroundColor: palette.text.primary,
+      },
+      arrow: { color: palette.text.primary },
     },
   },
   MuiSkeleton: {
@@ -642,16 +765,57 @@ const components = {
   // 렌더됐다). 어두운 AppBar 위의 inherit 탭이 남색 글자가 되는 문제도 같은 원인.
   MuiTabs: {
     styleOverrides: {
+      root: { minHeight: 44 },
       indicator: {
+        height: 2,
         '&.MuiTabs-indicatorColorPrimary': { backgroundColor: palette.accent.main },
       },
     },
   },
+  /* 탭은 MUI 기본(48px 높이, 대문자, 90px 최소폭)보다 한 단 조용하다 — 14px 500,
+     비선택은 text.secondary, 선택만 accent. 밑줄은 라벨 폭만큼(minWidth 0). */
   MuiTab: {
     styleOverrides: {
       root: {
+        minHeight: 44,
+        minWidth: 0,
+        padding: '12px 16px',
+        fontSize: '0.875rem',
+        fontWeight: 500,
+        textTransform: 'none',
+        color: palette.text.secondary,
         '&.MuiTab-textColorPrimary.Mui-selected': { color: palette.accent.main },
       },
+    },
+  },
+  /**
+   * 표 — 헤더는 12px 500 흐린 회색, 본문은 13px, 행 구분은 divider 1px.
+   * MUI 기본 헤더(14px 500 검정)는 값과 같은 급으로 읽혀서 표 위쪽이 무거웠고,
+   * 셀 테두리도 divider와 별개의 값(TableCell.border)이라 표 안팎의 선 굵기가
+   * 미묘하게 달랐다. 레퍼런스(ref/re1.png Daily spend)의 헤더는 값보다 한 단
+   * 물러난 라벨이다.
+   */
+  MuiTableCell: {
+    styleOverrides: {
+      root: {
+        borderBottom: `1px solid ${palette.divider}`,
+        fontSize: '0.8125rem', // 13px
+        lineHeight: 1.5,
+        padding: '10px 16px',
+      },
+      head: {
+        fontSize: '0.75rem', // 12px
+        fontWeight: 500,
+        lineHeight: 1.4,
+        color: palette.text.secondary,
+        backgroundColor: palette.background.paper,
+        paddingTop: 8,
+        paddingBottom: 8,
+        // 헤더는 한 줄 — 라벨이 접히면 헤더 행만 두꺼워져 표마다 높이가 달라진다
+        whiteSpace: 'nowrap',
+      },
+      stickyHeader: { backgroundColor: palette.background.paper },
+      sizeSmall: { padding: '8px 16px' },
     },
   },
   MuiTableRow: {
@@ -664,6 +828,13 @@ const components = {
           backgroundColor: palette.action.hover,
         },
       },
+    },
+  },
+  MuiTablePagination: {
+    styleOverrides: {
+      root: { color: palette.text.secondary, fontSize: '0.75rem' },
+      toolbar: { minHeight: 44 },
+      displayedRows: { fontSize: '0.75rem' },
     },
   },
   MuiDrawer: {

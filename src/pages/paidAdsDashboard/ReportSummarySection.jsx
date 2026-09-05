@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { alpha, useTheme } from '@mui/material/styles';
 import { useNavigate } from 'react-router-dom';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
@@ -28,7 +27,7 @@ import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
-import { money, moneyWhole, count, percent, seconds, dateMed, rangeDays } from '../../utils/format';
+import { money, moneyWhole, count, percent, seconds, dateMed, dateRange as formatDateRange, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
@@ -75,22 +74,10 @@ function loadLastReportView() {
   }
 }
 
-// Plan 탭 Gantt의 phase 막대 채움. 색을 순환시키지 않고 primary 하나의 명도만
-// 바꾼다(시간 순 옅음→진함).
-//
-// 왜 순환을 버렸나:
-//  1) 대비 실패. 예전 5색 순환(info/success/warning/primary/secondary)은 검증에서
-//     떨어졌다 — success↔info가 정상 시야 ΔE 12.1(기준 15), 색각이상 4.9.
-//  2) 텍스트가 안 읽혔다. 막대 채움은 {token}.light인데 글자는 {token}.contrastText
-//     (흰색)를 썼다. contrastText는 .main 기준으로 정의된 값이라 .light 위에서는
-//     2.76~4.28:1로 5개 중 4개가 WCAG AA(4.5:1)에 미달했다.
-//  3) 애초에 색이 정체성을 나를 필요가 없다. 막대마다 자기 행이 있고 이름이 막대
-//     안에 직접 적혀 있다. phase는 시간 순서가 있으니 순차 램프가 맞는 인코딩이다.
-//
-// 막대의 존재감은 테두리(primary.main, 흰 배경 대비 8.59:1)가 맡고, 채움을 밝게
-// 두어 진한 텍스트가 전 구간에서 4.95:1 이상을 유지한다.
-const PHASE_FILL_MIN_ALPHA = 0.15;
-const PHASE_FILL_MAX_ALPHA = 0.50;
+// phase 막대의 색은 PhaseTimelineChart가 정한다 — 기본은 중립 회색, 강조(오늘
+// 진행 중) 하나만 accent 파랑(테마 chart 토큰). 예전엔 여기서 시간 순 채도
+// 램프(fillAlpha 0.15→0.50)를 매겨 넘겼는데, 램프는 "무엇이 강조인가"를 말하지
+// 못하면서 막대를 화면에서 가장 시끄러운 요소로 만들었다(2026-09 리디자인).
 
 /**
  * 섹션 제목 — 본문 영역에서 "이 블록이 무엇인가"를 말하는 진짜 제목.
@@ -112,6 +99,65 @@ const SECTION_TITLE_SX = { display: 'block', mb: 1.5, color: 'text.primary' };
 const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
 
 /**
+ * 섹션 카드 — 타임라인·표 하나가 한 장의 카드다(ref/re1.png).
+ *
+ * 예전엔 섹션이 여백으로만 나뉘어서, 표 15개 컬럼과 그 위 제목, 옆 섹션의
+ * 제목이 전부 같은 흰 면 위에 떠 있었다. 1px 옅은 경계선 + 8px radius로 "이
+ * 블록이 하나의 분석 단위"라고 묶는다. 그림자는 없다 — 면의 위계는 선과
+ * 여백으로만 만든다(테마 customShadows 주석). 안쪽 여백은 카드가 아니라
+ * 제목 행과 표 셀(px 2)이 각자 갖는다 — 그래야 제목 글자와 첫 컬럼 글자가
+ * 같은 x에 선다.
+ */
+const SECTION_CARD_SX = (theme) => ({
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: `${theme.shape.radius.container}px`,
+  backgroundColor: 'background.paper',
+  overflow: 'hidden',
+  mb: 3,
+});
+
+/**
+ * 카드 제목 행 — 제목(title 토큰) + 범위(scope) 왼쪽, 액션 오른쪽.
+ *
+ * Props:
+ * @param {node} title - 섹션 제목 [Required]
+ * @param {node} scope - 제목 옆 범위 텍스트(개수·기간 등) [Optional]
+ * @param {node} action - 오른쪽 끝 액션(버튼 등) [Optional]
+ * @param {boolean} hasDivider - 제목 행 아래 구분선 여부 [Optional, 기본값: true]
+ * @param {string} component - 제목 태그. 접이식 헤더처럼 제목이 버튼 안에 들어갈 때 'span' [Optional, 기본값: 'h3']
+ *
+ * Example usage:
+ * <SectionHeader title="Event timeline" scope="4 phases · Jun 17 – Aug 31" />
+ */
+function SectionHeader({ title, scope, action, hasDivider = true, component = 'h3' }) {
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        alignItems: 'baseline',
+        justifyContent: 'space-between',
+        gap: 2,
+        px: 2,
+        pt: 2,
+        pb: 1.5,
+        ...(hasDivider && { borderBottom: '1px solid', borderColor: 'divider' }),
+      }}
+    >
+      <Typography variant="title" component={component} sx={{ ...SECTION_TITLE_SX, mb: 0, minWidth: 0 }}>
+        {title}
+        {scope && (
+          <Typography component="span" variant="body2" sx={{ ...SECTION_SCOPE_SX, ml: 1.5 }}>
+            {scope}
+          </Typography>
+        )}
+      </Typography>
+      {action && <Box sx={{ flexShrink: 0, alignSelf: 'center' }}>{action}</Box>}
+    </Box>
+  );
+}
+
+/**
  * 타임라인을 그리는 phase 수 상한. 이 차트는 "Coming Soon → Now Open → Grand
  * Opening → 1 Month Deals"처럼 **몇 단계짜리 이벤트**를 전제로 설계됐다 — 행마다
  * 이름 한 줄 + 막대 한 줄을 쓰고, 시작일마다 마일스톤 점선을 긋는 문법이 전부
@@ -128,13 +174,6 @@ const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
  * 스캔되는 높이이기도 하다.
  */
 const PHASE_TIMELINE_MAX_PHASES = 15;
-
-/** 시간 순 index를 채움 불투명도로. phase가 하나뿐이면 가장 옅은 값을 쓴다. */
-function phaseFillAlpha(index, total) {
-  if (total <= 1) return PHASE_FILL_MIN_ALPHA;
-  const t = index / (total - 1);
-  return PHASE_FILL_MIN_ALPHA + (PHASE_FILL_MAX_ALPHA - PHASE_FILL_MIN_ALPHA) * t;
-}
 
 // 같은 이름(phase)의 캠페인을 플랫폼별로 묶어 하나의 타임라인 막대 + Budget
 // Breakdown 한 행으로 합친다 — "G10 Grand Opening"이 Meta/TikTok 두 캠페인으로
@@ -195,9 +234,7 @@ function buildPhaseTimeline(campaigns) {
         totalDaily,
       };
     })
-    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
-    // 램프는 정렬이 끝난 뒤에 매긴다 — 정렬 전 index로 주면 색이 시간 순과 어긋난다.
-    .map((phase, index, all) => ({ ...phase, fillAlpha: phaseFillAlpha(index, all.length) }));
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
 }
 
 // Performance 탭에서 goal별로 캠페인을 묶어 각각 다른 컬럼의 표를 그린다 —
@@ -653,8 +690,7 @@ function buildPlanPhases(plan) {
         totalBudget: items.reduce((sum, i) => sum + (planItemTotal(i) ?? 0), 0),
       };
     })
-    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0))
-    .map((phase, index, all) => ({ ...phase, fillAlpha: phaseFillAlpha(index, all.length) }));
+    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
 }
 
 /** 계획 금액 표기 — 계획은 소수점이 의미 없어 정수로 반올림한다. */
@@ -736,14 +772,15 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
           No plans yet. Create one to set a budget before the campaigns run — it does not have to exist in Meta or TikTok yet.
         </Typography>
       ) : (
+        <TableContainer sx={SECTION_CARD_SX}>
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>Event</TableCell>
-              <TableCell sx={{ fontWeight: 600 }} align="right">Phases</TableCell>
-              <TableCell sx={{ fontWeight: 600 }} align="right">Planned</TableCell>
-              <TableCell sx={{ fontWeight: 600 }} align="right">Actual</TableCell>
-              <TableCell sx={{ fontWeight: 600 }} align="right">Difference</TableCell>
+              <TableCell>Event</TableCell>
+              <TableCell align="right">Phases</TableCell>
+              <TableCell align="right">Planned</TableCell>
+              <TableCell align="right">Actual</TableCell>
+              <TableCell align="right">Difference</TableCell>
               <TableCell />
             </TableRow>
           </TableHead>
@@ -811,6 +848,7 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
             })}
           </TableBody>
         </Table>
+        </TableContainer>
       )}
     </Box>
   );
@@ -824,7 +862,7 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
  * 귀속을 만든다(schema.js planVsActual 주석). 총액만 비교하고 단계 목록은 계획
  * 쪽을 그대로 보여준다 — 어긋남은 숨기지 않는다.
  */
-function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete }) {
+function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete, today }) {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [values, setValues] = useState({ name: eventName, notes: '', items: [] });
@@ -944,16 +982,22 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
           "언제 뭐가 겹치는지"가 안 보이는데, 단계·기간·예산이 이미 다 있으므로
           그릴 수 있다. 아래 실제 타임라인과 같은 문법이라 둘을 눈으로 바로
           비교할 수 있다. */}
-      {planPhases.length > 0 && <PhaseTimelineChart phases={planPhases} sx={{ mb: 2 }} />}
+      {planPhases.length > 0 && (
+        <Box sx={SECTION_CARD_SX}>
+          <SectionHeader title="Planned timeline" scope={`${planPhases.length} ${planPhases.length === 1 ? 'phase' : 'phases'}`} hasDivider={false} />
+          <PhaseTimelineChart phases={planPhases} today={today} />
+        </Box>
+      )}
 
+      <TableContainer sx={SECTION_CARD_SX}>
       <Table size="small">
         <TableHead>
           <TableRow>
-            <TableCell sx={{ fontWeight: 600 }}>Phase</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Platform</TableCell>
-            <TableCell sx={{ fontWeight: 600 }}>Dates</TableCell>
-            <TableCell sx={{ fontWeight: 600 }} align="right">Daily</TableCell>
-            <TableCell sx={{ fontWeight: 600 }} align="right">Planned</TableCell>
+            <TableCell>Phase</TableCell>
+            <TableCell>Platform</TableCell>
+            <TableCell>Dates</TableCell>
+            <TableCell align="right">Daily</TableCell>
+            <TableCell align="right">Planned</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -970,6 +1014,7 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
           ))}
         </TableBody>
       </Table>
+      </TableContainer>
     </Box>
   );
 }
@@ -1062,14 +1107,14 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
  * @param {boolean} isLoading - 데이터 로드 중 여부. true면 표 대신 스켈레톤 [Optional, 기본값: false]
  * @param {string|null} error - 백엔드 오류 메시지. 있으면 상단에 오류 배너 [Optional, 기본값: null]
  * @param {function} onRetry - 오류 배너의 Retry 클릭 시 실행할 함수 [Optional]
+ * @param {Date|string} today - 기준일. 타임라인에서 이 날짜에 진행 중인 phase가 강조된다 [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <ReportSummarySection campaigns={campaigns} performanceRecords={performanceRecords} />
  */
-export function ReportSummarySection({ campaigns, performanceRecords, performanceDaily = [], adAccounts = [], plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, sx }) {
+export function ReportSummarySection({ campaigns, performanceRecords, performanceDaily = [], adAccounts = [], plans = [], onSavePlan, onDeletePlan, isLoading = false, error = null, onRetry, today, sx }) {
   const navigate = useNavigate();
-  const theme = useTheme();
   /* 기본 탭은 Performance다. 이 화면 이름이 Reports이고, 보고서에 오는 사람의
      첫 질문은 "얼마나 잘 됐나"다 — Plan(예산·타임라인)은 기획 단계에서 보는
      산출물이라 빈도가 낮고, "지금 뭐가 돌고 뭐가 예정인가"는 Dashboard가 이미
@@ -1481,6 +1526,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
             comparison={planComparison}
             onSave={onSavePlan}
             onDelete={onDeletePlan}
+            today={today}
           />
         ) : (
           /* Event를 안 골랐을 때 — 계획 목록과 새 계획 만들기.
@@ -1511,14 +1557,21 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
              표가 주인공이라 폭을 풀어야 하는 건 Performance 쪽뿐이다. */
           <Box sx={(theme) => ({ maxWidth: theme.layout.content.wide })}>
             {/* Event 타임라인 — Plan·Performance 두 탭이 같은 컴포넌트를 쓴다
-                (PhaseTimelineChart 주석 참고). 막대에는 기간과 함께 일일 예산·
-                총 예산이 붙는다. phase가 너무 많으면 차트 대신 안내 한 줄 —
+                (PhaseTimelineChart 주석 참고). 플랫폼/예산 열에 일일 예산·총
+                예산이 붙는다. phase가 너무 많으면 차트 대신 안내 한 줄 —
                 PHASE_TIMELINE_MAX_PHASES 주석 참고. 안내에 phase 수를 굳이 안
                 적는 이유: 바로 아래 Budget Breakdown 제목이 이미 센다. */}
             {isTimelineReadable ? (
-              <PhaseTimelineChart phases={phases} sx={{ mb: 4 }} />
+              <Box sx={SECTION_CARD_SX}>
+                <SectionHeader
+                  title="Event timeline"
+                  scope={`${phases.length} ${phases.length === 1 ? 'phase' : 'phases'} · ${formatDateRange(phases[0].startDate, phases.reduce((max, p) => (p.endDate > max ? p.endDate : max), phases[0].endDate))}`}
+                  hasDivider={false}
+                />
+                <PhaseTimelineChart phases={phases} today={today} />
+              </Box>
             ) : (
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                 Too many phases to draw on one timeline — every phase is in the table below.
               </Typography>
             )}
@@ -1527,48 +1580,32 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                 phase가 어느 캠페인 하나에 대응하지 않고 여러 캠페인(플랫폼별)을
                 합친 값이라, 위 Plan 표와 달리 행 클릭으로 캠페인 Drawer에 못
                 보낸다(어느 캠페인을 열지 애매함) — 그래서 클릭 불가로 둔다. */}
-            <Typography variant="title" sx={SECTION_TITLE_SX}>
-              Budget Breakdown{' '}
-              <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · {moneyWhole(planTotalBudget)} planned
-              </Typography>
-            </Typography>
-            <TableContainer sx={{ mb: 2, overflowX: 'auto' }}>
+            <Box sx={SECTION_CARD_SX}>
+            <SectionHeader
+              title="Budget Breakdown"
+              scope={`${phases.length} ${phases.length === 1 ? 'phase' : 'phases'} · ${moneyWhole(planTotalBudget)} planned`}
+            />
+            <TableContainer sx={{ overflowX: 'auto' }}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Campaign</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Run Dates</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Days</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Meta Daily</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Meta Budget</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>TikTok Daily</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>TikTok Budget</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Total</TableCell>
+                    <TableCell>Campaign</TableCell>
+                    <TableCell>Run Dates</TableCell>
+                    <TableCell align="right">Days</TableCell>
+                    <TableCell align="right">Meta Daily</TableCell>
+                    <TableCell align="right">Meta Budget</TableCell>
+                    <TableCell align="right">TikTok Daily</TableCell>
+                    <TableCell align="right">TikTok Budget</TableCell>
+                    <TableCell align="right">Total</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {phases.map((p) => (
                     <TableRow key={p.key}>
-                      <TableCell sx={{ whiteSpace: 'nowrap' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          {/* 위 Gantt 막대와 같은 램프를 쓴다 — 표의 점과 막대가 다른 색이면
-                              같은 phase인지 눈으로 이어지지 않는다. 점은 작아서 채움만으로는
-                              흐릿하므로 막대와 동일하게 primary.main 테두리를 함께 준다. */}
-                          <Box
-                            sx={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: '50%',
-                              bgcolor: alpha(theme.palette.primary.main, p.fillAlpha),
-                              border: '1px solid',
-                              borderColor: 'primary.main',
-                              flexShrink: 0,
-                            }}
-                          />
-                          {p.name}
-                        </Box>
-                      </TableCell>
+                      {/* 색 점은 뺐다 — 막대가 램프를 버리고 단색이 되면서 점이 이어줄
+                          색이 없어졌다. 행 순서가 타임라인과 같아서(둘 다 시작일순)
+                          이름만으로 짝이 맞는다. */}
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{p.name}</TableCell>
                       <TableCell sx={{ fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                         {shortDate(p.startDate)}–{shortDate(p.endDate)}
                       </TableCell>
@@ -1601,17 +1638,18 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                 </TableBody>
               </Table>
             </TableContainer>
+            </Box>
           </Box>
         ) : (
           <Box>
-            <TableContainer sx={{ mb: 2 }}>
+            <TableContainer sx={SECTION_CARD_SX}>
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Campaign</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Period</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Daily Budget</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Total Budget</TableCell>
+                    <TableCell>Campaign</TableCell>
+                    <TableCell>Period</TableCell>
+                    <TableCell align="right">Daily Budget</TableCell>
+                    <TableCell align="right">Total Budget</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1665,8 +1703,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                       // PacingIndicator 막대와 동일 — 6px 높이의 절반(inlay 3px) 풀 필
                       borderRadius: (theme) => `${theme.shape.radius.inlay}px`,
                       backgroundColor: 'surface.muted',
-                      // 위 phase 막대와 같은 이유로 primary.light (기본은 primary.main)
-                      '& .MuiLinearProgress-bar': { backgroundColor: 'primary.light' },
+                      // 트랙 위의 채움 하나뿐이라 강조색(차트 토큰)을 쓴다 — 회색 위 회색은 안 읽힌다
+                      '& .MuiLinearProgress-bar': { backgroundColor: 'chart.barEmphasis' },
                     }}
                   />
                 </Box>
@@ -1696,16 +1734,15 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
               (spend per phase)은 바로 아래 goal별 표가 캠페인 단위로 이미 다
               지키고 있어서, "차트가 없다"는 안내는 제목만 남은 빈 섹션을 만든다. */}
           {phases.length > 0 && isTimelineReadable && (
-            <Box sx={{ mb: 4 }}>
-              <Typography variant="title" sx={SECTION_TITLE_SX}>
-                Event timeline{' '}
-                <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                  — {phases.length} {phases.length === 1 ? 'phase' : 'phases'} · Spend on each bar
-                </Typography>
-              </Typography>
-
+            <Box sx={SECTION_CARD_SX}>
+              <SectionHeader
+                title="Event timeline"
+                scope={`${phases.length} ${phases.length === 1 ? 'phase' : 'phases'} · ${formatDateRange(phases[0].startDate, phases.reduce((max, p) => (p.endDate > max ? p.endDate : max), phases[0].endDate))}`}
+                hasDivider={false}
+              />
               <PhaseTimelineChart
                 phases={phases}
+                today={today}
                 barSuffix={(phase) => {
                   const spend = performanceByPhaseKey.get(phase.key)?.spend;
                   // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에
@@ -1722,8 +1759,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
               상세 드로어였는데, "각 캠페인별 데일리는 어디 있나"가 바로
               나왔다(실사용 지적) — 클릭 뒤에 숨기지 않고 이 표가 캠페인을
               컬럼으로 세워 나란히 보여준다. 행이 없으면 섹션을 숨기지 않고
-              한 줄로 말한다 — 첫 동기화 전의 정상 상태가 고장으로 읽히지 않게. */}
-          {(() => {
+              한 줄로 말한다 — 첫 동기화 전의 정상 상태가 고장으로 읽히지 않게.
+
+              **Event를 골랐을 때만 그린다.** All Events 상태에서는 타임라인 없이
+              이 표가 화면 맨 위에 와서, 이벤트와 무관한 캠페인 수백 건의 합계가
+              리포트의 첫 내용이 됐다(실사용 지적). 일별 지출은 "이 이벤트가 하루에
+              얼마씩 나갔나"라는 질문이라 이벤트 단위에서만 뜻이 선다. */}
+          {activeCampaignGroup && (() => {
             /* 캠페인 컬럼은 이벤트 하나를 골랐을 때의 규모(한 자릿수)를 전제로
                한다 — 필터 없이 캠페인 수백 건이 걸리면 컬럼 수백 개짜리 표가
                되므로 합계 모드로 접는다(PHASE_TIMELINE_MAX_PHASES와 같은 종류의
@@ -1738,10 +1780,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
               });
             };
             return (
-              <Box sx={{ mb: 4 }}>
+              <Box sx={SECTION_CARD_SX}>
                 {/* 제목 행 전체가 토글이다(ref/issue22-1·2, Meta Business Suite의
                     Comments/Messages 행과 같은 문법) — 제목은 왼쪽, 화살표는 오른쪽
-                    끝에 붙고 접힘 ∨ / 펼침 ∧ 로 뒤집힌다. 행 아래 구분선이 접힌
+                    끝에 붙고 접힘 ∨ / 펼침 ∧ 로 뒤집힌다. 카드 테두리가 접힌
                     상태에서도 "여기 섹션 하나가 있다"를 남긴다. 제목이 요약(일수·
                     캠페인 수)을 이미 말하므로 접힌 채로도 무엇이 접혀 있나가 읽힌다.
                     시맨틱은 button + aria-expanded. */}
@@ -1757,28 +1799,30 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                     justifyContent: 'space-between',
                     gap: 1.5,
                     width: '100%',
-                    px: 0,
-                    py: 1.25,
-                    mb: isDailySpendOpen ? 1.5 : 0,
+                    px: 2,
+                    pt: 2,
+                    pb: 1.5,
                     border: 0,
-                    borderBottom: '1px solid',
+                    borderBottom: isDailySpendOpen ? '1px solid' : 0,
                     borderBottomColor: 'divider',
                     background: 'none',
                     textAlign: 'left',
                     cursor: 'pointer',
                     font: 'inherit',
                     color: 'text.primary',
+                    '@media (hover: hover)': {
+                      '&:hover': { backgroundColor: 'action.hover' },
+                    },
                     '&:focus-visible': {
                       outline: 'none',
-                      boxShadow: (theme) => `0 0 0 3px ${theme.palette.accent.ring}`,
-                      borderRadius: 1,
+                      boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
                     },
                   }}
                 >
                   <Typography variant="title" component="span" sx={{ ...SECTION_TITLE_SX, mb: 0 }}>
-                    Daily spend{' '}
-                    <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                      — {dailyMatrix.rows.length} {dailyMatrix.rows.length === 1 ? 'day' : 'days'}
+                    Daily spend
+                    <Typography component="span" variant="body2" sx={{ ...SECTION_SCOPE_SX, ml: 1.5 }}>
+                      {dailyMatrix.rows.length} {dailyMatrix.rows.length === 1 ? 'day' : 'days'}
                       {hasDateFilter ? ' in selected dates' : ''}
                       {showPerCampaign ? ` · ${dailyMatrix.columns.length} campaigns` : ''}
                     </Typography>
@@ -1795,7 +1839,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                 </Box>
                 <Collapse in={isDailySpendOpen} id="report-daily-spend-body" unmountOnExit>
                   {dailyMatrix.rows.length === 0 ? (
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
                       No daily data for these campaigns yet — it arrives with the next sync.
                     </Typography>
                   ) : (
@@ -1805,17 +1849,17 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                        TableContainer가 아니라 ScrollArea인 이유(goal 표와 동일):
                        기본 overflow는 넘쳤다는 신호를 주지 않아서, 43일짜리 표가
                        열한 줄에서 딱 끝난 것처럼 보였다(실사용 신고 i-9). */
-                    <ScrollArea label="Daily spend by campaign" maxHeight={448} sx={{ mb: 2, ...(showPerCampaign ? {} : { maxWidth: 560 }) }}>
+                    <ScrollArea label="Daily spend by campaign" maxHeight={448} sx={showPerCampaign ? undefined : { maxWidth: 560 }}>
                       <Table size="small" stickyHeader>
                         <TableHead>
                           <TableRow>
-                            <TableCell sx={{ fontWeight: 600 }}>Date</TableCell>
+                            <TableCell>Date</TableCell>
                             {showPerCampaign && dailyMatrix.columns.map((col) => (
                               /* 캠페인 이름은 길다("G10_Coming Soon_0617~0707") —
                                  한 줄 말줄임 + 전체 이름은 툴팁. 같은 phase가
                                  Meta/TikTok 쌍으로 오므로 플랫폼을 둘째 줄에 밝혀
                                  같은 이름 컬럼 둘이 구분되게 한다. */
-                              <TableCell key={col.campaignId} align="right" sx={{ fontWeight: 600 }}>
+                              <TableCell key={col.campaignId} align="right">
                                 <Tooltip title={col.name}>
                                   <Box sx={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', ml: 'auto' }}>
                                     {col.name}
@@ -1826,9 +1870,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                                 </Typography>
                               </TableCell>
                             ))}
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>{showPerCampaign ? 'Total' : 'Spend'}</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>Impressions</TableCell>
-                            <TableCell align="right" sx={{ fontWeight: 600 }}>Clicks</TableCell>
+                            <TableCell align="right">{showPerCampaign ? 'Total' : 'Spend'}</TableCell>
+                            <TableCell align="right">Impressions</TableCell>
+                            <TableCell align="right">Clicks</TableCell>
                           </TableRow>
                         </TableHead>
                         <TableBody>
@@ -1983,14 +2027,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
              (행별로 갈릴 일이 없다: 컬럼이 없다는 건 전 행이 비었다는 뜻이다.) */
           if (dataColumns.length === 0) {
             return (
-              <Box key={value} sx={{ mb: 3 }}>
-                <Typography variant="title" sx={SECTION_TITLE_SX}>
-                  {label}{' '}
-                  <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                    — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}
-                  </Typography>
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
+              <Box key={value} sx={SECTION_CARD_SX}>
+                <SectionHeader
+                  title={label}
+                  scope={`${rowsForGoal.length} ${rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}`}
+                />
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
                   No performance data yet.
                 </Typography>
               </Box>
@@ -1998,14 +2040,11 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
           }
 
           return (
-            <Box key={value} sx={{ mb: 3 }}>
-              <Typography variant="title" sx={SECTION_TITLE_SX}>
-                {label}{' '}
-                <Typography component="span" variant="body2" sx={SECTION_SCOPE_SX}>
-                  — {rowsForGoal.length} {rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}
-                  {headlineMedian && ` · median ${headlineMedian}`}
-                </Typography>
-              </Typography>
+            <Box key={value} sx={SECTION_CARD_SX}>
+              <SectionHeader
+                title={label}
+                scope={`${rowsForGoal.length} ${rowsForGoal.length === 1 ? 'campaign' : 'campaigns'}${headlineMedian ? ` · median ${headlineMedian}` : ''}`}
+              />
               {/* TableContainer 대신 ScrollArea — 기본 overflow는 넘쳤다는 신호를
                   전혀 주지 않아서, 마지막 컬럼이 통째로 안 보이는데도 표가 딱 맞게
                   끝난 것처럼 보였다(실화면 리뷰). 좌측 그림자는 고정 열 오른쪽
@@ -2029,8 +2068,8 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                   </colgroup>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 600, ...STICKY_CAMPAIGN_SX }}>Campaign</TableCell>
-                      <TableCell sx={{ fontWeight: 600 }}>Platform</TableCell>
+                      <TableCell sx={STICKY_CAMPAIGN_SX}>Campaign</TableCell>
+                      <TableCell>Platform</TableCell>
                       {dataColumns.map((column) => (
                         <TableCell
                           key={`${column.group}-${column.header}`}
@@ -2041,7 +2080,6 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                              된다(실화면 12-14~12-17, 사용자 지적). 긴 이름과
                              중앙값은 ⓘ 툴팁이 갖는다. */
                           sx={{
-                            fontWeight: 600,
                             whiteSpace: 'nowrap',
                             ...(column.isGroupStart ? GROUP_DIVIDER_SX : null),
                           }}
@@ -2119,7 +2157,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                 />
               )}
               {hasPlatformSpecificMetric && isMixedPlatform && (
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, py: 1.25, borderTop: '1px solid', borderColor: 'divider' }}>
                   This table mixes Meta and TikTok. Hook Rate uses each platform&apos;s own
                   definition (Meta counts a 3-second play, TikTok a 2-second play), and Hold Rate
                   builds on it (full watches ÷ hook views) — compare them within a platform, not across.

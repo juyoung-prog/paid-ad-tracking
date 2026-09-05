@@ -614,7 +614,7 @@ export const Usage = {
           } }
         >
 { `// 주의: color="primary" 버튼의 실제 표면색은 primary.main(#0000FF)이 아니라
-// accent.main(#0000B2)이다 — 테마의 MuiButton override가 "선택·상호작용은 accent
+// accent.main(#2563EB)이다 — 테마의 MuiButton override가 "선택·상호작용은 accent
 // 하나로"라는 규칙을 버튼에도 적용한다(Overview/Visual Direction의 토큰 변경표 참고).
 // primary.main은 브랜드 색으로 팔레트에 그대로 남아 있다.
 <Button variant="contained" color="primary">Primary</Button>

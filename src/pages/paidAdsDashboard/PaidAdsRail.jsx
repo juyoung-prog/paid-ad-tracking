@@ -11,6 +11,9 @@ import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlin
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
+import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+import { useDesignSystem } from '../../styles/themes/designSystemContext';
+import { themeMeta, getThemeNames } from '../../styles/themes';
 import logoUrl from '../../assets/beautymaster-logo.png';
 
 /**
@@ -253,6 +256,18 @@ export function PaidAdsRail({ sx }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const { notify, SnackbarComponent } = useSnackbar();
 
+  /* 디자인 시스템 전환(Default → Carbon → Default…). 전역 헤더가 없는
+     셸이라 모든 페이지에서 보이는 자리는 이 레일뿐이다. 라벨이 **현재** 시스템을
+     말한다("Design: Carbon") — 누르면 무엇이 되는지가 아니라 지금 무엇을 보고
+     있는지를 알려야, 시스템을 번갈아 비교하는 사람이 어느 쪽인지 잊지 않는다.
+     순서는 레지스트리(themes) 등록 순 — 테마를 추가하면 버튼이 알아서 순환에 넣는다. */
+  const { themeName, setThemeName } = useDesignSystem();
+  const toggleDesignSystem = () => {
+    const names = getThemeNames();
+    const next = names[(names.indexOf(themeName) + 1) % names.length];
+    setThemeName(next);
+  };
+
   /* Dashboard 헤더의 Sync now와 같은 순서(캠페인 → 성과 — 뒤집으면 방금 들어온
      캠페인의 성과를 이번 회차에 놓친다). 끝나면 이벤트로 페이지 스토어에
      "다시 읽어라"를 알린다 — 레일은 어떤 페이지의 스토어에도 접근할 수 없다. */
@@ -288,7 +303,10 @@ export function PaidAdsRail({ sx }) {
         flexDirection: 'column',
         borderRight: '1px solid',
         borderColor: 'divider',
-        backgroundColor: 'surface.sunken',
+        /* 흰 배경 + 1px 경계선 — 본문과 같은 면이고 선 하나로만 갈린다(ref/re1.png).
+           예전의 한 단 낮은 면(surface.sunken)은 레일이 본문보다 "눌린" 영역으로
+           읽혀 화면이 두 톤으로 갈렸다. */
+        backgroundColor: 'background.paper',
         px: 1.25,
         py: 1.75,
         transition: theme.transitions.create(['width', 'background-color', 'box-shadow'], {
@@ -395,6 +413,9 @@ export function PaidAdsRail({ sx }) {
         }) }
       >
         {/* 레퍼런스의 하단 블록 순서 그대로: Last synced → Refresh → Settings.
+            Design(디자인 시스템 전환)은 레퍼런스에 없는 이 프로젝트만의 행이라
+            Refresh와 Settings 사이에 끼운다 — 동작(Refresh)과 링크(Settings)의
+            경계에 놓인 "보기 설정"이다.
             (레퍼런스의 "Open Google Sheet"만 없다 — 그쪽은 데이터 원천이 시트
             하나라 그 행이 있고, 우리 원천은 Meta·TikTok 광고 관리자 둘이라
             대응되는 단일 링크가 없다. 캠페인 단위 딥링크는 Drawer의 Ads
@@ -426,6 +447,11 @@ export function PaidAdsRail({ sx }) {
           label={ isSyncing ? 'Syncing…' : 'Refresh' }
           onClick={ handleRefresh }
           isBusy={ isSyncing }
+        />
+        <RailButton
+          icon={ <PaletteOutlinedIcon /> }
+          label={ `Design: ${themeMeta[themeName]?.name ?? themeName}` }
+          onClick={ toggleDesignSystem }
         />
         { UTILITY_ITEMS.map(({ to, label, icon }) => (
           <RailRow key={ to } to={ to } icon={ icon } label={ label } isActive={ isPathActive(to) } />

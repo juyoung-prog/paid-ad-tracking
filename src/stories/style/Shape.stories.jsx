@@ -165,7 +165,7 @@ function ShapeDocs() {
           >
 { `/* radius 토큰 활용 프롬프트 예시 */
 
-"칩처럼 클릭되는 요소에 shape.radius.control(4px)을 적용해줘.
+"칩처럼 클릭되는 요소에 shape.radius.control(6px)을 적용해줘.
 sx에서는 숫자가 아니라 \\\`\${theme.shape.radius.control}px\\\` 문자열로 넘겨야 해."
 
 "이 분석 카드 컨테이너에 shape.radius.container(6px)를 써줘.
