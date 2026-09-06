@@ -13,6 +13,8 @@ const POST_END_SYNC_DAYS = 7;
 
 /** 페이지네이션 상한. 응답이 잘못돼도 무한 루프에 빠지지 않게 하는 안전장치다. */
 const MAX_PAGES = 50;
+/** Meta 일별 insights 요청 하나가 덮는 최대 일수(약 한 분기). fetchMetaDailyByCampaign 주석 참고. */
+const META_DAILY_WINDOW_DAYS = 92;
 
 /** performance_records에 넣는 지표 필드. 플랫폼별 매퍼가 반드시 이 형태로 반환한다. */
 type Metrics = {
@@ -180,42 +182,54 @@ async function fetchMetaDailyByCampaign(
   since: string,
   until: string,
 ): Promise<{ byCampaign: Map<string, DailyRow[]>; errorMessage: string | null }> {
-  const timeRange = encodeURIComponent(JSON.stringify({ since, until }));
   const byCampaign = new Map<string, DailyRow[]>();
-  // clicks는 최상위 필드가 아니라 actions의 link_click에서 뽑는다 — 스냅샷
-  // (mapMetaInsight)과 같은 정의여야 두 테이블의 클릭이 서로 어긋나지 않는다.
-  let url: string | null =
-    `https://graph.facebook.com/v19.0/act_${externalAccountId}/insights` +
-    `?level=campaign&fields=campaign_id,spend,impressions,actions` +
-    `&time_increment=1&time_range=${timeRange}&limit=500&access_token=${accessToken}`;
 
-  let page = 0;
-  for (; url && page < MAX_PAGES; page += 1) {
-    const res: Response = await fetch(url);
-    // 명시적 any — 스냅샷 fetch와 같은 TS7022 회피.
-    const json: any = await res.json();
-    if (json?.error) {
-      console.error('Meta daily insights 조회 실패', { externalAccountId, message: json.error.message });
-      return { byCampaign, errorMessage: `Meta daily insights 조회 실패 — ${json.error.message}` };
-    }
-    for (const row of json.data ?? []) {
-      if (!row.campaign_id || !row.date_start) continue;
-      const list = byCampaign.get(String(row.campaign_id)) ?? [];
-      list.push({
-        date: String(row.date_start),
-        spend: num(row.spend) ?? 0,
-        impressions: num(row.impressions),
-        clicks: metaAction(row, 'actions', 'link_click') ?? (Array.isArray(row.actions) ? 0 : null),
-      });
-      byCampaign.set(String(row.campaign_id), list);
-    }
-    url = json.paging?.next ?? null;
-  }
+  /* 창을 META_DAILY_WINDOW_DAYS 단위로 잘라 순회한다. 계정 하나의 3년치를
+     요청 하나로 보내면 Meta가 "An unknown error occurred"로 거절한다 —
+     BM Atlanta(캠페인 79개, 2018년부터)에서 매일 재현됐다(2026-09-04~06 cron
+     기록). 페이지네이션은 행 수를 나눌 뿐 서버가 계산하는 범위는 그대로라
+     도움이 안 되고, 기간을 잘라야 한 요청의 무게가 준다.
+     한 창이라도 실패하면 계정 전체를 실패로 돌린다 — 일부만 저장하면 그
+     캠페인이 "이미 일별이 있는" 것으로 분류돼 빠진 구간이 영영 안 채워진다. */
+  for (let windowStart = since; windowStart <= until; windowStart = addDays(windowStart, META_DAILY_WINDOW_DAYS)) {
+    const windowEndCandidate = addDays(windowStart, META_DAILY_WINDOW_DAYS - 1);
+    const windowEnd = windowEndCandidate < until ? windowEndCandidate : until;
+    const timeRange = encodeURIComponent(JSON.stringify({ since: windowStart, until: windowEnd }));
+    // clicks는 최상위 필드가 아니라 actions의 link_click에서 뽑는다 — 스냅샷
+    // (mapMetaInsight)과 같은 정의여야 두 테이블의 클릭이 서로 어긋나지 않는다.
+    let url: string | null =
+      `https://graph.facebook.com/v19.0/act_${externalAccountId}/insights` +
+      `?level=campaign&fields=campaign_id,spend,impressions,actions` +
+      `&time_increment=1&time_range=${timeRange}&limit=500&access_token=${accessToken}`;
 
-  // 페이지 상한에 걸려 뒷부분을 못 받았으면 실패로 보고한다 — 조용히 자르면
-  // "그 캠페인은 그날 지출이 없었다"라는 거짓 데이터가 된다.
-  if (url) {
-    return { byCampaign, errorMessage: `Meta daily insights가 ${MAX_PAGES}페이지를 초과 — 기간을 좁혀 다시 받아야 함` };
+    let page = 0;
+    for (; url && page < MAX_PAGES; page += 1) {
+      const res: Response = await fetch(url);
+      // 명시적 any — 스냅샷 fetch와 같은 TS7022 회피.
+      const json: any = await res.json();
+      if (json?.error) {
+        console.error('Meta daily insights 조회 실패', { externalAccountId, windowStart, windowEnd, message: json.error.message });
+        return { byCampaign, errorMessage: `Meta daily insights 조회 실패(${windowStart}~${windowEnd}) — ${json.error.message}` };
+      }
+      for (const row of json.data ?? []) {
+        if (!row.campaign_id || !row.date_start) continue;
+        const list = byCampaign.get(String(row.campaign_id)) ?? [];
+        list.push({
+          date: String(row.date_start),
+          spend: num(row.spend) ?? 0,
+          impressions: num(row.impressions),
+          clicks: metaAction(row, 'actions', 'link_click') ?? (Array.isArray(row.actions) ? 0 : null),
+        });
+        byCampaign.set(String(row.campaign_id), list);
+      }
+      url = json.paging?.next ?? null;
+    }
+
+    // 페이지 상한에 걸려 뒷부분을 못 받았으면 실패로 보고한다 — 조용히 자르면
+    // "그 캠페인은 그날 지출이 없었다"라는 거짓 데이터가 된다.
+    if (url) {
+      return { byCampaign, errorMessage: `Meta daily insights가 ${MAX_PAGES}페이지를 초과(${windowStart}~${windowEnd}) — 기간을 좁혀 다시 받아야 함` };
+    }
   }
   return { byCampaign, errorMessage: null };
 }
@@ -558,7 +572,17 @@ Deno.serve(async (req) => {
   // Meta: 스냅샷과 마찬가지로 계정마다 한 번. 창은 그 계정 대상 캠페인들이
   // 필요로 하는 범위의 합집합 — backfill 캠페인은 자기 start_date부터,
   // 재수집 캠페인은 cutoffDate부터.
-  const metaDailyTargets = dailyTargets.filter((c) => c.platform === 'meta');
+  /* 창 밖에서 **끝난** 캠페인은 대상에서 뺀다. Meta가 그 구간의 일별을 주지
+     않으니 행이 영영 안 생기고, 안 생기니 매일 backfill 대상으로 다시 잡혀
+     계정 창을 36개월 전체로 끌어내렸다 — BM Atlanta의 2018~2023년 캠페인 62개가
+     정확히 이 상태였다. 창 안에서 끝난 캠페인은 시작이 창 밖이어도 남긴다
+     (since 클램프로 받을 수 있는 부분은 받는다). 이미 받아둔 행은 이 판정과
+     무관하게 DB에 남는다 — 제한은 요청에만 걸린다. */
+  const metaDailyTargets = dailyTargets.filter((c) => {
+    if (c.platform !== 'meta') return false;
+    if (c.end_date < metaMinSince) { skip('daily_outside_meta_window'); return false; }
+    return true;
+  });
   const metaDailyAccounts = new Set(metaDailyTargets.map((c) => c.account_id));
   for (const accountId of metaDailyAccounts) {
     const externalAccountId = externalIdByAccount.get(accountId);
