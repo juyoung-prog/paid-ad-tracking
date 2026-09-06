@@ -31,6 +31,22 @@ const tiers = [
   { tier: '4', components: 'FilterBar 수정', category: 'templates', dep: '없음 (옵션 세트만 교체)' },
 ];
 
+/* Recap(캠페인 종료 후 결과 보고, 2026-09 계획) — 같은 Tier 규칙으로 생성 순서를 잡는다.
+   1단계는 DB 변경 없이 화면과 계산만, 2단계에서 테이블 2개, 3단계는 내보내기·다국어. */
+const recapTiers = [
+  { tier: '0', components: 'BenchmarkDelta, VerdictChip', category: 'data-display', dep: '없음 (원자) — 1단계', phase: '1' },
+  { tier: '1', components: 'RecapCampaignTable', category: 'data-display', dep: 'Tier 0 + PerformanceReportTable 열 정의 공유 — 1단계', phase: '1' },
+  { tier: '2', components: 'Print stylesheet (@media print)', category: 'PaidAdsShell', dep: '없음 — 1단계', phase: '1' },
+  { tier: '3', components: 'RecapNoteEditor', category: 'templates', dep: 'event_recaps · recap_campaign_notes 테이블 + 로그인 게이트 — 2단계', phase: '2' },
+  { tier: '4', components: 'LanguageSwitch, Excel export', category: 'input, utils', dep: '언어별 문자열 표 · LocalizedText 칸 — 3단계', phase: '3' },
+];
+
+const recapLogic = [
+  { block: 'schema.js 벤치마크 함수 (순수)', content: 'buildBenchmarkPeers(campaign, allCampaigns) — 같은 platform + 같은 단계 이름(→ goal → not enough data 순 fallback), 2024년 이후만 · benchmarkStats(values, value, lowerIsBetter) — 중앙값·백분위·N · suggestVerdict(percentiles, goal) — 상위 30% good / 하위 30% bad' },
+  { block: '페이지 (Tier 5)', content: 'RecapPage(목록) · RecapDetailPage(/recap/:event) — Reports의 buildPhaseTimeline·goalRows 계산을 재사용, 레일에 Recap 메뉴 추가' },
+  { block: 'Recap 문자열 표', content: 'recapStrings.js — { en, ko, "zh-Hant" } 키로 화면 문구. 1단계는 en만 채우고 나머지 키는 비워둔다(빈 값이면 en으로 대체)' },
+];
+
 const checklist = [
   'schema.js에 React import 없음 (순수 JS 로직만)',
   '컴포넌트 파일에서 mock 데이터 직접 import 안 함 (스토리 파일만 예외)',
@@ -147,6 +163,53 @@ export const Doc = {
             </TableBody>
           </Table>
         </TableContainer>
+
+        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 같은 Tier 규칙, 단계별로 나눠 만든다" />
+        <TableContainer sx={{ mb: 2 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, width: '8%' }}>Tier</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>컴포넌트</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '16%' }}>카테고리</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '32%' }}>의존 / 단계</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {recapTiers.map((t) => (
+                <TableRow key={`recap-${t.tier}`}>
+                  <TableCell>
+                    <Chip label={`Tier ${t.tier}`} size="small" variant="outlined" color={t.phase === '1' ? 'primary' : 'default'} sx={{ borderRadius: (th) => `${th.shape.radius.control}px` }} />
+                  </TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{t.components}</TableCell>
+                  <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{t.category}</TableCell>
+                  <TableCell sx={{ fontSize: 13 }}>{t.dep}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TableContainer sx={{ mb: 1 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, width: '25%' }}>로직 레이어</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>내용</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {recapLogic.map((b) => (
+                <TableRow key={b.block}>
+                  <TableCell sx={{ fontWeight: 600 }}>{b.block}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{b.content}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+          1단계(Tier 0~2 + 페이지)는 DB 변경이 없어 먼저 배포할 수 있다. 2단계는 마이그레이션 2개(event_recaps · recap_campaign_notes, anon read + owner write RLS)와 Recap 편집에서만 켜는 로그인 게이트가 선행 조건이다. 3단계의 AI 초안/번역(Claude API)은 Edge Function으로 두고 프론트는 결과만 받는다.
+        </Typography>
 
         <SectionTitle title="분리 원칙 체크리스트" />
         <TableContainer>

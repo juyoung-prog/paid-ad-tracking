@@ -92,6 +92,20 @@ const scenarios = [
     success: '연결 후 별도 조작 없이 캠페인/성과가 채워짐. 토큰은 항상 서버에만 존재 — 프론트는 연결 상태만 앎',
     exception: '토큰 만료/재인증 필요 시 "연결 끊김" 상태 표시 + 재연결 CTA. 연결 안 된 계정의 캠페인은 시나리오 2(수동 등록)로 계속 지원',
   },
+  {
+    name: '시나리오 7: 캠페인 종료 후 결과 보고 (신규 — Recap, 2026-09)',
+    goal: '이벤트(예: G10 Opening)가 끝나면 보고용 문서를 대시보드 안에서 만든다. 숫자는 동기화 데이터로 자동, 사람은 판정·장점·아쉬운 점·배운 점만 쓴다. Reports는 "지금 어떻게 되고 있나"(진행 확인), Recap은 "끝났으니 무엇을 배웠나"(보고) — 목적이 달라 별도 메뉴',
+    flow: [
+      '레일에서 Recap 진입 → 이벤트 목록(최근 종료 순, Draft/Final 상태)',
+      '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), 단계 타임라인, 플랫폼별 캠페인 표',
+      '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·CPC)마다 벤치마크 — 같은 플랫폼·같은 단계의 과거 캠페인 중앙값 대비 차이와 백분위. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
+      '판정(good/mid/bad)은 백분위로 자동 제안하고 사람이 바꾼다',
+      '캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언 작성 → 저장 (2단계, 로그인 필요)',
+      '인쇄/PDF(1단계) 또는 Excel(3단계)로 내보내거나 링크 공유 — 읽기는 로그인 없이 열린다',
+    ],
+    success: '이벤트 종료 후 대시보드 밖에서 보고서를 다시 만들지 않는다. 읽는 사람이 숫자를 몰라도 벤치마크로 잘 됐는지 안다',
+    exception: '비교군이 3개 미만이면 "not enough data". 직접 등록 캠페인은 지표가 비어 있으면 "—". 2023년 이전 캠페인은 비교군에서 제외. 단계: 1 숫자·벤치마크·인쇄(DB 변경 없음) → 2 코멘트 저장(새 테이블 2개, 로그인 게이트) → 3 Excel·ko/zh-Hant·AI 초안·오가닉 지표 선택 입력',
+  },
 ];
 
 const dbSteps = [
@@ -140,6 +154,15 @@ const dbSteps = [
       "자동/수동 동기화(\"Sync now\") → sync-campaigns가 campaigns upsert(external_campaign_id 기준), sync-performance가 performance_records insert(source='api')",
     ],
   },
+  {
+    scenario: '시나리오 7. 캠페인 종료 후 결과 보고 (신규 — Recap)',
+    steps: [
+      '/recap 이벤트 목록 → campaigns read(campaign_group으로 묶음), event_recaps read(보고서 상태)',
+      '/recap/{event} 진입 → campaigns/performance_records/performance_daily/plans read. 벤치마크는 같은 read 결과로 그 자리에서 계산(저장 없음 — Alert와 같은 원칙)',
+      '판정·코멘트 저장(2단계) → event_recaps insert/update(이벤트 1행), recap_campaign_notes upsert(캠페인마다 1행). 로그인 사용자만 write',
+      '인쇄/PDF·Excel·링크 공유 → DB 동작 없음. 읽기는 anon read 정책으로 공개',
+    ],
+  },
 ];
 
 const mermaidFlow = `flowchart TD
@@ -169,7 +192,12 @@ const mermaidFlow = `flowchart TD
 
     C -->|매장 관리| I[/stores 이동]
     I --> I1[매장 추가/수정]
-    I1 --> E1`;
+    I1 --> E1
+
+    C -->|이벤트 종료 후 보고| J[/recap 이벤트 목록]
+    J --> J1[/recap/:event — 숫자·벤치마크 자동]
+    J1 --> J2[판정·코멘트·배운 점 작성 — 로그인]
+    J2 --> J3[인쇄/PDF · Excel · 링크 공유]`;
 
 const iaTree = `Paid Ads Dashboard
 ├── /dashboard (메인 — 기본 진입점)
@@ -190,8 +218,17 @@ const iaTree = `Paid Ads Dashboard
 │   ├── 기간 · 매장 · 플랫폼 선택
 │   ├── 요약 통계
 │   └── 내보내기 (CSV/이미지)
-└── /settings (신규 — API Integration) — 플랫폼 계정 연결 관리
-    └── 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA`;
+├── /settings (신규 — API Integration) — 플랫폼 계정 연결 관리
+│   └── 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA
+└── /recap (신규 — 2026-09) — 캠페인 종료 후 결과 보고
+    ├── 이벤트 목록 (최근 종료 순, Draft/Final 상태)
+    └── /recap/:event — 이벤트 하나의 보고서
+        ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄
+        ├── 단계 타임라인 (PhaseTimelineChart 재활용)
+        ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
+        ├── 캠페인별 코멘트 — 장점 · 아쉬운 점 · 이유 (2단계, 언어별)
+        ├── 배운 점 · 다음 제언 (2단계, 언어별)
+        └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)`;
 
 const pageList = [
   { page: 'Dashboard', path: '/dashboard', data: 'Campaign(R), PerformanceRecord(R, 집계), Store(R, 필터), AdAccount(R, 필터) — Alert는 저장 없이 재계산' },
@@ -200,6 +237,8 @@ const pageList = [
   { page: 'Stores', path: '/stores', data: 'Store(R/W, insert·update)' },
   { page: 'Reports', path: '/reports', data: 'Campaign(R), PerformanceRecord(R)' },
   { page: 'Settings (신규)', path: '/settings', data: "Connection(R, connections_public view만 — 토큰 필드는 프론트에 노출 안 함)" },
+  { page: 'Recap (신규 — 2026-09)', path: '/recap', data: 'Campaign(R, 이벤트 묶음), EventRecap(R, 상태)' },
+  { page: 'Recap Detail (신규 — 2026-09)', path: '/recap/{event}', data: 'Campaign(R), PerformanceRecord(R), PerformanceDaily(R), Plan(R), EventRecap(R/W), RecapCampaignNote(R/W) — 벤치마크는 저장 없이 계산' },
 ];
 
 const routes = [
@@ -212,6 +251,9 @@ const routes = [
   { path: '/reports', desc: '성과 보고서 뷰/내보내기' },
   { path: '/reports?from=2026-01-01&to=2026-03-31&store=G01', desc: '보고서 필터 상태 URL 유지' },
   { path: '/settings', desc: '플랫폼 계정 연결 관리 (신규 — API Integration)' },
+  { path: '/recap', desc: '이벤트별 결과 보고 목록 (신규 — 2026-09)' },
+  { path: '/recap/{event}', desc: '이벤트 하나의 보고서. {event}는 campaigns.campaign_group 값(URL 인코딩)' },
+  { path: '/recap/{event}?lang=ko', desc: '보고서 언어 전환 (3단계 — en 기본, ko / zh-Hant)' },
 ];
 
 /** Documentation */
@@ -234,7 +276,7 @@ export const Doc = {
           유저 시나리오, UX 플로우, 정보 구조(IA), 라우팅 설계
         </Typography>
 
-        <SectionTitle title="유저 시나리오" description="핵심 플로우 6개" />
+        <SectionTitle title="유저 시나리오" description="핵심 플로우 7개" />
         {scenarios.map((s) => (
           <Box key={s.name} sx={{ mb: 3 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1 }}>
@@ -382,6 +424,8 @@ const dataDictionary = [
   { name: 'Alert', table: '(없음 — 계산 전용)', desc: 'campaigns/performance_records를 읽어 매번 재계산, 저장 안 함' },
   { name: 'Connection', table: 'connections', desc: 'Meta/TikTok OAuth 연결 상태 — 서버 전용, RLS로 본인 행만 조회' },
   { name: 'User', table: 'auth.users (Supabase 내장)', desc: '로그인 사용자. 1인 운영 기준이며 모든 테이블의 owner_id가 참조' },
+  { name: 'EventRecap (신규 — 2026-09)', table: 'event_recaps', desc: '이벤트 하나의 결과 보고서 — 상태(draft/final), 배운 점·다음 제언(언어별). 2단계에서 생성' },
+  { name: 'RecapCampaignNote (신규 — 2026-09)', table: 'recap_campaign_notes', desc: '보고서 안 캠페인 하나의 판정과 코멘트(장점·아쉬운 점·이유, 언어별) + 선택 입력 오가닉 지표. 2단계에서 생성' },
 ];
 
 const entities = [
@@ -463,6 +507,31 @@ const entities = [
       { field: 'connectedAt', type: 'string', format: 'ISO 8601 datetime', desc: '최초 연결 시각', example: '"2026-07-20T09:00:00Z"' },
     ],
     note: 'AdAccount 참조. 서버 전용 — RLS로 본인 행만 조회 가능하며, 프론트는 connections_public(토큰 제외 view)를 통해 연결 상태(boolean)만 읽는다.',
+  },
+  {
+    name: 'EventRecap (결과 보고서, 신규 — 2026-09, 2단계)',
+    fields: [
+      { field: 'id', type: 'string', format: 'UUID v4, PK', desc: '—', example: '"r-01"' },
+      { field: 'eventName', type: 'string', format: 'campaigns.campaign_group과 같은 값, owner 안에서 unique', desc: '어느 이벤트의 보고서인가', example: '"G10 Opening"' },
+      { field: 'status', type: 'enum', format: 'draft | final', desc: '목록에서 표시. final이면 편집 전 확인', example: '"draft"' },
+      { field: 'summary', type: 'LocalizedText', format: '{ en, ko, zh-Hant } — ko/zh-Hant는 null 가능', desc: '머리글 아래 한 단락', example: '{ en: "Grand Opening drove ..." }' },
+      { field: 'learnings', type: 'LocalizedText[]', format: '항목마다 { title, body }의 언어별 칸', desc: '"배운 점" 카드 목록(이전 보고서의 4개 카드)', example: '—' },
+      { field: 'nextSteps', type: 'LocalizedText', format: '언어별', desc: '다음 캠페인 제언', example: '—' },
+      { field: 'createdAt / updatedAt', type: 'string', format: 'ISO 8601 datetime', desc: '—', example: '—' },
+    ],
+    note: 'LocalizedText = { en: string, ko: string | null, "zh-Hant": string | null }. 영어는 필수, 나머지는 3단계에서 채운다. 화면은 요청 언어가 비어 있으면 영어로 대체하고 "(English)" 표시를 붙인다. 읽기는 anon 공개, 쓰기는 로그인.',
+  },
+  {
+    name: 'RecapCampaignNote (캠페인 코멘트, 신규 — 2026-09, 2단계)',
+    fields: [
+      { field: 'id', type: 'string', format: 'UUID v4, PK', desc: '—', example: '—' },
+      { field: 'recapId', type: 'string', format: 'FK → EventRecap.id', desc: '—', example: '—' },
+      { field: 'campaignId', type: 'string', format: 'FK → Campaign.id, (recapId, campaignId) unique', desc: '캠페인당 1행', example: '—' },
+      { field: 'verdict', type: 'enum | null', format: 'good | mid | bad', desc: '예산 효율 판정. null이면 벤치마크 백분위로 자동 제안한 값을 보여준다', example: '"good"' },
+      { field: 'strength / weakness / reason', type: 'LocalizedText', format: '언어별', desc: '이전 보고서의 장점 · 아쉬운 점 · 이유', example: '—' },
+      { field: 'organicViews / organicEngagements', type: 'number | null', format: '정수', desc: '계정 전체(오가닉) 조회·참여 — 광고 API에 없어 선택 입력(3단계)', example: '100250' },
+    ],
+    note: 'Recap 벤치마크는 저장하지 않는 계산 전용: 비교군 = 같은 platform + 같은 단계 이름의 다른 이벤트 캠페인(3개 미만이면 같은 platform + 같은 goal, 그래도 미만이면 not enough data) · 대상은 비율 지표(CPM·CTR·CPC·Hook·Hold·참여율)만 · 중앙값 + 백분위 + N · 판정 제안은 goal별 대표 지표 백분위 상위 30% good / 하위 30% bad · 2024년 이후만 · Meta와 TikTok을 섞지 않는다.',
   },
 ];
 
@@ -558,6 +627,14 @@ const components = [
   { name: 'PerformanceForm', usage: '성과 지표 입력 폼 (goal 기반 Tier 조건부 노출)', type: '신규(구현됨)', note: '카테고리: templates' },
   { name: 'PacingIndicator', usage: '예산 소진 속도(pacing) 시각화', type: '신규(구현됨)', note: '카테고리: data-display' },
   { name: 'ConnectionCard', usage: 'Settings에서 계정별 연결 상태 + Connect/재연결 CTA', type: '신규 — API Integration', note: '카테고리: card — CustomCard 위에 구성, 상태 Chip(연결됨=success, 끊김=warning) 재활용' },
+  { name: 'KpiBar (Recap 머리글)', usage: '이벤트 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표', type: '재활용', note: 'delta로 벤치마크 대비 표시' },
+  { name: 'PhaseTimelineChart (Recap)', usage: '이벤트 단계 타임라인', type: '재활용', note: 'pages/paidAdsDashboard/PhaseTimelineChart.jsx — 클릭 없이 읽기 전용' },
+  { name: 'BenchmarkDelta', usage: '지표 값 + 중앙값 대비 차이 · 백분위 · N. not enough data 상태 포함', type: '신규 — Recap 1단계', note: '카테고리: data-display — KpiBar delta와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대)' },
+  { name: 'VerdictChip', usage: 'good / mid / bad 판정 표시. 자동 제안이면 점선 테두리', type: '신규 — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
+  { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 · (2단계) 코멘트', type: '신규 — Recap 1단계', note: '카테고리: data-display — PerformanceReportTable과 열 정의 공유, 보고서용 여러 줄 셀. 인쇄 시 가로 스크롤 없이 접히는 열 규칙' },
+  { name: 'RecapNoteEditor', usage: '캠페인별 장점·아쉬운 점·이유 + 이벤트 배운 점·다음 제언 입력. 언어 탭(en 기본)', type: '신규 — Recap 2단계', note: '카테고리: templates — 읽기 모드와 편집 모드가 같은 자리(인쇄는 읽기 모드)' },
+  { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규 — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출' },
+  { name: 'Print stylesheet (Recap)', usage: '인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소', type: '신규 — Recap 1단계', note: '컴포넌트가 아니라 @media print 규칙. PaidAdsShell 레벨' },
 ];
 
 function typeColor(type) {

@@ -78,6 +78,22 @@
 - **성공 조건**: 연결 후 별도 조작 없이 캠페인/성과가 채워짐. 토큰은 항상 서버에만 존재 — 프론트는 연결 상태만 앎
 - **예외 상황**: 토큰 만료/재인증 필요 시 "연결 끊김" 상태 표시 + 재연결 CTA. 연결 안 된 계정의 캠페인은 시나리오 2(수동 등록)로 계속 지원
 
+### 시나리오 7: 캠페인 종료 후 결과 보고 (신규 — Recap, 2026-09)
+
+- **사용자**: 페이드 광고 실무자 본인(작성), 상사/경영진(읽기 전용)
+- **목표**: 이벤트(예: G10 Opening)가 끝나면 보고용 문서를 대시보드 안에서 만든다. 숫자는 동기화 데이터로 자동, 사람은 판정·장점·아쉬운 점·배운 점만 쓴다. Reports는 "지금 어떻게 되고 있나"(진행 확인)이고 Recap은 "끝났으니 무엇을 배웠나"(보고)다 — 목적이 달라 별도 메뉴로 둔다
+- **플로우**:
+  1. 레일에서 `Recap` 진입 → 이벤트 목록(최근 종료 순, 보고서 상태 Draft/Final 표시)
+  2. 이벤트 클릭 → `/recap/{event}`: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), 단계 타임라인, **플랫폼별 캠페인 표**(순위·매장·캠페인·일예산·지출·판정·영상 반응·참여 반응·행동)
+  3. 표의 비율 지표(CPM·CTR·Hook·Hold·참여율·CPC)마다 **벤치마크** — 같은 플랫폼·같은 단계의 과거 캠페인 중앙값 대비 차이와 백분위(예: `Hook 23% · median 18% · top 25%`). 머리글에 "역대 오프닝 중 CPM 2위" 같은 순위 한 줄
+  4. 판정(good / mid / bad)은 백분위로 자동 제안(상위 30% good, 하위 30% bad)하고 사람이 바꾼다
+  5. 캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언을 쓴다 → 저장(**2단계**, 로그인 필요)
+  6. 인쇄/PDF(브라우저 인쇄, 1단계) 또는 Excel(3단계)로 내보내거나 링크를 그대로 보낸다 — 읽기는 로그인 없이 열린다
+- **성공 조건**: 이벤트 종료 후 대시보드 밖에서 보고서를 다시 만들지 않는다. 읽는 사람이 숫자를 몰라도 벤치마크로 잘 됐는지 안다
+- **예외 상황**: 비교군이 3개 미만이면 벤치마크 자리에 `not enough data`. 동기화 안 된(직접 등록) 캠페인은 지표가 비어 있으면 표에 `—`. 2023년 이전 캠페인은 지표가 거의 없어 비교군에서 제외
+- **단계**: 1단계 숫자·벤치마크·인쇄(DB 변경 없음) → 2단계 코멘트·배운 점 저장(새 테이블 2개, 로그인 게이트) → 3단계 Excel, 한국어·번체중문, AI 초안/번역, 오가닉(계정 전체) 지표 선택 입력
+- **다국어 전제**: 화면 문자열은 언어별 문자열 표(영어만 채운 채 시작), 사람이 쓰는 문장은 `{ en, ko, zh-Hant }` 칸. Recap에만 적용
+
 ---
 
 ## UX 플로우
@@ -111,6 +127,11 @@ flowchart TD
     C -->|매장 관리| I[/stores 이동]
     I --> I1[매장 추가/수정]
     I1 --> E1
+
+    C -->|이벤트 종료 후 보고| J[/recap 이벤트 목록]
+    J --> J1[/recap/:event — 숫자·벤치마크 자동]
+    J1 --> J2[판정·코멘트·배운 점 작성 — 로그인]
+    J2 --> J3[인쇄/PDF · Excel · 링크 공유]
 ```
 
 ### UX-flow 단계별 서사
@@ -158,6 +179,13 @@ flowchart TD
 - **Settings 화면 표시** → `connections_public`(토큰 제외 view) read
 - **자동/수동 동기화("Sync now")** → `sync-campaigns` Edge Function이 `campaigns` upsert(`external_campaign_id` 기준), `sync-performance`가 `performance_records` insert(`source='api'`)
 
+#### 시나리오 7. 캠페인 종료 후 결과 보고 (신규 — Recap)
+
+- **`/recap` 이벤트 목록** → `campaigns` read(campaign_group으로 묶음), `event_recaps` read(보고서 상태)
+- **`/recap/{event}` 진입** → `campaigns`/`performance_records`/`performance_daily`/`plans` read. 벤치마크는 같은 read 결과로 그 자리에서 계산(저장 없음 — Alert와 같은 원칙)
+- **판정·코멘트 저장(2단계)** → `event_recaps` insert/update(이벤트 1행), `recap_campaign_notes` upsert(캠페인마다 1행). 로그인 사용자만 write
+- **인쇄/PDF·Excel·링크 공유** → DB 동작 없음(클라이언트 사이드). 읽기는 anon read 정책으로 공개
+
 ## 정보 구조 (IA)
 
 ```
@@ -180,8 +208,17 @@ Paid Ads Dashboard
 │   ├── 기간 · 매장 · 플랫폼 선택
 │   ├── 요약 통계 (StoreBreakdown/CampaignSummaryGrid 계열 재사용)
 │   └── 내보내기 (CSV/이미지)
-└── /settings (신규 — API Integration) — 플랫폼 계정 연결 관리
-    └── 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA
+├── /settings (신규 — API Integration) — 플랫폼 계정 연결 관리
+│   └── 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA
+└── /recap (신규 — 2026-09) — 캠페인 종료 후 결과 보고
+    ├── 이벤트 목록 (최근 종료 순, Draft/Final 상태)
+    └── /recap/:event — 이벤트 하나의 보고서
+        ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄
+        ├── 단계 타임라인 (PhaseTimelineChart 재활용)
+        ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
+        ├── 캠페인별 코멘트 — 장점 · 아쉬운 점 · 이유 (2단계, 언어별)
+        ├── 배운 점 · 다음 제언 (2단계, 언어별)
+        └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)
 ```
 
 > 캠페인 상세·성과 입력은 별도 페이지 없이 Drawer로 처리 (Influencer Tracking Dashboard와 동일한 패턴 — 운영 툴은 페이지 전환보다 즉시 열람이 우선).
@@ -199,6 +236,8 @@ Paid Ads Dashboard
 | Stores | `/stores` | Store(R/W, insert·update) |
 | Reports | `/reports` | Campaign(R), PerformanceRecord(R) |
 | Settings (신규) | `/settings` | Connection(R, `connections_public` view만 — 토큰 필드는 프론트에 노출 안 함) |
+| Recap (신규 — 2026-09) | `/recap` | Campaign(R, 이벤트 묶음), EventRecap(R, 상태) |
+| Recap Detail (신규 — 2026-09) | `/recap/{event}` | Campaign(R), PerformanceRecord(R), PerformanceDaily(R), Plan(R), EventRecap(R/W), RecapCampaignNote(R/W) — 벤치마크는 저장 없이 계산 |
 
 ### 라우팅 설계
 
@@ -214,6 +253,9 @@ Paid Ads Dashboard
 | `/reports` | 성과 보고서 뷰/내보내기 |
 | `/reports?from=2026-01-01&to=2026-03-31&store=G01` | 보고서 필터 상태 URL 유지 |
 | `/settings` | 플랫폼 계정 연결 관리 (신규 — API Integration) |
+| `/recap` | 이벤트별 결과 보고 목록 (신규 — 2026-09) |
+| `/recap/{event}` | 이벤트 하나의 보고서. `{event}`는 `campaigns.campaign_group` 값(URL 인코딩) |
+| `/recap/{event}?lang=ko` | 보고서 언어 전환 (3단계 — en 기본, ko / zh-Hant) |
 
 ## 데이터 모델
 
@@ -232,6 +274,8 @@ Paid Ads Dashboard
 | Alert | `alerts` | 종료 임박/성과 미입력/중복 타겟팅 등 경고 |
 | Connection | `connections` | Meta/TikTok OAuth 연결 상태 — 서버 전용, RLS로 본인 행만 조회 |
 | User | `auth.users` (Supabase 내장) | 로그인 사용자. 1인 운영 기준이며 모든 테이블의 `owner_id`가 참조 |
+| EventRecap (신규 — 2026-09) | `event_recaps` | 이벤트 하나의 결과 보고서 — 상태(draft/final), 배운 점·다음 제언(언어별). 2단계에서 생성 |
+| RecapCampaignNote (신규 — 2026-09) | `recap_campaign_notes` | 보고서 안 캠페인 하나의 판정과 코멘트(장점·아쉬운 점·이유, 언어별) + 선택 입력 오가닉 지표. 2단계에서 생성 |
 
 ### 핵심 엔티티
 
@@ -243,6 +287,8 @@ Paid Ads Dashboard
 | PerformanceRecord (성과 기록) | id, campaignId, recordedAt, 지표들 | Campaign 1:1 (또는 1:N 스냅샷) |
 | Alert (알림) | id, campaignId, type, triggeredAt, resolvedAt | Campaign 참조 |
 | Connection (플랫폼 연결, 신규 — API Integration) | id, platform, accountId, accessToken(암호화), refreshToken, expiresAt, connectedAt | AdAccount 참조. **서버 전용** — RLS로 본인 행만 조회, 프론트에는 연결 상태(boolean)만 노출 |
+| EventRecap (결과 보고서, 신규 — 2026-09) | id, eventName, status, summary(언어별), learnings(언어별 목록), nextSteps(언어별), createdAt, updatedAt | eventName = Campaign.campaignGroup. RecapCampaignNote의 부모. 읽기는 anon 공개, 쓰기는 로그인 |
+| RecapCampaignNote (캠페인 코멘트, 신규 — 2026-09) | id, recapId, campaignId, verdict, strength(언어별), weakness(언어별), reason(언어별), organicViews, organicEngagements | EventRecap·Campaign 참조. 캠페인당 1행 |
 
 > Connection은 05-api-integration.md의 Supabase 연동을 위해 추가된 엔티티다. `/supabase-integration`이 이 섹션을 입력으로 읽으므로, 아래 필드 추가 사항과 함께 반드시 여기 반영한다.
 
@@ -355,6 +401,42 @@ Paid Ads Dashboard
 | Engagement Rate | `engagements ÷ impressions` |
 | CPA (Cost per Result) | `spend ÷ conversions` |
 
+#### EventRecap (신규 — 2026-09, 2단계)
+
+| 필드 | 타입 | 포맷 | 설명 | 예시 |
+|------|------|------|------|------|
+| id | string | UUID v4, PK | — | `"r-01"` |
+| eventName | string | `campaigns.campaign_group`과 같은 값, owner 안에서 unique | 어느 이벤트의 보고서인가 | `"G10 Opening"` |
+| status | enum | `draft` \| `final` | 목록에서 표시. final이면 편집 전 확인 | `"draft"` |
+| summary | LocalizedText | `{ en, ko, zh-Hant }` (ko/zh-Hant는 null 가능) | 머리글 아래 한 단락 | `{ en: "Grand Opening drove ..." }` |
+| learnings | LocalizedText[] | 항목마다 `{ title, body }`의 언어별 칸 | "배운 점" 카드 목록(이전 보고서의 4개 카드) | — |
+| nextSteps | LocalizedText | 언어별 | 다음 캠페인 제언 | — |
+| createdAt / updatedAt | string | ISO 8601 datetime | — | — |
+
+> **LocalizedText**: `{ en: string, ko: string \| null, "zh-Hant": string \| null }`. 영어는 필수, 나머지는 3단계에서 채운다. 화면은 요청 언어가 비어 있으면 영어로 대체하고 "(English)" 표시를 붙인다.
+
+#### RecapCampaignNote (신규 — 2026-09, 2단계)
+
+| 필드 | 타입 | 포맷 | 설명 | 예시 |
+|------|------|------|------|------|
+| id | string | UUID v4, PK | — | — |
+| recapId | string | FK → EventRecap.id | — | — |
+| campaignId | string | FK → Campaign.id, (recapId, campaignId) unique | 캠페인당 1행 | — |
+| verdict | enum \| null | `good` \| `mid` \| `bad` | 예산 효율 판정. null이면 벤치마크 백분위로 자동 제안한 값을 보여준다 | `"good"` |
+| strength / weakness / reason | LocalizedText | 언어별 | 이전 보고서의 장점 · 아쉬운 점 · 이유 | — |
+| organicViews / organicEngagements | number \| null | 정수 | 계정 전체(오가닉) 조회·참여 — 광고 API에 없어 선택 입력(3단계) | `100250` |
+
+#### Recap 벤치마크 (계산 전용 — 저장 안 함)
+
+| 항목 | 정의 |
+|---|---|
+| 비교군 | 같은 `platform` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal로, 그래도 3개 미만이면 `not enough data` |
+| 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
+| 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
+| 판정 제안 | 대표 지표(goal이 awareness면 CPM·Hook, traffic이면 CTR·CPC, engagement면 참여율)의 백분위 평균이 상위 30%면 `good`, 하위 30%면 `bad`, 그 사이 `mid` |
+| 기간 | 2024년 이후 캠페인만(2023년 이전은 지표가 거의 없음). 지역 필터(같은 GA/FL만) 전환 가능 |
+| 원칙 | Meta와 TikTok을 섞지 않는다(Hook 정의가 다르다). 평균이 아니라 중앙값 — 하나 터진 캠페인이 기준을 끌어올리지 않게 |
+
 #### Alert
 
 | 필드 | 타입 | 포맷 | 설명 | 예시 |
@@ -395,5 +477,13 @@ Paid Ads Dashboard
 | PacingIndicator | 예산 소진 속도(pacing) 시각화 | 신규 | 카테고리: data-display |
 | CampaignThumbnail | 캠페인 소재 썸네일 (플랫폼색 이니셜 fallback) | 재활용 | `components/media/CampaignThumbnail.jsx` — 이미 구현됨 |
 | ConnectionCard (신규 — API Integration) | Settings에서 계정별 연결 상태 + Connect/재연결 CTA 표시 | 신규 | 카테고리: card — CustomCard 위에 구성, 상태는 Chip(연결됨=success, 끊김=warning) 재활용 |
+| KpiBar (Recap 머리글) | 이벤트 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표 | 재활용 | `components/data-display/KpiBar.jsx` — `delta`로 벤치마크 대비 표시 |
+| PhaseTimelineChart (Recap) | 이벤트 단계 타임라인 | 재활용 | `pages/paidAdsDashboard/PhaseTimelineChart.jsx` — 클릭 없이 읽기 전용 |
+| BenchmarkDelta (신규 — Recap) | 지표 값 + 중앙값 대비 차이 · 백분위 · N. `not enough data` 상태 포함 | 신규 | 카테고리: data-display — KpiBar `delta`와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대) |
+| VerdictChip (신규 — Recap) | good / mid / bad 판정 표시. 자동 제안이면 점선 테두리 | 신규 | 카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning |
+| RecapCampaignTable (신규 — Recap) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 · (2단계) 코멘트 | 신규 | 카테고리: data-display — PerformanceReportTable과 열 정의를 공유하되 보고서용으로 셀에 여러 줄(Reach / Hook·Hold / 조회)을 담는다. 인쇄 시 가로 스크롤 없이 접히는 열 규칙 |
+| RecapNoteEditor (신규 — Recap 2단계) | 캠페인별 장점·아쉬운 점·이유 + 이벤트 배운 점·다음 제언 입력. 언어 탭(en 기본) | 신규 | 카테고리: templates — 읽기 모드와 편집 모드가 같은 자리(인쇄는 읽기 모드) |
+| LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규 | 카테고리: input — ToggleButton 재활용, Recap에만 노출 |
+| Print stylesheet (Recap) | 인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소 | 신규 | 컴포넌트가 아니라 `@media print` 규칙. PaidAdsShell 레벨 |
 
 > CampaignTable(2줄 리스트, 아바타 없음)과 KpiBar(라벨-위-숫자 배치)는 이후 라운드에서 Influencer Tracking Dashboard 실측 기준으로 갱신됨 — 위 표는 초기 이식 시점 기준이라 세부 배치는 각 컴포넌트 자체 주석/`components.md`가 최신 기준이다.

@@ -18,6 +18,8 @@ ux-flow의 사전을 그대로 인용.
 | Alert | *(없음 — 계산 전용)* | `campaigns`/`performance_records`를 읽어 매번 재계산, 저장 안 함 |
 | Connection | `connections` | Meta/TikTok OAuth 연결 상태 — 서버 전용, RLS로 본인 행만 조회 |
 | User | `auth.users` (Supabase 내장) | 로그인 사용자. 1인 운영 기준이며 모든 테이블의 `owner_id`가 참조 |
+| EventRecap (신규 — 2026-09) | `event_recaps` | 이벤트 하나의 결과 보고서 — 상태(draft/final), 배운 점·다음 제언(언어별). 2단계에서 생성 |
+| RecapCampaignNote (신규 — 2026-09) | `recap_campaign_notes` | 보고서 안 캠페인 하나의 판정과 코멘트(장점·아쉬운 점·이유, 언어별) + 선택 입력 오가닉 지표. 2단계에서 생성 |
 
 ## 2. UX-flow의 어느 시점에 DB가 업데이트되나?
 
@@ -56,6 +58,13 @@ ux-flow의 사전을 그대로 인용.
 - **Settings 화면 표시** → `connections_public`(토큰 제외 view) R
 - **자동/수동 동기화** → `sync-campaigns`가 `campaigns` upsert(`external_campaign_id` 기준), `sync-performance`가 `performance_records` insert(`source='api'`)
 
+### 시나리오 7. 캠페인 종료 후 결과 보고 (신규 — Recap)
+
+- **`/recap` 이벤트 목록** → `campaigns` R(campaign_group으로 묶음), `event_recaps` R(보고서 상태)
+- **`/recap/{event}` 진입** → `campaigns`/`performance_records`/`performance_daily`/`plans` R. 벤치마크는 같은 R 결과로 그 자리에서 계산(W 없음 — Alert와 같은 원칙)
+- **판정·코멘트 저장(2단계)** → `event_recaps` W(insert/update, 이벤트 1행), `recap_campaign_notes` W(upsert, 캠페인마다 1행). 로그인 사용자만 W — RLS는 다른 테이블과 같은 `owner_id = auth.uid()`, 읽기는 anon 공개 정책(00000000000019와 같은 방식)
+- **인쇄/PDF·Excel·링크 공유** → DB 동작 없음(클라이언트 사이드)
+
 ## 3. 각 페이지는 어떤 DB와 연결되나?
 
 | 페이지 | 다루는 테이블 | 동작 |
@@ -66,6 +75,8 @@ ux-flow의 사전을 그대로 인용.
 | Stores | `stores` | R + W |
 | Reports | `campaigns` + `performance_records` | R |
 | Settings | `connections_public`(view) | R (토큰 필드 없음 — 실제 `connections` write는 Edge Function 전용) |
+| Recap (신규 — 2026-09) | `campaigns` + `event_recaps` | R |
+| Recap Detail (신규 — 2026-09) | `campaigns` + `performance_records` + `performance_daily` + `plans` + `event_recaps` + `recap_campaign_notes` | R + W (2단계, 로그인 사용자만) — 벤치마크는 계산 전용, 저장 없음 |
 
 ## 4. 외부 의존 데이터의 라이프사이클
 
