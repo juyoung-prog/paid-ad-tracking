@@ -4,6 +4,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
 import { toLocalISODate } from './paidAdsPageUtils';
+import { phaseNameOf } from '../../data/schema';
 import { moneyWhole, dateMed, rangeDays } from '../../utils/format';
 
 /**
@@ -44,30 +45,11 @@ function splitNamePrefix(name) {
   return match ? { prefix: match[1], rest: match[2] } : { prefix: name ?? '', rest: '' };
 }
 
-/** 이름 끝의 기간 접미사 — `_0617~0707`, ` _0706 ~ 0801`, `-0710-0831` */
-const DATE_SUFFIX_PATTERN = /[\s_\-–—]*\d{4}\s*[~\-–—]\s*\d{4}\s*$/;
-/** 이름 앞의 매장·이벤트 코드 — `G10_`, `BF2 `, `G01-` (schema.js의 매장 코드 규칙과 같은 꼴) */
-const CODE_PREFIX_PATTERN = /^[A-Za-z]{1,3}\d{1,3}[\s_\-–—]+/;
-
-/**
- * 표시용 이름. 이 계정의 계획 캠페인은 `G10_Coming Soon_0617~0707`처럼 매장 코드와
- * 기간을 이름에 담는데, 그 둘은 이 차트에서 이미 다른 자리가 말한다(코드는 Event
- * 필터, 기간은 막대와 둘째 줄). 첫 줄에는 사람이 부르는 이름("Coming Soon")만 남기고
- * 원본 전체는 title(hover)로 보낸다 — 행마다 굵기 배치가 달라지지 않게 모든
- * 행이 같은 규칙을 탄다. 벗겨낸 뒤 아무것도 안 남으면 원본을 그대로 쓴다.
- *
- * @param {string} name - 원본 캠페인 이름
- * @returns {string}
- */
-function displayName(name) {
-  const cleaned = (name ?? '')
-    .replace(DATE_SUFFIX_PATTERN, '')
-    .replace(CODE_PREFIX_PATTERN, '')
-    .replace(/_/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned || name || '';
-}
+/* 표시용 이름(`G10_Coming Soon_0617~0707` → `Coming Soon`)은 schema.js의
+   phaseNameOf가 정한다 — Recap 벤치마크의 "같은 단계끼리" 판정과 같은 규칙이어야
+   화면에 같은 이름으로 보이는 두 캠페인이 벤치마크에서 다른 단계로 갈리지 않는다.
+   한때 이 파일이 자기 정규식을 들고 있었다(Build Plan Phase 1에서 올림). */
+const displayName = phaseNameOf;
 
 /**
  * phase 막대 옆에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —

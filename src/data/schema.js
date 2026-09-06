@@ -1418,3 +1418,430 @@ export function planVsActual(plan, campaigns, performanceRecords) {
   };
 }
 
+
+// ============================================================
+// Recap — 캠페인 종료 후 결과 보고 (02-ux-flow 시나리오 7, Build Plan Phase 1)
+//
+// 저장되는 것(EventRecap · RecapCampaignNote · LocalizedText)과 계산 전용
+// (BenchmarkStat · RecapCampaignRow · RecapHeadline)을 나눈다. 중앙값·백분위·
+// 판정·순위는 전부 여기서만 계산한다 — 컴포넌트는 결과를 props로 받을 뿐
+// 안에서 다시 나누지 않는다(Build Plan 분리 원칙).
+// ============================================================
+
+/** 보고서 상태 — draft는 편집 중, final은 편집 전 확인이 뜬다 */
+export const RECAP_STATUS = Object.freeze({
+  DRAFT: 'draft',
+  FINAL: 'final',
+});
+
+/** 예산 효율 판정 — 이전 보고서의 좋음/보통/아쉬움 */
+export const VERDICT = Object.freeze({
+  GOOD: 'good',
+  MID: 'mid',
+  BAD: 'bad',
+});
+
+/** Recap 화면 언어. 영어가 기본이고 나머지는 3단계에서 채운다 */
+export const RECAP_LANG = Object.freeze({
+  EN: 'en',
+  KO: 'ko',
+  ZH_HANT: 'zh-Hant',
+});
+export const RECAP_DEFAULT_LANG = RECAP_LANG.EN;
+
+/**
+ * 벤치마크 대상 지표 — **비율 지표만**. Reach·조회수 같은 절대값은 예산과 기간에
+ * 묶여 있어 캠페인끼리 비교가 안 된다. lowerIsBetter인 지표(비용)는 백분위를
+ * 뒤집어 "높을수록 좋음"으로 정규화한다.
+ */
+export const BENCHMARK_METRICS = Object.freeze([
+  { key: 'cpm', lowerIsBetter: true },
+  { key: 'cpc', lowerIsBetter: true },
+  { key: 'cpa', lowerIsBetter: true },
+  { key: 'ctr', lowerIsBetter: false },
+  { key: 'hookRate', lowerIsBetter: false },
+  { key: 'holdRate', lowerIsBetter: false },
+  { key: 'engagementRate', lowerIsBetter: false },
+]);
+
+/** goal별 대표 지표 — 판정 제안과 머리글 순위에 쓴다 */
+export const GOAL_HEADLINE_METRICS = Object.freeze({
+  [GOAL.AWARENESS]: ['cpm', 'hookRate'],
+  [GOAL.TRAFFIC]: ['ctr', 'cpc'],
+  [GOAL.ENGAGEMENT]: ['engagementRate'],
+  [GOAL.CONVERSION]: ['cpa'],
+  [GOAL.STORE_VISIT]: ['cpa'],
+});
+
+/** 비교군 최소 수 — 이보다 적으면 숫자 대신 "not enough data" */
+export const BENCHMARK_MIN_PEERS = 3;
+/** 비교 대상 시작일 — 2023년 이전 캠페인은 지표가 거의 없다(실계정 확인) */
+export const BENCHMARK_SINCE = '2024-01-01';
+/** 판정 제안 경계 — 대표 지표 백분위 평균이 good 이상이면 good, bad 이하면 bad */
+export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
+
+/**
+ * @typedef {Object} LocalizedText
+ * @property {string} en - 영어. 필수
+ * @property {string|null} [ko] - 한국어. 비어 있으면 화면은 en으로 대체하고 isFallback 표시
+ * @property {string|null} ['zh-Hant'] - 번체중문. 위와 같음
+ */
+
+/**
+ * @typedef {Object} EventRecap
+ * @property {string} id - UUID v4 PK
+ * @property {string} eventName - campaigns.campaign_group과 같은 값. owner 안에서 unique
+ * @property {'draft'|'final'} status
+ * @property {LocalizedText|null} summary - 머리글 아래 한 단락
+ * @property {Array<{ title: LocalizedText, body: LocalizedText }>} learnings - "배운 점" 카드 목록
+ * @property {LocalizedText|null} nextSteps - 다음 캠페인 제언
+ * @property {string} createdAt - ISO 8601 datetime
+ * @property {string} updatedAt - ISO 8601 datetime
+ */
+
+/**
+ * @typedef {Object} RecapCampaignNote
+ * @property {string} id - UUID v4 PK
+ * @property {string} recapId - FK → EventRecap.id
+ * @property {string} campaignId - FK → Campaign.id. (recapId, campaignId) unique
+ * @property {'good'|'mid'|'bad'|null} verdict - 예산 효율 판정. null이면 화면은 suggestedVerdict를 점선 칩으로 보여준다
+ * @property {LocalizedText|null} strength - 장점
+ * @property {LocalizedText|null} weakness - 아쉬운 점
+ * @property {LocalizedText|null} reason - 이유
+ * @property {number|null} organicViews - 계정 전체(오가닉) 조회 — 광고 API에 없어 선택 입력(3단계)
+ * @property {number|null} organicEngagements - 계정 전체(오가닉) 참여 — 위와 같음
+ */
+
+/**
+ * 계산 전용 — 지표 하나의 벤치마크 결과.
+ * @typedef {Object} BenchmarkStat
+ * @property {string} metricKey - BENCHMARK_METRICS의 key
+ * @property {number|null} value - 이 캠페인의 값
+ * @property {number|null} median - 비교군 중앙값. sampleSize < BENCHMARK_MIN_PEERS면 null
+ * @property {number|null} percentile - 0~100, "높을수록 좋음"으로 정규화. 위와 같은 조건에서 null
+ * @property {number} sampleSize - 값이 있는 비교 캠페인 수
+ * @property {boolean} lowerIsBetter
+ * @property {'phase'|'goal'|'none'} peerScope - 비교군을 어떤 기준으로 잡았나
+ */
+
+/**
+ * 계산 전용 — Recap 표 한 행. getGoalMetricsRow의 모든 필드 + 아래.
+ * @typedef {Object} RecapCampaignRowExtra
+ * @property {string} storeCode - 타겟 매장 코드(여러 개면 ", "로 이어 붙임, 전체면 "All")
+ * @property {string} phaseName - phaseNameOf(name)
+ * @property {string} startDate
+ * @property {string} endDate
+ * @property {number|null} dailyBudget
+ * @property {number} rank - 같은 플랫폼 안에서 1부터
+ * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
+ * @property {'good'|'mid'|'bad'|null} suggestedVerdict
+ * @property {RecapCampaignNote|null} note
+ */
+
+/**
+ * 계산 전용 — 머리글 한 줄의 재료. 문장은 recapStrings가 만든다.
+ * @typedef {Object} RecapHeadline
+ * @property {string} metricKey - 순위를 매긴 대표 지표
+ * @property {number} rank - 1부터
+ * @property {number} total - 이 이벤트를 포함한 비교 이벤트 수
+ * @property {string[]} peerEvents - 순위순 이벤트 이름(이 이벤트 포함)
+ */
+
+/** 이름 끝의 기간 접미사 — `_0617~0707`, ` _0706 ~ 0801`, `-0710-0831` */
+const PHASE_DATE_SUFFIX_PATTERN = /[\s_\-–—]*\d{4}\s*[~\-–—]\s*\d{4}\s*$/;
+/** 이름 앞의 매장·이벤트 코드 — `G10_`, `BF2 `, `G01-` (매장 코드 규칙과 같은 꼴) */
+const PHASE_CODE_PREFIX_PATTERN = /^[A-Za-z]{1,3}\d{1,3}[\s_\-–—]+/;
+
+/**
+ * 캠페인 이름에서 사람이 부르는 단계 이름만 남긴다 — `G10_Coming Soon_0617~0707`
+ * → `Coming Soon`. 매장 코드와 기간은 다른 자리(Event 필터·타임라인 막대)가
+ * 말하므로 이름에서 뺀다. 벗겨낸 뒤 아무것도 안 남으면 원본을 그대로 쓴다.
+ *
+ * PhaseTimelineChart의 첫 줄 표시와 Recap 벤치마크의 "같은 단계끼리" 판정이
+ * 같은 규칙을 써야 한다 — 한쪽만 고치면 화면에 같은 이름으로 보이는 두 캠페인이
+ * 벤치마크에서는 다른 단계로 갈린다.
+ *
+ * @param {string|{name: string}} nameOrCampaign - 캠페인 이름 또는 캠페인
+ * @returns {string}
+ */
+export function phaseNameOf(nameOrCampaign) {
+  const name = typeof nameOrCampaign === 'string' ? nameOrCampaign : (nameOrCampaign?.name ?? '');
+  const cleaned = (name ?? '')
+    .replace(PHASE_DATE_SUFFIX_PATTERN, '')
+    .replace(PHASE_CODE_PREFIX_PATTERN, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned || name || '';
+}
+
+/**
+ * 단계 비교 키 — phaseNameOf를 소문자·구분자 정리한 값. 화면 표시에는 쓰지 않는다.
+ * @param {string|{name: string}} nameOrCampaign
+ * @returns {string}
+ */
+export function phaseKey(nameOrCampaign) {
+  return campaignNameKey(phaseNameOf(nameOrCampaign));
+}
+
+/**
+ * 중앙값. 빈 배열이면 null.
+ * @param {number[]} values
+ * @returns {number|null}
+ */
+export function median(values) {
+  const sorted = (values ?? []).filter((v) => v != null && Number.isFinite(v)).sort((a, b) => a - b);
+  if (sorted.length === 0) return null;
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+/**
+ * 비교군 안에서 이 값의 백분위(0~100). "높을수록 좋음"으로 정규화한다 — 비용
+ * 지표(lowerIsBetter)는 값이 낮을수록 백분위가 높다. 동점은 절반으로 센다.
+ * 비교군이 비거나 값이 없으면 null.
+ *
+ * @param {number[]} values - 비교군 값
+ * @param {number|null} value - 이 캠페인의 값
+ * @param {boolean} [lowerIsBetter=false]
+ * @returns {number|null}
+ */
+export function percentileRank(values, value, lowerIsBetter = false) {
+  const peers = (values ?? []).filter((v) => v != null && Number.isFinite(v));
+  if (value == null || !Number.isFinite(value) || peers.length === 0) return null;
+  let worse = 0;
+  let equal = 0;
+  peers.forEach((v) => {
+    if (v === value) equal += 1;
+    else if (lowerIsBetter ? v > value : v < value) worse += 1;
+  });
+  return Math.round(((worse + equal / 2) / peers.length) * 100);
+}
+
+/**
+ * 비교군을 고른다 — 같은 platform, **다른 이벤트**, BENCHMARK_SINCE 이후 시작.
+ * 1순위는 같은 단계 이름(phaseKey), 3개 미만이면 같은 goal, 그래도 미만이면 none.
+ * Meta와 TikTok은 Hook 정의가 달라 절대 섞지 않는다.
+ *
+ * @param {Campaign} campaign
+ * @param {Campaign[]} allCampaigns - 탭·필터와 무관한 전체 목록
+ * @param {{ since?: string, region?: string|null, accountRegionById?: Object<string, string> }} [options] - region을 주면 같은 지역 계정(accountRegionById로 판정)만
+ * @returns {{ peers: Campaign[], scope: 'phase'|'goal'|'none' }}
+ */
+export function buildBenchmarkPeers(campaign, allCampaigns, options = {}) {
+  const { since = BENCHMARK_SINCE, region = null, accountRegionById = {} } = options;
+  const selfEvent = campaignNameKey(campaignGroupKey(campaign));
+  const base = (allCampaigns ?? []).filter((c) =>
+    c.id !== campaign.id
+    && c.platform === campaign.platform
+    && campaignNameKey(campaignGroupKey(c)) !== selfEvent
+    && (c.startDate ?? '') >= since
+    && (!region || accountRegionById[c.accountId] === region)
+  );
+  const samePhase = base.filter((c) => phaseKey(c) === phaseKey(campaign));
+  if (samePhase.length >= BENCHMARK_MIN_PEERS) return { peers: samePhase, scope: 'phase' };
+  const sameGoal = base.filter((c) => c.goal === campaign.goal);
+  if (sameGoal.length >= BENCHMARK_MIN_PEERS) return { peers: sameGoal, scope: 'goal' };
+  return { peers: [], scope: 'none' };
+}
+
+/**
+ * 지표 하나의 벤치마크. 비교군에서 값이 없는 행은 표본에서 뺀다.
+ *
+ * @param {string} metricKey - BENCHMARK_METRICS의 key
+ * @param {number|null} value - 이 캠페인의 값
+ * @param {Array<Object>} peerRows - getGoalMetricsRow 결과 배열
+ * @param {'phase'|'goal'|'none'} [peerScope='none']
+ * @returns {BenchmarkStat}
+ */
+export function benchmarkStat(metricKey, value, peerRows, peerScope = 'none') {
+  const meta = BENCHMARK_METRICS.find((m) => m.key === metricKey);
+  const lowerIsBetter = meta?.lowerIsBetter ?? false;
+  const peerValues = (peerRows ?? []).map((r) => r?.[metricKey]).filter((v) => v != null && Number.isFinite(v));
+  const enough = peerScope !== 'none' && peerValues.length >= BENCHMARK_MIN_PEERS;
+  return {
+    metricKey,
+    value: value ?? null,
+    median: enough ? median(peerValues) : null,
+    percentile: enough ? percentileRank(peerValues, value, lowerIsBetter) : null,
+    sampleSize: peerValues.length,
+    lowerIsBetter,
+    peerScope: enough ? peerScope : 'none',
+  };
+}
+
+/**
+ * goal별 대표 지표의 백분위 평균으로 판정을 제안한다. 대표 지표가 전부
+ * not enough data면 null — 근거 없는 판정은 만들지 않는다.
+ *
+ * @param {Object<string, BenchmarkStat>} benchmarks
+ * @param {string} goal
+ * @returns {'good'|'mid'|'bad'|null}
+ */
+export function suggestVerdict(benchmarks, goal) {
+  const keys = GOAL_HEADLINE_METRICS[goal] ?? [];
+  const pcts = keys.map((k) => benchmarks?.[k]?.percentile).filter((p) => p != null);
+  if (pcts.length === 0) return null;
+  const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length;
+  if (avg >= VERDICT_PERCENTILE.good) return VERDICT.GOOD;
+  if (avg <= VERDICT_PERCENTILE.bad) return VERDICT.BAD;
+  return VERDICT.MID;
+}
+
+/** 캠페인 하나의 성과 레코드 — 여러 개면 recordedAt이 늦은 것(없으면 마지막) */
+function latestRecordFor(campaignId, records) {
+  const mine = (records ?? []).filter((r) => r.campaignId === campaignId);
+  if (mine.length === 0) return undefined;
+  return mine.reduce((best, r) => ((r.recordedAt ?? '') >= (best.recordedAt ?? '') ? r : best), mine[0]);
+}
+
+/** 대표 지표 백분위 평균 — 정렬 점수. 하나도 없으면 -1(맨 뒤) */
+function headlineScore(benchmarks, goal) {
+  const keys = GOAL_HEADLINE_METRICS[goal] ?? [];
+  const pcts = keys.map((k) => benchmarks?.[k]?.percentile).filter((p) => p != null);
+  return pcts.length === 0 ? -1 : pcts.reduce((a, b) => a + b, 0) / pcts.length;
+}
+
+/** 타겟 매장 표기 — 표의 Store 열 */
+function storeCodeOf(campaign) {
+  if (campaign.targetScope === TARGET_SCOPE.ALL_STORES || !(campaign.targetStoreIds?.length)) return 'All';
+  return campaign.targetStoreIds.join(', ');
+}
+
+/**
+ * 이벤트 하나의 Recap 표 데이터 — 캠페인마다 지표 행 + 벤치마크 + 판정 제안,
+ * 플랫폼별로 대표 지표 백분위 순으로 정렬해 순위를 매긴다. 컴포넌트는 이
+ * 결과를 그대로 그린다.
+ *
+ * @param {string} eventName - campaigns.campaignGroup 값
+ * @param {Campaign[]} allCampaigns - 전체 캠페인(이 이벤트 + 비교군 후보)
+ * @param {PerformanceRecord[]} allRecords - 전체 성과 레코드
+ * @param {{ notesById?: Object<string, RecapCampaignNote>, since?: string, region?: string|null, accountRegionById?: Object<string, string> }} [options]
+ * @returns {{ byPlatform: Object<string, Array<Object>>, campaigns: Campaign[], peerEvents: string[] }}
+ */
+export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}) {
+  const { notesById = {}, ...peerOptions } = options;
+  const eventKey = campaignNameKey(eventName);
+  const eventCampaigns = (allCampaigns ?? []).filter((c) => campaignNameKey(campaignGroupKey(c)) === eventKey);
+  const peerEventNames = new Set();
+
+  const rows = eventCampaigns.map((c) => {
+    const row = getGoalMetricsRow(c, latestRecordFor(c.id, allRecords));
+    const { peers, scope } = buildBenchmarkPeers(c, allCampaigns, peerOptions);
+    peers.forEach((p) => peerEventNames.add(campaignGroupKey(p)));
+    const peerRows = peers.map((p) => getGoalMetricsRow(p, latestRecordFor(p.id, allRecords)));
+    const benchmarks = Object.fromEntries(
+      BENCHMARK_METRICS.map((m) => [m.key, benchmarkStat(m.key, row[m.key], peerRows, scope)])
+    );
+    return {
+      ...row,
+      storeCode: storeCodeOf(c),
+      phaseName: phaseNameOf(c),
+      startDate: c.startDate,
+      endDate: c.endDate,
+      dailyBudget: c.budgetDaily ?? null,
+      rank: 0,
+      benchmarks,
+      suggestedVerdict: suggestVerdict(benchmarks, c.goal),
+      note: notesById[c.id] ?? null,
+    };
+  });
+
+  const byPlatform = {};
+  rows.forEach((r) => { (byPlatform[r.platform] ??= []).push(r); });
+  Object.values(byPlatform).forEach((list) => {
+    list
+      .sort((a, b) => {
+        const diff = headlineScore(b.benchmarks, b.goal) - headlineScore(a.benchmarks, a.goal);
+        return diff !== 0 ? diff : (b.spend ?? 0) - (a.spend ?? 0);
+      })
+      .forEach((r, i) => { r.rank = i + 1; });
+  });
+
+  return { byPlatform, campaigns: eventCampaigns, peerEvents: [...peerEventNames].sort() };
+}
+
+/**
+ * 이벤트 단위 대표 지표 — 비율끼리 평균 내지 않고 분자·분모를 합쳐 다시 나눈다.
+ * @param {Array<Object>} rows - getGoalMetricsRow 결과 배열
+ * @param {string} metricKey
+ * @returns {number|null}
+ */
+function aggregateMetric(rows, metricKey) {
+  const sum = (key) => rows.reduce((acc, r) => (r[key] != null ? (acc ?? 0) + r[key] : acc), null);
+  switch (metricKey) {
+    case 'cpm': return calcCPM(sum('spend'), sum('impressions'));
+    case 'cpc': return calcCPC(sum('spend'), sum('clicks'));
+    case 'cpa': return calcCPA(sum('spend'), sum('conversions'));
+    case 'ctr': return calcCTR(sum('clicks'), sum('impressions'));
+    case 'hookRate': return calcHookRate(sum('hookViews'), sum('videoPlays'));
+    case 'holdRate': return calcHoldRate(sum('heldViews'), sum('hookViews'));
+    case 'engagementRate': return calcEngagementRate(sum('engagements'), sum('impressions'));
+    default: return null;
+  }
+}
+
+/**
+ * 머리글 순위 — "역대 오프닝 5개 중 CPM 2위". 이 이벤트의 가장 흔한 goal의
+ * 첫 대표 지표로, 단계 구성이 하나라도 겹치는 다른 이벤트들과 이벤트 단위로
+ * 비교한다. 이 이벤트를 포함해 3개 미만이면 null.
+ *
+ * @param {string} eventName
+ * @param {Campaign[]} allCampaigns
+ * @param {PerformanceRecord[]} allRecords
+ * @param {{ since?: string }} [options]
+ * @returns {RecapHeadline|null}
+ */
+export function buildRecapHeadline(eventName, allCampaigns, allRecords, options = {}) {
+  const { since = BENCHMARK_SINCE } = options;
+  const eventKey = campaignNameKey(eventName);
+  const byEvent = new Map();
+  (allCampaigns ?? []).forEach((c) => {
+    const key = campaignNameKey(campaignGroupKey(c));
+    if (key !== eventKey && (c.startDate ?? '') < since) return;
+    if (!byEvent.has(key)) byEvent.set(key, { name: campaignGroupKey(c), campaigns: [] });
+    byEvent.get(key).campaigns.push(c);
+  });
+  const self = byEvent.get(eventKey);
+  if (!self || self.campaigns.length === 0) return null;
+
+  const goalCounts = {};
+  self.campaigns.forEach((c) => { goalCounts[c.goal] = (goalCounts[c.goal] ?? 0) + 1; });
+  const goal = Object.entries(goalCounts).sort((a, b) => b[1] - a[1])[0][0];
+  const metricKey = (GOAL_HEADLINE_METRICS[goal] ?? [])[0];
+  if (!metricKey) return null;
+  const lowerIsBetter = BENCHMARK_METRICS.find((m) => m.key === metricKey)?.lowerIsBetter ?? false;
+
+  const selfPhases = new Set(self.campaigns.map((c) => phaseKey(c)));
+  const scored = [...byEvent.values()]
+    .filter((e) => e === self || e.campaigns.some((c) => selfPhases.has(phaseKey(c))))
+    .map((e) => ({
+      name: e.name,
+      value: aggregateMetric(e.campaigns.map((c) => getGoalMetricsRow(c, latestRecordFor(c.id, allRecords))), metricKey),
+    }))
+    .filter((e) => e.value != null);
+  if (scored.length < BENCHMARK_MIN_PEERS || !scored.some((e) => e.name === self.name)) return null;
+
+  scored.sort((a, b) => (lowerIsBetter ? a.value - b.value : b.value - a.value));
+  return {
+    metricKey,
+    rank: scored.findIndex((e) => e.name === self.name) + 1,
+    total: scored.length,
+    peerEvents: scored.map((e) => e.name),
+  };
+}
+
+/**
+ * 언어별 문장에서 요청 언어를 꺼낸다. 비어 있으면 en으로 대체하고 isFallback을
+ * 켠다 — 컴포넌트는 이 결과만 받고 언어 판단을 직접 하지 않는다.
+ *
+ * @param {LocalizedText|null|undefined} text
+ * @param {string} [lang=RECAP_DEFAULT_LANG]
+ * @returns {{ value: string, isFallback: boolean }}
+ */
+export function localizedText(text, lang = RECAP_DEFAULT_LANG) {
+  if (!text) return { value: '', isFallback: false };
+  const requested = text[lang];
+  if (requested) return { value: requested, isFallback: false };
+  return { value: text[RECAP_DEFAULT_LANG] ?? '', isFallback: lang !== RECAP_DEFAULT_LANG };
+}

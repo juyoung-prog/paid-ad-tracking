@@ -380,3 +380,186 @@ export const mockAlerts = [
     message: 'Spring Grand Opening — ended 5d ago with no performance data — enter results to complete reporting',
   },
 ];
+
+// ============================================================
+// Recap — 캠페인 종료 후 결과 보고 (Build Plan Phase 1)
+//
+// 위 mockCampaigns와 섞지 않고 따로 둔다 — Dashboard/Reports 스토리의 개수·KPI
+// 확인 포인트가 위 목록을 세고 있어서, 여기에 이벤트 다섯 개를 더하면 그 스토리
+// 문서가 전부 틀린 숫자를 말하게 된다. Recap 스토리는 이 목록만 쓴다.
+//
+// 구성: 보고 대상 'G10 Opening'(2026-06~08) + 비교군 이벤트 넷. Meta의 Coming
+// Soon / Grand Opening은 비교군이 3개 이상이라 숫자가 나오고, TikTok은 2개뿐이라
+// "not enough data"가 나온다. Now Open(store_visit)은 어디에도 짝이 없어 none.
+// ============================================================
+
+/** Recap 목 캠페인 한 건 — 반복되는 필드는 여기서 채운다 */
+function recapCampaign(id, group, name, platform, store, startDate, endDate, budgetDaily, goal) {
+  return {
+    id,
+    name,
+    campaignGroup: group,
+    platform,
+    accountId: platform === PLATFORM.TIKTOK ? 'tiktok-unified' : (store.startsWith('BF') ? 'meta-fl' : 'meta-ga'),
+    targetScope: TARGET_SCOPE.SINGLE_STORE,
+    targetStoreIds: [store],
+    startDate,
+    endDate,
+    budgetPlanned: 0,
+    budgetDaily,
+    goal,
+    manualStatus: null,
+    creativeUrl: null,
+    externalCampaignId: `ext-${id}`,
+    createdAt: `${startDate}T09:00:00Z`,
+    updatedAt: `${endDate}T09:00:00Z`,
+  };
+}
+
+/** Recap 목 성과 레코드 — 없는 값은 null */
+function recapRecord(campaignId, m) {
+  return {
+    id: `perf-${campaignId}`,
+    campaignId,
+    recordedAt: '2026-09-01',
+    source: 'api',
+    impressions: m.impressions ?? null,
+    reach: m.reach ?? null,
+    clicks: m.clicks ?? null,
+    spend: m.spend,
+    videoPlays: m.videoPlays ?? null,
+    hookViews: m.hookViews ?? null,
+    heldViews: m.heldViews ?? null,
+    avgWatchSeconds: m.avgWatchSeconds ?? null,
+    likes: m.likes ?? null,
+    comments: m.comments ?? null,
+    shares: m.shares ?? null,
+    follows: m.follows ?? null,
+    profileVisits: m.profileVisits ?? null,
+    engagements: m.engagements ?? null,
+    conversions: m.conversions ?? null,
+  };
+}
+
+const M = PLATFORM.META;
+const T = PLATFORM.TIKTOK;
+
+/** @type {import('./schema').Campaign[]} */
+export const mockRecapCampaigns = [
+  // 보고 대상 — G10 Opening
+  recapCampaign('rc-g10-cs-m', 'G10 Opening', 'G10_Coming Soon_0617~0707', M, 'G10', '2026-06-17', '2026-07-07', 10, GOAL.AWARENESS),
+  recapCampaign('rc-g10-cs-t', 'G10 Opening', 'G10_Coming Soon_0617~0707', T, 'G10', '2026-06-17', '2026-07-07', 10, GOAL.AWARENESS),
+  recapCampaign('rc-g10-go-m', 'G10 Opening', 'G10_Grand Opening_0706~0801', M, 'G10', '2026-07-06', '2026-08-01', 30, GOAL.AWARENESS),
+  recapCampaign('rc-g10-go-t', 'G10 Opening', 'G10_Grand Opening_0706~0801', T, 'G10', '2026-07-06', '2026-08-01', 30, GOAL.AWARENESS),
+  recapCampaign('rc-g10-no-m', 'G10 Opening', 'G10_Now Open_0706~0831', M, 'G10', '2026-07-06', '2026-08-31', 20, GOAL.STORE_VISIT),
+  recapCampaign('rc-g10-deals-m', 'G10 Opening', 'G10_1 Month Deals_0710~0831', M, 'G10', '2026-07-10', '2026-08-31', 20, GOAL.TRAFFIC),
+  // 비교군 — BF4 Opening (2026-04)
+  recapCampaign('rc-bf4-cs-m', 'BF4 Opening', 'BF4_Coming Soon_0327~0412', M, 'BF4', '2026-03-27', '2026-04-12', 5, GOAL.AWARENESS),
+  recapCampaign('rc-bf4-go-m', 'BF4 Opening', 'BF4_Grand Opening_0413~0502', M, 'BF4', '2026-04-13', '2026-05-02', 40, GOAL.AWARENESS),
+  recapCampaign('rc-bf4-go-t', 'BF4 Opening', 'BF4_Grand Opening_0413~0502', T, 'BF4', '2026-04-13', '2026-05-02', 40, GOAL.AWARENESS),
+  recapCampaign('rc-bf4-deals-m', 'BF4 Opening', 'BF4_1MonthDeals_0417~0531', M, 'BF4', '2026-04-17', '2026-05-31', 20, GOAL.TRAFFIC),
+  // 비교군 — BF3 Opening (2025-10)
+  recapCampaign('rc-bf3-cs-m', 'BF3 Opening', 'BF3_Coming Soon_1001~1015', M, 'BF3', '2025-10-01', '2025-10-15', 8, GOAL.AWARENESS),
+  recapCampaign('rc-bf3-go-m', 'BF3 Opening', 'BF3_Grand Opening_1016~1110', M, 'BF3', '2025-10-16', '2025-11-10', 35, GOAL.AWARENESS),
+  recapCampaign('rc-bf3-go-t', 'BF3 Opening', 'BF3_Grand Opening_1016~1110', T, 'BF3', '2025-10-16', '2025-11-10', 30, GOAL.AWARENESS),
+  recapCampaign('rc-bf3-deals-m', 'BF3 Opening', 'BF3_1 Month Deals_1020~1130', M, 'BF3', '2025-10-20', '2025-11-30', 15, GOAL.TRAFFIC),
+  // 비교군 — G09 Opening (2025-06)
+  recapCampaign('rc-g09-cs-m', 'G09 Opening', 'G09_Coming Soon_0601~0614', M, 'G09', '2025-06-01', '2025-06-14', 8, GOAL.AWARENESS),
+  recapCampaign('rc-g09-go-m', 'G09 Opening', 'G09_Grand Opening_0615~0710', M, 'G09', '2025-06-15', '2025-07-10', 30, GOAL.AWARENESS),
+  recapCampaign('rc-g09-deals-m', 'G09 Opening', 'G09_1 Month Deals_0620~0731', M, 'G09', '2025-06-20', '2025-07-31', 15, GOAL.TRAFFIC),
+  // 비교군 — G08 Opening (2025-03)
+  recapCampaign('rc-g08-go-m', 'G08 Opening', 'G08_Grand Opening_0301~0325', M, 'G08', '2025-03-01', '2025-03-25', 25, GOAL.AWARENESS),
+  recapCampaign('rc-g08-deals-m', 'G08 Opening', 'G08_1 Month Deals_0305~0410', M, 'G08', '2025-03-05', '2025-04-10', 15, GOAL.TRAFFIC),
+];
+
+/** @type {import('./schema').PerformanceRecord[]} */
+export const mockRecapPerformanceRecords = [
+  // G10 — Coming Soon(Meta)은 CPM이 비교군 중 가장 싸고 Hook은 중간, Grand Opening(Meta)은 Hook 최고
+  recapRecord('rc-g10-cs-m', { spend: 210.4, impressions: 98000, reach: 61000, clicks: 240, videoPlays: 90000, hookViews: 21600, heldViews: 5400, avgWatchSeconds: 3.1, likes: 180, comments: 6, shares: 40, engagements: 226 }),
+  recapRecord('rc-g10-cs-t', { spend: 205.7, impressions: 120000, reach: 54000, clicks: 130, videoPlays: 118000, hookViews: 11800, heldViews: 3500, avgWatchSeconds: 1.9, likes: 210, comments: 4, shares: 25, engagements: 239 }),
+  recapRecord('rc-g10-go-m', { spend: 812.5, impressions: 265000, reach: 151000, clicks: 3900, videoPlays: 250000, hookViews: 92500, heldViews: 30000, avgWatchSeconds: 4.2, likes: 620, comments: 18, shares: 540, engagements: 1178 }),
+  recapRecord('rc-g10-go-t', { spend: 776.9, impressions: 340000, reach: 128000, clicks: 1200, videoPlays: 335000, hookViews: 46900, heldViews: 15400, avgWatchSeconds: 2.1, likes: 410, comments: 9, shares: 120, engagements: 539 }),
+  recapRecord('rc-g10-no-m', { spend: 1119.3, impressions: 464000, reach: 163000, clicks: 2900, videoPlays: 296000, hookViews: 68400, heldViews: 10400, avgWatchSeconds: 3.5, likes: 300, comments: 11, shares: 210, engagements: 521, conversions: 64 }),
+  recapRecord('rc-g10-deals-m', { spend: 771.2, impressions: 301000, reach: 120000, clicks: 4100, videoPlays: 280000, hookViews: 58800, heldViews: 12300, avgWatchSeconds: 3.0, likes: 250, comments: 8, shares: 160, engagements: 418 }),
+  // BF4
+  recapRecord('rc-bf4-cs-m', { spend: 64.3, impressions: 31000, reach: 22700, clicks: 40, videoPlays: 22500, hookViews: 3900, heldViews: 390, avgWatchSeconds: 2.4, likes: 44, comments: 2, shares: 33, engagements: 79 }),
+  recapRecord('rc-bf4-go-m', { spend: 755.9, impressions: 165000, reach: 44300, clicks: 4400, videoPlays: 100000, hookViews: 37400, heldViews: 11900, avgWatchSeconds: 4.8, likes: 508, comments: 10, shares: 601, engagements: 1119 }),
+  recapRecord('rc-bf4-go-t', { spend: 776.7, impressions: 210000, reach: 17000, clicks: 700, videoPlays: 205000, hookViews: 29300, heldViews: 10100, avgWatchSeconds: 1.9, likes: 152, comments: 0, shares: 141, engagements: 293 }),
+  recapRecord('rc-bf4-deals-m', { spend: 1025.4, impressions: 420000, reach: 143000, clicks: 5100, videoPlays: 256000, hookViews: 54300, heldViews: 16100, avgWatchSeconds: 3.4, likes: 95, comments: 4, shares: 168, engagements: 267 }),
+  // BF3
+  recapRecord('rc-bf3-cs-m', { spend: 118.0, impressions: 52000, reach: 38000, clicks: 90, videoPlays: 47000, hookViews: 8900, heldViews: 1700, avgWatchSeconds: 2.6, likes: 60, comments: 3, shares: 21, engagements: 84 }),
+  recapRecord('rc-bf3-go-m', { spend: 890.2, impressions: 240000, reach: 132000, clicks: 3100, videoPlays: 215000, hookViews: 64500, heldViews: 19400, avgWatchSeconds: 3.9, likes: 430, comments: 12, shares: 380, engagements: 822 }),
+  recapRecord('rc-bf3-go-t', { spend: 640.0, impressions: 260000, reach: 99000, clicks: 800, videoPlays: 255000, hookViews: 30600, heldViews: 9200, avgWatchSeconds: 1.8, likes: 190, comments: 3, shares: 70, engagements: 263 }),
+  recapRecord('rc-bf3-deals-m', { spend: 612.8, impressions: 250000, reach: 101000, clicks: 3300, videoPlays: 230000, hookViews: 46000, heldViews: 11500, avgWatchSeconds: 3.1, likes: 140, comments: 5, shares: 90, engagements: 235 }),
+  // G09
+  recapRecord('rc-g09-cs-m', { spend: 104.5, impressions: 44000, reach: 33000, clicks: 70, videoPlays: 40000, hookViews: 7200, heldViews: 1300, avgWatchSeconds: 2.5, likes: 52, comments: 2, shares: 18, engagements: 72 }),
+  recapRecord('rc-g09-go-m', { spend: 760.0, impressions: 230000, reach: 125000, clicks: 2600, videoPlays: 205000, hookViews: 55400, heldViews: 15900, avgWatchSeconds: 3.7, likes: 380, comments: 9, shares: 300, engagements: 689 }),
+  recapRecord('rc-g09-deals-m', { spend: 588.4, impressions: 236000, reach: 96000, clicks: 2700, videoPlays: 210000, hookViews: 42000, heldViews: 9900, avgWatchSeconds: 2.9, likes: 120, comments: 4, shares: 75, engagements: 199 }),
+  // G08
+  recapRecord('rc-g08-go-m', { spend: 610.0, impressions: 176000, reach: 98000, clicks: 1900, videoPlays: 160000, hookViews: 40000, heldViews: 11200, avgWatchSeconds: 3.5, likes: 290, comments: 7, shares: 210, engagements: 507 }),
+  recapRecord('rc-g08-deals-m', { spend: 540.0, impressions: 205000, reach: 84000, clicks: 2100, videoPlays: 180000, hookViews: 34200, heldViews: 7900, avgWatchSeconds: 2.8, likes: 90, comments: 3, shares: 60, engagements: 153 }),
+];
+
+/** @type {import('./schema').EventRecap[]} */
+export const mockEventRecaps = [
+  {
+    id: 'recap-g10',
+    eventName: 'G10 Opening',
+    status: 'draft',
+    summary: {
+      en: 'Grand Opening carried the event: the strongest hook rate and share volume of any opening so far. Coming Soon built reach cheaply but did not move clicks, and the store-visit push after opening has no comparable campaign yet.',
+      ko: null,
+      'zh-Hant': null,
+    },
+    learnings: [
+      {
+        title: { en: 'Urgency beats announcement', ko: null, 'zh-Hant': null },
+        body: { en: 'The Grand Opening creative that said "open now, come this week" outperformed the softer Coming Soon message on every action metric.', ko: null, 'zh-Hant': null },
+      },
+      {
+        title: { en: 'TikTok reaches, Instagram converts', ko: null, 'zh-Hant': null },
+        body: { en: 'TikTok delivered cheaper impressions but far fewer clicks per dollar. Keep TikTok as the awareness layer and let Meta carry the call to action.', ko: null, 'zh-Hant': null },
+      },
+    ],
+    nextSteps: { en: 'Keep the opening structure. Put the K-Beauty category message in the Coming Soon phase so the teaser gives people a reason to visit, not just a date.', ko: null, 'zh-Hant': null },
+    createdAt: '2026-09-02T10:00:00Z',
+    updatedAt: '2026-09-05T15:20:00Z',
+  },
+];
+
+/** @type {import('./schema').RecapCampaignNote[]} */
+export const mockRecapCampaignNotes = [
+  {
+    id: 'note-g10-go-m',
+    recapId: 'recap-g10',
+    campaignId: 'rc-g10-go-m',
+    verdict: 'good',
+    strength: { en: 'Clicks, landing-page visits and shares were all the strongest in the event.', ko: null, 'zh-Hant': null },
+    weakness: { en: 'Largest budget of the event — audience fatigue will need managing if the creative is reused.', ko: null, 'zh-Hant': null },
+    reason: { en: 'Opening-week urgency, a clear call to action and a concrete reason to visit lined up.', ko: null, 'zh-Hant': null },
+    organicViews: 100250,
+    organicEngagements: null,
+  },
+  {
+    id: 'note-g10-cs-m',
+    recapId: 'recap-g10',
+    campaignId: 'rc-g10-cs-m',
+    verdict: null,
+    strength: { en: 'Cheapest reach of the event.', ko: null, 'zh-Hant': null },
+    weakness: { en: 'Almost no clicks — the teaser announced but did not persuade.', ko: null, 'zh-Hant': null },
+    reason: null,
+    organicViews: null,
+    organicEngagements: null,
+  },
+  {
+    id: 'note-g10-cs-t',
+    recapId: 'recap-g10',
+    campaignId: 'rc-g10-cs-t',
+    verdict: 'bad',
+    strength: null,
+    weakness: { en: 'Low hook rate for the spend; the vertical cut of the teaser did not hold attention.', ko: null, 'zh-Hant': null },
+    reason: { en: 'The creative was a resized Instagram asset rather than a TikTok-native cut.', ko: null, 'zh-Hant': null },
+    organicViews: null,
+    organicEngagements: null,
+  },
+];
