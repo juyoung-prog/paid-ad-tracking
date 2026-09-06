@@ -104,7 +104,7 @@ const scenarios = [
       '인쇄/PDF(1단계) 또는 Excel(3단계)로 내보내거나 링크 공유 — 읽기는 로그인 없이 열린다',
     ],
     success: '이벤트 종료 후 대시보드 밖에서 보고서를 다시 만들지 않는다. 읽는 사람이 숫자를 몰라도 벤치마크로 잘 됐는지 안다',
-    exception: '비교군이 3개 미만이면 "not enough data". 직접 등록 캠페인은 지표가 비어 있으면 "—". 2023년 이전 캠페인은 비교군에서 제외. 단계: 1 숫자·벤치마크·인쇄(DB 변경 없음) → 2 코멘트 저장(새 테이블 2개, 로그인 게이트) → 3 Excel·ko/zh-Hant·AI 초안·오가닉 지표 선택 입력',
+    exception: '비교군이 3개 미만이면 "not enough data". 직접 등록 캠페인은 지표가 비어 있으면 "—". 2023년 이전 캠페인은 비교군에서 제외. 단계: 1 숫자·벤치마크·인쇄 → 2 코멘트 저장(테이블 2개, 로그인 게이트) → 3 Excel·ko/zh-Hant·AI 초안·오가닉 지표 — 세 단계 모두 구현됨(2026-09-06)',
   },
 ];
 
@@ -626,15 +626,17 @@ const components = [
   { name: 'CampaignForm', usage: '캠페인 등록/수정 폼', type: '신규(구현됨)', note: '카테고리: templates — Ad Link(텍스트)와 Thumbnail(업로드/붙여넣기 전용, 실시간 미리보기·Uploaded 상태 표시) 별개 필드 포함' },
   { name: 'PerformanceForm', usage: '성과 지표 입력 폼 (goal 기반 Tier 조건부 노출)', type: '신규(구현됨)', note: '카테고리: templates' },
   { name: 'PacingIndicator', usage: '예산 소진 속도(pacing) 시각화', type: '신규(구현됨)', note: '카테고리: data-display' },
-  { name: 'ConnectionCard', usage: 'Settings에서 계정별 연결 상태 + Connect/재연결 CTA', type: '신규 — API Integration', note: '카테고리: card — CustomCard 위에 구성, 상태 Chip(연결됨=success, 끊김=warning) 재활용' },
-  { name: 'KpiBar (Recap 머리글)', usage: '이벤트 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표', type: '재활용', note: 'delta로 벤치마크 대비 표시' },
+  { name: 'ConnectionCard', usage: 'Settings에서 계정별 연결 상태 + Connect/재연결 CTA', type: '검토 후 미채택', note: '계획은 card 카테고리의 별도 컴포넌트였으나 실제로는 SettingsPage 안에 직접 그렸다 — 계정이 넷뿐이고 다른 화면에서 쓰이지 않는다' },
+  { name: 'RecapHeader', usage: 'Recap 머리글 — 이벤트·상태 칩·기간·매장·플랫폼, KpiBar, 순위 한 줄', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar를 안에서 재활용. headline이 null이면 순위 줄 생략' },
   { name: 'PhaseTimelineChart (Recap)', usage: '이벤트 단계 타임라인', type: '재활용', note: 'pages/paidAdsDashboard/PhaseTimelineChart.jsx — 클릭 없이 읽기 전용' },
-  { name: 'BenchmarkDelta', usage: '지표 값 + 중앙값 대비 차이 · 백분위 · N. not enough data 상태 포함', type: '신규 — Recap 1단계', note: '카테고리: data-display — KpiBar delta와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대)' },
-  { name: 'VerdictChip', usage: 'good / mid / bad 판정 표시. 자동 제안이면 점선 테두리', type: '신규 — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
-  { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 · (2단계) 코멘트', type: '신규 — Recap 1단계', note: '카테고리: data-display — PerformanceReportTable과 열 정의 공유, 보고서용 여러 줄 셀. 인쇄 시 가로 스크롤 없이 접히는 열 규칙' },
-  { name: 'RecapNoteEditor', usage: '캠페인별 장점·아쉬운 점·이유 + 이벤트 배운 점·다음 제언 입력. 언어 탭(en 기본)', type: '신규 — Recap 2단계', note: '카테고리: templates — 읽기 모드와 편집 모드가 같은 자리(인쇄는 읽기 모드)' },
-  { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규 — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출' },
-  { name: 'Print stylesheet (Recap)', usage: '인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소', type: '신규 — Recap 1단계', note: '컴포넌트가 아니라 @media print 규칙. PaidAdsShell 레벨' },
+  { name: 'BenchmarkDelta', usage: '지표 값 + 중앙값 대비 차이 · 백분위 · N. not enough data 상태 포함', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar delta와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대)' },
+  { name: 'VerdictChip', usage: 'good / mid / bad 판정 표시. 자동 제안이면 점선 테두리', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
+  { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — 고정 열 폭 + ScrollArea, 비율 지표마다 BenchmarkDelta' },
+  { name: 'RecapNoteEditor', usage: '캠페인 한 줄의 판정 + 장점·아쉬운 점·이유 + 오가닉 선택 입력', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — lang 칸 하나만 편집, 저장은 페이지' },
+  { name: 'RecapLearningsEditor', usage: '이벤트 단위 글 — 상태·요약·배운 점 카드·다음 제언', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 캠페인 단위와 저장 대상이 달라 RecapNoteEditor에서 분리' },
+  { name: 'SignInDialog', usage: 'Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 앱 전체 게이트는 꺼진 채 쓰기가 필요한 자리에서만' },
+  { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 EN · 한국어 · 繁中' },
+  { name: 'Print stylesheet (Recap)', usage: '인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소', type: '신규(구현됨) — Recap 1단계', note: '컴포넌트가 아니라 @media print 규칙. PaidAdsShell GlobalStyles + data-print 속성' },
 ];
 
 function typeColor(type) {
