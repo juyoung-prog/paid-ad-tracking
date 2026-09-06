@@ -26,7 +26,7 @@ import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup, SECTION_CARD_SX } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds, dateMed, dateRange as formatDateRange, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
@@ -98,25 +98,6 @@ const SECTION_TITLE_SX = { display: 'block', mb: 1.5, color: 'text.primary' };
 
 /** 제목 옆 범위 텍스트 — 제목과 같은 줄, 한 단 약하게 */
 const SECTION_SCOPE_SX = { fontWeight: 400, color: 'text.secondary' };
-
-/**
- * 섹션 카드 — 타임라인·표 하나가 한 장의 카드다(ref/re1.png).
- *
- * 예전엔 섹션이 여백으로만 나뉘어서, 표 15개 컬럼과 그 위 제목, 옆 섹션의
- * 제목이 전부 같은 흰 면 위에 떠 있었다. 1px 옅은 경계선 + 8px radius로 "이
- * 블록이 하나의 분석 단위"라고 묶는다. 그림자는 없다 — 면의 위계는 선과
- * 여백으로만 만든다(테마 customShadows 주석). 안쪽 여백은 카드가 아니라
- * 제목 행과 표 셀(px 2)이 각자 갖는다 — 그래야 제목 글자와 첫 컬럼 글자가
- * 같은 x에 선다.
- */
-const SECTION_CARD_SX = (theme) => ({
-  border: '1px solid',
-  borderColor: 'divider',
-  borderRadius: `${theme.shape.radius.container}px`,
-  backgroundColor: 'background.paper',
-  overflow: 'hidden',
-  mb: 3,
-});
 
 /**
  * 카드 제목 행 — 제목(title 토큰) + 범위(scope) 왼쪽, 액션 오른쪽.

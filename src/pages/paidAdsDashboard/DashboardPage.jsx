@@ -44,7 +44,7 @@ import { PlatformMetricList } from '../../components/data-display/PlatformMetric
 import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
-import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
+import { PAGE_GUTTER_X, SECTION_CARD_SX, campaignInDateRange, generateId, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
 import { money, moneyWhole } from '../../utils/format';
 import { useViewUrlSync } from './useViewUrlSync';
 import { BulkEventTagDialog } from '../../components/templates/BulkEventTagDialog';
@@ -133,13 +133,28 @@ const STATUS_GROUP_ORDER = { active: 0, planned: 1, ended: 2, ended_early: 2, ar
 /** 동기화 캠페인 드로어에서 평문으로만 보여주는 필드 — CampaignForm readOnlyFields */
 const SYNCED_READ_ONLY_FIELDS = ['name', 'platform', 'accountId', 'dates', 'creativeUrl', 'thumbnailUrl'];
 
-const LIST_TOOLBAR_SX = {
+/* 목록 카드의 제목 행 — Reports 섹션 카드의 SectionHeader와 같은 자리다
+   (px 2, 아래 1px 구분선). 제목·결과 수가 왼쪽, 검색·정렬이 오른쪽. 컨트롤이
+   36px라 세로는 center 정렬이고, 위아래 여백은 컨트롤이 있을 때 1.5, 글자만
+   있을 때 Reports와 같은 pt 2 / pb 1.5다. */
+const LIST_HEADER_SX = {
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'space-between',
   gap: 2,
   minHeight: 36,
-  mb: 2,
+  px: 2,
+  py: 1.5,
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+};
+
+/* 카드 안의 캠페인 행 — 행 자체는 그대로고(그리드·글자·구분선) 카드 안에서
+   제목 글자와 같은 x에 서도록 px 2를 주고, 마지막 행의 구분선은 뺀다(카드
+   테두리가 그 선이라 겹치면 2px가 된다). hover 배경은 카드 폭 전체를 채운다. */
+const CARD_ROWS_SX = {
+  '& > *': { px: 2 },
+  '& > *:last-child': { borderBottom: 0 },
 };
 
 const LIST_SORT = {
@@ -1116,22 +1131,6 @@ export function DashboardPage() {
             판단이되, 접기·그룹 내 로컬 필터까지는 안 간다 — 캠페인 10여 개
             규모에서는 접힌 그룹이 오히려 "안 보이는 데이터"를 만든다.
             알림이 하나도 없으면 헤더 없이 예전처럼 평평한 리스트다. */}
-        {/* 목록 컨트롤 — 결과 수(왼쪽) + 검색·정렬(오른쪽) 한 줄. 위 필터 행의
-            보조라 컨테이너 없이 글자와 컨트롤만 놓는다. 검색 중이면 "3 of 171"로
-            좁힌 정도를 말한다. This Period 탭은 그룹 헤더("Recently ended ·
-            4 campaigns")가 이미 수를 세므로 이 줄을 따로 두지 않고 첫 그룹
-            헤더 오른쪽에 컨트롤만 붙인다(아래 IIFE). */}
-        {!isLoading && allCampaignRows.length > 0 && tab !== 'now' && (
-          <Box sx={LIST_TOOLBAR_SX}>
-            <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
-              {listQuery && campaignRows.length !== allCampaignRows.length
-                ? `${campaignRows.length} of ${allCampaignRows.length} campaigns`
-                : `${allCampaignRows.length} ${allCampaignRows.length === 1 ? 'campaign' : 'campaigns'}`}
-            </Typography>
-            {listControls}
-          </Box>
-        )}
-
         {!isLoading && (() => {
           /* Now 탭에서 Action Required로 끌어올릴 알림은 "지금 손대야 하는" 것만이다.
              missing_performance는 제외한다 — Recently Ended 그룹의 존재 이유가 바로
@@ -1201,20 +1200,36 @@ export function DashboardPage() {
 
              탭 배지는 이미 필터를 반영하므로 여기 쓰는 숫자와 도착지의 숫자가
              일치한다(이 화면의 "클릭한 숫자와 도착한 행 수는 같다" 원칙). */
-          /* This Period 탭에서 컨트롤이 설 자리 — 그룹 헤더가 있으면 첫 헤더
-             오른쪽, 없으면(평평한 목록·빈 결과) 목록 위 오른쪽 정렬 한 줄. */
-          const nowControlsRow = tab === 'now' && listControls ? (
-            <Box sx={{ ...LIST_TOOLBAR_SX, justifyContent: 'flex-end' }}>{listControls}</Box>
-          ) : null;
+          /* 목록은 Reports의 Awareness/Traffic과 같은 **섹션 카드** 한 장이다 —
+             제목 행(제목 또는 결과 수 + 검색·정렬)과 행들이 한 테두리 안에 있다.
+             한때 "Recently ended" 제목과 행이 페이지 흰 면에 그대로 떠 있어서,
+             카드로 묶인 Reports 옆에서 같은 앱의 다른 문법으로 보였다.
+             All·Ended 탭엔 그룹 제목이 없으므로 결과 수("171 campaigns", 검색
+             중이면 "3 of 171")가 제목 자리를 맡는다. This Period 탭은 그룹
+             헤더가 수를 세므로 첫 카드 제목 옆에 컨트롤만 붙는다. */
+          const countLabel = (
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+              {listQuery && campaignRows.length !== allCampaignRows.length
+                ? `${campaignRows.length} of ${allCampaignRows.length} campaigns`
+                : `${allCampaignRows.length} ${allCampaignRows.length === 1 ? 'campaign' : 'campaigns'}`}
+            </Typography>
+          );
+          const flatHeader = tab === 'now' ? <span /> : countLabel;
 
           if (campaignRows.length === 0 && listQuery) {
+            /* 검색이 비었을 때도 카드와 컨트롤은 남는다 — 검색어를 지울 자리가
+               사라지면 안 된다. 문구는 Reports의 "No performance data yet."과
+               같은 자리·여백. */
             return (
-              <>
-                {nowControlsRow}
-                <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+              <Box sx={SECTION_CARD_SX}>
+                <Box sx={LIST_HEADER_SX}>
+                  {flatHeader}
+                  {listControls}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>
                   {`No campaigns match “${listSearch.trim()}” in this view.`}
                 </Typography>
-              </>
+              </Box>
             );
           }
           if (campaignRows.length === 0) {
@@ -1248,43 +1263,51 @@ export function DashboardPage() {
                모든 행이 Active인 건 이미 탭 라벨이 말했다. ended 탭은 'ended'와
                'ended_early'가 섞이므로 제외한다(라벨이 서로 다르다). */
             return (
-              <>
-                {nowControlsRow}
+              <Box sx={SECTION_CARD_SX}>
+                <Box sx={LIST_HEADER_SX}>
+                  {flatHeader}
+                  {listControls}
+                </Box>
                 <CampaignTable
                   rows={campaignRows}
                   allCampaigns={campaigns}
                   isStatusRedundant={tab === 'active'}
                   onRowClick={openCampaignDrawer}
+                  sx={CARD_ROWS_SX}
                 />
-              </>
+              </Box>
             );
           }
           /* "손댈 게 없다"는 여기가 아니라 상단 KPI(Needs Attention 0 +
              "budget · timing · reporting")가 말한다 — 한때 이 자리에 문장을 띄웠는데
              그 문장은 0일 때만 존재해서 스크롤과 함께 사라지는 반면 툴바는 sticky라
              어느 위치에서든 같은 답을 준다. 같은 말을 두 곳에서 하지 않는다. */
-          return sections.map((section, i) => (
-            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 2.5 }}>
-              {/* 첫 헤더는 컨트롤을 품은 툴바다 — All·Ended 탭의 결과 수 줄과 같은
-                  높이·여백(LIST_TOOLBAR_SX)이라 탭을 오가도 목록이 같은 y에서 시작한다. */}
-              <Box sx={i === 0 && tab === 'now' ? LIST_TOOLBAR_SX : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.5 }}>
-                <Typography variant="title" component="h3" sx={{ display: 'block', color: 'text.primary', minWidth: 0 }}>
-                  {section.label}
-                  <Typography component="span" variant="body2" sx={{ ml: 1.5, fontWeight: 400, color: 'text.secondary' }}>
-                    {[countScope(section.rows.length), section.scopeSuffix].filter(Boolean).join(' · ')}
+          /* 그룹마다 카드 한 장 — 첫 카드의 제목 행이 검색·정렬을 품는다(This
+             Period 탭). 컨트롤이 없는 카드의 제목 행은 Reports SectionHeader와
+             같은 pt 2 / pb 1.5라 탭을 오가도 제목 글자가 같은 자리에 선다. */
+          return sections.map((section, i) => {
+            const hasControls = i === 0 && tab === 'now' && Boolean(listControls);
+            return (
+              <Box key={section.label} sx={SECTION_CARD_SX}>
+                <Box sx={{ ...LIST_HEADER_SX, ...(!hasControls && { pt: 2, pb: 1.5, alignItems: 'baseline' }) }}>
+                  <Typography variant="title" component="h3" sx={{ display: 'block', color: 'text.primary', minWidth: 0 }}>
+                    {section.label}
+                    <Typography component="span" variant="body2" sx={{ ml: 1.5, fontWeight: 400, color: 'text.secondary' }}>
+                      {[countScope(section.rows.length), section.scopeSuffix].filter(Boolean).join(' · ')}
+                    </Typography>
                   </Typography>
-                </Typography>
-                {/* This Period 탭: 검색·정렬은 첫 그룹 헤더와 같은 줄 오른쪽 */}
-                {i === 0 && tab === 'now' && listControls}
+                  {hasControls && listControls}
+                </Box>
+                <CampaignTable
+                  rows={section.rows}
+                  allCampaigns={campaigns}
+                  isStatusRedundant={Boolean(section.isStatusRedundant)}
+                  onRowClick={openCampaignDrawer}
+                  sx={CARD_ROWS_SX}
+                />
               </Box>
-              <CampaignTable
-                rows={section.rows}
-                allCampaigns={campaigns}
-                isStatusRedundant={Boolean(section.isStatusRedundant)}
-                onRowClick={openCampaignDrawer}
-              />
-            </Box>
-          ));
+            );
+          });
         })()}
       </PageContainer>
 

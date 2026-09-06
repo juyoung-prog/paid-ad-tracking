@@ -63,6 +63,26 @@ export function toLocalISODate(date) {
 export const PAGE_GUTTER_X = { xs: 2, sm: 3, md: 4 };
 
 /**
+ * 섹션 카드 — 타임라인·표·목록 하나가 한 장의 카드다(ref/re1.png).
+ *
+ * 1px 옅은 경계선 + container radius로 "이 블록이 하나의 단위"라고 묶는다.
+ * 그림자는 없다 — 면의 위계는 선과 여백으로만 만든다(테마 customShadows 주석).
+ * 안쪽 여백은 카드가 아니라 제목 행과 행/셀(px 2)이 각자 갖는다 — 그래야 제목
+ * 글자와 첫 열 글자가 같은 x에 선다. Reports의 Awareness/Traffic 카드와
+ * Dashboard의 캠페인 목록 카드가 같은 값을 쓴다(한쪽만 고치면 어긋난다).
+ * Stores처럼 페이지 전체가 표 하나인 관리 화면에는 쓰지 않는다 — 감쌀 형제
+ * 섹션이 없는 표에 카드는 테두리만 하나 더한다.
+ */
+export const SECTION_CARD_SX = (theme) => ({
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: `${theme.shape.radius.container}px`,
+  backgroundColor: 'background.paper',
+  overflow: 'hidden',
+  mb: 3,
+});
+
+/**
  * 캠페인 기간이 필터 dateRange와 겹치는지 확인한다.
  * @param {import('../../data/schema').Campaign} campaign
  * @param {{ start?: string, end?: string }} dateRange
