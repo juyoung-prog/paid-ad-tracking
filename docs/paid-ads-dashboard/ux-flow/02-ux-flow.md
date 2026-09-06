@@ -91,7 +91,7 @@
   6. 인쇄/PDF(브라우저 인쇄, 1단계) 또는 Excel(3단계)로 내보내거나 링크를 그대로 보낸다 — 읽기는 로그인 없이 열린다
 - **성공 조건**: 이벤트 종료 후 대시보드 밖에서 보고서를 다시 만들지 않는다. 읽는 사람이 숫자를 몰라도 벤치마크로 잘 됐는지 안다
 - **예외 상황**: 비교군이 3개 미만이면 벤치마크 자리에 `not enough data`. 동기화 안 된(직접 등록) 캠페인은 지표가 비어 있으면 표에 `—`. 2023년 이전 캠페인은 지표가 거의 없어 비교군에서 제외
-- **단계**: 1단계 숫자·벤치마크·인쇄(DB 변경 없음) → 2단계 코멘트·배운 점 저장(새 테이블 2개, 로그인 게이트) → 3단계 Excel, 한국어·번체중문, AI 초안/번역, 오가닉(계정 전체) 지표 선택 입력
+- **단계**: 1단계 숫자·벤치마크·인쇄(DB 변경 없음) → 2단계 코멘트·배운 점 저장(새 테이블 2개, 로그인 게이트) → 3단계 Excel, 한국어·번체중문, AI 초안/번역, 오가닉(계정 전체) 지표 선택 입력. **세 단계 모두 구현됨(2026-09-06)** — 2단계는 마이그레이션 20 적용, 3단계 AI는 recap-draft Edge Function 배포 + ANTHROPIC_API_KEY 시크릿이 선행 조건
 - **다국어 전제**: 화면 문자열은 언어별 문자열 표(영어만 채운 채 시작), 사람이 쓰는 문장은 `{ en, ko, zh-Hant }` 칸. Recap에만 적용
 
 ---
@@ -476,14 +476,16 @@ Paid Ads Dashboard
 | PerformanceForm | 성과 지표 입력 폼 (goal 기반 Tier 1/2 기본 노출, Tier 3/4 조건부 노출) | 신규 | 카테고리: templates |
 | PacingIndicator | 예산 소진 속도(pacing) 시각화 | 신규 | 카테고리: data-display |
 | CampaignThumbnail | 캠페인 소재 썸네일 (플랫폼색 이니셜 fallback) | 재활용 | `components/media/CampaignThumbnail.jsx` — 이미 구현됨 |
-| ConnectionCard (신규 — API Integration) | Settings에서 계정별 연결 상태 + Connect/재연결 CTA 표시 | 신규 | 카테고리: card — CustomCard 위에 구성, 상태는 Chip(연결됨=success, 끊김=warning) 재활용 |
-| KpiBar (Recap 머리글) | 이벤트 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표 | 재활용 | `components/data-display/KpiBar.jsx` — `delta`로 벤치마크 대비 표시 |
+| ConnectionCard (API Integration) | Settings에서 계정별 연결 상태 + Connect/재연결 CTA 표시 | 미채택 | 계획은 card 카테고리의 별도 컴포넌트였으나 실제로는 SettingsPage 안에 직접 그렸다 — 계정이 넷뿐이고 다른 화면에서 쓰이지 않아 분리할 이유가 없었다. 상태 Chip(연결됨=success)은 계획대로 |
+| RecapHeader (신규 — Recap) | Recap 머리글 — 이벤트 이름 + 상태 칩, 기간·매장·플랫폼 한 줄, KpiBar(캠페인 수 · 지출 "of $X planned" · 매장), 순위 한 줄("Best of 5 comparable events by CPM") | 신규(구현됨) | 카테고리: data-display — KpiBar를 안에서 재활용. 순위 재료(headline)가 null이면 그 줄을 생략한다 |
 | PhaseTimelineChart (Recap) | 이벤트 단계 타임라인 | 재활용 | `pages/paidAdsDashboard/PhaseTimelineChart.jsx` — 클릭 없이 읽기 전용 |
-| BenchmarkDelta (신규 — Recap) | 지표 값 + 중앙값 대비 차이 · 백분위 · N. `not enough data` 상태 포함 | 신규 | 카테고리: data-display — KpiBar `delta`와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대) |
-| VerdictChip (신규 — Recap) | good / mid / bad 판정 표시. 자동 제안이면 점선 테두리 | 신규 | 카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning |
-| RecapCampaignTable (신규 — Recap) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 · (2단계) 코멘트 | 신규 | 카테고리: data-display — PerformanceReportTable과 열 정의를 공유하되 보고서용으로 셀에 여러 줄(Reach / Hook·Hold / 조회)을 담는다. 인쇄 시 가로 스크롤 없이 접히는 열 규칙 |
-| RecapNoteEditor (신규 — Recap 2단계) | 캠페인별 장점·아쉬운 점·이유 + 이벤트 배운 점·다음 제언 입력. 언어 탭(en 기본) | 신규 | 카테고리: templates — 읽기 모드와 편집 모드가 같은 자리(인쇄는 읽기 모드) |
-| LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규 | 카테고리: input — ToggleButton 재활용, Recap에만 노출 |
-| Print stylesheet (Recap) | 인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소 | 신규 | 컴포넌트가 아니라 `@media print` 규칙. PaidAdsShell 레벨 |
+| BenchmarkDelta (신규 — Recap) | 지표 값 + 중앙값 대비 차이 · 백분위 · N. `not enough data` 상태 포함 | 신규(구현됨) | 카테고리: data-display — KpiBar `delta`와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대) |
+| VerdictChip (신규 — Recap) | good / mid / bad 판정 표시. 자동 제안이면 점선 테두리 | 신규(구현됨) | 카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning |
+| RecapCampaignTable (신규 — Recap) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 | 신규(구현됨) | 카테고리: data-display — PerformanceReportTable과 열 정의를 공유하되 보고서용으로 셀에 여러 줄(Reach / Hook·Hold / 조회)을 담는다. 인쇄 시 가로 스크롤 없이 접히는 열 규칙 |
+| RecapNoteEditor (신규 — Recap 2단계) | 캠페인 한 줄의 판정(good/mid/bad, 제안값 "Use suggestion") + 장점·아쉬운 점·이유 + 오가닉 조회·참여 선택 입력 | 신규(구현됨) | 카테고리: templates — LocalizedText의 `lang` 칸 하나만 편집, 저장은 페이지(onChange patch) |
+| RecapLearningsEditor (신규 — Recap 2단계) | 이벤트 단위 글 — 상태(draft/final), 요약, 배운 점 카드(제목+본문, 추가·삭제·순서), 다음 제언 | 신규(구현됨) | 카테고리: templates — 계획 단계에서는 RecapNoteEditor 하나에 묶었으나 캠페인 단위와 이벤트 단위는 저장 대상(테이블)이 달라 분리 |
+| SignInDialog (신규 — Recap 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 | 신규(구현됨) | 카테고리: templates — LoginPage와 같은 로직. 앱 전체 게이트는 꺼진 채 "쓰기가 필요한 자리"에서만 연다 |
+| LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규(구현됨) | 카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 각 언어의 자기 이름(EN · 한국어 · 繁中) |
+| Print stylesheet (Recap) | 인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소 | 신규(구현됨) | 컴포넌트가 아니라 `@media print` 규칙. PaidAdsShell의 GlobalStyles + `data-print` 속성 |
 
 > CampaignTable(2줄 리스트, 아바타 없음)과 KpiBar(라벨-위-숫자 배치)는 이후 라운드에서 Influencer Tracking Dashboard 실측 기준으로 갱신됨 — 위 표는 초기 이식 시점 기준이라 세부 배치는 각 컴포넌트 자체 주석/`components.md`가 최신 기준이다.
