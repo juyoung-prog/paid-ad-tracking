@@ -98,6 +98,21 @@ Deno.serve(async (req) => {
     });
   }
 
+  /* 재연결에서 광고주 조회가 비면 **이미 저장된 값을 지키고** 새 값이 있을 때만
+     덮어쓴다. 2026-09-06 재연결 때 advertiser/get이 빈 목록을 돌려줬는데
+     그대로 null을 upsert해서 멀쩡히 돌던 advertiser_id가 지워졌다 — 그 뒤
+     sync-campaigns는 "external_account_id가 없습니다"로 207, sync-performance는
+     TikTok 캠페인 전부를 no_advertiser_id로 건너뛰었다. 토큰 갱신이 목적인
+     재연결이 데이터 연결을 끊으면 안 된다. */
+  const { data: existing } = await admin
+    .from('ad_accounts')
+    .select('label, external_account_id')
+    .eq('id', accountId)
+    .maybeSingle();
+  if (!advertiser && existing?.external_account_id) {
+    console.warn('TikTok 광고주 조회가 비어 기존 advertiser_id를 유지한다', { accountId, kept: existing.external_account_id });
+  }
+
   // connections.account_id가 ad_accounts(id)를 FK로 참조하므로 순서상 먼저 넣어야 한다.
   const { error: accountError } = await admin.from('ad_accounts').upsert(
     {
@@ -105,8 +120,8 @@ Deno.serve(async (req) => {
       owner_id: ownerId,
       platform: 'tiktok',
       region: 'ALL', // TikTok은 지역 분리 없이 통합 운영 (02-ux-flow.md 데이터 모델)
-      label: advertiser?.advertiser_name ?? 'TikTok - Unified',
-      external_account_id: advertiser?.advertiser_id ?? null,
+      label: advertiser?.advertiser_name ?? existing?.label ?? 'TikTok - Unified',
+      external_account_id: advertiser?.advertiser_id ?? existing?.external_account_id ?? null,
     },
     { onConflict: 'id' }
   );
