@@ -5,6 +5,7 @@ import Button from '@mui/material/Button';
 import Collapse from '@mui/material/Collapse';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
+import ListSubheader from '@mui/material/ListSubheader';
 import IconButton from '@mui/material/IconButton';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
@@ -17,6 +18,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import GridViewIcon from '@mui/icons-material/GridView';
 import ViewListIcon from '@mui/icons-material/ViewList';
 import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { SearchBar } from '../input/SearchBar';
 import { DateRangeField } from '../input/DateRangeField';
 
@@ -44,7 +46,7 @@ import { DateRangeField } from '../input/DateRangeField';
  * @param {string} viewMode - 현재 뷰 모드 ('grid' | 'list') [Optional, 기본값: 'grid']
  * @param {function} onViewModeChange - 뷰 모드 변경 핸들러 [Optional]
  * @param {number} resultCount - 검색 결과 수 [Optional]
- * @param {Array<{key: string, label: string, allLabel?: string, options: Array<{value: string, label: string}>, variant?: 'select'|'segmented'}>} filterGroups - 범용 필터 그룹 (도메인 필드를 하드코딩하지 않고 호출부에서 정의). allLabel은 필터 해제 항목의 문구(기본값 `All {label}s`) — 선택이 없을 때 트리거에 뜨는 문구이기도 하다. variant='segmented'면 드롭다운 대신 All+옵션 전부를 ToggleButtonGroup으로 보여준다 — 옵션이 2~4개로 고정된 배타적 선택지(예: Platform)에 적합, 옵션 개수가 늘어날 수 있는 필터(예: Campaign Group)는 기본값(select)을 쓴다 [Optional, 기본값: []]
+ * @param {Array<{key: string, label: string, allLabel?: string, options: Array<{value: string, label: string, section?: string}>, sections?: Array<{key: string, label: string, isCollapsible?: boolean, isCollapsedByDefault?: boolean}>, variant?: 'select'|'segmented'}>} filterGroups - 범용 필터 그룹 (도메인 필드를 하드코딩하지 않고 호출부에서 정의). allLabel은 필터 해제 항목의 문구(기본값 `All {label}s`) — 선택이 없을 때 트리거에 뜨는 문구이기도 하다. variant='segmented'면 드롭다운 대신 All+옵션 전부를 ToggleButtonGroup으로 보여준다 — 옵션이 2~4개로 고정된 배타적 선택지(예: Platform)에 적합, 옵션 개수가 늘어날 수 있는 필터(예: Campaign Group)는 기본값(select)을 쓴다. `sections`를 주면 드롭다운이 섹션(예: Recent → 연도별 → Unassigned)으로 나뉜다 — 옵션의 `section`이 섹션 key를 가리키고, isCollapsible인 섹션은 헤더를 눌러 접었다 펼 수 있다(isCollapsedByDefault로 처음 상태). 검색어가 있으면 섹션·접힘과 무관하게 전체 옵션에서 부분 일치로 거른 결과를 평평하게 보여준다 [Optional, 기본값: []]
  * @param {object} groupValues - filterGroups 각 key의 현재 선택값 { [key]: value } [Optional, 기본값: {}]
  * @param {function} onGroupChange - 그룹 필터 변경 핸들러 (key, value) => void [Optional]
  * @param {{ start: string, end: string }} dateRange - 기간 필터 값 [Optional]
@@ -109,6 +111,160 @@ export function FilterBar({
   /* 드롭다운 안 검색어(그룹 키별). 드롭다운을 닫을 때 비운다 — 남겨두면 다음에
      열었을 때 목록이 이미 걸러진 채로 떠서 "항목이 사라졌다"로 보인다. */
   const [optionSearch, setOptionSearch] = useState({});
+  /* 섹션 접힘 상태(그룹키:섹션키 → boolean). 값이 없으면 섹션의 isCollapsedByDefault를
+     따른다 — 데이터가 바뀌어 섹션이 새로 생겨도 기본 상태로 시작한다. */
+  const [collapsedSections, setCollapsedSections] = useState({});
+  const isSectionCollapsed = (groupKey, section) =>
+    collapsedSections[`${groupKey}:${section.key}`] ?? Boolean(section.isCollapsedByDefault);
+  const toggleSection = (groupKey, section) => {
+    const id = `${groupKey}:${section.key}`;
+    setCollapsedSections((prev) => ({ ...prev, [id]: !(prev[id] ?? Boolean(section.isCollapsedByDefault)) }));
+  };
+
+  /**
+   * 드롭다운 본문 — MUI Select는 Fragment를 자식으로 못 받으므로 배열로 만든다.
+   *
+   * 순서: 검색창 → 해제 항목 → (검색 중이면) 평평한 결과 / (아니면) 섹션별 목록.
+   * 섹션이 없는 그룹은 예전과 똑같이 평평한 목록이다 — Dashboard의 Store 필터처럼
+   * 항목이 한 자릿수인 곳은 섹션이 오히려 단계만 늘린다.
+   *
+   * 섹션 헤더는 ListSubheader다. MUI Select가 자식마다 onClick을 덧씌우지만
+   * tabindex 없는 요소는 클릭 처리에서 조용히 빠지므로(SelectInput의
+   * handleItemClick) 헤더를 눌러도 메뉴가 닫히지 않는다 — 대신 그 덧씌움이 우리
+   * onClick도 삼키기 때문에 토글은 **헤더 안의** 요소에 단다(이벤트 버블링).
+   */
+  const renderOptionMenu = (group) => {
+    const query = (optionSearch[group.key] ?? '').trim().toLowerCase();
+    const matches = (opt) => !query || opt.label.toLowerCase().includes(query);
+    const optionItem = (opt) => (
+      <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+    );
+    const items = [];
+
+    /* 옵션이 많으면 검색을 붙인다. Event 필터가 25개 넘는 항목을 정렬·그룹 없이
+       쏟아내서 원하는 걸 찾는 게 스캔 작업이었다(자동 생성된 게시물 이름·오타·
+       "- Copy" 사본이 섞여 있다). 적을 때는 검색창이 오히려 단계를 늘리므로 안 띄운다.
+       목록이 스크롤돼도 검색창은 붙어 있어야 한다 — autoFocus가 걸려 있어서,
+       스크롤과 함께 사라지면 "타이핑은 되는데 입력창이 안 보이는" 상태가 된다. */
+    if (group.options.length > OPTION_SEARCH_THRESHOLD) {
+      items.push(
+        <Box
+          key="__search"
+          onKeyDown={(e) => e.stopPropagation()}
+          sx={{ px: 1.5, py: 1, position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'background.paper' }}
+        >
+          <TextField
+            size="small"
+            fullWidth
+            autoFocus
+            placeholder={`Search ${group.label.toLowerCase()}`}
+            value={optionSearch[group.key] ?? ''}
+            onChange={(e) => setOptionSearch((prev) => ({ ...prev, [group.key]: e.target.value }))}
+            // htmlInput이라야 <input> 자체에 이름이 붙는다 — input 슬롯은 감싸는 div다
+            slotProps={{ htmlInput: { 'aria-label': `Search ${group.label}` } }}
+          />
+        </Box>
+      );
+    }
+
+    /* 필터 해제 항목이자 목록의 첫 선택지. 검색창 **아래**에 둔다 — 검색은 목록을
+       다루는 도구라 머리말 자리가 맞고, 이게 검색창과 목록 사이에 끼면 어디까지가
+       머리말인지 흐려진다. 라벨은 예전에 그룹 이름("Event")이라 목록 안에서
+       제목처럼 보이고 정작 "전체로 되돌리기"라는 기능은 읽히지 않았다. 하는 일을
+       그대로 적는다 — 선택이 없을 때 트리거에 뜨는 문구이기도 하다. 검색어와
+       무관하게 항상 남긴다: 검색 결과가 아니라 언제든 눌러야 하는 동작이다. */
+    items.push(<MenuItem key="__all" value="">{group.allLabel ?? `All ${group.label}s`}</MenuItem>);
+
+    /* 검색 중에는 섹션·접힘을 무시하고 전체에서 부분 일치로 거른다 — 접힌 2024년
+       섹션 안의 이벤트도 이름 일부만 치면 바로 나와야 한다. */
+    if (query) {
+      const hits = group.options.filter(matches);
+      if (hits.length === 0) {
+        items.push(
+          <Typography key="__empty" variant="body2" color="text.secondary" sx={{ px: 2, py: 1 }}>
+            No match
+          </Typography>
+        );
+      }
+      hits.forEach((opt) => items.push(optionItem(opt)));
+      return items;
+    }
+
+    const sections = group.sections ?? [];
+    if (sections.length === 0) {
+      group.options.forEach((opt) => items.push(optionItem(opt)));
+      return items;
+    }
+
+    /* 섹션에 속하지 않은 옵션은 해제 항목 바로 아래 평평하게 */
+    const sectionKeys = new Set(sections.map((s) => s.key));
+    group.options.filter((opt) => !sectionKeys.has(opt.section)).forEach((opt) => items.push(optionItem(opt)));
+
+    sections.forEach((section, index) => {
+      const sectionOptions = group.options.filter((opt) => opt.section === section.key);
+      if (sectionOptions.length === 0) return;
+      const isCollapsible = Boolean(section.isCollapsible);
+      const isCollapsed = isCollapsible && isSectionCollapsed(group.key, section);
+      const toggle = () => toggleSection(group.key, section);
+      items.push(
+        <ListSubheader
+          key={`__section-${section.key}`}
+          disableSticky
+          sx={{
+            px: 0,
+            py: 0,
+            lineHeight: 1,
+            bgcolor: 'background.paper',
+            // 첫 섹션은 해제 항목과 여백으로만 갈리고, 그다음부터 옅은 선 하나
+            ...(index > 0 && { borderTop: '1px solid', borderColor: 'divider', mt: 0.5 }),
+          }}
+        >
+          {/* 작은 흐린 라벨 + (접히는 섹션이면) 개수와 화살표. 접힘 토글은 이 안쪽
+              요소가 받는다 — 위 renderOptionMenu 주석 참고. */}
+          <Box
+            role={isCollapsible ? 'button' : undefined}
+            tabIndex={isCollapsible ? 0 : undefined}
+            aria-expanded={isCollapsible ? !isCollapsed : undefined}
+            onClick={isCollapsible ? toggle : undefined}
+            onKeyDown={isCollapsible ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggle(); } } : undefined}
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 1,
+              px: 2,
+              pt: 1.25,
+              pb: 0.5,
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+              color: 'text.secondary',
+              userSelect: 'none',
+              cursor: isCollapsible ? 'pointer' : 'default',
+              '&:focus-visible': { outline: 'none', boxShadow: (theme) => `inset 0 0 0 2px ${theme.palette.accent.ring}` },
+            }}
+          >
+            <span>{section.label}</span>
+            {isCollapsible && (
+              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 400, letterSpacing: 0, textTransform: 'none', fontVariantNumeric: 'tabular-nums' }}>
+                {sectionOptions.length}
+                <ExpandMoreIcon
+                  sx={(theme) => ({
+                    fontSize: theme.iconSize.inline,
+                    transform: isCollapsed ? 'rotate(-90deg)' : 'none',
+                    transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shortest }),
+                  })}
+                />
+              </Box>
+            )}
+          </Box>
+        </ListSubheader>
+      );
+      if (!isCollapsed) sectionOptions.forEach((opt) => items.push(optionItem(opt)));
+    });
+    return items;
+  };
 
   const sortOptions = [
     { id: 'newest', label: 'Newest First' },
@@ -224,6 +380,12 @@ export function FilterBar({
                  봤다. 호출부의 필터 판정도 모르는 값은 이미 무시하므로, 여기서
                  빈 값으로 보이게 하면 화면과 실제 동작이 일치한다. */
               value={group.options.some((o) => o.value === groupValues[group.key]) ? groupValues[group.key] : ''}
+              /* 트리거 라벨은 자식 MenuItem이 아니라 옵션 목록에서 직접 찾는다.
+                 MUI 기본은 "선택된 MenuItem의 children"을 보여주는데, 접힌 섹션
+                 안의 항목이나 검색으로 걸러진 항목은 자식으로 렌더되지 않아서
+                 트리거가 빈칸이 됐다. 이 한 줄 덕분에 목록은 자유롭게 접고 거를 수
+                 있다. */
+              renderValue={(value) => (value === '' ? (group.allLabel ?? `All ${group.label}s`) : (group.options.find((o) => o.value === value)?.label ?? String(value)))}
               onChange={(e) => onGroupChange?.(group.key, e.target.value)}
               onClose={() => setOptionSearch((prev) => ({ ...prev, [group.key]: '' }))}
               slotProps={{ input: { 'aria-label': group.label } }}
@@ -232,49 +394,7 @@ export function FilterBar({
               MenuProps={{ PaperProps: { sx: { maxHeight: OPTION_MENU_MAX_HEIGHT } } }}
               sx={{ minWidth: 140 }}
             >
-              {/* 옵션이 많으면 검색을 붙인다. Event 필터가 25개 넘는 항목을
-                  정렬·그룹 없이 쏟아내서 원하는 걸 찾는 게 스캔 작업이었다
-                  (자동 생성된 게시물 이름·오타·"- Copy" 사본이 섞여 있다).
-                  적을 때는 검색창이 오히려 단계를 늘리므로 안 띄운다. */}
-              {group.options.length > OPTION_SEARCH_THRESHOLD && (
-                <Box
-                  onKeyDown={(e) => e.stopPropagation()}
-                  /* 목록이 스크롤돼도 검색창은 붙어 있어야 한다 — autoFocus가 걸려
-                     있어서, 스크롤과 함께 사라지면 "타이핑은 되는데 입력창이 안
-                     보이는" 상태가 된다. */
-                  sx={{ px: 1.5, py: 1, position: 'sticky', top: 0, zIndex: 1, backgroundColor: 'background.paper' }}
-                >
-                  <TextField
-                    size="small"
-                    fullWidth
-                    autoFocus
-                    placeholder={`Search ${group.label.toLowerCase()}`}
-                    value={optionSearch[group.key] ?? ''}
-                    onChange={(e) => setOptionSearch((prev) => ({ ...prev, [group.key]: e.target.value }))}
-                    slotProps={{ input: { 'aria-label': `Search ${group.label}` } }}
-                  />
-                </Box>
-              )}
-              {/* 필터 해제 항목이자 목록의 첫 선택지. 검색창 **아래**에 둔다 —
-                  검색은 목록을 다루는 도구라 머리말 자리가 맞고, 이게 검색창과
-                  목록 사이에 끼면 어디까지가 머리말인지 흐려진다.
-                  라벨은 예전에 그룹 이름("Event")이라 목록 안에서 제목처럼 보이고
-                  정작 "전체로 되돌리기"라는 기능은 읽히지 않았다. 하는 일을 그대로
-                  적는다 — 선택이 없을 때 트리거에 뜨는 문구이기도 하다.
-                  검색어와 무관하게 항상 남긴다: 검색 결과가 아니라 언제든 눌러야
-                  하는 동작이다. */}
-              <MenuItem value="">{group.allLabel ?? `All ${group.label}s`}</MenuItem>
-              {group.options
-                .filter((opt) => {
-                  // 선택된 항목은 검색어와 무관하게 항상 남긴다 — MUI Select는
-                  // 선택된 MenuItem이 자식에 없으면 닫힌 상태의 라벨을 못 그린다.
-                  if (opt.value === groupValues[group.key]) return true;
-                  const query = (optionSearch[group.key] ?? '').trim().toLowerCase();
-                  return !query || opt.label.toLowerCase().includes(query);
-                })
-                .map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-                ))}
+              {renderOptionMenu(group)}
             </Select>
           )
         )}

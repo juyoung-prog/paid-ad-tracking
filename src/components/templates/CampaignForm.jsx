@@ -13,6 +13,7 @@ import { StoreMultiSelect } from '../input/StoreMultiSelect';
 import { DateRangeField } from '../input/DateRangeField';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { PLATFORM, GOAL, calcAutoBudgetPlanned } from '../../data/schema';
+import { dateRangeWithDays } from '../../utils/format';
 
 const PLATFORM_OPTIONS = [
   { value: PLATFORM.META, label: 'Meta' },
@@ -46,6 +47,20 @@ function FieldLabel({ children }) {
   return (
     <Typography variant="caption" sx={{ display: 'block', mb: 0.5, fontWeight: 600, color: 'text.secondary' }}>
       {children}
+    </Typography>
+  );
+}
+
+/**
+ * 읽기 전용 값 — 입력 컨트롤 자리에 같은 높이감으로 놓이는 평문. 동기화
+ * 캠페인의 이름·플랫폼·계정·기간·광고 링크처럼 원천이 플랫폼인 값은 여기서
+ * 고쳐도 다음 동기화 때 되돌아오거나 애초에 바뀔 수 없는 값이라, 입력창을
+ * 보여주는 것 자체가 "고칠 수 있다"는 거짓말이었다.
+ */
+function ReadOnlyValue({ children }) {
+  return (
+    <Typography variant="body2" sx={{ py: 0.75, color: 'text.primary', wordBreak: 'break-word' }}>
+      {children || '—'}
     </Typography>
   );
 }
@@ -105,6 +120,7 @@ function FieldLabel({ children }) {
  * @param {Array<{id: string, name: string}>} stores - StoreMultiSelect에 전달할 매장 목록 [Required]
  * @param {Array<{id: string, platform: string, label: string}>} accounts - 광고 계정 목록 (선택된 platform으로 내부 필터링) [Required]
  * @param {object} errors - 필드별 에러 메시지 { field: message } [Optional]
+ * @param {string[]} readOnlyFields - 입력 대신 평문으로 보여줄 필드. 'name' | 'platform' | 'accountId' | 'dates' | 'creativeUrl' | 'thumbnailUrl'. 동기화 캠페인의 드로어가 이 여섯을 넘긴다 — 원천이 플랫폼이라 고쳐도 되돌아오거나(이름·썸네일), 바뀔 수 없거나(플랫폼·계정), 플랫폼이 정한 값(기간)이다. 썸네일은 Upload/Remove 대신 "From Ads Manager" 한 줄 [Optional, 기본값: []]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
@@ -115,8 +131,10 @@ function FieldLabel({ children }) {
  *   accounts={mockAdAccounts}
  * />
  */
-export function CampaignForm({ values, onChange, stores, accounts, errors = {}, sx }) {
+export function CampaignForm({ values, onChange, stores, accounts, errors = {}, readOnlyFields = [], sx }) {
   const availableAccounts = accounts.filter((a) => a.platform === values.platform);
+  const isReadOnly = (field) => readOnlyFields.includes(field);
+  const isThumbnailReadOnly = isReadOnly('thumbnailUrl');
   const fileInputRef = useRef(null);
   const dropzoneRef = useRef(null);
   const [uploadAnchorEl, setUploadAnchorEl] = useState(null);
@@ -171,6 +189,9 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
             아래 줄로 내린다 — 짧은 값이라 좁은 컬럼에서도 온전히 보인다. */}
         <Grid size={12}>
           <FieldLabel>Campaign Name</FieldLabel>
+          {isReadOnly('name') ? (
+            <ReadOnlyValue>{values.name}</ReadOnlyValue>
+          ) : (
           <TextField
             fullWidth
             size="small"
@@ -180,6 +201,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
             helperText={errors.name}
             slotProps={{ htmlInput: { 'aria-label': 'Campaign Name' } }}
           />
+          )}
         </Grid>
 
         {/* 캠페인 1개=플랫폼 1개라 "메타+틱톡 동시 진행"처럼 이름만 통일해도 되는
@@ -210,6 +232,9 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
 
         <Grid size={{ xs: 12, md: 6 }}>
           <FieldLabel>Platform</FieldLabel>
+          {isReadOnly('platform') ? (
+            <ReadOnlyValue>{PLATFORM_OPTIONS.find((opt) => opt.value === values.platform)?.label ?? values.platform}</ReadOnlyValue>
+          ) : (
           <Select
             fullWidth
             size="small"
@@ -224,10 +249,14 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
               <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
             ))}
           </Select>
+          )}
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
           <FieldLabel>Account</FieldLabel>
+          {isReadOnly('accountId') ? (
+            <ReadOnlyValue>{accounts.find((a) => a.id === values.accountId)?.label ?? values.accountId}</ReadOnlyValue>
+          ) : (
           <Select
             fullWidth
             size="small"
@@ -241,6 +270,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
               <MenuItem key={account.id} value={account.id}>{account.label}</MenuItem>
             ))}
           </Select>
+          )}
         </Grid>
 
         <Grid size={{ xs: 12 }}>
@@ -259,6 +289,9 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
 
         <Grid size={{ xs: 12 }}>
           <FieldLabel>Campaign Dates</FieldLabel>
+          {isReadOnly('dates') ? (
+            <ReadOnlyValue>{dateRangeWithDays(values.startDate, values.endDate)}</ReadOnlyValue>
+          ) : (
           <DateRangeField
             value={{ start: values.startDate ?? '', end: values.endDate ?? '' }}
             onChange={({ start, end }) => {
@@ -269,6 +302,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
             helperText={errors.startDate || errors.endDate}
             label="Campaign Dates"
           />
+          )}
         </Grid>
 
         <Grid size={{ xs: 12, md: 6 }}>
@@ -315,6 +349,11 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
 
         <Grid size={{ xs: 12 }}>
           <FieldLabel>Ad Link (optional)</FieldLabel>
+          {isReadOnly('creativeUrl') ? (
+            /* 동기화 캠페인의 링크는 서버가 채운 ad_link를 화면(View ad)이 이미
+               쓴다 — 여기 수동 링크는 있을 때만 평문으로 보여준다. */
+            <ReadOnlyValue>{values.creativeUrl}</ReadOnlyValue>
+          ) : (
           <TextField
             fullWidth
             size="small"
@@ -323,6 +362,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
             onChange={(e) => onChange('creativeUrl', e.target.value)}
             slotProps={{ htmlInput: { 'aria-label': 'Ad Link (optional)' } }}
           />
+          )}
         </Grid>
 
         <Grid size={{ xs: 12 }}>
@@ -336,6 +376,15 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
               platform={values.platform}
               size={56}
             />
+            {/* 동기화 캠페인: 버튼 없이 출처 한 줄. 이미지는 sync-campaigns가 광고
+                크리에이티브에서 가져와 매번 갱신한다(Meta CDN 링크는 만료되므로).
+                여기서 올린 파일은 data URI로 DB에 박히고 다음 동기화 대상에서만
+                제외될 뿐 — 사람이 관리할 값이 아니다. */}
+            {isThumbnailReadOnly ? (
+              <Typography variant="caption" color="text.secondary">
+                From Ads Manager — updates with the next sync.
+              </Typography>
+            ) : (
             <Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Button
@@ -368,6 +417,7 @@ export function CampaignForm({ values, onChange, stores, accounts, errors = {}, 
                 {isUploadedImage ? 'Uploaded' : 'Not uploaded'}
               </Typography>
             </Box>
+            )}
             <input
               ref={fileInputRef}
               type="file"

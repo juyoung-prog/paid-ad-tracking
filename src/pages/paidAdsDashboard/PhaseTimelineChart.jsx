@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
 import { toLocalISODate } from './paidAdsPageUtils';
@@ -52,7 +53,7 @@ const CODE_PREFIX_PATTERN = /^[A-Za-z]{1,3}\d{1,3}[\s_\-–—]+/;
  * 표시용 이름. 이 계정의 계획 캠페인은 `G10_Coming Soon_0617~0707`처럼 매장 코드와
  * 기간을 이름에 담는데, 그 둘은 이 차트에서 이미 다른 자리가 말한다(코드는 Event
  * 필터, 기간은 막대와 둘째 줄). 첫 줄에는 사람이 부르는 이름("Coming Soon")만 남기고
- * 원본 전체는 둘째 줄과 title로 보낸다 — 행마다 굵기 배치가 달라지지 않게 모든
+ * 원본 전체는 title(hover)로 보낸다 — 행마다 굵기 배치가 달라지지 않게 모든
  * 행이 같은 규칙을 탄다. 벗겨낸 뒤 아무것도 안 남으면 원본을 그대로 쓴다.
  *
  * @param {string} name - 원본 캠페인 이름
@@ -189,7 +190,7 @@ function TimelineGrid({ ticks, monthStarts, pct }) {
  *
  * ## 표 + 막대 (2026-09 리디자인, ref/re1.png)
  *
- * 왼쪽 두 열은 표다 — Campaign(이름 + 기간·일수), Platform / Budget / Spend.
+ * 왼쪽 두 열은 표다 — Campaign(이름 + 기간·일수), Platform / Budget(/ Spend).
  * 오른쪽이 시간 축인데, 막대 **안에는 아무 글자도 없다.** 예전엔 24px 막대 안에
  * 기간·예산·지출을 한 줄로 욱여넣어서 좁은 막대에서는 첫 글자만 남았고, 이름은
  * 막대 위에 떠 있어 행마다 높이가 달랐다. 이제 숫자는 전부 왼쪽 열이 말하고,
@@ -216,13 +217,14 @@ function TimelineGrid({ ticks, monthStarts, pct }) {
  * @param {function} barSuffix - 플랫폼/예산 열 끝에 덧붙일 문자열을 돌려주는 함수 (phase) => string|null [Optional]
  * @param {Date|string} today - 기준일. 이 날짜에 진행 중인 phase의 막대가 강조(파랑)된다 [Optional]
  * @param {string} emphasizedKey - 강조할 phase의 key. today보다 우선한다 [Optional]
+ * @param {function} onPhaseClick - 행 클릭 핸들러 (phase) => void. 주면 행이 눌리는 객체가 된다(커서·hover 배경·키보드 활성화). 안 주면 예전처럼 읽기 전용 표 — 계획 타임라인(buildPlanPhases)처럼 행 뒤에 캠페인이 없는 경우가 그렇다 [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <PhaseTimelineChart phases={phases} today={today} />
  * <PhaseTimelineChart phases={phases} barSuffix={(p) => `Spend $${spendByPhase[p.name]}`} />
  */
-export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx }) {
+export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, onPhaseClick, sx }) {
   /* 축의 실제 폭(px). 눈금 간격은 %가 아니라 픽셀로 정해야 한다 — 같은 75일짜리
      축이 Performance 탭(전폭)에서는 주 단위가 맞고 Plan 탭(1120px 안)에서는
      2주 단위여야 라벨이 안 겹친다. 첫 렌더에는 0이라 상한 상수로 대신한다. */
@@ -324,7 +326,9 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
           }}
         >
           <Typography component="div" sx={headCellSx}>Campaign</Typography>
-          <Typography component="div" sx={headCellSx}>Platform / Budget / Spend</Typography>
+          {/* 실지출(barSuffix)이 붙는 Performance 탭에서만 "Spend"를 말한다 —
+              Plan 탭은 이 열에 계획 예산뿐이라 헤더가 없는 값을 약속하면 안 된다. */}
+          <Typography component="div" sx={headCellSx}>{barSuffix ? 'Platform / Budget / Spend' : 'Platform / Budget'}</Typography>
           <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider' }}>
             {months.map((mo) => mo.showLabel && (
               <Typography
@@ -335,7 +339,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
                   top: 10,
                   left: `${pct(mo.labelDay)}%`,
                   pl: 1,
-                  fontSize: 13,
+                  // 월 라벨은 주 눈금(11px 흐림)보다 확실히 위 단계 — 크기로 가른다
+                  fontSize: 14,
                   fontWeight: 600,
                   color: 'text.primary',
                   whiteSpace: 'nowrap',
@@ -373,12 +378,12 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
           const barColor = emphasized ? 'chart.barEmphasis' : 'chart.bar';
           /* 첫 줄은 부르는 이름. `타입: 캡션` 꼴(부스팅 게시물)은 캡션이 이름이다 —
              타입("Instagram post")은 같은 무리 전부가 공유하므로 구분에 쓸모가
-             없고, 원본 전체가 둘째 줄에 남아 타입도 거기서 읽힌다. 그 외에는
-             코드·기간을 벗긴 이름이다. 모든 행이 같은 규칙: 첫 줄 표시 이름,
-             둘째 줄 기간·일수·원본 이름. */
+             없다. 그 외에는 코드·기간을 벗긴 이름이다. 원본 전체는 title(hover)
+             로만 남긴다 — 한때 둘째 줄 끝에도 붙였는데, 잘려서 "G10_Coming Soon_…"
+             까지만 보이는 조각은 정보가 아니라 소음이었다. 모든 행이 같은 규칙:
+             첫 줄 표시 이름, 둘째 줄 기간·일수. */
           const { rest } = splitNamePrefix(p.name);
           const primaryName = displayName(rest || p.name);
-          const isNameShortened = primaryName !== p.name;
           const details = [formatPhaseBudget(p), barSuffix?.(p)].filter(Boolean).join(' · ');
           const isLast = index === phases.length - 1;
           const metaSx = { fontSize: 11, lineHeight: 1.6, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' };
@@ -394,33 +399,63 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, sx
           return (
             <Box
               key={p.key}
+              onClick={onPhaseClick ? () => onPhaseClick(p) : undefined}
+              onKeyDown={
+                onPhaseClick
+                  ? (event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        onPhaseClick(p);
+                      }
+                    }
+                  : undefined
+              }
+              role={onPhaseClick ? 'button' : undefined}
+              tabIndex={onPhaseClick ? 0 : undefined}
+              /* 행 전체가 하나의 버튼이다 — 막대만 누르게 하면 좁은 막대(하루짜리
+                 phase)는 과녁이 몇 px밖에 안 된다. 왼쪽 두 열이 평문이라
+                 스크린리더는 이름·기간을 그대로 읽는다(막대 쪽은 aria-hidden). */
               sx={(theme) => ({
                 display: 'grid',
                 gridTemplateColumns: GRID_TEMPLATE,
                 borderBottom: isLast ? 0 : '1px solid',
                 borderColor: 'divider',
+                cursor: onPhaseClick ? 'pointer' : 'default',
+                ...(onPhaseClick && {
+                  // 포커스는 앱 공통 문법(1px accent 테두리 + 옅은 ring)
+                  '&:focus-visible': {
+                    outline: '1px solid',
+                    outlineColor: theme.palette.accent.main,
+                    outlineOffset: -1,
+                    boxShadow: `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                  },
+                }),
                 /* hover — 이 행의 막대만 accent로. 파랑은 강조·hover에만 쓴다.
                    마우스 있는 기기에서만: 터치에서는 탭 뒤 hover가 눌어붙는다. */
                 '@media (hover: hover)': {
+                  ...(onPhaseClick && { '&:hover': { backgroundColor: theme.palette.action.hover } }),
                   [`&:hover .${BAR_CLASS}`]: { backgroundColor: theme.palette.chart.barEmphasis },
                   [`&:hover .${DOT_CLASS}`]: { borderColor: theme.palette.chart.barEmphasis },
                   [`&:hover .${DATE_CLASS}`]: { color: theme.palette.text.primary },
                 },
               })}
             >
-              {/* 이름 — 첫 줄은 세미볼드 표시 이름, 둘째 줄은 기간·일수와(코드·기간을
-                  벗겼다면) 원본 이름. 모든 행이 같은 두 줄이라 훑을 때 리듬이
-                  안 깨진다. 전체 원본은 title로도 남긴다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }} title={p.name}>
-                <Typography
-                  component="div"
-                  sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                >
-                  {primaryName}
-                </Typography>
+              {/* 이름 — 첫 줄은 세미볼드 표시 이름, 둘째 줄은 기간·일수. 모든 행이
+                  같은 두 줄이라 훑을 때 리듬이 안 깨진다. 원본 전체 이름은 이 칸의
+                  title(hover)로 남는다. */}
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
+                {/* 긴 이름은 말줄임 — 열 폭은 고정이라 타임라인을 잠식하지 않는다.
+                    전체 원본 이름은 hover 툴팁(CampaignTable 행과 같은 문법). */}
+                <Tooltip title={p.name} enterDelay={400} placement="top-start">
+                  <Typography
+                    component="div"
+                    sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                  >
+                    {primaryName}
+                  </Typography>
+                </Tooltip>
                 <Typography component="div" sx={metaSx}>
                   {dateMed(p.startDate)} – {dateMed(p.endDate)} · {rangeDays(p.startDate, p.endDate)}
-                  {isNameShortened && ` · ${p.name}`}
                 </Typography>
               </Box>
 

@@ -27,8 +27,8 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
 
 ### 기능
 - 맨 좌측: 소재 썸네일(CampaignThumbnail) — thumbnailUrl 없으면 중립색 이니셜로 자동 대체, 항상 뭔가 보임
-- 좌측: 캠페인명(Hero, bold) + (creativeUrl 있으면) 외부 링크 아이콘("View Ad"), 그 아래 메타 줄은 **칩이 아니라 평문 + 가운뎃점**으로 이어진다 — 플랫폼 · 타겟 · (형제 있거나 campaignGroup 입력됐으면) "{그룹명} (+N)" · (있으면) 중복 타겟팅(warning 색). 예전엔 전부 outlined 칩이라 한 행에 테두리가 5~6개씩 생겨 캠페인명보다 테두리가 먼저 읽혔다
-- 우측: 고긴급 알림이 있으면 알림 텍스트 2줄(여러 개면 Tooltip에 전부), 없으면 상태 표시(8px 점 + 라벨) + 기간·예산
+- 좌측: 캠페인명(Hero, bold) + (creativeUrl 있으면) 외부 링크 아이콘("View Ad"), 그 아래 메타 줄은 **칩이 아니라 평문 + 가운뎃점**으로 이어진다 — 플랫폼 · 타겟 · (campaignGroup 있으면) 그룹명 · (같은 플랫폼 형제 있으면) "+N ads" · (있으면) 중복 타겟팅(warning 색). 예전엔 전부 outlined 칩이라 한 행에 테두리가 5~6개씩 생겨 캠페인명보다 테두리가 먼저 읽혔다
+- 우측: 고정폭 세 열 — 기간(범위 / 일수) | 지출(금액 / spent · 예산) | 상태(점+라벨 / 페이스). 고긴급 알림이 있으면 상태 열이 알림 텍스트 2줄(여러 개면 Tooltip에 전부)로 바뀐다. 모든 행이 같은 x에 정렬된다
 - \`isStatusRedundant\`가 true면 상태 표시를 생략한다 — 감싼 그룹 헤더가 이미 상태를 말하는 경우(\`LIVE (4)\` 아래 모든 행이 Active)
 - onRowClick이 있으면 행이 Tab으로 포커스 가능하고 Enter/Space로 활성화됨
 
@@ -37,7 +37,7 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
 사람이 정수 달러로 정하고 일수를 곱한 값이라 센트가 없다), 집행은 \`money\`
 (항상 2자리 — 플랫폼이 센트로 청구한 실측값). 예전엔 옵션 없는
 \`toLocaleString\`이라 같은 열에 \`$2,261.5\`와 \`$514.49\`가 나란히 찍혔다.
-기간은 \`dateRangeWithDays\` — \`Jul 10 – Aug 31 (53 days)\` 꼴로, 같은 해면
+기간은 \`dateRange\` + \`rangeDays\` — \`Jul 10 – Aug 31\` 아래 \`53 days\` 두 줄로, 같은 해면
 연도를 생략하고 진행 일수(양끝 포함)를 함께 보여준다.
 
 ### 상태 표시가 왜 칩이 아닌가
@@ -247,7 +247,7 @@ export const WithAlerts = {
  * 이니셔티브를 Coming Soon/Now Open/Grand Opening 등 여러 단계로 나눠 등록한
  * 경우. 각 단계가 리스트에서 구분되는 이름을 가지므로 name 매칭만으로는 그룹이
  * 안 되고, campaignGroup(전부 "BF4 Grand Opening")으로 묶어야 한다 —
- * 메타 줄에 "{campaignGroup} (+N)" 평문으로 표시된다(Tooltip에 형제 이름 목록).
+ * 메타 줄에 "{campaignGroup} · +N ads" 평문으로 표시된다(Tooltip에 형제 이름 목록).
  */
 export const WithSamePlatformGroup = {
   render: (args) => (
@@ -374,4 +374,87 @@ export const StatusRedundantUnderGroupHeader = {
 
 export const Empty = {
   args: { rows: [] },
+};
+
+/**
+ * 형제 광고가 열 건을 넘는 캠페인 — 부스팅 게시물을 한 이벤트로 묶으면 실계정에서
+ * 수십~백 건이 된다("noname" 그룹 96건).
+ *
+ * 확인 포인트:
+ * - 메타 줄 끝이 `+95 ads`가 아니라 **`95 ads`**인가 — 큰 수 앞의 `+`는 눈에만
+ *   걸리고 뜻을 더하지 않는다(열 건 미만은 `+3 ads` 그대로)
+ * - `Unassigned` — "noname"은 이벤트가 아니라 "이벤트를 못 정한 캠페인들"이라
+ *   Event 필터와 같은 말로 부른다(schema의 isUnassignedEvent)
+ * - 형제 목록은 Tooltip에만 있고 행 높이는 다른 행과 같은가
+ *
+ * `rows`에는 한 건만 넣고 `allCampaigns`에 96건을 넘긴다 — 형제 판정은 탭·필터와
+ * 무관한 전체 목록 기준이라는 걸 같이 보여준다.
+ */
+export const LargeAdCount = {
+  render: (args) => {
+    const siblings = Array.from({ length: 96 }, (_, i) => ({
+      id: `boost-${i}`,
+      name: `Instagram post: boosted caption #${i + 1}`,
+      campaignGroup: 'noname',
+      platform: 'meta',
+      targetScope: 'all_stores',
+      targetStoreIds: [],
+      startDate: '2026-03-07',
+      endDate: '2026-03-14',
+      budgetPlanned: 0,
+      status: 'ended',
+    }));
+    return (
+      <Box>
+        <CampaignTable rows={[siblings[0]]} allCampaigns={siblings} onRowClick={args.onRowClick} />
+      </Box>
+    );
+  },
+};
+
+/**
+ * 지출이 없는 두 캠페인 — 같은 빈칸이라도 상태에 따라 다른 말을 한다.
+ *
+ * 확인 포인트:
+ * - 도는 중(active)은 `No spend yet` — 아직 안 나갔다는 뜻이다
+ * - 끝난 것(ended)은 `No spend data` — 이제 와서 들어올 값이 아니라 안 온 값이다
+ * - 금액 자리는 둘 다 `—`이고 **`$0.00`이 아니다** — 0을 찍으면 "0을 측정했다"는
+ *   주장이 되고, 이 앱은 모르는 값과 0을 구분한다
+ */
+export const MissingSpendCopy = {
+  name: 'Missing spend (status-aware copy)',
+  render: (args) => (
+    <Box>
+      <CampaignTable
+        rows={[
+          {
+            id: 'nospend-1',
+            name: 'G02_Spring Teaser_0401~0430',
+            campaignGroup: 'G02 Spring',
+            platform: 'meta',
+            targetScope: 'single_store',
+            targetStoreIds: ['G02'],
+            startDate: '2026-04-01',
+            endDate: '2026-04-30',
+            budgetPlanned: 600,
+            budgetDaily: 20,
+            status: 'active',
+          },
+          {
+            id: 'nospend-2',
+            name: 'Instagram Post: #novembersale',
+            campaignGroup: 'noname',
+            platform: 'meta',
+            targetScope: 'all_stores',
+            targetStoreIds: [],
+            startDate: '2025-11-02',
+            endDate: '2025-11-04',
+            budgetPlanned: 0,
+            status: 'ended',
+          },
+        ]}
+        onRowClick={args.onRowClick}
+      />
+    </Box>
+  ),
 };

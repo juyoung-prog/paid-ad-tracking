@@ -16,8 +16,8 @@ import { PacingIndicator } from '../data-display/PacingIndicator';
 import { ScrollArea } from '../container/ScrollArea';
 import { PlatformMetricList } from '../data-display/PlatformMetricList';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
-import { calcBudgetPacing, effectiveBudgetPlanned, PLATFORM } from '../../data/schema';
-import { money, moneyWhole, count, dateRangeWithDays, dateMed, EMPTY } from '../../utils/format';
+import { calcBudgetPacing, calcCTR, effectiveBudgetPlanned, PLATFORM } from '../../data/schema';
+import { money, moneyWhole, count, percent, dateRangeWithDays, dateMed, EMPTY } from '../../utils/format';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -96,6 +96,7 @@ export function CampaignDetailPanel({
   // 뒤죽박죽이면 "언제부터 줄었나"를 읽을 수 없다. 원본은 건드리지 않는다.
   const sortedDaily = [...dailyRows].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   const planned = effectiveBudgetPlanned(campaign);
+  const ctr = calcCTR(performance?.clicks ?? null, performance?.impressions ?? null);
   const pacing = calcBudgetPacing(campaign, spend ?? 0, today);
   const showPacing = spend != null && (planned != null || campaign.budgetDaily != null);
 
@@ -216,9 +217,12 @@ export function CampaignDetailPanel({
           )}
         </Box>
 
-        <Divider sx={{ mb: 2 }} />
+        <Divider sx={{ mb: 3 }} />
 
-        <Box sx={{ mb: 2 }}>
+        {/* 섹션 사이는 24px(mb:3), 섹션 제목과 내용 사이는 12px(mb:1.5)로 통일한다 —
+            요약·페이싱·일별·지표가 제각각(16/24/8px)이라 스크롤할 때 어디가 한
+            블록인지 경계가 흔들렸다. */}
+        <Box sx={{ mb: 3 }}>
           <Row label="Dates" value={dateRangeWithDays(campaign.startDate, campaign.endDate)} />
           {/* 계획 예산은 정수, 집행은 2자리 (utils/format.js 규칙) */}
           <Row label="Planned budget" value={planned != null ? moneyWhole(planned) : null} />
@@ -229,6 +233,12 @@ export function CampaignDetailPanel({
               goal 표에서 드로어로 들어오면 여기가 유일한 확인 지점이다. */}
           <Row label="Reach" value={performance?.reach != null ? count(performance.reach) : null} />
           <Row label="Impressions" value={performance?.impressions != null ? count(performance.impressions) : null} />
+          {/* Clicks·CTR도 같은 이유로 여기 둔다 — goal에 따라 아래 표에 Clicks
+              컬럼이 없는 경우(Awareness·Engagement)가 있어서, 그 캠페인은 이
+              블록이 유일한 확인 지점이다. CTR은 저장값이 아니라 계산값이라
+              schema의 순수 함수를 쓴다(표·Reports와 같은 값이 나오게). */}
+          <Row label="Clicks" value={performance?.clicks != null ? count(performance.clicks) : null} />
+          <Row label="CTR" value={ctr != null ? percent(ctr, { digits: 2 }) : null} />
         </Box>
 
         {showPacing && (
@@ -250,7 +260,7 @@ export function CampaignDetailPanel({
             일부러 둘 다 보이게 둔다. */}
         {sortedDaily.length > 0 && (
           <Box sx={{ mb: 3 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5 }}>
               Daily spend{' '}
               <Typography component="span" variant="body2" color="text.secondary">
                 — {sortedDaily.length} {sortedDaily.length === 1 ? 'day' : 'days'}
@@ -258,10 +268,12 @@ export function CampaignDetailPanel({
             </Typography>
             {/* Reports의 Daily spend 표와 같은 문법(stickyHeader + maxHeight 스크롤,
                 tabular-nums, Total 행 굵게) — 같은 데이터가 화면마다 다른 모양이면
-                둘 중 하나가 틀린 것으로 읽힌다. TableContainer가 아니라 ScrollArea인
-                것도 같은 이유 — 스크롤이 남았다는 신호(아래 그림자)가 없으면 21일
-                짜리 표가 열 줄에서 끝난 것처럼 보인다(Reports에서 실사용 신고 i-9). */}
-            <ScrollArea label="Daily spend" maxHeight={320}>
+                둘 중 하나가 틀린 것으로 읽힌다. 스크롤이 남았다는 신호는 필요하지만
+                (없으면 47일짜리 표가 여덟 줄에서 끝난 것처럼 보인다 — Reports 신고
+                i-9) 여기서는 아래 페이드 대신 **항상 보이는 얇은 스크롤바**로 준다:
+                좁은 드로어에서 가로 페이드는 마지막 행 위에 깔려 그 행이 선택된
+                것처럼 읽혔다(scrollHint='scrollbar'). */}
+            <ScrollArea label="Daily spend" maxHeight={320} scrollHint="scrollbar">
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>

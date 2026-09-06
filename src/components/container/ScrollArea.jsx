@@ -8,6 +8,8 @@ import Box from '@mui/material/Box';
  * 내용 위에 얹히므로 더 넓히면 숫자를 가린다 — 여기가 상한선이다.
  */
 const EDGE_WIDTH = 24;
+/** 아래 그림자 높이 — 표 행(약 33px)의 3분의 1. 행을 칠하지 않고 표가 흐려지는 것으로 읽힌다 */
+const BOTTOM_EDGE_HEIGHT = 10;
 
 /**
  * 가장자리 그림자. 색이 아니라 검정 알파의 그라디언트라 어떤 배경 위에서도
@@ -16,7 +18,12 @@ const EDGE_WIDTH = 24;
 const EDGE_GRADIENT = {
   start: 'linear-gradient(to right, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
   end: 'linear-gradient(to left, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
-  bottom: 'linear-gradient(to top, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
+  /* 아래 그림자만 옅고 얕다(0.2/24px → 0.08/10px). 좌우 그림자는 세로 띠라
+     가장자리 페이드로 읽히지만, 아래 그림자는 표의 **마지막 행 위에 가로로**
+     깔려서 "이 행이 선택됐다"로 읽혔다(실사용 지적). 신호는 남기되 행을 칠하지
+     않는 두께·농도로 낮춘다 — 없애면 21일짜리 표가 열 줄에서 끝난 것처럼
+     보이던 문제(i-9)가 돌아온다. */
+  bottom: 'linear-gradient(to top, rgba(17, 24, 39, 0.08), rgba(17, 24, 39, 0))',
 };
 
 /**
@@ -67,7 +74,7 @@ const EDGE_GRADIENT = {
  *   <Table sx={{ minWidth: 1800 }}>...</Table>
  * </ScrollArea>
  */
-export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) {
+export function ScrollArea({ children, label, startOffset = 0, maxHeight, scrollHint = 'fade', sx }) {
   const viewportRef = useRef(null);
   const [edges, setEdges] = useState({ start: false, end: false, bottom: false });
 
@@ -106,7 +113,7 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) 
         // 그린다. 가로 그림자는 sticky 고정 열 **뒤**로 숨는 게 맞아서(고정 열
         // 위에 그림자가 지나가면 안 움직이는 열이 움직이는 것처럼 읽힘) 기본
         // 겹침을 유지한다 — 같은 이유의 반대 방향 결정이다.
-        { left: 0, right: 0, bottom: 0, height: EDGE_WIDTH, zIndex: 3 }
+        { left: 0, right: 0, bottom: 0, height: BOTTOM_EDGE_HEIGHT, zIndex: 3 }
       : { top: 0, bottom: 0, width: EDGE_WIDTH, ...(side === 'start' ? { left: startOffset } : { right: 0 }) }),
     background: EDGE_GRADIENT[side],
     opacity: edges[side] ? 1 : 0,
@@ -125,13 +132,33 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, sx }) 
         role={label ? 'region' : undefined}
         aria-label={label}
         tabIndex={label ? 0 : undefined}
-        sx={{ overflowX: 'auto', maxHeight, overflowY: maxHeight ? 'auto' : undefined }}
+        sx={(theme) => ({
+          overflowX: 'auto',
+          maxHeight,
+          overflowY: maxHeight ? 'auto' : undefined,
+          /* scrollHint='scrollbar' — 아래 페이드 대신 **항상 보이는 얇은 스크롤바**로
+             "더 있다"를 말한다. 페이드는 표의 마지막 행 위에 가로로 깔려서 그 행이
+             선택된 것처럼 읽혔다(실사용 지적). 기본값(overlay 스크롤바)은 마우스를
+             올려야 나타나서 신호가 되지 못하므로 여기서 직접 그린다. */
+          ...(scrollHint === 'scrollbar' && {
+            scrollbarWidth: 'thin',
+            scrollbarColor: `${theme.palette.grey[300]} transparent`,
+            '&::-webkit-scrollbar': { width: 8, height: 8 },
+            '&::-webkit-scrollbar-track': { backgroundColor: 'transparent' },
+            '&::-webkit-scrollbar-thumb': {
+              backgroundColor: theme.palette.grey[300],
+              borderRadius: 4,
+              border: '2px solid transparent',
+              backgroundClip: 'content-box',
+            },
+          }),
+        })}
       >
         {children}
       </Box>
       <Box aria-hidden sx={edgeSx('start')} />
       <Box aria-hidden sx={edgeSx('end')} />
-      {maxHeight != null && <Box aria-hidden sx={edgeSx('bottom')} />}
+      {maxHeight != null && scrollHint === 'fade' && <Box aria-hidden sx={edgeSx('bottom')} />}
     </Box>
   );
 }

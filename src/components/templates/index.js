@@ -4,3 +4,5 @@ export { FilterBar } from './FilterBar.jsx';
 export { CampaignForm } from './CampaignForm.jsx';
 export { PerformanceForm } from './PerformanceForm.jsx';
 export { PlanForm } from './PlanForm.jsx';
+export { CampaignDetailPanel } from './CampaignDetailPanel.jsx';
+export { PhaseDetailPanel } from './PhaseDetailPanel.jsx';

@@ -32,7 +32,7 @@ filterGroups 항목에 \`variant: 'segmented'\`를 주면 드롭다운 대신 Al
     selectedTags: { control: 'object' },
     onTagToggle: { action: 'tagToggled' },
     resultCount: { control: { type: 'number' } },
-    filterGroups: { control: 'object', description: "{ key, label, options, variant? } 배열 — variant:'segmented'면 드롭다운 대신 세그먼트 버튼" },
+    filterGroups: { control: 'object', description: "{ key, label, options, sections?, variant? } 배열 — variant:'segmented'면 드롭다운 대신 세그먼트 버튼, sections를 주면 드롭다운이 (Planned)/연도별(그 해 전체, 최신 연도만 펼침)/Unassigned 섹션으로 나뉜다" },
     groupValues: { control: 'object' },
     onGroupChange: { action: 'groupChanged' },
     dateRange: { control: 'object' },
@@ -120,6 +120,56 @@ export const AdsDashboardFilters = {
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
           resultCount={11}
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * 섹션이 있는 드롭다운 — 이벤트가 수백 개로 늘어도 같은 구조를 유지하는 Event 필터.
+ *
+ * 검색창 → All Events → 연도별(최신 연도만 펼침, 그 전은 접힘, 헤더에 개수·화살표)
+ * → Unassigned("noname" 같은 자리표시자를 정상 이벤트와 분리) 순이다. 연도
+ * 섹션은 그 해의 전체 목록이다(별도 Recent 섹션은 두지 않는다 — 같은 해가 둘로
+ * 갈라져 보였다). 확인할 것:
+ * - 접힌 2025·2024 헤더를 누르면 메뉴가 닫히지 않고 펼쳐지는가
+ * - 검색어("deal")를 넣으면 접힌 연도 안의 이벤트도 평평하게 나오는가(부분 일치)
+ * - 접힌 섹션 안의 항목을 골라 두고 다시 열어도 트리거 라벨이 비지 않는가
+ */
+export const GroupedEventOptions = {
+  render: () => {
+    const [groupValues, setGroupValues] = useState({ event: '' });
+    const y2026 = ['G10 Opening', 'BF2 2 Months Deals', 'G07 Anniversary', 'FL1 Grand Opening', 'BF4 Coming Soon', 'G03 Spring Deals', 'G05 Mother\'s Day', 'BF1 Summer Sale', 'G09 Back to School'];
+    const y2025 = Array.from({ length: 14 }, (_, i) => `2025 Event ${i + 1}`);
+    const y2024 = Array.from({ length: 9 }, (_, i) => `2024 Event ${i + 1}`);
+    const options = [
+      ...y2026.map((v) => ({ value: v, label: v, section: 'year-2026' })),
+      ...y2025.map((v) => ({ value: v, label: v, section: 'year-2025' })),
+      ...y2024.map((v) => ({ value: v, label: v, section: 'year-2024' })),
+      { value: 'noname', label: 'Unassigned', section: 'unassigned' },
+    ];
+    return (
+      <Box>
+        <FilterBar
+          showSearch={false}
+          searchValue=""
+          onSearchChange={() => {}}
+          filterGroups={[
+            {
+              key: 'event',
+              label: 'Event',
+              options,
+              sections: [
+                { key: 'year-2026', label: '2026', isCollapsible: true },
+                { key: 'year-2025', label: '2025', isCollapsible: true, isCollapsedByDefault: true },
+                { key: 'year-2024', label: '2024', isCollapsible: true, isCollapsedByDefault: true },
+                { key: 'unassigned', label: 'Unassigned' },
+              ],
+            },
+          ]}
+          groupValues={groupValues}
+          onGroupChange={(key, value) => setGroupValues((v) => ({ ...v, [key]: value }))}
         />
       </Box>
     );

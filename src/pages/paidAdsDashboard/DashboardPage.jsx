@@ -12,17 +12,23 @@ import DialogTitle from '@mui/material/DialogTitle';
 import Divider from '@mui/material/Divider';
 import Drawer from '@mui/material/Drawer';
 import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import MenuItem from '@mui/material/MenuItem';
 import Popover from '@mui/material/Popover';
+import Select from '@mui/material/Select';
 import Skeleton from '@mui/material/Skeleton';
 import Tab from '@mui/material/Tab';
 import Tabs from '@mui/material/Tabs';
+import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import ArchiveOutlinedIcon from '@mui/icons-material/ArchiveOutlined';
+import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import NotificationsOutlinedIcon from '@mui/icons-material/NotificationsOutlined';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import RestoreIcon from '@mui/icons-material/Restore';
+import SearchIcon from '@mui/icons-material/Search';
 
 import { PageContainer } from '../../components/layout/PageContainer';
 import { KpiBar } from '../../components/data-display/KpiBar';
@@ -35,10 +41,10 @@ import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
 import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
-import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
-import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
+import { PAGE_GUTTER_X, campaignInDateRange, generateId, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
 import { money, moneyWhole } from '../../utils/format';
 import { useViewUrlSync } from './useViewUrlSync';
 import { BulkEventTagDialog } from '../../components/templates/BulkEventTagDialog';
@@ -112,6 +118,36 @@ const NO_EVENT = '(no-event)';
 // 한 그룹만 걸러진 상태라 이 값이 전부 같아서 기존 정렬(severity→종료일)
 // 결과에 영향을 주지 않는다.
 const STATUS_GROUP_ORDER = { active: 0, planned: 1, ended: 2, ended_early: 2, archived: 2 };
+
+/**
+ * 목록 정렬 — 결과 수 옆의 작은 드롭다운. All 탭이 171건이라 "어느 게 최근 것"
+ * "어디에 돈이 몰렸나"를 스크롤 없이 답하려면 정렬이 필요하다. 지출이 없는 행
+ * (null)은 어느 방향이든 맨 뒤 — 없는 값을 0으로 세면 "가장 적게 쓴 캠페인"
+ * 자리를 데이터 없는 행이 차지한다.
+ */
+/**
+ * 목록 툴바 — 결과 수(또는 첫 그룹 헤더) 왼쪽, 검색·정렬 오른쪽. 세 탭이 정확히
+ * 같은 높이(컨트롤 높이 36px)와 아래 여백(16px)을 쓴다 — 탭마다 툴바 높이가 다르면
+ * 탭을 바꿀 때 목록 첫 행이 위아래로 튄다.
+ */
+/** 동기화 캠페인 드로어에서 평문으로만 보여주는 필드 — CampaignForm readOnlyFields */
+const SYNCED_READ_ONLY_FIELDS = ['name', 'platform', 'accountId', 'dates', 'creativeUrl', 'thumbnailUrl'];
+
+const LIST_TOOLBAR_SX = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 2,
+  minHeight: 36,
+  mb: 2,
+};
+
+const LIST_SORT = {
+  newest: { label: 'Newest', compare: (a, b) => b.startDate.localeCompare(a.startDate) },
+  oldest: { label: 'Oldest', compare: (a, b) => a.startDate.localeCompare(b.startDate) },
+  spend_desc: { label: 'Highest spend', compare: (a, b) => (b.spend ?? -Infinity) - (a.spend ?? -Infinity) },
+  spend_asc: { label: 'Lowest spend', compare: (a, b) => (a.spend ?? Infinity) - (b.spend ?? Infinity) },
+};
 
 const HIGH_SEVERITY_TYPES = ['ending_soon', 'budget_pacing', 'missing_performance', 'no_results'];
 
@@ -233,6 +269,11 @@ export function DashboardPage() {
   /* 초기값은 localStorage에서만 읽는다. URL이 있으면 useViewUrlSync가 마운트
      직후 덮어쓴다 — 우선순위는 URL > localStorage > 기본값이다. */
   const [tab, setTab] = useState(() => sanitizeTab(loadLastView()?.tab));
+  /* 목록 검색·정렬. 필터(Event·Platform·Store·기간·탭)를 건드리지 않고 **그 결과
+     안에서** 좁히고 줄 세운다 — 세션 안에서만 살고 URL·localStorage에는 안 남긴다
+     (검색어는 "지금 찾는 것"이지 "보는 방식"이 아니다). */
+  const [listSearch, setListSearch] = useState('');
+  const [listSort, setListSort] = useState('newest');
   const [groupValues, setGroupValues] = useState(() => {
     const saved = loadLastView();
     return { platform: saved?.platform ?? '', store: saved?.store ?? '', campaignGroup: saved?.event ?? '' };
@@ -540,8 +581,10 @@ export function DashboardPage() {
      같은 게시물을 여러 번 부스팅하면 캡션이 그대로 이름이라 **우연히** 중복되고
      그게 전부 "이벤트"로 올라왔다. 서버가 유도 못 한 이름에는 이제 그룹을 안
      붙이므로(resolveEventGroup이 null) 그룹 유무 하나로 판단한다. */
-  const campaignGroupOptions = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))]
-    .map((key) => ({ value: key, label: key }));
+  /* Reports와 같은 섹션 구조(Recent → 연도별 → Unassigned) — buildEventFilterGroup.
+     Dashboard 스토어에는 계획(plans)이 없으므로 집행된 이벤트만 넘긴다. */
+  const eventFilterGroup = useMemo(() => buildEventFilterGroup(campaigns, []), [campaigns]);
+  const campaignGroupOptions = eventFilterGroup.options;
 
   /* Event 태그가 없는 캠페인. 필터·탭과 무관하게 **전체**를 센다 — 지금 보고
      있는 화면에 안 걸린다고 문제가 없는 게 아니다. 아카이브된 것은 뺀다:
@@ -580,7 +623,8 @@ export function DashboardPage() {
     const hasRecord = (id) => performanceRecords.some((p) => p.campaignId === id);
     const currentIndex = filteredCampaigns.findIndex((c) => c.id === selectedCampaignId);
     const ordered = [...filteredCampaigns.slice(currentIndex + 1), ...filteredCampaigns.slice(0, Math.max(currentIndex, 0))];
-    return ordered.find((c) => c.id !== selectedCampaignId && !hasRecord(c.id))?.id ?? null;
+    // 동기화 캠페인은 사람이 입력할 대상이 아니다(isSyncedCampaign) — 건너뛴다.
+    return ordered.find((c) => c.id !== selectedCampaignId && !isSyncedCampaign(c) && !hasRecord(c.id))?.id ?? null;
   })();
 
   const editCampaignMissing = missingRequiredFields(editCampaignValues, { isNew: false });
@@ -589,6 +633,10 @@ export function DashboardPage() {
   // 빈 폼 저장이 미보고 알림을 데이터 없이 해제하는 것을 막는다(handleSavePerformance 참고).
   const canSavePerformance = hasAnyMetricValue(performanceValues);
   const canSaveCampaignEdit = editCampaignMissing.length === 0;
+  /* Save Campaign Details는 필드를 실제로 바꿨을 때만 켜진다 — 성과 지표(읽기
+     전용·동기화)는 이 판정에 들어가지 않는다. 스냅샷과 같으면 저장할 것이 없다. */
+  const isCampaignEdited =
+    originalCampaignSnapshot != null && JSON.stringify(editCampaignValues) !== JSON.stringify(originalCampaignSnapshot);
 
   // 닫기(배경 클릭·Escape·Cancel/Close 버튼)를 눌렀을 때 입력한 내용을 그냥
   // 버리지 않는다 — Enterprise UX 리뷰(Fiori/Carbon의 unsaved-changes guard)
@@ -699,6 +747,80 @@ export function DashboardPage() {
     return true;
   };
 
+
+  const allCampaignRows = filteredCampaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    campaignGroup: c.campaignGroup,
+    platform: c.platform,
+    accountLabel: accountLabelFor(c.accountId),
+    targetScope: c.targetScope,
+    targetStoreIds: c.targetStoreIds,
+    startDate: c.startDate,
+    endDate: c.endDate,
+    budgetPlanned: c.budgetPlanned,
+    budgetDaily: c.budgetDaily,
+    spend: spendFor(c.id),
+    /* 페이스는 여기서 계산해 행에 실어준다 — 알림(15% 초과)과 같은 근거를
+       쓰되, 알림은 임계를 넘을 때만 말하고 이 값은 항상 말한다. "괜찮다"를
+       확인하려고 사용자가 기간·일예산·지출로 암산하던 걸 없애는 게 목적이라,
+       정상 범위일 때 보이는 게 핵심이다.
+
+       dailyBudgetRatio만 쓰면 안 된다 — 일일 예산이 있는 캠페인에만 붙어서
+       Meta 쪽 상당수가 아무 신호도 못 받는다(플랫폼이 총액으로만 설정한
+       캠페인). budgetPaceRatio가 알림과 같은 우선순위로 총예산 기준 대체
+       경로까지 포함한다. */
+    paceRatio: budgetPaceRatio(c, spendFor(c.id), today),
+    status: c.effectiveStatus,
+    alertBadges: alertBadgesFor(c.id),
+    overlapNote: overlapNoteFor(c.id),
+    thumbnailUrl: c.thumbnailUrl,
+    // View Ad 아이콘 — 수동 링크 우선, 없으면 동기화가 채운 게시물 링크
+    creativeUrl: c.creativeUrl || c.adLink,
+  }));
+
+  /* 검색·정렬은 필터 결과 위에서만 — 위 필터·탭이 고른 집합은 그대로 두고,
+     이름 부분 일치로 좁힌 뒤 선택한 순서로 줄 세운다(LIST_SORT). */
+  const listQuery = listSearch.trim().toLowerCase();
+  const campaignRows = allCampaignRows
+    .filter((r) => !listQuery || r.name.toLowerCase().includes(listQuery))
+    .sort(LIST_SORT[listSort]?.compare ?? LIST_SORT.newest.compare);
+
+  /* 검색·정렬 컨트롤 — 결과 수 옆(All·Ended 탭) 또는 첫 그룹 헤더 옆(This Period)에
+     같은 모양으로 놓인다. */
+  const listControls = allCampaignRows.length > 0 ? (
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+    <TextField
+      size="small"
+      placeholder="Search campaigns..."
+      value={listSearch}
+      onChange={(e) => setListSearch(e.target.value)}
+      slotProps={{
+        htmlInput: { 'aria-label': 'Search campaigns' },
+        input: {
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.secondary' })} />
+            </InputAdornment>
+          ),
+        },
+      }}
+      sx={{ width: 220, '& .MuiInputBase-input': { fontSize: 13 } }}
+    />
+    <Select
+      size="small"
+      value={listSort}
+      onChange={(e) => setListSort(e.target.value)}
+      renderValue={(value) => `Sort: ${LIST_SORT[value]?.label ?? LIST_SORT.newest.label}`}
+      slotProps={{ input: { 'aria-label': 'Sort campaigns' } }}
+      sx={{ minWidth: 168, fontSize: 13 }}
+    >
+      {Object.entries(LIST_SORT).map(([value, { label }]) => (
+        <MenuItem key={value} value={value}>{label}</MenuItem>
+      ))}
+    </Select>
+    </Box>
+  ) : null;
 
   return (
     <Box>
@@ -882,10 +1004,14 @@ export function DashboardPage() {
                   label: 'Event',
                   options: [
                     ...campaignGroupOptions,
+                    /* 태그 없는 캠페인은 "noname" 그룹과 같은 Unassigned 섹션에 —
+                       둘 다 "이벤트가 정해지지 않은 것"이라 정상 이벤트 사이에
+                       섞이면 안 된다. */
                     ...(campaigns.some((c) => !c.campaignGroup)
-                      ? [{ value: NO_EVENT, label: 'No Event' }]
+                      ? [{ value: NO_EVENT, label: 'No Event', section: 'unassigned' }]
                       : []),
                   ],
+                  sections: eventFilterGroup.sections,
                 }]
               : []),
             {
@@ -921,14 +1047,25 @@ export function DashboardPage() {
         {untaggedCampaigns.length > 0 && (
           <Alert
             severity="info"
-            sx={{ mb: 2 }}
+            /* 얇은 안내 띠 — 경고 카드가 아니다. 기본 Alert 패딩(위아래 6+8px)을
+               줄여 한 줄짜리 정보 스트립으로 둔다. */
+            sx={{
+              mb: 2,
+              py: 0,
+              alignItems: 'center',
+              '& .MuiAlert-icon': { py: 0.75 },
+              '& .MuiAlert-message': { py: 0.75, fontSize: 13 },
+              '& .MuiAlert-action': { pt: 0, alignItems: 'center' },
+            }}
             action={
               <Button color="inherit" size="small" onClick={() => setIsBulkTagOpen(true)}>
                 Tag them
               </Button>
             }
           >
-            {`${untaggedCampaigns.length} campaign${untaggedCampaigns.length === 1 ? ' has' : 's have'} no Event — they are missing from event summaries and plan comparisons.`}
+            {untaggedCampaigns.length === 1
+              ? '1 campaign has no Event — it is missing from event summaries and plan comparisons.'
+              : `${untaggedCampaigns.length} campaigns have no Event — they are missing from event summaries and plan comparisons.`}
           </Alert>
         )}
 
@@ -979,37 +1116,23 @@ export function DashboardPage() {
             판단이되, 접기·그룹 내 로컬 필터까지는 안 간다 — 캠페인 10여 개
             규모에서는 접힌 그룹이 오히려 "안 보이는 데이터"를 만든다.
             알림이 하나도 없으면 헤더 없이 예전처럼 평평한 리스트다. */}
-        {!isLoading && (() => {
-          const campaignRows = filteredCampaigns.map((c) => ({
-            id: c.id,
-            name: c.name,
-            campaignGroup: c.campaignGroup,
-            platform: c.platform,
-            accountLabel: accountLabelFor(c.accountId),
-            targetScope: c.targetScope,
-            targetStoreIds: c.targetStoreIds,
-            startDate: c.startDate,
-            endDate: c.endDate,
-            budgetPlanned: c.budgetPlanned,
-            budgetDaily: c.budgetDaily,
-            spend: spendFor(c.id),
-            /* 페이스는 여기서 계산해 행에 실어준다 — 알림(15% 초과)과 같은 근거를
-               쓰되, 알림은 임계를 넘을 때만 말하고 이 값은 항상 말한다. "괜찮다"를
-               확인하려고 사용자가 기간·일예산·지출로 암산하던 걸 없애는 게 목적이라,
-               정상 범위일 때 보이는 게 핵심이다.
+        {/* 목록 컨트롤 — 결과 수(왼쪽) + 검색·정렬(오른쪽) 한 줄. 위 필터 행의
+            보조라 컨테이너 없이 글자와 컨트롤만 놓는다. 검색 중이면 "3 of 171"로
+            좁힌 정도를 말한다. This Period 탭은 그룹 헤더("Recently ended ·
+            4 campaigns")가 이미 수를 세므로 이 줄을 따로 두지 않고 첫 그룹
+            헤더 오른쪽에 컨트롤만 붙인다(아래 IIFE). */}
+        {!isLoading && allCampaignRows.length > 0 && tab !== 'now' && (
+          <Box sx={LIST_TOOLBAR_SX}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}>
+              {listQuery && campaignRows.length !== allCampaignRows.length
+                ? `${campaignRows.length} of ${allCampaignRows.length} campaigns`
+                : `${allCampaignRows.length} ${allCampaignRows.length === 1 ? 'campaign' : 'campaigns'}`}
+            </Typography>
+            {listControls}
+          </Box>
+        )}
 
-               dailyBudgetRatio만 쓰면 안 된다 — 일일 예산이 있는 캠페인에만 붙어서
-               Meta 쪽 상당수가 아무 신호도 못 받는다(플랫폼이 총액으로만 설정한
-               캠페인). budgetPaceRatio가 알림과 같은 우선순위로 총예산 기준 대체
-               경로까지 포함한다. */
-            paceRatio: budgetPaceRatio(c, spendFor(c.id), today),
-            status: c.effectiveStatus,
-            alertBadges: alertBadgesFor(c.id),
-            overlapNote: overlapNoteFor(c.id),
-            thumbnailUrl: c.thumbnailUrl,
-            // View Ad 아이콘 — 수동 링크 우선, 없으면 동기화가 채운 게시물 링크
-            creativeUrl: c.creativeUrl || c.adLink,
-          }));
+        {!isLoading && (() => {
           /* Now 탭에서 Action Required로 끌어올릴 알림은 "지금 손대야 하는" 것만이다.
              missing_performance는 제외한다 — Recently Ended 그룹의 존재 이유가 바로
              "성과 입력이 남은 캠페인"이라 그 그룹 안에서는 중복 신호이고, 더 심각하게는
@@ -1029,7 +1152,11 @@ export function DashboardPage() {
              화면에서 가장 약한 글씨**였다 — 그 아래 행마다 반복되는 초록
              `Active` 칩이 헤더보다 훨씬 강했다(실화면 리뷰). 구조가 장식보다
              세야 한다. */
-          const groupHeaderSx = { display: 'block', mb: 0.5, color: 'text.primary' };
+          /* 그룹 헤더는 Reports의 섹션 제목과 같은 문법 — 제목(title 토큰) + 같은
+             기준선의 흐린 범위("4 campaigns · Last 14 days"). 한때 대문자 label
+             토큰("RECENTLY ENDED (LAST 14 DAYS) (4)")이었는데, 괄호가 겹치고
+             앱의 다른 화면 제목과 다른 언어였다. 개수는 범위 텍스트가 센다. */
+          const countScope = (n) => `${n} ${n === 1 ? 'campaign' : 'campaigns'}`;
 
           /* Now 탭은 라이프사이클 순서로 4그룹 — 아침에 읽는 순서 그대로다
              (터진 것 → 도는 것 → 곧 시작 → 막 끝나서 성과 입력 남은 것).
@@ -1044,22 +1171,24 @@ export function DashboardPage() {
           const sections =
             tab === 'now'
               ? [
-                  { label: 'Action Required', rows: actionRows },
+                  { label: 'Action required', rows: actionRows },
                   { label: 'Live', rows: restRows.filter((r) => r.status === 'active'), isStatusRedundant: true },
                   {
-                    label: `Starting Soon (next ${STARTING_SOON_DAYS} days)`,
+                    label: 'Starting soon',
+                    scopeSuffix: `Next ${STARTING_SOON_DAYS} days`,
                     rows: restRows.filter((r) => r.status === 'planned'),
                     isStatusRedundant: true,
                   },
                   {
-                    label: `Recently Ended (last ${RECENTLY_ENDED_DAYS} days)`,
+                    label: 'Recently ended',
+                    scopeSuffix: `Last ${RECENTLY_ENDED_DAYS} days`,
                     rows: restRows.filter((r) => r.status === 'ended' || r.status === 'ended_early'),
                   },
                 ].filter((s) => s.rows.length > 0)
               : actionRows.length > 0
                 ? [
-                    { label: 'Action Required', rows: actionRows },
-                    { label: 'Other Campaigns', rows: restRows },
+                    { label: 'Action required', rows: actionRows },
+                    { label: 'Other campaigns', rows: restRows },
                   ].filter((s) => s.rows.length > 0)
                 : [];
 
@@ -1072,6 +1201,22 @@ export function DashboardPage() {
 
              탭 배지는 이미 필터를 반영하므로 여기 쓰는 숫자와 도착지의 숫자가
              일치한다(이 화면의 "클릭한 숫자와 도착한 행 수는 같다" 원칙). */
+          /* This Period 탭에서 컨트롤이 설 자리 — 그룹 헤더가 있으면 첫 헤더
+             오른쪽, 없으면(평평한 목록·빈 결과) 목록 위 오른쪽 정렬 한 줄. */
+          const nowControlsRow = tab === 'now' && listControls ? (
+            <Box sx={{ ...LIST_TOOLBAR_SX, justifyContent: 'flex-end' }}>{listControls}</Box>
+          ) : null;
+
+          if (campaignRows.length === 0 && listQuery) {
+            return (
+              <>
+                {nowControlsRow}
+                <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                  {`No campaigns match “${listSearch.trim()}” in this view.`}
+                </Typography>
+              </>
+            );
+          }
           if (campaignRows.length === 0) {
             const elsewhere = [
               { tab: 'active', label: 'Active', count: activeCount },
@@ -1103,12 +1248,15 @@ export function DashboardPage() {
                모든 행이 Active인 건 이미 탭 라벨이 말했다. ended 탭은 'ended'와
                'ended_early'가 섞이므로 제외한다(라벨이 서로 다르다). */
             return (
-              <CampaignTable
-                rows={campaignRows}
-                allCampaigns={campaigns}
-                isStatusRedundant={tab === 'active'}
-                onRowClick={openCampaignDrawer}
-              />
+              <>
+                {nowControlsRow}
+                <CampaignTable
+                  rows={campaignRows}
+                  allCampaigns={campaigns}
+                  isStatusRedundant={tab === 'active'}
+                  onRowClick={openCampaignDrawer}
+                />
+              </>
             );
           }
           /* "손댈 게 없다"는 여기가 아니라 상단 KPI(Needs Attention 0 +
@@ -1116,10 +1264,19 @@ export function DashboardPage() {
              그 문장은 0일 때만 존재해서 스크롤과 함께 사라지는 반면 툴바는 sticky라
              어느 위치에서든 같은 답을 준다. 같은 말을 두 곳에서 하지 않는다. */
           return sections.map((section, i) => (
-            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 3 }}>
-              <Typography variant="label" sx={groupHeaderSx}>
-                {section.label} ({section.rows.length})
-              </Typography>
+            <Box key={section.label} sx={{ mt: i === 0 ? 0 : 2.5 }}>
+              {/* 첫 헤더는 컨트롤을 품은 툴바다 — All·Ended 탭의 결과 수 줄과 같은
+                  높이·여백(LIST_TOOLBAR_SX)이라 탭을 오가도 목록이 같은 y에서 시작한다. */}
+              <Box sx={i === 0 && tab === 'now' ? LIST_TOOLBAR_SX : { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.5 }}>
+                <Typography variant="title" component="h3" sx={{ display: 'block', color: 'text.primary', minWidth: 0 }}>
+                  {section.label}
+                  <Typography component="span" variant="body2" sx={{ ml: 1.5, fontWeight: 400, color: 'text.secondary' }}>
+                    {[countScope(section.rows.length), section.scopeSuffix].filter(Boolean).join(' · ')}
+                  </Typography>
+                </Typography>
+                {/* This Period 탭: 검색·정렬은 첫 그룹 헤더와 같은 줄 오른쪽 */}
+                {i === 0 && tab === 'now' && listControls}
+              </Box>
               <CampaignTable
                 rows={section.rows}
                 allCampaigns={campaigns}
@@ -1232,6 +1389,14 @@ export function DashboardPage() {
                     </IconButton>
                   </Tooltip>
                 )}
+                {/* 닫기는 헤더 오른쪽 끝 하나뿐 — 예전엔 긴 드로어 맨 아래에 텍스트
+                    Close 버튼이 있어서 닫으려면 끝까지 내려가야 했다. 여기가
+                    유일한 닫기 컨트롤이다(ESC·바깥 클릭과 같은 requestCloseDrawer). */}
+                <Tooltip title="Close">
+                  <IconButton size="small" onClick={requestCloseDrawer} aria-label="Close campaign details">
+                    <CloseIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
               </Box>
             </Box>
 
@@ -1304,6 +1469,11 @@ export function DashboardPage() {
               <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.primary' }}>
                 Campaign Details
               </Typography>
+              {isSyncedCampaign(selectedCampaign) && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                  Name, platform, account, dates and creative come from Ads Manager. Edit the event, stores, budget and goal here.
+                </Typography>
+              )}
               {/* key={selectedCampaignId} — 리스트의 다른 행이나 알림을 클릭하면
                   Drawer를 닫지 않고 같은 자리에서 selectedCampaignId만 바뀐다. key가
                   없으면 CampaignForm(과 그 안의 DateRangeField)이 리마운트되지 않고
@@ -1318,6 +1488,11 @@ export function DashboardPage() {
                 accounts={adAccounts}
                 values={editCampaignValues}
                 onChange={(field, value) => setEditCampaignValues((v) => ({ ...v, [field]: value }))}
+                /* 동기화 캠페인은 원천이 플랫폼인 값(이름·플랫폼·계정·기간·링크·
+                   썸네일)을 평문으로만 보여준다 — 이름·썸네일은 다음 동기화 때
+                   되돌아오고, 플랫폼·계정은 바뀔 수 없다. 편집은 Event·매장·예산·
+                   목표 네 가지(동기화가 사람 값을 보존하는 것들)만 남는다. */
+                readOnlyFields={isSyncedCampaign(selectedCampaign) ? SYNCED_READ_ONLY_FIELDS : []}
               />
               {/* 무엇이 비어서 저장이 막혔는지 말해준다. 저장을 막지 않는 Event는
                   대신 "태그가 없으면 어떤 일이 생기는지"를 알려준다 — 막는 대신
@@ -1330,7 +1505,7 @@ export function DashboardPage() {
                       ? 'No Event tag — this campaign only shows under the "No Event" filter'
                       : ''}
                 </Typography>
-                <Button type="submit" size="small" variant="contained" disabled={!canSaveCampaignEdit || isSubmitting} sx={{ boxShadow: 'none' }}>
+                <Button type="submit" size="small" variant="contained" disabled={!canSaveCampaignEdit || !isCampaignEdited || isSubmitting} sx={{ boxShadow: 'none' }}>
                   Save Campaign Details
                 </Button>
               </Box>
@@ -1359,6 +1534,26 @@ export function DashboardPage() {
               />
             )}
 
+            {/* 동기화 캠페인은 입력 폼이 없다 — 지표는 API가 채우고 매일 덮어쓴다.
+                여기서 손으로 적으면 다음 동기화 때 API 값이 따로 쌓여 두 벌이 된다.
+                수집된 값만 읽기 전용으로 보여주고, 어디서 온 값인지 한 줄 밝힌다.
+                직접 등록한 캠페인(외부 ID 없음)만 예전처럼 입력 폼을 쓴다. */}
+            {isSyncedCampaign(selectedCampaign) ? (
+              <Box>
+                <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.primary' }}>
+                  Performance
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
+                  {`Synced from ${selectedCampaign.platform === PLATFORM.TIKTOK ? 'TikTok' : 'Meta'} Ads Manager — updates with the next sync.`}
+                </Typography>
+                <PlatformMetricList metrics={performanceValues} hasCoreMetrics />
+                {!hasAnyMetricValue(performanceValues) && (
+                  <Typography variant="body2" color="text.secondary">
+                    No performance data has arrived yet.
+                  </Typography>
+                )}
+              </Box>
+            ) : (
             <form onSubmit={(e) => { e.preventDefault(); handleSavePerformance(); }}>
               <Typography variant="label" sx={{ display: 'block', mb: 1, color: 'text.primary' }}>
                 Performance
@@ -1376,7 +1571,6 @@ export function DashboardPage() {
               {/* Campaign Details의 Save 버튼과 크기를 맞춘다(size="small") — 같은
                   Drawer 안에서 "저장" 역할을 하는 버튼끼리 높이가 다르면 안 된다. */}
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
-                <Button type="button" size="small" onClick={requestCloseDrawer}>Close</Button>
                 {/* 미입력 캠페인이 리스트에 더 남아 있을 때만 — 저장 성공 시
                     Drawer를 닫지 않고 다음 미입력 캠페인으로 바로 전환해
                     "N건 입력"의 행 클릭 왕복을 없앤다. */}
@@ -1398,6 +1592,7 @@ export function DashboardPage() {
                 </Button>
               </Box>
             </form>
+            )}
           </Box>
         )}
       </Drawer>

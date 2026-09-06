@@ -540,6 +540,34 @@ export function campaignNameKey(name) {
 }
 
 /**
+ * 플랫폼 API로 동기화되는 캠페인인지. 외부 캠페인 ID가 있으면 sync-campaigns /
+ * sync-performance가 상태·지출·지표를 매일 덮어쓴다 — 그런 캠페인의 성과를
+ * 사람이 손으로 적을 일은 없고, 적어도 다음 동기화 때 API 값이 따로 쌓인다.
+ * 성과 입력 폼과 "성과 미보고" 알림은 이 값이 false인 캠페인(대시보드에서 직접
+ * 등록한 것)에만 뜬다.
+ *
+ * @param {{ externalCampaignId?: string|null }} campaign
+ * @returns {boolean}
+ */
+export function isSyncedCampaign(campaign) {
+  return Boolean(campaign?.externalCampaignId);
+}
+
+/**
+ * 이벤트 이름이 "배정 없음"을 뜻하는 자리표시자인지. 실데이터에 부스팅 게시물
+ * 수십 건이 "noname"이라는 그룹으로 묶여 있는데, 이건 이벤트가 아니라 "이벤트를
+ * 못 정한 캠페인들"이다. 화면(Event 필터·목록 메타 줄)은 이 값을 "Unassigned"로
+ * 부르고 정상 이벤트와 분리한다 — 데이터는 그대로 둔다(동기화가 매번 덮어쓴다).
+ *
+ * @param {string|null|undefined} name
+ * @returns {boolean}
+ */
+const UNASSIGNED_EVENT_PATTERN = /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i;
+export function isUnassignedEvent(name) {
+  return UNASSIGNED_EVENT_PATTERN.test((name ?? '').trim());
+}
+
+/**
  * 캠페인을 하나의 마케팅 이니셔티브로 묶는 그룹 키. campaignGroup이 있으면 그걸,
  * 없으면 name을 그대로 쓴다 — CampaignTable의 형제 판단, FilterBar의 Campaign
  * Group 드롭다운, DashboardPage의 그룹 합계, overlap_target 억제까지 전부 이
@@ -969,7 +997,11 @@ export function generateAlerts(campaigns, performanceRecords, today = new Date()
       }
     }
 
-    if (status === MANUAL_STATUS.ENDED_EARLY || status === CAMPAIGN_STATUS.ENDED) {
+    /* 성과 미보고는 **직접 등록한 캠페인**에만 묻는다. 동기화 캠페인의 지표는
+       API가 채우는 것이라 비어 있으면 사람이 아니라 동기화의 문제다 — 그걸
+       "입력하라"는 error 알림으로 띄우면 할 수 없는 일을 시키는 셈이고, 실데이터
+       171건 전부가 동기화라 이 알림이 사실상 항상 헛소리였다. */
+    if (!isSyncedCampaign(campaign) && (status === MANUAL_STATUS.ENDED_EARLY || status === CAMPAIGN_STATUS.ENDED)) {
       // 성과 미보고 판정 — 값이 하나도 없으면 미보고다. "레코드 존재"만으로
       // 판정하면, 빈 Performance 폼을 저장하는 것만으로 error 등급 알림이
       // 사라진다(전 필드 null + spend 0인 행이 생긴다). 기록이 없다는 사실이

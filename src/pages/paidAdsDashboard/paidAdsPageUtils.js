@@ -25,6 +25,8 @@
  * 전부 같은 store.today를 쓴다.
  */
 
+import { isUnassignedEvent } from '../../data/schema';
+
 /** 목데이터 시나리오의 기준일 — 목 스토어와 스토리 전용 */
 export const MOCK_TODAY = new Date('2026-07-20');
 
@@ -241,6 +243,69 @@ export const paidAdsFontSx = (theme) => ({
   // 버튼의 Arial을 물려받는다(레퍼런스가 겪은 문제).
   '& button, & input, & select, & textarea, & optgroup': { fontFamily: 'inherit' },
 });
+
+/**
+ * Event 드롭다운의 옵션과 섹션(FilterBar의 sections 계약). Dashboard와 Reports가
+ * 같은 드롭다운을 쓰므로 여기(페이지 공통 유틸)에 둔다 — 한쪽만 섹션이 있으면
+ * 같은 필터가 화면마다 다른 물건이 된다.
+ *
+ * 이벤트가 열 개일 때도, 몇 년 뒤 수백 개일 때도 같은 구조여야 한다:
+ *   All Events → (날짜 없는 계획) → 연도별(최신 연도만 펼침, 나머지 접힘) → Unassigned.
+ * 예전엔 최근순 평평한 목록 하나였는데, 한 해에 이벤트가 수십 개 쌓이면 검색 없이는
+ * 스크롤이 끝나지 않는다. 검색은 섹션과 무관하게 전체를 뒤진다(FilterBar).
+ *
+ * 연도 섹션은 **그 해의 전체 목록**이다. 한때 "Recent(최근 5)" 섹션을 위에 두고
+ * 연도에는 나머지만 넣었는데, 같은 해 이벤트가 두 섹션으로 갈라져 "2026에 왜
+ * 이것뿐이지"가 됐다(실사용 지적). 최신 연도가 펼쳐져 있으면 그 안의 최근순
+ * 정렬이 Recent 역할을 이미 한다.
+ *
+ * 각 연도 안의 순서는 **가장 늦은 시작일** 기준 최근순이다 — 캠페인이 여럿이면
+ * 가장 최근에 시작한 것. 계획만 있고 집행이 없는 이벤트는 계획 항목의 시작일을
+ * 쓰고, 항목조차 없으면 날짜 없는 "지금 만드는 중"이라 맨 위 Planned 섹션에 둔다.
+ *
+ * @param {Campaign[]} campaigns
+ * @param {Array<{name: string, items?: Array<{startDate: string}>}>} plans
+ * @returns {{ options: Array<{value: string, label: string, section: string}>, sections: Array<{key: string, label: string, isCollapsible?: boolean, isCollapsedByDefault?: boolean}> }}
+ */
+export function buildEventFilterGroup(campaigns, plans) {
+  const latestStartByGroup = new Map();
+  campaigns.forEach((c) => {
+    if (!c.campaignGroup) return;
+    const prev = latestStartByGroup.get(c.campaignGroup);
+    if (!prev || (c.startDate ?? '') > prev) latestStartByGroup.set(c.campaignGroup, c.startDate ?? '');
+  });
+  plans.forEach((plan) => {
+    if (latestStartByGroup.has(plan.name)) return;
+    const starts = (plan.items ?? []).map((i) => i.startDate).filter(Boolean);
+    latestStartByGroup.set(plan.name, starts.length > 0 ? starts.reduce((max, d) => (d > max ? d : max)) : '');
+  });
+
+  /* 날짜 없는 것(계획만, 항목 없음)이 맨 앞, 그다음 최근순 */
+  const ordered = [...latestStartByGroup.entries()]
+    .sort((a, b) => (a[1] === '' ? -1 : b[1] === '' ? 1 : b[1].localeCompare(a[1])));
+
+  const named = ordered.filter(([name]) => !isUnassignedEvent(name));
+  const unassigned = ordered.filter(([name]) => isUnassignedEvent(name));
+  const undated = named.filter(([, date]) => date === '');
+  const dated = named.filter(([, date]) => date !== '');
+
+  const yearOf = (date) => date.slice(0, 4);
+  const years = [...new Set(dated.map(([, date]) => yearOf(date)))];
+
+  const options = [
+    ...undated.map(([name]) => ({ value: name, label: name, section: 'planned' })),
+    ...dated.map(([name, date]) => ({ value: name, label: name, section: `year-${yearOf(date)}` })),
+    ...unassigned.map(([name]) => ({ value: name, label: 'Unassigned', section: 'unassigned' })),
+  ];
+  const sections = [
+    { key: 'planned', label: 'Planned' },
+    /* 가장 최근 연도만 펼쳐 둔다 — 지금 돌고 있는 이벤트는 거기 있다. 그 전 해부터는
+       접혀서 헤더(연도·개수)만 남는다. */
+    ...years.map((year, index) => ({ key: `year-${year}`, label: year, isCollapsible: true, isCollapsedByDefault: index > 0 })),
+    { key: 'unassigned', label: 'Unassigned' },
+  ];
+  return { options, sections };
+}
 
 /**
  * 'YYYY-MM-DD' -> 'M/D'. 차트 축·막대 라벨처럼 폭이 좁은 자리에서 쓴다.

@@ -5,8 +5,8 @@ import Typography from '@mui/material/Typography';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
-import { TARGET_SCOPE, PLATFORM, campaignGroupKey } from '../../data/schema';
-import { money, moneyWhole, dateRangeWithDays } from '../../utils/format';
+import { TARGET_SCOPE, PLATFORM, campaignGroupKey, isUnassignedEvent } from '../../data/schema';
+import { money, moneyWhole, dateRange, rangeDays } from '../../utils/format';
 
 const STATUS_META = {
   planned: { label: 'Planned', color: 'grey.500' },
@@ -45,7 +45,7 @@ function StatusDot({ status }) {
           flexShrink: 0,
         }}
       />
-      <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+      <Typography variant="body2" sx={{ fontSize: 13, lineHeight: 1.45, color: 'text.secondary', fontWeight: 500 }}>
         {meta.label}
       </Typography>
     </Box>
@@ -58,29 +58,22 @@ function formatStoreLabel(targetScope, targetStoreIds) {
 }
 
 /**
- * 우측 상태줄의 기간 뒤에 붙는 예산·집행 문자열. 없으면 빈 문자열을 돌려주고
- * 호출부가 구분자(·)까지 통째로 생략한다.
+ * Spend 열의 셋째 줄 — 예산. 없으면 null을 돌려주고 호출부가 줄을 통째로 생략한다.
  *
  * 계획 예산이 0이면 예산을 표시하지 않는다 — 동기화로 들어온 캠페인은 계획
- * 예산이라는 개념 자체가 없어 0으로 저장되는데, "$0 · $2,261.5 spent"로 찍으면
- * "예산을 0으로 계획했는데 초과 집행 중"으로 읽힌다(실데이터 스크린샷 리뷰로
- * 발견). 그 경우 spend만 남긴다. 계획 예산 없이 일일 예산만 있으면 그것만
- * 표시한다(있는 것만 말한다).
+ * 예산이라는 개념 자체가 없어 0으로 저장되는데, "$0 planned" 위에 "$2,261.5
+ * spent"를 찍으면 "예산을 0으로 계획했는데 초과 집행 중"으로 읽힌다(실데이터
+ * 스크린샷 리뷰로 발견). 일일 예산이 있으면 그걸 먼저 말한다 — 페이스 문구의
+ * 기준값이라 바로 위 지출과 나란히 있어야 "빠른가"가 읽힌다.
+ *
+ * 예산은 moneyWhole(정수), 집행은 money(2자리)다. 예산은 사람이 정수 달러로
+ * 정하고 일수를 곱해 만든 값이라 센트가 존재하지 않고, 집행은 플랫폼이 센트
+ * 단위로 청구한 실측값이다(utils/format.js 참고).
  */
-function formatBudget(row) {
-  const parts = [];
-  // 예산은 moneyWhole(정수), 집행은 money(2자리)다. 예산은 사람이 정수 달러로
-  // 정하고 일수를 곱해 만든 값이라 센트가 존재하지 않고, 집행은 플랫폼이 센트
-  // 단위로 청구한 실측값이다. 예전엔 둘 다 옵션 없는 toLocaleString이라 같은
-  // 열에 `$2,261.5`와 `$514.49`가 나란히 찍혔다(utils/format.js 참고).
-  if (row.budgetPlanned > 0) {
-    const daily = row.budgetDaily != null ? ` (${moneyWhole(row.budgetDaily)}/day)` : '';
-    parts.push(`${moneyWhole(row.budgetPlanned)}${daily}`);
-  } else if (row.budgetDaily != null) {
-    parts.push(`${moneyWhole(row.budgetDaily)}/day`);
-  }
-  if (row.spend != null) parts.push(`${money(row.spend)} spent`);
-  return parts.join(' · ');
+function formatBudgetLine(row) {
+  if (row.budgetDaily != null) return `${moneyWhole(row.budgetDaily)}/day`;
+  if (row.budgetPlanned > 0) return `${moneyWhole(row.budgetPlanned)} planned`;
+  return null;
 }
 
 /** 페이스가 "정상"으로 읽히는 폭. 이 안이면 편차를 숫자로 말하지 않는다. */
@@ -112,13 +105,36 @@ const ON_PACE_TOLERANCE = 0.1;
 function formatPace(paceRatio) {
   if (paceRatio == null || !Number.isFinite(paceRatio)) return null;
   const deviation = paceRatio - 1;
-  if (Math.abs(deviation) <= ON_PACE_TOLERANCE) return { text: 'on budget pace', isOver: false };
+  /* 색은 판단이 있을 때만 — 정상·미달은 차분한 초록, 초과만 경고색. 미달은
+     "예산 안에서 돌았다"는 뜻이라 건강한 쪽으로 읽는다(사용자 결정, 2026-09).
+     초록은 success.main(#167C3D) — 채도 높은 초록이 아니라 글자용 어두운 값이다. */
+  if (Math.abs(deviation) <= ON_PACE_TOLERANCE) return { text: 'on budget pace', tone: 'good' };
   const percent = Math.round(Math.abs(deviation) * 100);
-  return {
-    text: deviation > 0 ? `${percent}% over budget pace` : `${percent}% under budget pace`,
-    isOver: deviation > 0,
-  };
+  return deviation > 0
+    ? { text: `${percent}% over budget pace`, tone: 'bad' }
+    : { text: `${percent}% under budget pace`, tone: 'good' };
 }
+const PACE_COLOR = { good: 'success.main', bad: 'warning.main' };
+
+/**
+ * 우측 메타 열의 폭. 행마다 정보량이 달라도 **같은 x에 정렬**되도록 고정한다 —
+ * 예전엔 우측이 한 문장("Jul 10 – Aug 31 (53 days) · $20/day · $771.20 spent ·
+ * 26% under budget pace")이라 행마다 길이가 달라 훑을 때 눈이 매번 다른 곳에서
+ * 멈췄다. 기간 | 지출 | 상태 세 열이면 같은 종류의 값이 세로로 줄을 선다.
+ */
+const META_COLUMN_WIDTH = { period: 136, spend: 128, status: 216 };
+/**
+ * 넓은 화면에서 우측 메타 블록과 화살표 사이에 두는 빈 열. 이 열이 없으면 메타
+ * 블록이 화면 오른쪽 끝에 붙어 왼쪽 캠페인 정보와의 사이가 텅 비었다 — 블록을
+ * 56px쯤 왼쪽으로 당겨 행이 한 덩어리로 읽히게 한다(처음 104px는 너무 왼쪽이었다). 이름 영역을 늘려서 채우는
+ * 게 아니라(이름은 어차피 한 줄) 빈 공간을 오른쪽 끝으로 보내는 것이다.
+ * 화살표는 그대로 오른쪽 끝에 남는다.
+ */
+const WIDE_TRAILING_GAP = 56;
+/** 이 수부터는 형제 수 앞의 "+"를 뗀다 — "+95 ads"는 소음이다 */
+const LARGE_SIBLING_COUNT = 10;
+/** 썸네일 한 변 — 행이 2줄(이름 20 + 메타 18)이라 40이면 세로 여백 없이 꼭 맞는다 */
+const THUMBNAIL_SIZE = 40;
 
 /**
  * 알림 문구에서 맨 앞의 캠페인명을 떼어낸다.
@@ -225,10 +241,15 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
             role={onRowClick ? 'button' : undefined}
             tabIndex={onRowClick ? 0 : undefined}
             sx={{
-              display: 'flex',
+              /* 행 안은 고정 그리드 — 우측 세 열이 모든 행에서 같은 x에 선다 */
+              display: 'grid',
+              gridTemplateColumns: {
+                xs: `${THUMBNAIL_SIZE}px minmax(0, 1fr) ${META_COLUMN_WIDTH.period}px ${META_COLUMN_WIDTH.spend}px ${META_COLUMN_WIDTH.status}px 0px ${onRowClick ? '20px' : '0px'}`,
+                lg: `${THUMBNAIL_SIZE}px minmax(0, 1fr) ${META_COLUMN_WIDTH.period}px ${META_COLUMN_WIDTH.spend}px ${META_COLUMN_WIDTH.status}px ${WIDE_TRAILING_GAP}px ${onRowClick ? '20px' : '0px'}`,
+              },
               alignItems: 'center',
-              gap: 2,
-              py: 2,
+              columnGap: 2,
+              py: 1.25,
               borderBottom: '1px solid',
               borderColor: 'divider',
               cursor: onRowClick ? 'pointer' : 'default',
@@ -248,17 +269,19 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
           >
             {/* 소재 썸네일 — thumbnailUrl이 없으면 CampaignThumbnail이 자체적으로
                 중립색 이니셜로 대체하므로 항상 뭔가 시각적으로 보인다 */}
-            {/* 크기는 컴포넌트 기본값(48)을 쓴다 — 옆 텍스트 블록이 이름(24px) +
-                메타(20px)로 이미 그만한 높이라 행이 두꺼워지지 않는다. */}
-            <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} />
+            <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={THUMBNAIL_SIZE} />
 
-            {/* 좌측 — 캠페인명(Hero) + 메타(플랫폼·계정·타겟) */}
-            <Box sx={{ minWidth: 0, flex: 1 }}>
+            {/* 좌측 — 캠페인명(Hero) + 메타(플랫폼·매장·이벤트·+N ads) */}
+            <Box sx={{ minWidth: 0 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                 {/* body1(16px)은 운영 화면 밀도에 안 맞는다(design-system.md) — 행의 강조는 body2 + 600 */}
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {row.name}
-                </Typography>
+                {/* 긴 이름은 말줄임 — 열 폭이나 행 높이를 늘리지 않는다. 전체 이름은
+                    hover 툴팁(팝오버가 아니라 한 줄 Tooltip)으로 본다. */}
+                <Tooltip title={row.name} enterDelay={400} placement="top-start">
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 600, lineHeight: 1.45, minWidth: 0 }}>
+                    {row.name}
+                  </Typography>
+                </Tooltip>
                 {row.creativeUrl && (
                   <Tooltip title="View Ad">
                     <IconButton
@@ -285,7 +308,7 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
 
                   accountLabel(예: "Georgia")은 여전히 안 보여준다 — 옆 Store가
                   이미 구체적인 매장명을 보여줘서 지역 정보가 중복이다. */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.5, minWidth: 0 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mt: 0.25, minWidth: 0, '& .MuiTypography-root': { fontSize: 13, lineHeight: 1.4 } }}>
                 {(() => {
                   const parts = [
                     /* 플랫폼만 한 단 진하게 둔다. 같은 소재를 Meta·TikTok에
@@ -310,29 +333,35 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
                      리스트에서 아예 안 보이던 문제를 고친 결정. */
                   if (samePlatformSiblingCount > 0 || showGroupTag) {
                     parts.push(
-                      <Tooltip
-                        key="group"
-                        title={
-                          samePlatformSiblingCount > 0
-                            ? `Also in this group: ${siblingRows
-                                .filter((r) => r.platform === row.platform)
-                                .map((r) => r.name)
-                                .join(', ')}`
-                            : `Tagged with campaign group "${groupKey}"`
-                        }
-                      >
+                      <Tooltip key="group" title={isUnassignedEvent(row.campaignGroup) ? 'No valid event assigned' : `Event: ${groupKey}`}>
                         <Typography
                           variant="body2"
                           noWrap
                           sx={{ color: 'text.secondary', cursor: 'help', maxWidth: 240 }}
                         >
-                          {/* "(+3)"만 쓰면 무엇이 3개인지 hover해야 알 수 있었고,
-                              바로 옆 행이 "(+4)"라(같은 플랫폼 형제만 세므로)
-                              같은 그룹인데 숫자가 다른 설명 불가능한 불일치로
-                              보였다. 세는 대상을 라벨에 적는다. */}
-                          {samePlatformSiblingCount > 0
-                            ? `${groupKey} · ${samePlatformSiblingCount} more on ${PLATFORM_LABEL[row.platform] ?? row.platform}`
-                            : groupKey}
+                          {/* "noname" 같은 자리표시자는 Event 필터와 같은 말로 — Unassigned */}
+                          {isUnassignedEvent(row.campaignGroup) ? 'Unassigned' : groupKey}
+                        </Typography>
+                      </Tooltip>,
+                    );
+                  }
+                  /* 같은 플랫폼 형제 수 — "+4 ads". 한때 "4 more on Meta"였는데
+                     플랫폼은 이미 이 줄 첫 단어라 반복이었고, 문장이 길어 행마다
+                     메타 줄 길이가 들쭉날쭉했다. 무엇이 4개인지(같은 이벤트의
+                     다른 광고)는 Tooltip이 이름 목록으로 말한다. */
+                  if (samePlatformSiblingCount > 0) {
+                    parts.push(
+                      <Tooltip
+                        key="siblings"
+                        title={`Also in this group on ${PLATFORM_LABEL[row.platform] ?? row.platform}: ${siblingRows
+                          .filter((r) => r.platform === row.platform)
+                          .map((r) => r.name)
+                          .join(', ')}`}
+                      >
+                        <Typography variant="body2" noWrap sx={{ color: 'text.secondary', cursor: 'help', fontVariantNumeric: 'tabular-nums' }}>
+                          {/* 한 자릿수면 "+3 ads"(이 행 말고 3개 더), 그 이상이면 "95 ads" —
+                              큰 수 앞의 +는 눈에만 걸리고 뜻을 더하지 않는다. */}
+                          {samePlatformSiblingCount < LARGE_SIBLING_COUNT ? `+${samePlatformSiblingCount} ads` : `${samePlatformSiblingCount} ads`}
                         </Typography>
                       </Tooltip>,
                     );
@@ -365,14 +394,36 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
               </Box>
             </Box>
 
-            {/* 우측 — 2줄 상태 스택(Influencer의 "Visit Unconfirmed / 12d overdue..."
-                구조와 동일). 알림이 있으면 알림이 우선, 없으면 캠페인 상태 + 기간·예산. */}
-            {/* maxWidth 320에서는 페이스가 붙은 줄
-                ("07.10–08.31 · $20/day · $514.49 spent · on pace")이 딱 한 글자
-                넘쳐서 "on"과 "pace" 사이에서 잘렸다. 판단 문구가 두 줄로 쪼개지면
-                한눈에 안 읽히므로 폭을 늘린다 — 좌측 이름 블록은 minWidth:0이라
-                좁은 화면에서 알아서 줄어든다. */}
-            <Box sx={{ textAlign: 'right', flexShrink: 0, maxWidth: 400 }}>
+            {/* 우측 — 기간 | 지출 | 상태, 세 열 고정폭(META_COLUMN_WIDTH).
+                예전엔 한 문장이었다(주석 참고). 각 열은 위 줄이 값, 아래 줄이
+                단위·보조다: "Jul 10 – Aug 31 / 53 days", "$771.20 / spent /
+                $20/day", "● Ended / 26% under budget pace". 열은 세로선이 아니라
+                정렬과 간격으로 갈린다 — 선을 열마다 두면 표가 된다. 상태 열 앞에만
+                아주 옅은 선 하나를 남겨 "여기부터 판단"임을 표시한다. */}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" noWrap sx={{ fontSize: 13, lineHeight: 1.45, color: 'text.primary', fontVariantNumeric: 'tabular-nums' }}>
+                {dateRange(row.startDate, row.endDate)}
+              </Typography>
+              <Typography variant="body2" noWrap sx={{ fontSize: 12, lineHeight: 1.4, color: 'text.secondary', mt: 0.25, fontVariantNumeric: 'tabular-nums' }}>
+                {rangeDays(row.startDate, row.endDate)}
+              </Typography>
+            </Box>
+
+            <Box sx={{ minWidth: 0 }}>
+              {/* 지출이 캠페인명 다음으로 강하다 — 이 행에서 두 번째로 자주 찾는 값 */}
+              <Typography variant="body2" noWrap sx={{ fontSize: 13, lineHeight: 1.45, fontWeight: 600, color: 'text.primary', fontVariantNumeric: 'tabular-nums' }}>
+                {row.spend != null ? money(row.spend) : '—'}
+              </Typography>
+              {/* 지출이 없을 때의 말은 상태에 따라 다르다 — 도는 중이면 "아직"이고,
+                  끝났으면 "데이터가 없다"다. 둘 다 $0.00으로 찍지 않는다: 그건
+                  "0을 측정했다"는 주장이다. */}
+              <Typography variant="body2" noWrap sx={{ fontSize: 12, lineHeight: 1.4, color: 'text.secondary', mt: 0.25, fontVariantNumeric: 'tabular-nums' }}>
+                {row.spend != null ? 'spent' : (row.status === 'active' || row.status === 'planned' ? 'No spend yet' : 'No spend data')}
+                {formatBudgetLine(row) && ` · ${formatBudgetLine(row)}`}
+              </Typography>
+            </Box>
+
+            <Box sx={{ minWidth: 0, pl: 2, borderLeft: '1px solid', borderColor: 'chart.grid' }}>
               {hasAlert ? (
                 <Tooltip
                   title={
@@ -388,22 +439,21 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
                   }
                   arrow
                 >
-                  <Box sx={{ cursor: 'help' }}>
-                    {/* Influencer 레퍼런스의 "Visit Unconfirmed"는 pill(Chip)이
-                        아니라 색이 있는 굵은 텍스트다 — 알림 줄은 그 톤을
-                        따르고, 캠페인 상태(아래 else 분기)만 이 앱 나머지
-                        전체와 일관되게 Chip을 유지한다(StoreTable 등도 상태는
-                        Chip). */}
+                  <Box sx={{ cursor: 'help', minWidth: 0 }}>
+                    {/* 알림은 상태 자리를 대신한다 — 색이 있는 굵은 텍스트(레퍼런스의
+                        "Visit Unconfirmed" 톤). 둘째 줄이 무엇을 해야 하는지 말한다. */}
                     <Typography
                       variant="body2"
-                      sx={{ fontWeight: 700, color: worstSeverity === 'error' ? 'error.main' : 'warning.main' }}
+                      noWrap
+                      sx={{ fontSize: 13, lineHeight: 1.45, fontWeight: 600, color: worstSeverity === 'error' ? 'error.main' : 'warning.main' }}
                     >
                       {worstSeverity === 'error' ? 'Action Required' : 'Needs Attention'}
                     </Typography>
                     <Typography
                       variant="body2"
-                      color="text.secondary"
-                      sx={{ mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      noWrap
+                      title={stripCampaignName(alertBadges[0].text, row.name)}
+                      sx={{ fontSize: 12, lineHeight: 1.4, color: 'text.secondary', mt: 0.25 }}
                     >
                       {alertBadges.length > 1 ? `${alertBadges.length} issues · ` : ''}
                       {stripCampaignName(alertBadges[0].text, row.name)}
@@ -412,49 +462,33 @@ export function CampaignTable({ rows, allCampaigns = rows, isStatusRedundant = f
                 </Tooltip>
               ) : (
                 <>
-                  {/* 감싼 헤더가 이미 상태를 말하면 여기서는 생략한다 */}
+                  {/* 감싼 헤더가 이미 상태를 말하면 점은 생략하고 페이스만 남긴다 */}
                   {!isStatusRedundant && <StatusDot status={row.status} />}
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: isStatusRedundant ? 0 : 0.5, fontVariantNumeric: 'tabular-nums' }}
-                  >
-                    {[dateRangeWithDays(row.startDate, row.endDate), formatBudget(row)]
-                      .filter(Boolean)
-                      .join(' · ')}
-                    {/* 페이스만 색을 갖는다 — 초과는 지금 돈이 새는 중이라 눈에
-                        걸려야 하고, 정상·미달은 판단 재료일 뿐이라 회색으로 둔다.
-                        같은 줄에 이어 붙여 "얼마 썼다"와 "그게 빠른가"가 한 문장
-                        으로 읽히게 한다. */}
-                    {pace && (
-                      <>
-                        {' · '}
-                        <Box
-                          component="span"
-                          // 더 좁은 화면에서 줄이 넘치더라도 판단 문구만은 통째로
-                          // 넘어가야 한다("on"/"pace"로 쪼개지면 읽히지 않는다).
-                          // 페이스는 이 줄에서 유일하게 **판단**을 담은 조각이라,
-                          // 초과가 아닐 때도 굵기·색으로 raw 숫자와 분리한다.
-                          // 예전엔 정상·미달이 주변 회색 평문과 완전히 같은
-                          // 무게라, 화면에서 가장 중요한 문구가 가장 약했다.
-                          sx={{
-                            whiteSpace: 'nowrap',
-                            color: pace.isOver ? 'warning.main' : 'text.primary',
-                            fontWeight: 600,
-                          }}
-                        >
-                          {pace.text}
-                        </Box>
-                      </>
-                    )}
-                  </Typography>
+                  {/* 페이스 — 이 행에서 유일하게 **판단**을 담은 조각. 색이 이미
+                      판단을 말하므로 굵기는 500으로 — 600이면 지출 금액과 무게가
+                      같아져 보조 정보가 주인공과 경쟁했다. 정상·미달 초록, 초과만
+                      경고색 — formatPace 주석. */}
+                  {pace ? (
+                    <Typography
+                      variant="body2"
+                      noWrap
+                      sx={{ fontSize: 12, lineHeight: 1.4, fontWeight: 500, color: PACE_COLOR[pace.tone], mt: isStatusRedundant ? 0 : 0.25 }}
+                    >
+                      {pace.text}
+                    </Typography>
+                  ) : (
+                    isStatusRedundant && (
+                      <Typography variant="body2" sx={{ fontSize: 12, lineHeight: 1.4, color: 'text.disabled' }}>—</Typography>
+                    )
+                  )}
                 </>
               )}
             </Box>
 
+            <Box aria-hidden />
             {onRowClick && (
               <ChevronRightIcon
-                sx={(theme) => ({ fontSize: theme.iconSize.control, color: 'text.disabled', flexShrink: 0 })}
+                sx={(theme) => ({ fontSize: theme.iconSize.control, color: 'text.disabled', flexShrink: 0, justifySelf: 'end' })}
               />
             )}
           </Box>

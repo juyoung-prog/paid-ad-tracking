@@ -28,8 +28,9 @@ hold rate = 완주 ÷ 훅시청). 훅시청의 기준이 플랫폼마다 달라(
     },
   },
   argTypes: {
-    metrics: { control: 'object', description: '성과 레코드. 표시할 8개 지표를 읽는다' },
-    title: { control: 'text', description: '목록 위 라벨' },
+    metrics: { control: 'object', description: '성과 레코드. 영상·소셜 10개 + (hasCoreMetrics면) 핵심 8개를 읽는다' },
+    title: { control: 'text', description: '목록 위 소제목(13px 600 문장형)' },
+    hasCoreMetrics: { control: 'boolean', description: 'Spend·Impressions·Reach·CPM·Clicks·CTR·CPC·Engagements·Conversions·CPA를 앞에 붙인다 — 입력 폼이 없는 동기화 캠페인 드로어 전용' },
     sx: { control: 'object', description: '추가 스타일' },
   },
 };
@@ -91,6 +92,49 @@ export const PartialMetrics = {
 export const NoMetrics = {
   args: {
     metrics: { impressions: 1000, spend: 50 },
+  },
+  render: (args) => (
+    <Box sx={ { maxWidth: 420 } }>
+      <PlatformMetricList { ...args } />
+    </Box>
+  ),
+};
+
+/**
+ * 동기화 캠페인 드로어가 쓰는 형태 — `hasCoreMetrics`로 핵심 지표까지 붙어
+ * **세 그룹이 다 보이는** 유일한 스토리다. 폼이 없는 자리라 Spend·Clicks 같은
+ * 값도 여기서만 읽을 수 있다(폼이 있으면 같은 값이 필드에 이미 있어 중복이다).
+ *
+ * 확인 포인트:
+ * - `DELIVERY` / `TRAFFIC & ENGAGEMENT` / `VIDEO & SOCIAL` 세 그룹으로 갈리는가
+ * - 그룹 라벨은 11px 흐린 대문자로, 위의 소제목("Platform metrics")보다 한 단 아래인가
+ * - CPM·CTR·CPC·CPA는 저장된 값이 아니라 **계산값**이다(schema의 calc 함수) —
+ *   Spend÷Impressions×1000 = $2.41처럼 맞아떨어지는지
+ * - 지표 값이 **전부 같은 굵기(500)**인가 — 한때 Spend·CPM·Hook/Hold Rate만
+ *   600이었는데, 무엇이 중요한지는 캠페인 목표마다 달라서 컴포넌트가 미리 정하지 않는다
+ * - "Collected automatically…" 캡션이 **없다** — 바로 위 "Synced from … Ads Manager"가
+ *   같은 말을 하므로 이 모드에서는 생략한다
+ */
+export const SyncedCampaign = {
+  args: {
+    hasCoreMetrics: true,
+    metrics: {
+      spend: 1119.3,
+      impressions: 464425,
+      reach: 163290,
+      clicks: 0,
+      engagements: 564,
+      conversions: 0,
+      videoPlays: 295857,
+      hookViews: 68370,
+      heldViews: 2414,
+      avgWatchSeconds: 1.42,
+      likes: 490,
+      comments: 1,
+      shares: 73,
+      follows: 183,
+      profileVisits: 230,
+    },
   },
   render: (args) => (
     <Box sx={ { maxWidth: 420 } }>

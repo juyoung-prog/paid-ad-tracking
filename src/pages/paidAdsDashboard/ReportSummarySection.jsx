@@ -26,11 +26,12 @@ import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds, dateMed, dateRange as formatDateRange, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
+import { PhaseDetailPanel } from '../../components/templates/PhaseDetailPanel';
 
 const PLATFORM_LABEL = {
   [PLATFORM.META]: 'Meta',
@@ -919,9 +920,16 @@ function PlanPanel({ eventName, plan, eventOptions, comparison, onSave, onDelete
   if (!plan) {
     return (
       <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
-        <Typography variant="body2" color="text.secondary">
-          No plan for {eventName} yet — set the intended budget to compare against actual spend.
-        </Typography>
+        {/* "event-level"을 명시한다 — 바로 위 KPI가 캠페인 예산을 합친 Planned
+            Budget을 보여주는데 "No plan yet"이라고만 하면 서로 모순으로 읽혔다.
+            없는 건 이벤트 단위 계획 문서이지 예산 자체가 아니다. 카드·배너가
+            아니라 아이콘 하나 붙은 한 줄 — 안내이지 경고가 아니다. */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary' }}>
+          <InfoOutlinedIcon aria-hidden sx={(theme) => ({ fontSize: theme.iconSize.inline, flexShrink: 0 })} />
+          <Typography variant="body2" color="text.secondary">
+            No event-level plan yet. Create one to compare planned budget with actual spend.
+          </Typography>
+        </Box>
         <Button size="small" variant="outlined" onClick={startEditing} sx={{ boxShadow: 'none' }}>
           Create plan
         </Button>
@@ -1138,6 +1146,9 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
   /* 상세를 볼 캠페인. **id만** 들고 있는다 — 객체를 담아두면 동기화로 목록이
      갱신됐을 때 패널만 옛 값을 계속 보여준다. */
   const [detailCampaignId, setDetailCampaignId] = useState(null);
+  /* 타임라인에서 연 phase. 캠페인과 마찬가지로 **키만** 들고 있는다 — 객체를
+     담아두면 필터가 바뀌어 phase 목록이 새로 계산돼도 패널만 옛 값을 보여준다. */
+  const [detailPhaseKey, setDetailPhaseKey] = useState(null);
 
   /* 탭·필터를 URL과 묶는다 — Dashboard와 같은 규칙. 이 화면이 특히 중요한 게,
      "G10 Opening 성과"를 동료에게 보여주려면 지금까지는 링크가 아니라 조작
@@ -1173,21 +1184,16 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
      계획은 캠페인이 생기기 전에 세우는 문서라, 캠페인에서만 옵션을 뽑으면 아직
      안 연 매장의 계획은 만들고도 다시 찾아갈 수 없다(실사용 지적). 계획 이름도
      같은 목록에 넣어 "계획만 있고 집행은 아직"인 상태를 고를 수 있게 한다. */
-  const executedGroups = [...new Set(campaigns.map((c) => c.campaignGroup).filter(Boolean))];
-  /* 순서는 **최근순**이다. campaigns가 start_date 내림차순으로 오므로 Set의
-     삽입 순서가 곧 "그 이벤트의 가장 최근 캠페인" 순이 된다 — 지금 작업 중인
-     이벤트는 보통 최근 것이라 이 순서가 실무에 맞는다.
-
-     한때 알파벳순이었는데(계획 이름을 합치면서 딸려 들어간 정렬), "1$ Deals"·
-     "50%Offdeals Trafp" 같은 게 맨 위를 차지하고 정작 자주 쓰는 "G10 Opening"이
-     한참 아래로 밀렸다(실사용 지적).
-
-     집행이 아직 없는 계획은 맨 위에 둔다 — 정렬 기준이 될 날짜가 아예 없고,
-     Plan 탭에서 찾는 대상이 바로 그것이다. 집행이 있는 계획은 최근순 자리에
-     그대로 둔다(계획이 있다는 이유로 오래된 이벤트를 위로 끌어올리지 않는다). */
-  const planOnlyGroups = plans.map((p) => p.name).filter((name) => !executedGroups.includes(name));
-  const campaignGroupOptions = [...planOnlyGroups, ...executedGroups]
-    .map((key) => ({ value: key, label: key }));
+  /* 순서는 **최근순**이다(각 이벤트의 가장 늦은 시작일 기준). 한때 알파벳순
+     이었는데(계획 이름을 합치면서 딸려 들어간 정렬), "1$ Deals"·"50%Offdeals
+     Trafp" 같은 게 맨 위를 차지하고 정작 자주 쓰는 "G10 Opening"이 한참 아래로
+     밀렸다(실사용 지적). 집행이 아직 없는 계획은 맨 위에 둔다 — 정렬 기준이 될
+     날짜가 아예 없고, Plan 탭에서 찾는 대상이 바로 그것이다. */
+  /* 섹션 나누기(Recent / 연도 / Unassigned)는 buildEventFilterGroup이 한다 —
+     여기서는 그 결과를 그대로 쓰고, 옵션의 value 집합은 예전과 같다(집행된
+     이벤트 + 계획만 있는 이벤트). */
+  const eventFilterGroup = useMemo(() => buildEventFilterGroup(campaigns, plans), [campaigns, plans]);
+  const campaignGroupOptions = eventFilterGroup.options;
 
   /* 저장된 Event 값이 지금 데이터에 없으면 필터를 걸지 않는다. 탭·필터를
      localStorage에 기억하기 시작하면서 생긴 함정이다 — 그 이벤트의 캠페인이
@@ -1312,6 +1318,24 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
   // 두 탭이 같은 판정을 공유한다 — 같은 Event인데 탭에 따라 차트가 나왔다
   // 안 나왔다 하면 그것대로 혼란이다.
   const isTimelineReadable = phases.length <= PHASE_TIMELINE_MAX_PHASES;
+
+  /* 타임라인 행 클릭 → phase 패널. phase 하나가 캠페인 1~N건이라(같은 단계의
+     Meta·TikTok) 캠페인 패널을 바로 열 수 없다 — PhaseDetailPanel 주석 참고.
+     묶음 키는 buildPhaseTimeline과 같은 campaignNameKey라 항상 짝이 맞는다. */
+  const detailPhase = detailPhaseKey ? phases.find((p) => p.key === detailPhaseKey) ?? null : null;
+  const detailPhaseCampaigns = useMemo(() => {
+    if (!detailPhaseKey) return [];
+    const rowByCampaignId = new Map(goalRows.map((r) => [r.campaignId, r]));
+    return filteredCampaigns
+      .filter((c) => campaignNameKey(c.name) === detailPhaseKey)
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        platform: c.platform,
+        thumbnailUrl: c.thumbnailUrl,
+        spend: rowByCampaignId.get(c.id)?.spend ?? null,
+      }));
+  }, [detailPhaseKey, filteredCampaigns, goalRows]);
 
   const phaseMetaTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.META]?.total ?? 0), 0);
   const phaseTikTokTotal = phases.reduce((sum, p) => sum + (p.byPlatform[PLATFORM.TIKTOK]?.total ?? 0), 0);
@@ -1448,7 +1472,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
              뺐는데(위 컴포넌트 주석), 정작 순서는 Platform이 먼저라 위계
              선언과 화면이 어긋나 있었다. Dashboard와 같은 순서로 맞춘다. */
           ...(campaignGroupOptions.length > 0
-            ? [{ key: 'campaignGroup', label: 'Event', options: campaignGroupOptions }]
+            ? [{ key: 'campaignGroup', label: 'Event', options: campaignGroupOptions, sections: eventFilterGroup.sections }]
             : []),
           {
             key: 'platform',
@@ -1486,6 +1510,21 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
 
       {/* 읽기 전용 상세 — Reports를 떠나지 않는다. 열려 있을 때만 마운트해서
           닫았다 열면 항상 새 값으로 그린다(CampaignDetailPanel 주석 참고). */}
+      {/* phase 패널 — 캠페인을 고르면 이 패널을 닫고 캠페인 패널로 넘긴다.
+          드로어 둘을 겹쳐 띄우면 뒤쪽이 백드롭에 눌려 "무엇을 닫는 중인지"가
+          흐려진다. */}
+      {detailPhase && (
+        <PhaseDetailPanel
+          phase={detailPhase}
+          campaigns={detailPhaseCampaigns}
+          onClose={() => setDetailPhaseKey(null)}
+          onSelectCampaign={(id) => {
+            setDetailPhaseKey(null);
+            setDetailCampaignId(id);
+          }}
+        />
+      )}
+
       {detailCampaign && (() => {
         const detailAccount = adAccounts.find((a) => a.id === detailCampaign.accountId);
         return (
@@ -1551,11 +1590,12 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
             No campaigns match the current filters.
           </Typography>
         ) : phases.length > 0 ? (
-          /* Plan 탭은 컬럼이 7개뿐이라 뷰포트 전폭에 늘리면 우측 절반이 비고,
-             같은 탭 그룹의 Performance 표(15컬럼, 가로 스크롤)와 밀도가 극단으로
-             갈렸다(실화면 리뷰 12-9 vs 12-1). 분석 화면 폭 토큰으로 묶는다 —
-             표가 주인공이라 폭을 풀어야 하는 건 Performance 쪽뿐이다. */
-          <Box sx={(theme) => ({ maxWidth: theme.layout.content.wide })}>
+          /* Performance 탭과 같은 전폭이다. 한때 layout.content.wide(1120px)로
+             묶었는데 — 표가 7컬럼이라 넓히면 우측이 빈다는 이유였다 — 타임라인이
+             주인공이 된 지금은 반대다: 두 탭이 같은 차트를 다른 폭으로 그리면
+             같은 Event가 탭마다 다른 축으로 보이고, 우측에 빈 영역만 남았다.
+             두 탭의 차이는 데이터(planned vs spent)이지 레이아웃이 아니다. */
+          <Box>
             {/* Event 타임라인 — Plan·Performance 두 탭이 같은 컴포넌트를 쓴다
                 (PhaseTimelineChart 주석 참고). 플랫폼/예산 열에 일일 예산·총
                 예산이 붙는다. phase가 너무 많으면 차트 대신 안내 한 줄 —
@@ -1568,7 +1608,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                   scope={`${phases.length} ${phases.length === 1 ? 'phase' : 'phases'} · ${formatDateRange(phases[0].startDate, phases.reduce((max, p) => (p.endDate > max ? p.endDate : max), phases[0].endDate))}`}
                   hasDivider={false}
                 />
-                <PhaseTimelineChart phases={phases} today={today} />
+                <PhaseTimelineChart phases={phases} today={today} onPhaseClick={(p) => setDetailPhaseKey(p.key)} />
               </Box>
             ) : (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
@@ -1743,6 +1783,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
               <PhaseTimelineChart
                 phases={phases}
                 today={today}
+                onPhaseClick={(p) => setDetailPhaseKey(p.key)}
                 barSuffix={(phase) => {
                   const spend = performanceByPhaseKey.get(phase.key)?.spend;
                   // 기록이 없으면 지표를 아예 안 붙인다 — '—'를 붙이면 예산 뒤에

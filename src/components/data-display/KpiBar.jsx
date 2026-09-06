@@ -151,7 +151,8 @@ export function KpiBar({ items, sx }) {
                 variant="caption"
                 component="span"
                 sx={{
-                  mt: 0.25,
+                  // 값 줄과 비교 문구 사이 숨 쉴 틈(6px) — 2px는 한 덩어리로 붙어 보였다
+                  mt: 0.75,
                   whiteSpace: 'nowrap',
                   fontWeight: 600,
                   color:

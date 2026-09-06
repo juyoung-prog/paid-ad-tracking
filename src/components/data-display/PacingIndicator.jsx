@@ -67,8 +67,13 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           안 된다는 걸 알면서 깨진 식을 보여준 셈이라, 바로 아래 멀쩡히 동작하는
           Daily Avg 줄까지 같이 의심받았다(실사용 리뷰로 발견). 빈 막대도 함께
           사라진다: 0%로 그린 막대는 "아직 안 썼다"로 읽힌다. */}
+      {/* 세 줄의 간격은 각 줄의 margin이 아니라 이 스택의 gap이 정한다 — 예전엔
+          첫 줄이 mb, 셋째 줄이 mt를 들고 있어서 가운데 줄만 여백이 없었고, 줄이
+          하나 숨겨질 때(계획 예산 없음·일일 예산 없음)마다 리듬이 달라졌다.
+          막대는 셋 다 같은 높이(6)·같은 radius·같은 트랙색이고 폭은 100%다. */}
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
       {budgetUsedRatio != null && (
-      <Box sx={{ mb: 0.5 }}>
+      <Box>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
           <Typography variant="caption" color="text.secondary">Budget Spent</Typography>
           <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', color: pacing.color }}>
@@ -116,7 +121,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
       </Box>
 
       {budgetDaily != null && (
-        <Box sx={{ mt: 0.5 }}>
+        <Box>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.25 }}>
             <Typography variant="caption" color="text.secondary">Daily Avg</Typography>
             <Typography variant="caption" sx={{ fontVariantNumeric: 'tabular-nums', color: pacing.color }}>
@@ -138,6 +143,7 @@ export function PacingIndicator({ timeElapsedRatio, budgetUsedRatio, avgDailySpe
           />
         </Box>
       )}
+      </Box>
     </Box>
   );
 }

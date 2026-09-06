@@ -50,6 +50,7 @@ export default {
     stores: { control: 'object', description: 'StoreMultiSelect에 전달할 매장 목록' },
     accounts: { control: 'object', description: '광고 계정 목록' },
     errors: { control: 'object', description: '필드별 에러 메시지' },
+    readOnlyFields: { control: 'object', description: "입력 대신 평문으로 보여줄 필드 — 'name' | 'platform' | 'accountId' | 'dates' | 'creativeUrl' | 'thumbnailUrl'" },
     onChange: { action: 'fieldChanged' },
   },
 };
@@ -129,6 +130,55 @@ export const WithErrors = {
             name: '캠페인명을 입력하세요',
             endDate: '종료일은 시작일 이후여야 합니다',
           }}
+        />
+      </Box>
+    );
+  },
+};
+
+/**
+ * 동기화 캠페인의 수정 폼 — Dashboard 드로어가 `readOnlyFields`로 여는 형태.
+ *
+ * 플랫폼이 원천인 값은 입력창을 주지 않는다. 이름·썸네일은 sync-campaigns가 매번
+ * 덮어써서 여기서 고쳐도 다음 날 되돌아오고, 플랫폼·계정은 애초에 바뀔 수 없으며,
+ * 기간은 광고 관리자가 정한 값이다. 입력창을 그려두는 것 자체가 "고칠 수 있다"는
+ * 거짓말이었다.
+ *
+ * 확인 포인트:
+ * - Campaign Name·Platform·Account·Campaign Dates·Ad Link가 **평문**인가
+ *   (기간은 `Jul 6 – Aug 31 (57 days)` 한 줄로 접힌다)
+ * - Thumbnail에 Upload/Remove 버튼 대신 "From Ads Manager — updates with the next sync."
+ *   한 줄만 있는가
+ * - 편집 가능한 건 **Event · Target Store(s) · Daily/Planned Budget · Goal** 넷뿐인가
+ *   — 동기화가 사람이 넣은 값을 보존하는 필드들이다
+ * - Ad Link처럼 값이 비면 `—`로 자리만 지키는가
+ */
+export const SyncedCampaign = {
+  render: function SyncedCampaignStory(args) {
+    const [values, setValues] = useState({
+      name: 'G10_Now Open_0706 ~0831',
+      campaignGroup: 'G10 Opening',
+      platform: PLATFORM.META,
+      accountId: 'meta-ga',
+      targetScope: TARGET_SCOPE.SINGLE_STORE,
+      targetStoreIds: ['G04'],
+      startDate: '2026-07-06',
+      endDate: '2026-08-31',
+      budgetPlanned: 1140,
+      budgetDaily: 20,
+      goal: GOAL.ENGAGEMENT,
+      creativeUrl: '',
+      thumbnailUrl: '',
+    });
+    return (
+      <Box sx={{ maxWidth: 640 }}>
+        <CampaignForm
+          {...args}
+          stores={mockStores}
+          accounts={mockAdAccounts}
+          values={values}
+          onChange={(field, value) => setValues((v) => ({ ...v, [field]: value }))}
+          readOnlyFields={['name', 'platform', 'accountId', 'dates', 'creativeUrl', 'thumbnailUrl']}
         />
       </Box>
     );
