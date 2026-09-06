@@ -189,7 +189,7 @@ export const Docs = {
       { token: 'primary.light', value: theme.palette.primary.light, description: '브랜드 램프(밝은 쪽)' },
       { token: 'primary.dark', value: theme.palette.primary.dark, description: '브랜드 램프(어두운 쪽)' },
       { token: 'chart.bar', value: theme.palette.chart.bar, description: '차트 막대 기본 — 중립 회색' },
-      { token: 'chart.barEmphasis', value: theme.palette.chart.barEmphasis, description: '차트 막대 강조·hover — 파랑은 하나에만' },
+      { token: 'chart.barEmphasis', value: theme.palette.chart.barEmphasis, description: '차트 막대 강조·hover, 진행 막대(LinearProgress) 기본 채움 — 파랑은 하나에만' },
       { token: 'chart.grid / gridStrong', value: `${theme.palette.chart.grid} / ${theme.palette.chart.gridStrong}`, description: '날짜 격자(주 단위) / 월 경계' },
       { token: 'secondary.main', value: theme.palette.secondary.main, description: '보조 액션, 태그' },
       { token: 'error.main', value: theme.palette.error.main, description: '오류, 삭제, 위험' },

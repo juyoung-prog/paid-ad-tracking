@@ -46,6 +46,13 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
 이미 같은 말을 하고 있어 대부분 중복이었다. 반대로 정작 판단이 필요한 페이스
 문구는 회색 평문이었다. 색이 담은 의미는 유지하되 면적을 줄이고
 (8px 점 + 라벨), 중복인 자리에서는 아예 뺀다.
+
+### 카드 안에서
+Dashboard는 이 목록을 Reports의 Awareness/Traffic과 같은 **섹션 카드**(1px divider
+경계선 + radius.container, 그림자 없음) 안에 둔다. 컴포넌트 자체는 카드를 모른다 —
+호출부가 \`sx\`로 두 가지를 준다: 행에 \`px: 2\`(제목 글자와 썸네일이 같은 x에
+서도록), 마지막 행의 \`borderBottom: 0\`(카드 테두리와 겹치면 2px가 된다). 행의
+hover 배경은 카드 폭 전체를 채운다. InsideSectionCard 스토리가 그 조합이다.
         `,
       },
     },
@@ -55,6 +62,7 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
     allCampaigns: { control: 'object', description: '형제 칩 판단용 전체 캠페인 목록(탭/필터 미적용). 생략하면 rows로 대체 — LargeAdCount 스토리가 이 차이를 보여준다' },
     isStatusRedundant: { control: 'boolean', description: '감싼 헤더가 이미 상태를 말하면 true' },
     onRowClick: { action: 'rowClicked' },
+    sx: { control: 'object', description: '바깥 Box에 얹는 추가 스타일. 카드 안에 넣을 때 행 여백·마지막 구분선을 여기서 조정한다(InsideSectionCard)' },
   },
 };
 
@@ -463,4 +471,93 @@ export const MissingSpendCopy = {
       />
     </Box>
   ),
+};
+
+/**
+ * Dashboard가 실제로 쓰는 형태 — 섹션 카드 안의 목록.
+ *
+ * 확인 포인트:
+ * - 제목 "Recently ended"의 글자와 첫 행 썸네일의 왼쪽이 같은 x에 서는가(둘 다 px 2)
+ * - 마지막 행 아래에 선이 하나만 있는가(행 구분선을 빼고 카드 테두리만 남긴다)
+ * - 행 hover 배경이 카드 안쪽 폭 전체를 채우는가
+ * - 카드에 그림자가 없고 1px divider 경계선뿐인가(Reports 섹션 카드와 같은 문법)
+ */
+export const InsideSectionCard = {
+  render: (args) => {
+    const rows = [
+      {
+        id: 'camp-30',
+        name: 'G10_1_Month Deals_0710~0831',
+        platform: 'tiktok',
+        targetScope: 'stores',
+        targetStoreIds: ['G10'],
+        campaignGroup: 'G10 Opening',
+        startDate: '2026-07-10',
+        endDate: '2026-08-31',
+        budgetPlanned: 0,
+        budgetDaily: 20,
+        spend: 771.2,
+        paceRatio: 0.74,
+        status: 'ended',
+        thumbnailUrl: thumbnailFor('camp-30'),
+      },
+      {
+        id: 'camp-31',
+        name: 'G10_ 1 Month Deals_0710~0831',
+        platform: 'meta',
+        targetScope: 'stores',
+        targetStoreIds: ['G10'],
+        campaignGroup: 'G10 Opening',
+        startDate: '2026-07-10',
+        endDate: '2026-08-31',
+        budgetPlanned: 0,
+        budgetDaily: null,
+        spend: 830.57,
+        paceRatio: null,
+        status: 'ended',
+        thumbnailUrl: thumbnailFor('camp-31'),
+      },
+      {
+        id: 'camp-32',
+        name: 'G10_Now Open_0706~0831',
+        platform: 'meta',
+        targetScope: 'stores',
+        targetStoreIds: ['G10'],
+        campaignGroup: 'G10 Opening',
+        startDate: '2026-07-06',
+        endDate: '2026-08-31',
+        budgetPlanned: 0,
+        budgetDaily: 20,
+        spend: 1119.3,
+        paceRatio: 0.83,
+        status: 'ended',
+        thumbnailUrl: thumbnailFor('camp-32'),
+      },
+    ];
+    return (
+      <Box
+        sx={(theme) => ({
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: `${theme.shape.radius.container}px`,
+          backgroundColor: 'background.paper',
+          overflow: 'hidden',
+        })}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box component="h3" sx={{ typography: 'title', m: 0, color: 'text.primary' }}>
+            Recently ended
+            <Box component="span" sx={{ typography: 'body2', fontWeight: 400, color: 'text.secondary', ml: 1.5 }}>
+              {`${rows.length} campaigns · Last 14 days`}
+            </Box>
+          </Box>
+        </Box>
+        <CampaignTable
+          rows={rows}
+          onRowClick={args.onRowClick}
+          sx={{ '& > *': { px: 2 }, '& > *:last-child': { borderBottom: 0 } }}
+        />
+      </Box>
+    );
+  },
 };

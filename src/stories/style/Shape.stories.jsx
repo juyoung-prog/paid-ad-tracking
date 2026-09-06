@@ -48,7 +48,7 @@ function ShapeDocs() {
         token: 'shape.radius.container',
         value: `${theme.shape.radius.container}px`,
         radius: theme.shape.radius.container,
-        description: '카드형 컨테이너 — Reports의 섹션 카드(타임라인·표)와 떠 있는 종이(Menu/Popover). 구조 표면인 Card/Paper는 여전히 0',
+        description: '카드형 컨테이너 — 섹션 카드(Reports의 타임라인·표, Dashboard의 캠페인 목록)와 떠 있는 종이(Menu/Popover/Dialog). 구조 표면인 Card/Paper는 여전히 0',
       },
       {
         token: 'shape.radius.inlay',
