@@ -52,6 +52,7 @@ dense table 패턴보다 레퍼런스 일치를 우선한다.
   },
   argTypes: {
     rows: { control: 'object', description: '미리 조인된 캠페인 행 배열' },
+    allCampaigns: { control: 'object', description: '형제 칩 판단용 전체 캠페인 목록(탭/필터 미적용). 생략하면 rows로 대체 — LargeAdCount 스토리가 이 차이를 보여준다' },
     isStatusRedundant: { control: 'boolean', description: '감싼 헤더가 이미 상태를 말하면 true' },
     onRowClick: { action: 'rowClicked' },
   },
@@ -98,9 +99,11 @@ export const Default = {
  * **정상일 때도 말한다**는 점이다 — "알림이 없다"와 "확인해 봤더니 괜찮다"는
  * 사용자에게 전혀 다른 정보다.
  *
- * 확인 포인트: ±10% 안이면 편차 숫자 없이 `on pace`, 초과면 warning 색 + 굵게,
- * 미달이면 회색(판단 재료일 뿐 급하지 않다). 일일 예산이 없거나 기간이 하루라
- * 계산 근거가 없으면 아예 안 붙는다(모르면서 아는 척하지 않는다).
+ * 확인 포인트: ±10% 안이면 편차 숫자 없이 `on budget pace`("on pace"는 성과가
+ * 좋다는 뜻으로 읽혀서 쓰지 않는다). 색은 정상·미달이 success(차분한 초록),
+ * 초과만 warning — 미달은 예산 안에서 돌았다는 뜻이라 경고가 아니다. 굵기는
+ * 500으로, 바로 왼쪽 지출 금액(600)보다 한 단 뒤다. 일일 예산이 없거나 기간이
+ * 하루라 계산 근거가 없으면 아예 안 붙는다(모르면서 아는 척하지 않는다).
  */
 export const BudgetPace = {
   render: (args) => (
@@ -181,8 +184,10 @@ export const SyncedWithoutBudget = {
 };
 
 /**
- * 고긴급 알림·저긴급 중복 타겟팅이 섞인 행 — 각각 ⚠ / ⇄ 아이콘에
- * 마우스를 올리면 Tooltip으로 구체적인 문구가 보인다.
+ * 고긴급 알림·저긴급 중복 타겟팅이 섞인 행 — 둘 다 아이콘이 아니라 **색 있는
+ * 글자**다. 알림은 상태 열이 `Action Required`/`Needs Attention`(굵게) + 아래
+ * 조치 한 줄로 바뀌고, 중복 타겟팅은 메타 줄에 warning 색 `Overlapping Target`로
+ * 붙는다. 마우스를 올리면 Tooltip으로 구체적인 문구가 보인다.
  */
 export const WithAlerts = {
   render: (args) => (
@@ -319,7 +324,8 @@ export const WithSamePlatformGroup = {
  * 훨씬 세게 보였다.
  *
  * 확인 포인트:
- * - 아래 표에는 상태 점·라벨이 없고, 기간·예산 줄이 곧바로 우측 상단에 붙는가
+ * - 아래 표에는 상태 점·라벨이 없고 페이스 문구만 남는가 — 기간·지출 열의
+ *   x 위치는 두 표가 같다(행이 고정 그리드라 정보량과 무관하게 정렬된다)
  * - 페이스 문구가 주변 회색 숫자보다 진한가(색이 아니라 굵기로도 구분)
  * - 상태가 섞인 그룹(Action Required·Other Campaigns)에서는 이 prop을 켜면
  *   안 된다 — 그 경우 헤더가 상태를 대변하지 못한다

@@ -230,7 +230,7 @@ export const Default = {
             mb: 4,
           }}
         >
-{`import VideoScrubbing from '@/components/media/VideoScrubbing';
+{`import VideoScrubbing from '../scroll/VideoScrubbing';
 
 // 기본 사용
 <VideoScrubbing src="/video.mp4" />

@@ -141,7 +141,7 @@ export const Default = {
 		size: 48,
 		fill: false,
 		weight: 400,
-		color: "#0000FF",
+		color: "#2563EB",
 	},
 };
 
@@ -163,7 +163,7 @@ function FillUsageDocs() {
 		{ icon: "favorite", label: "Like", activeColor: theme.palette.error.main },
 		{ icon: "bookmark", label: "Bookmark", activeColor: theme.palette.accent.main },
 		{ icon: "star", label: "Favorite", activeColor: theme.palette.warning.main },
-		{ icon: "thumb_up", label: "Recommend", activeColor: theme.palette.primary.main },
+		{ icon: "thumb_up", label: "Recommend", activeColor: theme.palette.accent.main },
 		{ icon: "check_circle", label: "Complete", activeColor: theme.palette.success.main },
 		{ icon: "visibility", label: "Visible", activeColor: theme.palette.secondary.main },
 	];

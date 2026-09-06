@@ -47,7 +47,7 @@ export default {
     },
     size: {
       control: 'select',
-      options: ['small', 'medium', 'large'],
+      options: ['small', 'medium'],
       description: '체크박스 크기를 설정합니다.',
       table: {
         type: { summary: 'string' },

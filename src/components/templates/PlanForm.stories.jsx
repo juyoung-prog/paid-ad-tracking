@@ -53,6 +53,22 @@ export default {
       },
     },
   },
+  argTypes: {
+    values: {
+      control: 'object',
+      description: '폼 값 { name, notes, items[] }. items의 각 단계는 { label, platform, startDate, endDate, budgetDaily }',
+    },
+    eventOptions: {
+      control: 'object',
+      description: '이름 칸의 추천 목록(기존 이벤트 이름 배열). matchEventName()이 이 목록과 대조해 helperText·경고를 고른다',
+    },
+    errors: {
+      control: 'object',
+      description: '필드별 오류 메시지 { name, items: [{ label, dates, budgetDaily }] }',
+    },
+    onChange: { action: 'changed', description: '최상위 필드 변경 (field, value) => void' },
+    onItemsChange: { action: 'itemsChanged', description: '단계 목록 전체 변경 (items) => void' },
+  },
 };
 
 /** 상태를 들고 있는 래퍼 — 폼은 제어 컴포넌트라 스토리가 값을 소유해야 한다. */

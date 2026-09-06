@@ -4,7 +4,7 @@ import { FilterBar } from './FilterBar';
 import { mockStores } from '../../data/paidAdsMockData';
 
 export default {
-  title: 'Template/FilterBar',
+  title: 'Paid Ads Dashboard/Templates/FilterBar',
   component: FilterBar,
   tags: ['autodocs'],
   parameters: {
@@ -17,6 +17,11 @@ export default {
 검색 및 태그 기반 필터링 UI. \`filterGroups\`/\`dateRange\` props를 추가해
 도메인 특화 필터(플랫폼/계정/매장 등)와 기간 필터를 범용적으로 확장했다 —
 광고 도메인 필드를 하드코딩하지 않고, 이 값들은 호출부에서 정의해서 넘긴다.
+\`filterGroups\` 항목에 \`sections\`를 주면 드롭다운이 섹션으로 나뉜다 — Event 필터가
+(날짜 없는 계획) → 연도별(그 해 전체, 최신 연도만 펼침, 헤더에 개수·화살표) →
+Unassigned 순으로 쓴다. 이벤트가 수백 개로 늘어도 첫 화면은 최신 연도 + 접힌 연도
+헤더뿐이고, 검색어를 넣으면 섹션·접힘과 무관하게 전체에서 부분 일치로 거른다.
+
 filterGroups 항목에 \`variant: 'segmented'\`를 주면 드롭다운 대신 All+옵션
 전부를 세그먼트 버튼(ToggleButtonGroup)으로 보여준다 — 옵션이 2~4개로 고정된
 배타적 선택지(예: Platform)에 적합. 옵션 개수가 늘어날 수 있는 필터(예: 매장
@@ -35,6 +40,13 @@ filterGroups 항목에 \`variant: 'segmented'\`를 주면 드롭다운 대신 Al
     filterGroups: { control: 'object', description: "{ key, label, options, sections?, variant? } 배열 — variant:'segmented'면 드롭다운 대신 세그먼트 버튼, sections를 주면 드롭다운이 (Planned)/연도별(그 해 전체, 최신 연도만 펼침)/Unassigned 섹션으로 나뉜다" },
     groupValues: { control: 'object' },
     onGroupChange: { action: 'groupChanged' },
+    showSearch: { control: 'boolean', description: 'SearchBar 노출 여부. 텍스트 검색이 필요 없는 화면(구조화된 드롭다운 필터만 쓰는 곳)에서 false' },
+    searchPlaceholder: { control: 'text', description: 'SearchBar 플레이스홀더' },
+    onClearFilters: { action: 'filtersCleared' },
+    sortBy: { control: 'text', description: '현재 정렬 기준. onSortChange가 있을 때만 정렬 버튼이 나온다' },
+    onSortChange: { action: 'sortChanged' },
+    viewMode: { control: { type: 'radio' }, options: ['grid', 'list'], description: '뷰 모드. onViewModeChange가 있을 때만 토글이 나온다' },
+    onViewModeChange: { action: 'viewModeChanged' },
     dateRange: { control: 'object' },
     onDateRangeChange: { action: 'dateRangeChanged' },
   },

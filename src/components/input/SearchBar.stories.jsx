@@ -24,6 +24,27 @@ export default {
       },
     },
   },
+  argTypes: {
+    value: { control: 'text', description: '현재 검색어 값' },
+    placeholder: { control: 'text', description: '플레이스홀더 텍스트' },
+    variant: {
+      control: 'select',
+      options: ['outlined', 'filled', 'minimal'],
+      description: '스타일 변형',
+    },
+    size: {
+      control: 'select',
+      options: ['sm', 'md', 'lg'],
+      description: '크기 (높이·글자 크기·좌우 여백이 함께 바뀐다)',
+    },
+    isFullWidth: { control: 'boolean', description: '전체 너비 사용 여부' },
+    hasFilter: { control: 'boolean', description: '오른쪽 필터(Tune) 버튼 표시 여부' },
+    isFilterActive: { control: 'boolean', description: '필터 버튼의 활성 표시 상태' },
+    onChange: { action: 'changed', description: '입력 변경 핸들러 (value) => void' },
+    onSearch: { action: 'searched', description: 'Enter 키 또는 검색 아이콘 클릭 시 호출 (value) => void' },
+    onClear: { action: 'cleared', description: '값이 있을 때 나타나는 X 버튼 클릭 핸들러' },
+    onFilterToggle: { action: 'filterToggled', description: '필터 버튼 클릭 핸들러' },
+  },
 };
 
 /**

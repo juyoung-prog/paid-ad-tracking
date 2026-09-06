@@ -54,6 +54,18 @@ export default {
       control: 'boolean',
       description: '표시 여부',
     },
+    easing: {
+      control: 'text',
+      description: 'CSS 이징 함수',
+    },
+    isTriggerOnView: {
+      control: 'boolean',
+      description: '뷰포트 진입 시 자동 트리거 여부',
+    },
+    threshold: {
+      control: { type: 'range', min: 0, max: 1, step: 0.1 },
+      description: 'IntersectionObserver 감지 비율',
+    },
   },
 };
 

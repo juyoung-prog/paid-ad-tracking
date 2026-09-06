@@ -2,6 +2,8 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { PaidAdsShell } from './PaidAdsShell';
+import { PaidAdsStoreProvider } from './PaidAdsStoreProvider';
+import { createMockPaidAdsStore } from './createMockPaidAdsStore';
 
 export default {
   title: 'Paid Ads Dashboard/Layout/PaidAdsShell',
@@ -29,24 +31,29 @@ export default {
 };
 
 export const Default = {
+  /* mock 스토어를 주입한다 — 셸 안의 PaidAdsRail이 주입 스토어가 없으면
+     useSyncRuns(true)로 sync_runs를 실제 Supabase에서 읽는다. 스토리북에서
+     네트워크를 타지 않게 다른 페이지 스토리와 같은 방식으로 막는다. */
   render: () => (
-    <MemoryRouter initialEntries={['/dashboard']}>
-      <Routes>
-        <Route
-          element={<PaidAdsShell />}
-        >
+    <PaidAdsStoreProvider value={createMockPaidAdsStore()}>
+      <MemoryRouter initialEntries={['/dashboard']}>
+        <Routes>
           <Route
-            path="/dashboard"
-            element={(
-              <Box sx={{ p: 4 }}>
-                <Typography variant="body1" color="text.secondary">
-                  Page content renders here via &lt;Outlet /&gt;.
-                </Typography>
-              </Box>
-            )}
-          />
-        </Route>
-      </Routes>
-    </MemoryRouter>
+            element={<PaidAdsShell />}
+          >
+            <Route
+              path="/dashboard"
+              element={(
+                <Box sx={{ p: 4 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    Page content renders here via &lt;Outlet /&gt;.
+                  </Typography>
+                </Box>
+              )}
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>
+    </PaidAdsStoreProvider>
   ),
 };

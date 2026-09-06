@@ -84,8 +84,8 @@ export const Default = {
   },
 };
 
-/** 모든 레이아웃 비교 */
-export const Layouts = {
+/** 문서 및 데모 */
+export const Documentation = {
   render: () => (
     <>
       <DocumentTitle

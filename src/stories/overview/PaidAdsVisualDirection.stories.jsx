@@ -23,17 +23,21 @@ const cardMock = `┌───────────────────�
 │ ⚠ 종료 D-3                                   │  ← 고긴급 알림 뱃지 (있을 때만)
 └────────────────────────────────────────────┘`;
 
+/* 2026-09 리디자인 이후 실제 화면 값. h1~h6은 **크기 스케일**이고 화면이 실제로
+   쓰는 건 역할 토큰(display/title/label) + sx의 px다 — 운영 화면 본문 스케일은
+   10·11·12·13·14px가 주력이라 body1(16px)은 이 정보 밀도에 맞지 않는다. */
 const typographyScale = [
-  { role: '페이지 타이틀', variant: 'h6', size: '18px', weight: '700', note: '헤더 안에서 작게' },
-  { role: 'KPI 숫자', variant: 'h4', size: '32px', weight: '700', note: 'tabular-nums' },
-  { role: 'KPI 라벨', variant: 'caption', size: '11px', weight: '400', note: '숫자 아래, uppercase' },
-  { role: '캠페인명 (카드 Hero)', variant: 'body1', size: '16px', weight: '600', note: '—' },
-  { role: '캠페인 메타(플랫폼·계정·매장)', variant: 'body2', size: '14px', weight: '400', note: 'text.secondary' },
-  { role: '기간·예산', variant: 'body2', size: '14px', weight: '500', note: '예산 숫자는 tabular-nums' },
-  { role: 'AlertBanner 문구', variant: 'body2', size: '14px', weight: '500', note: 'warning.main / error.main' },
-  { role: 'Drawer 섹션 라벨', variant: 'overline', size: '11px', weight: '600', note: 'letter-spacing 넓게' },
-  { role: 'Drawer 성과 지표', variant: 'h5', size: '24px', weight: '700', note: 'tabular-nums 필수' },
-  { role: '계산 필드 (CPM/CTR/Hook Rate 등)', variant: 'body2', size: '14px', weight: '500', note: 'raw 값 옆 괄호 병기, text.secondary' },
+  { role: '섹션 제목 (Event timeline·goal 표 등)', variant: 'title', size: '18px', weight: '600', note: '역할 토큰 — h3로 렌더' },
+  { role: 'KPI 숫자', variant: 'display', size: '24px', weight: '600', note: '역할 토큰 — tabular-nums, div로 렌더' },
+  { role: 'KPI 라벨', variant: 'caption', size: '12px', weight: '400', note: '숫자 **위**, 문장형(대문자 아님)' },
+  { role: '그룹·컬럼 헤더', variant: 'label', size: '13px', weight: '600', note: '역할 토큰 — uppercase, letter-spacing 0.04em' },
+  { role: '캠페인명 (목록 행)', variant: 'body2 + sx', size: '13px', weight: '600', note: '한 줄 말줄임 + hover 툴팁' },
+  { role: '캠페인 메타(플랫폼·매장·이벤트)', variant: 'body2 + sx', size: '13px', weight: '400', note: '플랫폼만 600/text.primary — 같은 소재의 Meta·TikTok을 가르는 유일한 값' },
+  { role: '기간·지출 열', variant: 'sx', size: '13px / 12px', weight: '400 / 600', note: '위가 값, 아래가 단위·보조. 숫자는 tabular-nums' },
+  { role: '알림 문구 (목록 행)', variant: 'sx', size: '13px', weight: '600', note: 'warning.main / error.main' },
+  { role: '예산 페이스', variant: 'sx', size: '12px', weight: '500', note: '정상·미달 success, 초과 warning — 지출 금액보다 한 단 뒤' },
+  { role: '표 헤더 / 표 본문', variant: 'MuiTableCell', size: '12px / 13px', weight: '500 / 400', note: '헤더는 text.secondary — 값과 같은 급이면 표 위쪽이 무거워진다' },
+  { role: 'Drawer 성과 지표', variant: 'body2 + sx', size: '14px', weight: '500', note: '지표 전부 같은 무게 — 무엇이 중요한지는 캠페인 목표마다 다르다' },
 ];
 
 /** Documentation */
@@ -158,7 +162,7 @@ export const Doc = {
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>캠페인 카드 밀도 설계</Typography>
         <Box
           component="pre"
-          sx={{ backgroundColor: 'grey.100', p: 2, mb: 1, fontSize: 12, fontFamily: 'monospace', overflow: 'auto', borderRadius: 1 }}
+          sx={{ backgroundColor: 'surface.muted', p: 2, mb: 1, fontSize: 12, fontFamily: 'monospace', overflow: 'auto', borderRadius: 1 }}
         >
           {cardMock}
         </Box>
@@ -252,13 +256,16 @@ export const Doc = {
 };
 
 const baseColors = [
-  { token: 'primary.main', value: '#0000FF', desc: '유지 — 인터랙티브 요소 전용 (링크, 활성 탭, 버튼)' },
+  { token: 'primary.main', value: '#0000FF', desc: '브랜드 값으로만 남는다 — 화면에서 직접 쓰지 않는다' },
+  { token: 'accent.main', value: '#2563EB', desc: '활성·선택·포커스 + CTA 버튼 표면 — 화면의 파랑은 전부 여기서 나온다' },
+  { token: 'chart.bar / barEmphasis', value: '#AFB5BE / #2563EB', desc: '차트 막대 기본(중립 회색) / 강조 하나' },
   { token: 'secondary.main', value: '#263238', desc: '유지 — 헤더/구분 요소' },
   { token: 'error.main', value: '#B3261E', desc: 'Brand Blue 채도에 맞춰 재조정 (Influencer VD 근거 승계)' },
   { token: 'warning.main', value: '#8A5A00', desc: '상동' },
   { token: 'success.main', value: '#167C3D', desc: '상동' },
   { token: 'info.main', value: '#0E6B7A', desc: 'primary와 겹치지 않도록 청록 계열로 분리' },
-  { token: 'grey.50', value: '#FAFAFA', desc: '유지 — 좌측 패널 배경' },
+  { token: 'surface.sunken / muted', value: '#F9FAFB / #F3F4F6', desc: '한 단 낮은 면 — grey.50/100을 직접 쓰지 않는다' },
+  { token: 'divider', value: '#E5E7EB', desc: '표 행·카드 테두리·툴바 하단 — 면은 그림자가 아니라 이 선이 나눈다' },
 ];
 
 const alertColorMap = [
@@ -281,15 +288,21 @@ const tokenChanges = [
   { path: 'typography.h4, h5 (KPI·성과 숫자용)', before: '미설정', after: "fontVariantNumeric: 'tabular-nums' 추가", target: 'KPI 바, Drawer 성과 지표, 카드 예산 표기' },
   { path: 'components.MuiChip.styleOverrides.root.borderRadius', before: '4', after: '변경 없음 (이미 동일)', target: '—' },
   { path: 'components.MuiDrawer.styleOverrides.paper.width', before: '미설정', after: '440', target: '캠페인 상세/성과 입력 Drawer' },
-  { path: 'components.MuiTableRow.styleOverrides', before: '미설정', after: 'hover 시 rgba(0,0,0,0.03) 배경', target: 'StoreBreakdown, /reports 테이블' },
+  { path: 'components.MuiTableRow.styleOverrides', before: '미설정', after: 'hover 시 palette.action.hover 배경', target: 'StoreBreakdown, /reports 테이블' },
   // 아래는 "파랑 단일화" 이후 추가된 항목들 — 선택·상호작용 색을 accent 하나로
   // 모으고, 상호작용 컨트롤의 radius를 표면(0)에서 분리한 결과다.
-  { path: 'palette.accent (main/dark/tint/tintHover/ring)', before: '미설정', after: '#0000B2 / #000080 / 8%·14% 틴트 / 9% 링', target: '선택·활성·포커스 전반. primary.main(#0000FF)은 브랜드 색으로만 남음' },
-  { path: 'components.MuiButton.styleOverrides.root.borderRadius', before: '0', after: 'shape.radius.control (4px)', target: '버튼을 구조 표면이 아니라 상호작용 컨트롤로 재분류' },
-  { path: 'components.MuiButton contained/outlined/textPrimary', before: 'primary.main (#0000FF)', after: 'accent.main (#0000B2), hover는 accent.dark — @media (hover:hover) 가드', target: '앱 전체 primary 버튼' },
+  { path: 'palette.accent (main/dark/tint/tintHover/ring)', before: '미설정', after: '#2563EB / #1D4ED8 / 8%·14% 틴트 / 16% 링', target: '선택·활성·포커스 + CTA 버튼 표면. primary.main(#0000FF)은 브랜드 색으로만 남음' },
+  { path: 'palette.chart (bar/barEmphasis/grid/gridStrong)', before: '미설정', after: '#AFB5BE / #2563EB / #EEF0F3 / #DDE1E6', target: '타임라인 막대·격자, 진행 막대 — 막대 기본은 회색이고 파랑은 강조 하나' },
+  { path: 'palette.text / divider / surface', before: 'rgba(0,0,0,0.87·0.6·0.38) / rgba(0,0,0,0.12) / grey.50·100', after: '#111827·#6B7280·#9CA3AF / #E5E7EB / #F9FAFB·#F3F4F6', target: '중립 회색 체계로 교체 — 보조 텍스트가 본문과 확실히 갈린다' },
+  { path: 'components.MuiButton.styleOverrides.root', before: '0 / MUI 기본 그림자', after: 'shape.radius.control (6px) · 굵기 500 · **그림자 전면 제거** · sizeSmall 13px', target: '버튼을 구조 표면이 아니라 상호작용 컨트롤로 재분류' },
+  { path: 'components.MuiButton contained/outlined/textPrimary', before: 'primary.main (#0000FF)', after: 'accent.main (#2563EB), hover는 accent.dark — outlined 테두리는 accent 35%', target: '앱 전체 primary 버튼' },
   { path: 'components.MuiTabs.indicator / MuiTab.Mui-selected', before: '미설정(MUI 기본 primary)', after: 'accent.main — indicatorColorPrimary/textColorPrimary 한정', target: 'Dashboard 상태 탭, Reports Plan/Performance 탭' },
-  { path: 'components.MuiToggleButton / MuiAlert / MuiSkeleton', before: '미설정', after: 'borderRadius: shape.radius.control (4px)', target: '세그먼트 필터, 오류·경고 배너, 로딩 스켈레톤' },
-  { path: 'shape.radius (control/container/inlay)', before: '미설정', after: '4 / 6 / 3', target: '역할별 radius 토큰 — Style/Shape 스토리 참고' },
+  { path: 'components.MuiToggleButton / MuiAlert / MuiSkeleton / MuiTooltip', before: '미설정', after: 'borderRadius: shape.radius.control (6px) + 각자 색·크기 — MuiAlert의 standardInfo는 색면이 아니라 surface.sunken + 1px divider', target: '세그먼트 필터, 안내·경고 배너, 로딩 스켈레톤, 툴팁' },
+  { path: 'components.MuiTableCell / MuiTableRow / MuiTablePagination', before: '미설정', after: '본문 13px · 헤더 12px/500/text.secondary · padding 10px 16px · 1px divider', target: '앱의 모든 표 — 헤더가 값보다 한 단 물러난다' },
+  { path: 'components.MuiTab / MuiTabs', before: '미설정(MUI 기본)', after: '44px · 14px/500/none · 비선택 text.secondary · indicator 2px accent', target: 'Dashboard 상태 탭, Reports Plan/Performance 탭' },
+  { path: 'components.MuiMenu / MuiPopover', before: '미설정', after: '1px divider 테두리 + radius.container(8px) + 거의 안 보이는 그림자', target: '필터 드롭다운, 알림 팝오버' },
+  { path: 'shape.radius (control/container/inlay)', before: '미설정', after: '6 / 8 / 3', target: '역할별 radius 토큰 — Style/Shape 스토리 참고' },
+  { path: 'customShadows (sm~xl)', before: '0.06~0.12 알파', after: '0.04~0.10 알파 — 그림자는 떠 있는 것(메뉴·팝오버)에만', target: '면의 위계는 그림자가 아니라 1px divider와 여백이 만든다' },
 ];
 
 /** 컬러 팔레트 및 변경 토큰 */
@@ -358,7 +371,7 @@ export const ColorAndTokens = {
       <SectionTitle title="플랫폼 구분 및 컬러 사용 제한" />
       <Box sx={{ mb: 4 }}>
         <Typography variant="body2" sx={{ mb: 0.5 }}>· Meta/TikTok은 색으로 구분하지 않는다 — 아이콘 + 텍스트 라벨의 outline Chip으로만 표시 (알림 컬러와 경쟁 방지).</Typography>
-        <Typography variant="body2" sx={{ mb: 0.5 }}>· primary.main은 인터랙티브 요소에만, 배경·카드에 파란색 금지.</Typography>
+        <Typography variant="body2" sx={{ mb: 0.5 }}>· 파랑은 accent.main 하나다 — 활성·선택·포커스·CTA에만 쓰고 배경·카드는 칠하지 않는다. primary.main(#0000FF)은 브랜드 값이라 화면에 안 쓴다.</Typography>
         <Typography variant="body2">· 상태/알림 컬러는 텍스트·아이콘·칩 테두리로만, 카드 전체 배경 채색 금지.</Typography>
       </Box>
 
@@ -386,10 +399,10 @@ export const ColorAndTokens = {
         </Table>
       </TableContainer>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-        secondary.main, shape.borderRadius(전역 0), shadows, spacing — 기본값 유지.
-        primary.main(#0000FF)은 값 자체는 그대로지만 이제 브랜드 색으로만 쓰이고, 선택·활성·포커스는
-        새로 만든 accent(#0000B2)가 담당한다. 역할별 radius(shape.radius)도 이 프로젝트에서 추가한 토큰이다 —
-        위 표의 하단 항목 참고.
+        secondary.main과 shape.borderRadius(전역 0)는 기본값 유지. primary.main(#0000FF)은 값 자체는
+        그대로지만 이제 브랜드 색으로만 쓰이고, 선택·활성·포커스·CTA는 accent(#2563EB)가 담당한다.
+        역할별 radius(shape.radius)와 차트 잉크(chart.*)는 이 프로젝트에서 추가한 토큰이다.
+        **이 문서는 2026-09 리디자인 기준으로 갱신됐다** — 그 이전 캡처와 다르면 이쪽이 맞다.
       </Typography>
     </PageContainer>
   ),

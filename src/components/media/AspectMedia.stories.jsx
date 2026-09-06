@@ -34,6 +34,21 @@ export default {
     },
   },
   argTypes: {
+    src: {
+      control: 'text',
+      description: '미디어 소스 URL',
+      table: {
+        type: { summary: 'string' },
+      },
+    },
+    alt: {
+      control: 'text',
+      description: '대체 텍스트 (type이 image일 때 img의 alt로 전달)',
+      table: {
+        type: { summary: 'string' },
+        defaultValue: { summary: '\'\'' },
+      },
+    },
     type: {
       control: 'radio',
       options: ['image', 'video'],
@@ -63,7 +78,54 @@ export default {
     },
     isLazy: {
       control: 'boolean',
-      description: '지연 로딩 활성화',
+      description: '지연 로딩 활성화 (true면 loading="lazy", false면 "eager")',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'true' },
+      },
+    },
+    poster: {
+      control: 'text',
+      description: '비디오 포스터 이미지 URL (type이 video일 때만 사용)',
+      table: {
+        type: { summary: 'string' },
+      },
+    },
+    isAutoPlay: {
+      control: 'boolean',
+      description: '비디오 자동 재생 (video의 autoPlay)',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    isMuted: {
+      control: 'boolean',
+      description: '비디오 음소거 (video의 muted). 자동 재생하려면 true여야 한다',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'true' },
+      },
+    },
+    isLoop: {
+      control: 'boolean',
+      description: '비디오 반복 재생 (video의 loop)',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    hasControls: {
+      control: 'boolean',
+      description: '비디오 재생 컨트롤 표시 (video의 controls)',
+      table: {
+        type: { summary: 'boolean' },
+        defaultValue: { summary: 'false' },
+      },
+    },
+    isPlaysInline: {
+      control: 'boolean',
+      description: '모바일에서 전체화면 대신 인라인 재생 (video의 playsInline)',
       table: {
         type: { summary: 'boolean' },
         defaultValue: { summary: 'true' },

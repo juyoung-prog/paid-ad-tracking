@@ -36,8 +36,8 @@ export default {
 
 ### 기능
 - 플랫폼 선택 시 계정 목록을 해당 플랫폼으로 자동 필터링(선택값 초기화)
-- Campaign Name 옆에 **Event**(campaignGroup, 필수) — 하나의 마케팅 이니셔티브가 여러 캠페인(메타+틱톡 동시 진행, 또는 여러 단계)으로 쪼개질 때 이 값으로 묶는다. schema.js의 campaignGroupKey()가 이 값(없으면 name)을 CampaignTable의 "+N more in group" 칩·FilterBar의 Event 필터·overlap_target 억제 판단에 전부 사용
-- Planned Budget(총액, 필수) 옆에 Daily Budget(선택) — 있으면 Planned Budget이 Daily Budget × 기간으로 자동 계산됨(pacing 계산에도 반영)
+- Campaign Name은 전체 폭이고(동기화된 긴 이름이 잘리면 안 된다) 그 아래 줄에 **Event**(campaignGroup, 필수) — 하나의 마케팅 이니셔티브가 여러 캠페인(메타+틱톡 동시 진행, 또는 여러 단계)으로 쪼개질 때 이 값으로 묶는다. schema.js의 campaignGroupKey()가 이 값(없으면 name)을 CampaignTable의 "+N more in group" 칩·FilterBar의 Event 필터·overlap_target 억제 판단에 전부 사용
+- Daily Budget(선택)을 Planned Budget(총액, 필수)보다 **왼쪽에** 둔다 — Planned가 먼저 보이면 그것부터 채워야 할 것 같은 착시가 생긴다 — 있으면 Planned Budget이 Daily Budget × 기간으로 자동 계산됨(pacing 계산에도 반영)
 - Ad Link(creativeUrl, 사람이 타이핑하는 실제 링크)와 Thumbnail(thumbnailUrl, 업로드 전용 이미지)은 별개 필드 — 하나로 합쳤다가 실제 링크를 입력할 방법이 없어지는 문제로 다시 분리함
 - Thumbnail 옆에 CampaignThumbnail 실시간 미리보기, 업로드 성공 여부는 "Uploaded"/"Not uploaded" 상태 텍스트로 표시
 - 검증 로직은 갖지 않음 — errors prop으로 외부에서 주입

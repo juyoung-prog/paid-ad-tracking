@@ -47,18 +47,26 @@ export const Docs = {
     // 토큰 값 (테이블용)
     const tokenValues = [
       { token: 0, multiplier: '0x', px: 0, usage: '없음' },
-      { token: 0.5, multiplier: '0.5x', px: 4, usage: '아이콘 내부 간격' },
+      { token: 0.5, multiplier: '0.5x', px: 4, usage: '표 셀 위아래 — 행 높이를 정하는 값' },
+      { token: 0.75, multiplier: '0.75x', px: 6, usage: '행 안쪽, 아이콘과 글자 사이 (운영 화면 주력)' },
+      { token: 0.875, multiplier: '0.875x', px: 7, usage: '목록 행 높이(py) — 패널 세로 여백' },
       { token: 1, multiplier: '1x', px: 8, usage: '인라인 요소 간격' },
-      { token: 1.5, multiplier: '1.5x', px: 12, usage: '작은 컴포넌트 패딩' },
-      { token: 2, multiplier: '2x', px: 16, usage: '기본 컴포넌트 패딩' },
-      { token: 3, multiplier: '3x', px: 24, usage: '카드 내부 패딩' },
+      { token: 1.25, multiplier: '1.25x', px: 10, usage: '캠페인 목록 행 위아래' },
+      { token: 1.5, multiplier: '1.5x', px: 12, usage: '카드 안 요소 사이 · 섹션 제목과 내용 사이' },
+      { token: 2, multiplier: '2x', px: 16, usage: '패널 가로 여백 · 카드 안쪽 패딩' },
+      { token: 3, multiplier: '3x', px: 24, usage: '섹션 사이 (드로어·리포트 카드)' },
       { token: 4, multiplier: '4x', px: 32, usage: '섹션 간격' },
       { token: 5, multiplier: '5x', px: 40, usage: '큰 섹션 간격' },
       { token: 6, multiplier: '6x', px: 48, usage: '페이지 패딩' },
       { token: 8, multiplier: '8x', px: 64, usage: '대형 섹션 마진' },
       { token: 10, multiplier: '10x', px: 80, usage: '페이지 섹션 구분' },
-      { token: 12, multiplier: '12x', px: 96, usage: '히어로 섹션 패딩' },
+      { token: 12, multiplier: '12x', px: 96, usage: '히어로 섹션 패딩 (마케팅 페이지용 — 이 대시보드에는 없다)' },
     ];
+
+    /* 운영 화면의 주력은 **작은 단계**다(0.5~3). 6·8·10·12는 히어로가 있는
+       마케팅 페이지의 값이고, 하루에 여러 번 훑는 대시보드에서 그 여백을 쓰면
+       한 화면에 들어오는 행 수가 절반이 된다. 아래 표에서 위쪽 절반만 쓴다고
+       보면 된다. */
 
     // sx props 가이드
     const sxProps = [
@@ -123,7 +131,7 @@ export const Docs = {
                           sx={ {
                             width: Math.min(row.px, 80),
                             height: 16,
-                            backgroundColor: 'primary.main',
+                            backgroundColor: 'chart.barEmphasis',
                             minWidth: row.px > 0 ? 2 : 0,
                           } }
                         />
@@ -164,7 +172,7 @@ export const Docs = {
           <Box
             component="pre"
             sx={ {
-              backgroundColor: 'grey.100',
+              backgroundColor: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -211,7 +219,7 @@ export const Docs = {
             component="pre"
             sx={ {
               backgroundColor: 'grey.900',
-              color: 'grey.100',
+              color: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',

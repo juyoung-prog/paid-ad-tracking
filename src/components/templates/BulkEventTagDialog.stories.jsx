@@ -54,6 +54,8 @@ const EVENT_OPTIONS = ['G10 Opening', 'G09 Opening', 'BF3 Grand Opening', 'Labor
 
 export default {
   title: 'Paid Ads Dashboard/Templates/BulkEventTagDialog',
+  component: BulkEventTagDialog,
+  tags: ['autodocs'],
   parameters: {
     layout: 'centered',
     docs: {

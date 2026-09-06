@@ -116,7 +116,7 @@ export const Doc = {
         <SectionTitle title="아키텍처" description="Mermaid sequence diagram 소스" />
         <Box
           component="pre"
-          sx={{ backgroundColor: 'grey.100', p: 2, mb: 2, fontSize: 12, fontFamily: 'monospace', overflow: 'auto', borderRadius: 1 }}
+          sx={{ backgroundColor: 'surface.muted', p: 2, mb: 2, fontSize: 12, fontFamily: 'monospace', overflow: 'auto', borderRadius: 1 }}
         >
           {oauthSequence}
         </Box>

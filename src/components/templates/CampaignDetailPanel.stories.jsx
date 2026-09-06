@@ -47,6 +47,8 @@ const PERFORMANCE = {
 
 export default {
   title: 'Paid Ads Dashboard/Templates/CampaignDetailPanel',
+  component: CampaignDetailPanel,
+  tags: ['autodocs'],
   parameters: {
     layout: 'centered',
     docs: {
@@ -94,9 +96,9 @@ Billing & payments → Payment activity를 또 찾아 들어가야 했다. 인�
 그 계정이 선택된 상태, TikTok은 광고주 결제 화면까지).
 
 ### 폭이 고정이다
-패널 폭은 \`560\`(좁은 화면에선 전체 폭). 예전엔 지정이 없어 내용물이 폭을
+패널 폭은 \`580\`(좁은 화면에선 전체 폭). 예전엔 지정이 없어 내용물이 폭을
 정했는데, 그러면 액션 줄이 캠페인마다 다른 지점에서 접혀 같은 패널의 버튼
-배치가 열 때마다 달라졌다. 560은 문 네 개가 한 줄에 들어가는 폭이다 —
+배치가 열 때마다 달라졌다. 580은 문 네 개가 한 줄에 들어가는 폭이다 —
 라벨을 늘리거나 버튼을 더하면 이 값도 같이 봐야 한다(\`Payment activity\`를
 \`Billing\`으로 줄인 이유이기도 하다).
 
@@ -155,9 +157,12 @@ function Harness({ campaign, performance, dailyRows, adsManagerHref, billingHref
  * - 계획 예산이 0으로 저장돼 있어도 일일예산×기간으로 복원된 값이 뜬다
  *   (effectiveBudgetPlanned, $25 × 57일 = $1,425)
  * - Budget Pacing 블록이 나온다
+ * - 요약 블록이 `Dates · Planned budget · Daily budget · Spend · Reach ·
+ *   Impressions · Clicks · CTR` 순인가 — CTR은 저장값이 아니라 계산값이고,
+ *   값이 없는 줄은 아예 안 그린다
  * - `Reach · Plays · Comments · Shares · Follows · Visits`까지 전 지표가 보인다
  * - `Avg Watch`는 `1.01s` — TikTok이 준 소수를 그대로 쓴다
- * - **Daily spend 표** — 날짜당 한 행(7/6~8/7), 표 안 스크롤(stickyHeader),
+ * - **Daily spend 표** — 날짜당 한 행(7/6~8/7), 표 안 스크롤(stickyHeader + 항상 보이는 스크롤바 — 아래 페이드는 마지막 행이 선택된 것처럼 읽혀서 쓰지 않는다),
  *   Total이 위 Spend 줄($632.98)과 같은 값이다. Reports의 Daily spend 표는
  *   필터 집합의 합이라 캠페인 하나만 가르는 건 이 패널의 몫이다
  */
@@ -196,7 +201,7 @@ export const NoPerformance = {
  * - `Billing` — billingHref가 넘어왔을 때만. 계정의 청구 내역
  *   (Meta: Billing & payments → Payment activity)으로 간다 — 인보이스를 뽑는 자리다
  * - 전부 새 탭(target=_blank)이고, 없는 링크는 빈 버튼 대신 아예 안 그린다
- * - **문 네 개가 한 줄**에 들어간다(패널 폭 560 고정). 라벨을 늘리면 접힌다
+ * - **문 네 개가 한 줄**에 들어간다(패널 폭 580 고정). 라벨을 늘리면 접힌다
  */
 export const WithExternalLinks = {
   render: () => (

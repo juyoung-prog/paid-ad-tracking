@@ -185,9 +185,12 @@ export const Docs = {
 
     // 토큰 값 (테이블용)
     const tokenValues = [
-      { token: 'primary.main', value: theme.palette.primary.main, description: '주요 브랜드 색상, CTA 버튼' },
-      { token: 'primary.light', value: theme.palette.primary.light, description: 'hover 상태, 배경 강조' },
-      { token: 'primary.dark', value: theme.palette.primary.dark, description: 'active 상태, 텍스트 강조' },
+      { token: 'primary.main', value: theme.palette.primary.main, description: '브랜드 색 — **화면에서 직접 쓰지 않는다**(CTA 표면·선택 상태는 accent)' },
+      { token: 'primary.light', value: theme.palette.primary.light, description: '브랜드 램프(밝은 쪽)' },
+      { token: 'primary.dark', value: theme.palette.primary.dark, description: '브랜드 램프(어두운 쪽)' },
+      { token: 'chart.bar', value: theme.palette.chart.bar, description: '차트 막대 기본 — 중립 회색' },
+      { token: 'chart.barEmphasis', value: theme.palette.chart.barEmphasis, description: '차트 막대 강조·hover — 파랑은 하나에만' },
+      { token: 'chart.grid / gridStrong', value: `${theme.palette.chart.grid} / ${theme.palette.chart.gridStrong}`, description: '날짜 격자(주 단위) / 월 경계' },
       { token: 'secondary.main', value: theme.palette.secondary.main, description: '보조 액션, 태그' },
       { token: 'error.main', value: theme.palette.error.main, description: '오류, 삭제, 위험' },
       { token: 'warning.main', value: theme.palette.warning.main, description: '주의, 경고' },
@@ -200,7 +203,8 @@ export const Docs = {
       // 상호작용 액센트 — 활성·선택·포커스가 전부 이 한 값에서 나온다.
       // primary.main(#0000FF)은 채도 100%라 목록이 주인공인 화면에서 컨트롤이
       // 가장 강한 요소가 돼버려서, "선택됨"의 기준색은 한 단 낮은 이 값이다.
-      { token: 'accent.main', value: theme.palette.accent.main, description: '활성·선택·포커스 단일 액센트 (내비 활성, 탭 밑줄)' },
+      { token: 'accent.main', value: theme.palette.accent.main, description: '활성·선택·포커스 + CTA 버튼 표면 — 화면의 파랑은 전부 이 값' },
+      { token: 'accent.dark', value: theme.palette.accent.dark, description: '채운 표면(contained 버튼)의 hover' },
       { token: 'accent.tint', value: theme.palette.accent.tint, description: '선택 배경 — 채우지 않고 옅게 깐다' },
       { token: 'accent.tintHover', value: theme.palette.accent.tintHover, description: '선택 배경의 hover' },
       { token: 'accent.ring', value: theme.palette.accent.ring, description: '포커스 외곽 링 (테두리 1px 유지 + 번짐)' },
@@ -263,7 +267,7 @@ export const Docs = {
                           backgroundColor: row.value,
                           border: '1px solid',
                           borderColor: 'divider',
-                          borderRadius: '4px',
+                          borderRadius: (t) => `${t.shape.radius.control}px`,
                         } }
                       />
                     </TableCell>
@@ -279,7 +283,7 @@ export const Docs = {
           <Box
             component="pre"
             sx={ {
-              backgroundColor: 'grey.100',
+              backgroundColor: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -289,8 +293,9 @@ export const Docs = {
             } }
           >
 { `// 배경색 적용
-<Box sx={{ backgroundColor: 'primary.main' }} />
+<Box sx={{ backgroundColor: 'accent.main' }} />       // 선택·활성 표면
 <Box sx={{ backgroundColor: 'background.paper' }} />
+<Box sx={{ backgroundColor: 'surface.sunken' }} />    // 한 단 낮은 면
 
 // 텍스트 색상
 <Typography sx={{ color: 'text.primary' }}>주요 텍스트</Typography>
@@ -330,7 +335,7 @@ export const Docs = {
             component="pre"
             sx={ {
               backgroundColor: 'grey.900',
-              color: 'grey.100',
+              color: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -340,13 +345,13 @@ export const Docs = {
           >
 { `/* 색상 토큰 활용 프롬프트 예시 */
 
-"primary.main (${theme.palette.primary.main})을 사용해서 CTA 버튼을 만들어줘.
-hover 시 primary.dark로 변경되도록 해줘."
+"accent.main (${theme.palette.accent.main})으로 CTA 버튼을 만들어줘.
+hover 시 accent.dark로 변경되도록 해줘 — primary.main(브랜드 값)은 화면에서 쓰지 않아."
 
 "text.primary와 text.secondary를 사용해서
 카드 컴포넌트의 제목과 설명 텍스트 색상을 구분해줘."
 
-"background.paper 배경에 primary.main 보더를 가진
+"background.paper 배경에 accent.main 보더를 가진
 선택된 상태의 카드를 만들어줘."
 
 "error.main 색상으로 삭제 버튼을 만들고,
@@ -355,7 +360,10 @@ hover 시 error.dark로 어두워지게 해줘."
 "내비 항목의 활성 상태를 accent.tint 배경 + accent.main 글자로 만들어줘.
 primary.main은 쓰지 마 — 선택 상태의 기준색은 accent야."
 
-"사이드바 배경은 grey.50 대신 surface.sunken을 써줘."` }
+"사이드바 배경은 grey.50 대신 surface.sunken을 써줘."
+
+"차트 막대는 chart.bar(중립 회색)로 두고, 강조되는 하나만 chart.barEmphasis로 해줘.
+격자는 chart.grid — 막대가 격자에 묻히면 안 돼."` }
           </Box>
         </PageContainer>
       </>
@@ -373,12 +381,23 @@ function PaletteDocs() {
      재조정한 커스텀 값이라(테마 파일 palette 주석 참고), 예전처럼 MUI 기본
      스케일을 "Primary의 기반"으로 문서화하면 화면과 문서가 다른 색을 말한다. */
   const customRamps = [
-    { name: 'Brand Blue', description: 'Primary — CTA, 브랜드 아이덴티티', colors: [
+    { name: 'Brand Blue', description: 'Primary — 브랜드 아이덴티티 전용. 화면에는 안 쓴다', colors: [
       { label: 'light', value: theme.palette.primary.light },
       { label: 'main', value: theme.palette.primary.main },
       { label: 'dark', value: theme.palette.primary.dark },
-      { label: 'accent.main', value: theme.palette.accent.main },
-      { label: 'accent.dark', value: theme.palette.accent.dark },
+    ] },
+    /* accent는 브랜드 램프의 일부가 아니라 **다른 축**이다 — 브랜드 파랑의 명도
+       변형이 아니라, 상호작용을 말하려고 따로 고른 UI 파랑(#2563EB)이다. 한 램프에
+       묶어두면 "브랜드 색의 어두운 단계"로 읽힌다. */
+    { name: 'Accent (Interactive)', description: '활성·선택·포커스·CTA — 화면의 파랑은 전부 여기서 나온다', colors: [
+      { label: 'main', value: theme.palette.accent.main },
+      { label: 'dark', value: theme.palette.accent.dark },
+    ] },
+    { name: 'Chart Ink', description: '차트 데이터 잉크 — 막대 기본은 중립 회색, 파랑은 강조 하나에만', colors: [
+      { label: 'grid', value: theme.palette.chart.grid },
+      { label: 'gridStrong', value: theme.palette.chart.gridStrong },
+      { label: 'bar', value: theme.palette.chart.bar },
+      { label: 'barEmphasis', value: theme.palette.chart.barEmphasis },
     ] },
     { name: 'Error', description: '오류·삭제·위험 (커스텀 — MUI red 아님)', colors: [
       { label: 'light', value: theme.palette.error.light },
@@ -446,7 +465,7 @@ function PaletteDocs() {
           description="MUI 기본 팔레트 중 테마가 실제로 참조하는 두 스케일"
         />
 
-        <PaletteScale name="Grey" colorObj={ grey } description="텍스트·배경·보더, surface.sunken/muted(grey.50/100)의 원천" />
+        <PaletteScale name="Grey" colorObj={ grey } description="grey.300/400은 입력 테두리, 그 외는 참조용 — 면 위계(surface.sunken/muted)는 별도 커스텀 값이라 이 스케일에서 오지 않는다" />
         <PaletteScale name="Blue Grey" colorObj={ blueGrey } description="Secondary 색상의 기반 (secondary.main = blueGrey[900])" />
 
         <SectionTitle title="명도 가이드" description="Grey·Blue Grey 스케일을 고를 때의 기준" />
@@ -516,7 +535,7 @@ export const SemanticTokens = {
           <SemanticColorBlock
             name="Primary"
             colorObj={ theme.palette.primary }
-            description="CTA 버튼, 링크, 선택된 상태"
+            description="브랜드 값 — 화면에서 직접 쓰지 않는다(CTA·링크·선택 상태는 accent)"
           />
           <SemanticColorBlock
             name="Secondary"
@@ -605,7 +624,7 @@ export const Usage = {
         <Box
           component="pre"
           sx={ {
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             p: 2,
             fontSize: 12,
             fontFamily: 'monospace',
@@ -630,7 +649,7 @@ export const Usage = {
         <Box
           component="pre"
           sx={ {
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             p: 2,
             fontSize: 12,
             fontFamily: 'monospace',

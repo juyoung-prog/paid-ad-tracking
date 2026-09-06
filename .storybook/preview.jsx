@@ -55,11 +55,20 @@ const preview = {
       test: 'todo',
     },
     options: {
+      /* 순서 = 읽는 순서다. 디자인 언어(Overview·Style) → **이 제품**(Paid Ads
+         Dashboard) → 그 아래 범용 라이브러리(Component·Interactive) → 부속.
+         예전엔 목록에 'Paid Ads Dashboard'가 아예 없어서, 스토리 31개짜리 본
+         제품 섹션이 Test Data·Page 같은 스캐폴드보다도 뒤에 놓였다(목록에 없는
+         항목은 전부 뒤로 밀린다). 'Shape'도 Style 하위 목록에서 빠져 있어 같은
+         이유로 혼자 맨 끝이었다. */
       storySort: {
         order: [
           'Overview',
           'Style',
-          ['Overview', 'Colors', 'Typography', 'Icons', 'Spacing', 'Component Tokens'],
+          ['Overview', 'Colors', 'Typography', 'Shape', 'Icons', 'Spacing', 'Component Tokens'],
+          'Paid Ads Dashboard',
+          // 화면 → 화면을 이루는 부품 순. 처음 열어보는 사람은 페이지부터 본다.
+          ['Page', 'Section', 'Layout', 'Templates', 'Data Display', 'Input', 'Media', 'Card'],
           'Component',
           [
             '1. Typography',

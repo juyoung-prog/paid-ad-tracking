@@ -40,6 +40,10 @@ export default {
       control: 'boolean',
       description: '전체 너비 채우기',
     },
+    minWordSpacing: {
+      control: { type: 'number', min: 0, max: 5, step: 0.1 },
+      description: 'fillWidth가 false일 때만 적용되는 word-spacing 값 (em)',
+    },
     variant: {
       control: 'select',
       options: ['static', 'animated'],

@@ -16,7 +16,8 @@ export default {
 ## AlertBanner
 
 종료 임박(ending_soon)·예산 pacing(budget_pacing)·성과 미보고
-(missing_performance)를 고긴급으로 노출한다. overlap_target(저긴급)과
+(missing_performance)·성과 없음(no_results)·인보이스(invoice_due)·잔액 부족
+(balance_low) 여섯 유형을 노출한다(BANNERABLE_TYPES). overlap_target(저긴급)과
 new_store_reminder(Alert 시스템 밖)는 컴포넌트 내부에서 자동으로 걸러진다 —
 알림 피로를 만들지 않기 위한 설계. missing_performance는 한 번 삭제됐다가
 재도입됨 — 예전엔 reportedAt 필드가 트리거 근거였는데 그 필드가 사라지며
@@ -190,8 +191,9 @@ export const WithMockData = {
  * onDismiss가 있으면 알림 줄과 분리된 자체 줄에 닫기 버튼이 뜬다(첫 알림과
  * 겹쳐 보이던 예전 배치를 고쳐 "전체를 닫는다"는 게 명확해짐). 알림 벨
  * Popover와 배너가 같은 목록을 상시 중복 노출하지 않도록, 배너를 닫으면
- * 벨이 유일한 재접근 경로가 되는 설계다(DashboardPage의 alertsDismissed
- * 상태로 구현).
+ * 벨이 유일한 재접근 경로가 되는 설계다 — 다만 현재 DashboardPage는 배너를
+ * 쓰지 않고 알림을 벨 Popover 하나로만 노출하므로, 이 prop을 쓰는 화면은
+ * 아직 없다.
  */
 function DismissibleDemo() {
   const [dismissed, setDismissed] = useState(false);

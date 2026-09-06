@@ -275,7 +275,12 @@ export const GridLayout = {
   },
 };
 
-/** 액션 버튼 없음 (읽기 전용) */
+/**
+ * 액션 버튼 없음 (읽기 전용)
+ *
+ * 파일 최상단 argTypes의 action 스파이가 모든 스토리에 onEdit/onDelete를 주입하므로,
+ * 여기서 명시적으로 undefined를 덮어써야 hover 시 편집·삭제 버튼이 뜨지 않는다.
+ */
 export const ReadOnly = {
   args: {
     id: 'board-readonly',
@@ -286,7 +291,7 @@ export const ReadOnly = {
   },
   render: (args) => (
     <Box sx={ { width: 280 } }>
-      <MoodboardCard { ...args } />
+      <MoodboardCard { ...args } onEdit={ undefined } onDelete={ undefined } />
     </Box>
   ),
 };

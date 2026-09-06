@@ -42,13 +42,13 @@ function ShapeDocs() {
         token: 'shape.radius.control',
         value: `${theme.shape.radius.control}px`,
         radius: theme.shape.radius.control,
-        description: '상호작용 컨트롤 — 버튼·입력·셀렉트·칩·내비 행. MuiButton/MuiOutlinedInput/MuiChip 오버라이드와 같은 값',
+        description: '상호작용 컨트롤 — 버튼·입력·셀렉트·칩·토글·내비 행·Alert·Skeleton·Tooltip. 테마 override가 전부 이 값을 쓴다',
       },
       {
         token: 'shape.radius.container',
         value: `${theme.shape.radius.container}px`,
         radius: theme.shape.radius.container,
-        description: '분석·참조용 카드형 컨테이너 — Gantt phase 막대 등 (구조 표면인 Card/Paper는 여전히 0)',
+        description: '카드형 컨테이너 — Reports의 섹션 카드(타임라인·표)와 떠 있는 종이(Menu/Popover). 구조 표면인 Card/Paper는 여전히 0',
       },
       {
         token: 'shape.radius.inlay',
@@ -74,6 +74,7 @@ function ShapeDocs() {
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={ { mb: 4 } }>
             전역 radius는 0(각짐)이고, 역할 단위로만 예외를 둡니다 — 어떤 요소가 왜 둥근지가 토큰 이름에 담깁니다.
+            아래 값은 현재 테마에서 읽은 것이라 디자인 시스템을 바꾸면 같이 바뀝니다 — Carbon 테마는 세 역할이 전부 0입니다(Carbon은 radius를 쓰지 않습니다).
           </Typography>
 
           <SectionTitle title="토큰 구조" description="theme.shape 계층 구조" />
@@ -122,7 +123,7 @@ function ShapeDocs() {
           <Box
             component="pre"
             sx={ {
-              backgroundColor: 'grey.100',
+              backgroundColor: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -133,16 +134,16 @@ function ShapeDocs() {
           >
 { `// 반드시 px "문자열"로 넘긴다.
 // sx의 borderRadius에 숫자를 주면 shape.borderRadius(0)와 곱해져 0px가 된다 —
-// 이 곱셈 함정 때문에 화면마다 '4px' 리터럴과 경고 주석이 복사되던 것을
+// 이 곱셈 함정 때문에 화면마다 radius 리터럴과 경고 주석이 복사되던 것을
 // 토큰으로 모은 것이다.
 <Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.control}px\` })} />
 
 // 역할별 선택
-<Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.container}px\` })} />  // 차트 막대·참조 카드
+<Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.container}px\` })} />  // 섹션 카드·메뉴 종이
 <Box sx={theme => ({ borderRadius: \`\${theme.shape.radius.inlay}px\` })} />      // 버튼 안 키캡
 
 // 구조 표면(Card/Paper/Dialog)은 토큰을 덮지 않는다 — 전역 0(각짐)이 의도다.
-// Button은 상호작용 컨트롤로 재분류되어 테마 MuiButton이 control(4px)을 쓴다.
+// Button은 상호작용 컨트롤로 재분류되어 테마 MuiButton이 control을 쓴다.
 // 원형은 radius 역할이 아니므로 그대로 '50%'를 쓴다.
 <Box sx={{ borderRadius: '50%' }} />` }
           </Box>
@@ -155,7 +156,7 @@ function ShapeDocs() {
             component="pre"
             sx={ {
               backgroundColor: 'grey.900',
-              color: 'grey.100',
+              color: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -168,10 +169,10 @@ function ShapeDocs() {
 "칩처럼 클릭되는 요소에 shape.radius.control(6px)을 적용해줘.
 sx에서는 숫자가 아니라 \\\`\${theme.shape.radius.control}px\\\` 문자열로 넘겨야 해."
 
-"이 분석 카드 컨테이너에 shape.radius.container(6px)를 써줘.
+"이 섹션 카드 컨테이너에 shape.radius.container(8px)를 써줘.
 Card/Paper 같은 구조 표면은 전역 0을 유지하고 건드리지 마."
 
-"'6px' 같은 radius 리터럴을 발견하면 역할에 맞는 shape.radius 토큰으로 바꿔줘."` }
+"'6px'·'8px' 같은 radius 리터럴을 발견하면 역할에 맞는 shape.radius 토큰으로 바꿔줘."` }
           </Box>
         </PageContainer>
       </>

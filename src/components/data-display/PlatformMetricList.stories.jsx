@@ -19,23 +19,41 @@ PerformanceForm과 짝을 이루는 반대편이라 입력 필드가 아니라 �
 지표가 없는 플랫폼에서는 빈 줄만 늘어서서 "아직 안 왔다"인지 "원래 없다"인지
 구분이 안 되기 때문이다. 하나도 없으면 아무것도 그리지 않는다.
 
+### 세 그룹
+한 열에 열여덟 줄이 같은 무게로 늘어서면 훑을 데가 없어서 **Delivery**(돈이 어디까지
+갔나) → **Traffic & Engagement**(무엇을 했나) → **Video & Social**(소재가 어땠나)로
+나눈다. 작은 흐린 대문자 라벨과 14px 간격만 쓰고 카드는 만들지 않는다. 값은 지표
+전부 같은 무게(500)다 — 무엇이 중요한지는 캠페인 목표마다 달라서(Traffic이면 CTR)
+컴포넌트가 미리 정하지 않는다.
+
+Delivery·Traffic 그룹은 \`hasCoreMetrics\`를 켰을 때만 나온다. 옆에 입력 폼이 있는
+자리(직접 등록 캠페인)에서는 같은 값이 폼 필드에 이미 있어 중복이기 때문이다.
+
 Hook Rate / Hold Rate는 저장된 값이 아니라 schema.js의 calcHookRate/calcHoldRate로
 계산한 파생 지표다 — Meta 광고 관리자와 같은 정의(hook rate = 훅시청 ÷ video plays,
 hold rate = 완주 ÷ 훅시청). 훅시청의 기준이 플랫폼마다 달라(Meta 3초 / TikTok 2초 재생)
-그 사실을 값 위 캡션에 함께 표시한다 — 같은 이름의 숫자를 그대로 비교하면 틀리기 때문.
+목록 위에 \`Metric definitions vary by platform.\` 한 줄 + ⓘ를 두고, 전문은 그
+툴팁에 넣는다 — 설명 세 줄이 지표보다 먼저 읽히면 안 되지만, 같은 이름의 숫자를
+그대로 비교하면 틀리기 때문에 신호 자체는 남긴다.
         `,
       },
     },
   },
   argTypes: {
-    metrics: { control: 'object', description: '성과 레코드. 영상·소셜 10개 + (hasCoreMetrics면) 핵심 8개를 읽는다' },
+    metrics: { control: 'object', description: '성과 레코드. 영상·소셜 10개 + (hasCoreMetrics면) 핵심 10개를 읽는다' },
     title: { control: 'text', description: '목록 위 소제목(13px 600 문장형)' },
     hasCoreMetrics: { control: 'boolean', description: 'Spend·Impressions·Reach·CPM·Clicks·CTR·CPC·Engagements·Conversions·CPA를 앞에 붙인다 — 입력 폼이 없는 동기화 캠페인 드로어 전용' },
     sx: { control: 'object', description: '추가 스타일' },
   },
 };
 
-/** TikTok에서 실제로 수집되는 형태 — 8개 지표가 모두 있는 경우. */
+/**
+ * TikTok에서 실제로 수집되는 형태 — 영상·소셜 지표가 모두 있는 경우.
+ *
+ * `hasCoreMetrics`가 꺼져 있어 `VIDEO & SOCIAL` 그룹 하나만 나온다(핵심 지표는
+ * 입력 폼이 옆에 있는 자리라 중복이므로 안 붙인다). 세 그룹이 다 보이는 모습은
+ * 아래 `SyncedCampaign` 스토리에서 확인한다.
+ */
 export const Default = {
   args: {
     metrics: {

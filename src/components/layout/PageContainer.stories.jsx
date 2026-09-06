@@ -12,6 +12,25 @@ export default {
   parameters: {
     layout: 'fullscreen',
   },
+  argTypes: {
+    children: {
+      control: false,
+      description: '컨테이너 내부 콘텐츠',
+    },
+    maxWidth: {
+      control: 'select',
+      options: ['xs', 'sm', 'md', 'lg', 'xl', false],
+      description: 'MUI Container의 최대 너비 브레이크포인트. false면 너비를 제한하지 않는다',
+    },
+    disableGutters: {
+      control: 'boolean',
+      description: 'Container가 기본으로 주는 반응형 좌우 패딩을 끈다',
+    },
+    sx: {
+      control: 'object',
+      description: '추가 스타일. Container의 기본 동작 위에 병합된다',
+    },
+  },
 };
 
 /**
@@ -35,7 +54,7 @@ export const Default = {
       />
       
       <Box sx={ { py: 4 } }>
-        <SectionTitle>기본 사용법</SectionTitle>
+        <SectionTitle title="기본 사용법" />
         <PageContainer>
           <Placeholder.Box label="PageContainer (maxWidth=&quot;xl&quot;)" height={ 120 } />
           <Box sx={ { mt: 1 } }>
@@ -59,7 +78,7 @@ export const MaxWidthOptions = {
   name: 'maxWidth 옵션',
   render: () => (
     <Box sx={ { py: 4, bgcolor: 'grey.100' } }>
-      <SectionTitle>maxWidth 옵션 비교</SectionTitle>
+      <SectionTitle title="maxWidth 옵션 비교" />
       
       <Box sx={ { mb: 2 } }>
         <Typography variant="caption" sx={ { px: 2 } }>maxWidth="sm" (600px)</Typography>
@@ -99,7 +118,7 @@ export const Props = {
   name: 'Props',
   render: () => (
     <Box sx={ { py: 4 } }>
-      <SectionTitle>Props</SectionTitle>
+      <SectionTitle title="Props" />
       <PageContainer>
         <Paper sx={ { p: 3 } }>
           <Box component="table" sx={ { width: '100%', borderCollapse: 'collapse', '& td, & th': { p: 1.5, borderBottom: '1px solid', borderColor: 'divider', textAlign: 'left' } } }>

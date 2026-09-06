@@ -18,10 +18,10 @@ export default {
 PaidAdsShell(글로벌 셸)이 그리므로, 실제 화면과 동일하게 셸까지 포함해서
 렌더링한다.
 
-실제 앱에서는 usePaidAdsStore가 Supabase를 읽지만 스토리북에는 백엔드도
-로그인 세션도 없다 — PaidAdsStoreProvider로 mock 스토어를 주입하지 않으면
-RLS에 막혀 빈 배열이 돌아오고 표가 통째로 비어 보인다(에러가 아니라서
-빌드는 통과한다).
+실제 앱에서는 usePaidAdsStore가 Supabase를 읽는다. 읽기 자체는 로그인 없이도
+되지만(마이그레이션 19가 select를 anon에 열어 둠) 스토리북에는 백엔드 연결이
+없다 — PaidAdsStoreProvider로 mock 스토어를 주입하지 않으면 표가 통째로 비어
+보인다(에러가 아니라서 빌드는 통과한다).
         `,
       },
     },

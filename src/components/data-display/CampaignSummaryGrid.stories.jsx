@@ -11,7 +11,9 @@ export default {
         component: `
 ## CampaignSummaryGrid
 
-\`/reports\` 페이지 상단에 쓰이는 요약 스탯 카드 그리드.
+요약 스탯 카드 그리드. 예전엔 \`/reports\` 상단이 자리였지만, KPI 숫자를
+KpiBar 하나로 통일하면서 지금은 어느 화면에도 연결돼 있지 않다 — 지우지 않고
+재사용 후보로 보존한다.
 Influencer Tracking Dashboard의 StatCard 패턴을 도메인 특정 필드 대신
 범용 items 배열로 일반화했다.
 

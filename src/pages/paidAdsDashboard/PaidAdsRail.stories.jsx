@@ -34,12 +34,15 @@ export default {
 안 된다.
 
 ### 하단 유틸리티 블록 — 레퍼런스와 같은 구성
-\`Last synced {시각}\` → \`Refresh\` → \`Settings\` 순서(13-4 실측). 레퍼런스의
+\`Last synced {시각}\` → \`Refresh\` → \`Design: {테마}\` → \`Settings\` 순서.
+Design은 레퍼런스에 없는 이 프로젝트만의 행이라(디자인 시스템 Default ↔ Carbon
+전환) 동작(Refresh)과 링크(Settings)의 경계에 끼웠다. 레퍼런스의
 \`Open Google Sheet\`만 없다 — 그쪽은 데이터 원천이 시트 하나라 그 행이 있고,
 우리 원천은 Meta·TikTok 광고 관리자 둘이라 대응되는 단일 링크가 없다(캠페인
 단위 딥링크는 Drawer가 담당).
 
-Refresh는 Dashboard 헤더의 Sync now와 같은 동작(캠페인 → 성과 순서)이고, 끝나면
+Refresh는 캠페인 → 성과 순으로 동기화하고(뒤집으면 방금 들어온 캠페인의 성과를
+이번 회차에 놓친다), 끝나면
 \`paidads:refresh\` 이벤트로 현재 페이지의 스토어에 다시 읽기를 알린다 — 레일은
 어떤 페이지의 스토어에도 직접 접근할 수 없다. Last synced 행은 아이콘이 없어서
 접힘 상태에서는 **높이째** 접힌다(라벨만 숨기면 빈 슬롯이 남는다).

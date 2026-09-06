@@ -171,11 +171,38 @@ export const Docs = {
           </TableContainer>
 
           {/* 사용 예시 */}
+          <SectionTitle
+            title="운영 화면의 밀도"
+            description="이 대시보드가 기본 스케일 대신 역할 토큰과 sx px를 쓰는 이유"
+          />
+          <Box sx={ { mb: 4 } }>
+            <Typography variant="body2" sx={ { mb: 1 } }>
+              본문 스케일은 <strong>10 · 11 · 12 · 13 · 14px</strong>가 주력입니다. 표 한 화면에 스무 행,
+              드로어 한 화면에 지표 열여덟 줄이 들어와야 하는 화면이라 <code>body1</code>(16px)은 이 정보
+              밀도에 맞지 않습니다 — 밀도 높은 목록·표의 강조 텍스트는 <code>body1</code> 대신
+              <code>body2 + fontWeight</code> 또는 <code>sx</code>의 px를 씁니다.
+            </Typography>
+            <Typography variant="body2" sx={ { mb: 1 } }>
+              <code>h1~h6</code>은 <strong>크기 스케일</strong>이고, 화면이 실제로 필요로 한 건
+              <strong>역할</strong>이었습니다 — &ldquo;KPI 숫자 / 섹션 제목 / 그룹·컬럼 헤더&rdquo; 세 자리.
+              스케일에서 가장 가까운 걸 골라 쓰다 보니 섹션 제목(<code>subtitle1</code> 16/500)과 본문
+              (<code>body1</code> 16/400)이 크기가 같고 굵기만 100 차이라 제목으로 스캔되지 않았고,
+              구조를 나누는 그룹 헤더(<code>overline</code> 12px)가 화면에서 가장 작은 글씨라 위계가
+              역전됐습니다. 그래서 스케일은 그대로 두고 역할 칸을 새로 팠습니다 —
+              <code>display</code>(24/600) · <code>title</code>(18/600) · <code>label</code>(13/600 대문자).
+            </Typography>
+            <Typography variant="body2">
+              숫자는 자릿수가 바뀌어도 폭이 흔들리지 않게 <code>fontVariantNumeric: &apos;tabular-nums&apos;</code>를
+              함께 씁니다. 표 헤더는 12px/500 <code>text.secondary</code>로 값보다 한 단 물러납니다 —
+              헤더가 값과 같은 급이면 표 위쪽이 무거워집니다.
+            </Typography>
+          </Box>
+
           <SectionTitle title="사용 예시" description="MUI Typography 컴포넌트 활용" />
           <Box
             component="pre"
             sx={ {
-              backgroundColor: 'grey.100',
+              backgroundColor: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',
@@ -211,7 +238,7 @@ export const Docs = {
             component="pre"
             sx={ {
               backgroundColor: 'grey.900',
-              color: 'grey.100',
+              color: 'surface.muted',
               p: 2,
               fontSize: 12,
               fontFamily: 'monospace',

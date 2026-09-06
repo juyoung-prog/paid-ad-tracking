@@ -56,7 +56,7 @@ export default {
     },
     isFullHeight: {
       control: 'boolean',
-      description: '100vh 높이 적용',
+      description: '100svh 높이 적용',
     },
   },
 };
@@ -155,7 +155,7 @@ export const Documentation = {
                 <TableCell sx={ { fontFamily: 'monospace' } }>isFullHeight</TableCell>
                 <TableCell>boolean</TableCell>
                 <TableCell>false</TableCell>
-                <TableCell>100vh 높이 적용</TableCell>
+                <TableCell>100svh 높이 적용</TableCell>
               </TableRow>
             </TableBody>
           </Table>

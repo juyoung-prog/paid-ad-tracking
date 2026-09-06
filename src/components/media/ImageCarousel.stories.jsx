@@ -10,7 +10,7 @@ import TableRow from '@mui/material/TableRow';
 import Placeholder, { placeholderSvg } from '../../common/ui/Placeholder';
 import { DocumentTitle, PageContainer, SectionTitle } from '../storybookDocumentation';
 import { ImageCarousel } from './ImageCarousel';
-import { CarouselIndicator } from './CarouselIndicator';
+import { Indicator } from '../../common/ui/Indicator';
 
 export default {
   title: 'Component/4. Media/ImageCarousel',
@@ -111,7 +111,7 @@ export const Documentation = {
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={ { mb: 4 } }>
           스와이프 제스처, 키보드 네비게이션, 자동 재생을 지원하는 이미지 캐러셀입니다.
-          내장된 CarouselIndicator로 현재 위치를 표시합니다.
+          내장된 Indicator로 현재 위치를 표시합니다.
         </Typography>
 
         <SectionTitle title="Props" description="ImageCarousel 컴포넌트의 Props입니다." />
@@ -133,10 +133,22 @@ export const Documentation = {
                 <TableCell>이미지 배열</TableCell>
               </TableRow>
               <TableRow>
+                <TableCell sx={ { fontFamily: 'monospace' } }>aspectRatio</TableCell>
+                <TableCell>string</TableCell>
+                <TableCell>&apos;16/9&apos;</TableCell>
+                <TableCell>캐러셀 컨테이너의 종횡비 (CSS aspect-ratio 값)</TableCell>
+              </TableRow>
+              <TableRow>
                 <TableCell sx={ { fontFamily: 'monospace' } }>transition</TableCell>
                 <TableCell>&apos;slide&apos; | &apos;fade&apos;</TableCell>
                 <TableCell>&apos;slide&apos;</TableCell>
                 <TableCell>트랜지션 타입</TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell sx={ { fontFamily: 'monospace' } }>transitionDuration</TableCell>
+                <TableCell>number</TableCell>
+                <TableCell>300</TableCell>
+                <TableCell>슬라이드 전환에 걸리는 시간 (ms)</TableCell>
               </TableRow>
               <TableRow>
                 <TableCell sx={ { fontFamily: 'monospace' } }>isAutoPlay</TableCell>
@@ -281,23 +293,23 @@ export const Documentation = {
           </Box>
         </Stack>
 
-        <SectionTitle title="CarouselIndicator (Standalone)" description="인디케이터를 독립적으로 사용할 수 있습니다." />
+        <SectionTitle title="Indicator (Standalone)" description="캐러셀이 내부에서 쓰는 Indicator는 독립적으로도 사용할 수 있습니다." />
         <Stack spacing={ 3 } sx={ { p: 3, backgroundColor: 'grey.100' } }>
           <Box>
             <Typography variant="caption" sx={ { mb: 1, display: 'block' } }>Dot</Typography>
-            <CarouselIndicator total={ 5 } current={ 2 } type="dot" />
+            <Indicator total={ 5 } current={ 2 } variant="dot" activeColor="accent.main" inactiveColor="rgba(0,0,0,0.25)" />
           </Box>
           <Box>
             <Typography variant="caption" sx={ { mb: 1, display: 'block' } }>Line</Typography>
-            <CarouselIndicator total={ 5 } current={ 2 } type="line" />
+            <Indicator total={ 5 } current={ 2 } variant="line" activeColor="accent.main" inactiveColor="rgba(0,0,0,0.25)" />
           </Box>
           <Box>
             <Typography variant="caption" sx={ { mb: 1, display: 'block' } }>Fraction</Typography>
-            <CarouselIndicator total={ 5 } current={ 2 } type="fraction" />
+            <Indicator total={ 5 } current={ 2 } variant="fraction" activeColor="accent.main" inactiveColor="rgba(0,0,0,0.25)" />
           </Box>
           <Box>
             <Typography variant="caption" sx={ { mb: 1, display: 'block' } }>Progress</Typography>
-            <CarouselIndicator total={ 5 } current={ 2 } type="progress" />
+            <Indicator total={ 5 } current={ 2 } variant="progress" activeColor="accent.main" inactiveColor="rgba(0,0,0,0.25)" />
           </Box>
         </Stack>
 
@@ -341,11 +353,11 @@ export const Documentation = {
   indicatorType="progress"
 />
 
-// 인디케이터만 사용
-<CarouselIndicator
+// 인디케이터만 사용 (캐러셀 내부와 같은 컴포넌트)
+<Indicator
   total={5}
   current={currentIndex}
-  type="line"
+  variant="line"
   onClick={(index) => setCurrentIndex(index)}
 />` }
         </Box>

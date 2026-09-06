@@ -26,7 +26,7 @@ export default {
 ### 용도
 - 인용문을 시각적으로 강조
 - Editorial 스타일의 큰 인용 부호 장식
-- 다양한 인용 부호 스타일 지원
+- 인용 부호는 format_quote 아이콘 하나로 고정, 크기(quoteSize)와 색상(quoteColor)만 조절
         `,
       },
     },

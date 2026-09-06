@@ -26,7 +26,9 @@ mockCampaigns에는 \`campaignGroup\` 필드가 아예 없어서, 모든 mock �
 Event 태그 없이 도착하고, 태그를 안 붙이면 이벤트 요약·계획 대비에서 통째로 빠진다.
 
 \`Tag them\`을 누르면 BulkEventTagDialog가 열린다. mock 스토어의
-\`bulkSetCampaignGroup\`은 noop이라 실제로 저장되지는 않으므로, 대화상자 자체의
+\`bulkSetCampaignGroup\`은 상태를 바꾸지 않지만 마지막 인자를 그대로 돌려주는
+스텁이라(실패로 보이지 않게 하려는 의도), 적용하면 성공 스낵바가 뜬다 — 태그된
+개수 자리에 이벤트 이름이 들어가고 목록의 태그도 그대로다. 대화상자 자체의
 동작은 그 컴포넌트의 스토리에서 확인한다.
         `,
       },

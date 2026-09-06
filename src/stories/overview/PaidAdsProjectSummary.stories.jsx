@@ -109,7 +109,7 @@ export const Doc = {
                       size="small"
                       variant="outlined"
                       color={f.priority === '필수' ? 'primary' : 'default'}
-                      sx={{ borderRadius: '4px' }}
+                      sx={{ borderRadius: (t) => `${t.shape.radius.control}px` }}
                     />
                   </TableCell>
                 </TableRow>

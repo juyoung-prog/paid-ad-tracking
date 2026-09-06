@@ -25,6 +25,36 @@ export default {
   parameters: {
     layout: 'fullscreen',
   },
+  argTypes: {
+    logo: { control: false, description: 'GNB 왼쪽 로고 영역 (항상 표시)' },
+    headerPersistent: {
+      control: false,
+      description: '브레이크포인트와 무관하게 헤더에 계속 남는 요소',
+    },
+    headerCollapsible: {
+      control: false,
+      description: '브레이크포인트 아래에서 드로어로 옮겨지는 요소 (네비게이션 메뉴 등)',
+    },
+    drawerHeader: { control: false, description: '드로어 상단 커스텀 요소' },
+    drawerFooter: { control: false, description: '드로어 하단 커스텀 요소' },
+    children: { control: false, description: 'main 태그로 감싸지는 메인 콘텐츠 영역' },
+    breakpoint: {
+      control: 'select',
+      options: ['sm', 'md', 'lg'],
+      description: '헤더 메뉴가 드로어로 바뀌는 전환 브레이크포인트',
+    },
+    headerHeight: {
+      control: { type: 'number', min: 40, max: 120, step: 4 },
+      description: '헤더 높이 (px)',
+    },
+    drawerWidth: {
+      control: { type: 'number', min: 200, max: 400, step: 10 },
+      description: '드로어 너비 (px)',
+    },
+    hasHeaderBorder: { control: 'boolean', description: '헤더 하단 보더 표시 여부' },
+    isHeaderSticky: { control: 'boolean', description: '스크롤해도 헤더를 상단에 고정' },
+    isHeaderTransparent: { control: 'boolean', description: '헤더 배경을 투명하게' },
+  },
 };
 
 /**

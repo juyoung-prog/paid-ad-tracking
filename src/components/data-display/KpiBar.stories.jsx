@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import { KpiBar } from './KpiBar';
-import { getEffectiveStatus } from '../../data/schema';
+import { getEffectiveStatus, hasAnyMetricValue } from '../../data/schema';
 import { mockCampaigns, mockPerformanceRecords } from '../../data/paidAdsMockData';
 
 export default {
@@ -27,7 +27,7 @@ KPI 숫자 요약 바. label/value 배열을 받는 범용 컴포넌트로, Dash
 - delta로 비교 기준 한 줄 추가 가능 — 아래 "왜 delta인가" 참고
 
 ### 스타일은 레퍼런스 실측값이다
-라벨 12px/400 문장형, 값 \`display\`(24px/700), 모든 항목 사이 세로 구분선.
+라벨 12px/400 문장형, 값 \`display\`(24px/600), 모든 항목 사이 세로 구분선.
 전부 influencer tracking dashboard의 실측값이다. 한때 라벨을 13/600 대문자로,
 값을 28px로 올렸다가 되돌렸다 — 일반 위계 원칙으로는 나아 보여도 이 프로젝트의
 1순위 규칙("같은 회사 툴군처럼 보이기")을 어긴다. 두 도구를 오가는 사람에게는
@@ -48,7 +48,11 @@ PerformanceRecord). 없는 비교를 지어내지 않고, 실제로 도출되는
     },
   },
   argTypes: {
-    items: { control: 'object', description: '{ label, value, sub?, delta?, isAlert? } 배열' },
+    items: {
+      control: 'object',
+      description:
+        '{ label, value, sub?, delta?, isAlert?, onClick? } 배열. onClick을 넘긴 항목만 클릭 가능해진다 — role="button" · tabIndex=0이 붙고 Enter/Space 키로도 실행되며 hover·focus 표시가 생긴다. 필터·드릴다운으로 이어지는 항목에만 붙이고 나머지는 표시용으로 남긴다',
+    },
   },
 };
 
@@ -139,11 +143,15 @@ export const WithMockData = {
   render: () => {
     const today = new Date('2026-07-20');
     const statuses = mockCampaigns.map((c) => getEffectiveStatus(c, today));
+    /* 미보고 판정은 "레코드가 있나"가 아니라 "값이 하나라도 있나"다 —
+       reportedAt(보고 완료 일자) 필드는 삭제됐다. 빈 폼을 저장하는 것만으로
+       알림이 사라지면 안 되기 때문에 schema.hasAnyMetricValue를 쓴다
+       (schema.generateAlerts의 missing_performance와 같은 기준). */
     const missingReportCount = mockCampaigns.filter((c) => {
       const status = getEffectiveStatus(c, today);
       if (status !== 'ended') return false;
-      const hasReport = mockPerformanceRecords.some((p) => p.campaignId === c.id && p.reportedAt);
-      return !hasReport;
+      const record = mockPerformanceRecords.find((p) => p.campaignId === c.id);
+      return !(record && hasAnyMetricValue(record));
     }).length;
 
     return (

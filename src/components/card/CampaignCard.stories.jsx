@@ -49,6 +49,10 @@ export default {
       description: 'effectiveStatus 계산값',
     },
     alertBadge: { control: 'object', description: '{ text, severity } 형태의 고긴급 알림 뱃지' },
+    overlapNote: {
+      control: 'text',
+      description: '저긴급 중복 타겟팅 문구. 값이 있을 때만 "Overlapping Target" 칩이 노출되고, 전달한 문구는 칩의 Tooltip으로 보인다',
+    },
     onClick: { action: 'clicked' },
   },
 };

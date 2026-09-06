@@ -40,6 +40,31 @@ export default {
       },
     },
   },
+  argTypes: {
+    error: {
+      control: 'object',
+      description: 'describeBackendError()의 결과 { message, recovery, detail }. null이면 아무것도 그리지 않는다',
+    },
+    onRetry: {
+      action: 'retried',
+      description: '재시도 핸들러. recovery가 \'retry\'일 때만 Retry 버튼이 나온다',
+    },
+    onSignIn: {
+      action: 'signedIn',
+      description: '다시 로그인 핸들러. recovery가 \'sign_in\'일 때만 Sign in 버튼이 나온다',
+    },
+  },
+};
+
+/**
+ * 네트워크 실패 — 다시 시도하면 될 수 있으므로 **Retry**가 나온다.
+ */
+export const NetworkFailure = {
+  args: {
+    error: describeBackendError({ message: 'TypeError: fetch failed' }),
+    onRetry: () => {},
+    onSignIn: () => {},
+  },
 };
 
 /**
@@ -55,17 +80,6 @@ export const PermissionDenied = {
     }),
     onSignIn: () => {},
     onRetry: () => {},
-  },
-};
-
-/**
- * 네트워크 실패 — 다시 시도하면 될 수 있으므로 **Retry**가 나온다.
- */
-export const NetworkFailure = {
-  args: {
-    error: describeBackendError({ message: 'TypeError: fetch failed' }),
-    onRetry: () => {},
-    onSignIn: () => {},
   },
 };
 

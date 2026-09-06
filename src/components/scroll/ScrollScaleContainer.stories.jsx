@@ -19,6 +19,10 @@ export default {
       control: 'text',
       description: '스케일 기준점',
     },
+    offset: {
+      control: 'object',
+      description: 'Framer Motion useScroll offset 배열. 스크롤 진행도 0→1의 시작·끝 지점을 정한다 (기본값: [\'start end\', \'center center\'])',
+    },
   },
   parameters: {
     layout: 'fullscreen',

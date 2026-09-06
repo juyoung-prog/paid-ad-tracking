@@ -17,7 +17,6 @@ export const Default = {
         title="Neon City Vibes"
         tags={ ['Neon', 'City', 'Night'] }
         onLike={ () => console.log('Liked!') }
-        onAddToBoard={ () => console.log('Added to board!') }
       />
     </Box>
   ),

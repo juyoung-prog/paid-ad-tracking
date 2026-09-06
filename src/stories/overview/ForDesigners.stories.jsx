@@ -303,7 +303,7 @@ function DocContent() {
         <Box
           component="pre"
           sx={ {
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             p: 2,
             fontSize: 12,
             fontFamily: 'monospace',

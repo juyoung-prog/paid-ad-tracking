@@ -67,6 +67,7 @@ const EDGE_GRADIENT = {
  * @param {string} label - 스크롤 영역의 접근성 이름. 주면 role="region" + 키보드 포커스가 붙는다(WCAG 2.1.1: 스크롤 영역은 키보드로도 조작 가능해야 함) [Optional]
  * @param {number} startOffset - 좌측 그림자를 그릴 x 위치(px). 고정 열 폭 등 [Optional, 기본값: 0]
  * @param {number|string} maxHeight - 세로 최대 높이. 주면 세로 스크롤도 이 영역이 받는다 [Optional]
+ * @param {'fade'|'scrollbar'} scrollHint - 세로 스크롤이 남았다는 신호를 무엇으로 줄지. 'fade'(기본)는 아래 그라데이션, 'scrollbar'는 항상 보이는 얇은 스크롤바 — 표의 마지막 행 위에 페이드가 깔려 그 행이 선택된 것처럼 읽히는 자리(CampaignDetailPanel의 Daily spend)에서 쓴다. 좌우 페이드는 두 모드 모두 그대로다 [Optional, 기본값: 'fade']
  * @param {object} sx - 추가 스타일 오버라이드 [Optional]
  *
  * Example usage:

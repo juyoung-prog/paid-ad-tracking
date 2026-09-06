@@ -132,6 +132,31 @@ export default {
   parameters: {
     layout: 'fullscreen',
   },
+  argTypes: {
+    items: {
+      control: 'object',
+      description: '메뉴 아이템 배열 [{ id, label, icon, href, disabled }]',
+    },
+    activeId: { control: 'text', description: '현재 활성 아이템의 id' },
+    orientation: {
+      control: 'radio',
+      options: ['horizontal', 'vertical'],
+      description: '배치 방향',
+    },
+    variant: {
+      control: 'select',
+      options: ['default', 'pills', 'underline'],
+      description: '활성 아이템 표시 방식',
+    },
+    size: {
+      control: 'select',
+      options: ['sm', 'md', 'lg'],
+      description: '크기 (여백·글자 크기·아이콘 크기가 함께 바뀐다)',
+    },
+    isIconOnly: { control: 'boolean', description: '라벨 없이 아이콘만 표시' },
+    hasIconStart: { control: 'boolean', description: '아이콘을 텍스트 앞에 배치' },
+    onItemClick: { action: 'itemClicked', description: '아이템 클릭 핸들러 (item) => void' },
+  },
 };
 
 /**

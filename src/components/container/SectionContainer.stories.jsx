@@ -13,6 +13,20 @@ export default {
   parameters: {
     layout: 'fullscreen',
   },
+  argTypes: {
+    children: {
+      control: false,
+      description: '섹션 내부 콘텐츠',
+    },
+    maxWidth: {
+      control: 'text',
+      description: '나머지 props와 함께 Box로 전달되는 MUI system prop — 섹션 자체의 최대 너비를 제한한다',
+    },
+    sx: {
+      control: 'object',
+      description: '추가 스타일. 기본 상하 여백(py: xs 4 / md 6)과 width: 100% 뒤에 병합되므로 덮어쓸 수 있다',
+    },
+  },
 };
 
 /**
@@ -36,7 +50,7 @@ export const Default = {
       />
 
       <Box sx={{ py: 4 }}>
-        <SectionTitle>기본 사용법</SectionTitle>
+        <SectionTitle title="기본 사용법" />
         <SectionContainer sx={{ bgcolor: 'grey.50', border: '2px dashed', borderColor: 'secondary.main' }}>
           <PageContainer>
             <Typography variant="h6" gutterBottom color="secondary">
@@ -61,7 +75,7 @@ export const Default = {
 export const StackingSections = {
   render: () => (
     <Box sx={{ py: 4 }}>
-      <SectionTitle>여러 섹션 쌓기</SectionTitle>
+      <SectionTitle title="여러 섹션 쌓기" />
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, mb: 2 }}>
         SectionContainer를 연속으로 배치하면 자연스러운 섹션 구분이 가능합니다.
       </Typography>
@@ -98,7 +112,7 @@ export const StackingSections = {
 export const ResponsiveSpacing = {
   render: () => (
     <Box sx={{ py: 4, bgcolor: 'grey.50' }}>
-      <SectionTitle>기본 여백 (py)</SectionTitle>
+      <SectionTitle title="기본 여백 (py)" />
       <PageContainer>
         <Paper sx={{ p: 3 }}>
           <Typography variant="body2" paragraph>
@@ -128,7 +142,7 @@ export const ResponsiveSpacing = {
 export const Props = {
   render: () => (
     <Box sx={{ py: 4 }}>
-      <SectionTitle>Props</SectionTitle>
+      <SectionTitle title="Props" />
       <PageContainer>
         <Paper sx={{ p: 3 }}>
           <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse', '& td, & th': { p: 1.5, borderBottom: '1px solid', borderColor: 'divider', textAlign: 'left' } }}>
@@ -169,7 +183,7 @@ export const Props = {
 export const CombinedUsage = {
   render: () => (
     <Box>
-      <SectionTitle>조합 사용 예시</SectionTitle>
+      <SectionTitle title="조합 사용 예시" />
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, mb: 2 }}>
         SectionContainer가 전체 너비 배경을, PageContainer가 콘텐츠 너비 제한을 담당합니다.
       </Typography>

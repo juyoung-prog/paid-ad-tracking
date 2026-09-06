@@ -24,7 +24,7 @@ Influencer Tracking Dashboard의 SyncStatusBar(실시간 자동 동기화)와 �
     },
   },
   argTypes: {
-    lastUpdatedAt: { control: 'text', description: 'ISO 8601 datetime, 없으면 "기록 없음" 표시' },
+    lastUpdatedAt: { control: 'text', description: 'ISO 8601 datetime, 없으면 "No data" 표시' },
     label: { control: 'text', description: '라벨 텍스트' },
   },
 };

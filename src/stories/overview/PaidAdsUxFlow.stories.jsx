@@ -51,23 +51,23 @@ const scenarios = [
       '대시보드 상단 Alert 배너 또는 헤더 알림 아이콘에서 경고 수 확인',
       '배너 클릭 → 해당 유형의 캠페인만 필터링된 리스트로 이동',
       '캠페인 카드 클릭 → Drawer에서 원인 확인',
-      '조치 수행: 성과 입력 폼으로 이동하거나, 타겟 매장을 조정',
+      '조치 수행: 예산·기간을 조정하거나, 타겟 매장을 조정',
     ],
     success: '알림을 통해 사용자가 먼저 찾아보지 않아도 놓친 항목을 인지',
     exception: '조치 완료 시 알림 자동 해제, 조치 없이 하루 경과 시 알림 유지',
   },
   {
-    name: '시나리오 4: 성과 입력 및 보고서 생성',
-    goal: '광고 종료 후 핵심 지표만 빠르게 입력하고, 보고 시점에 재탐색 없이 바로 내보내기',
+    name: '시나리오 4: 성과 확인 및 보고서 생성',
+    goal: '광고 종료 후 지표를 확인하고, 보고 시점에 재탐색 없이 바로 내보내기',
     flow: [
-      '캠페인 카드(종료 상태) 클릭 → Drawer 오픈',
-      '"성과 입력" 탭에서 goal에 따라 자동으로 필요한 지표 필드만 노출',
-      '저장 시 해당 캠페인의 미보고 알림 자동 해제',
-      '/reports로 이동 → 기간/매장/플랫폼 기준으로 캠페인들을 선택',
-      '요약 통계 확인 후 CSV/이미지로 내보내기',
+      '캠페인 행(종료 상태) 클릭 → Drawer 오픈',
+      '동기화 캠페인은 지표가 이미 들어와 있다 — 읽기 전용 목록으로 확인한다(입력 폼 없음)',
+      '직접 등록한 캠페인(외부 ID 없음)만 goal에 맞는 지표 입력 폼이 뜬다',
+      '/reports로 이동 → 기간/이벤트/플랫폼 기준으로 캠페인들을 선택',
+      '요약 통계 확인 후 CSV로 내보내기',
     ],
-    success: '메타/틱톡을 오가며 전체 데이터를 재다운로드하지 않고, 사전에 정의된 핵심 지표만 기록/보고',
-    exception: '성과 미입력 상태로 종료일이 지나면 시나리오 3의 알림 트리거',
+    success: '메타/틱톡을 오가며 전체 데이터를 재다운로드하지 않고, 동기화된 지표를 한 화면에서 비교/보고',
+    exception: '직접 등록 캠페인이 성과 없이 종료일을 지나면 시나리오 3의 알림 트리거(동기화 캠페인은 제외 — 비어 있으면 사람이 아니라 동기화의 문제다)',
   },
   {
     name: '시나리오 5: 매장 마스터 관리',
@@ -119,11 +119,12 @@ const dbSteps = [
     ],
   },
   {
-    scenario: '시나리오 4. 성과 입력 및 보고서 생성',
+    scenario: '시나리오 4. 성과 확인 및 보고서 생성',
     steps: [
-      "Drawer \"성과 입력\" 탭 저장 → performance_records insert (source='manual')",
-      '/reports 이동 → 필터 → campaigns/performance_records read',
-      '내보내기(CSV/이미지) → DB 동작 없음(클라이언트 사이드)',
+      "sync-performance(cron) → performance_records upsert (source='api')",
+      "직접 등록 캠페인만: Drawer 성과 폼 저장 → performance_records insert (source='manual')",
+      '/reports 이동 → 필터 → campaigns/performance_records/performance_daily read',
+      '내보내기(CSV) → DB 동작 없음(클라이언트 사이드)',
     ],
   },
   {
@@ -157,10 +158,10 @@ const mermaidFlow = `flowchart TD
     F --> F1[해당 유형 필터링]
     F1 --> F2[Drawer에서 원인 확인]
     F2 --> F3{조치}
-    F3 -->|성과 입력 필요| G
+    F3 -->|직접 등록 캠페인만 성과 입력| G
     F3 -->|타겟 조정| E1
 
-    D2 --> G[성과 입력 탭]
+    D2 --> G[성과 섹션]
     G --> G1[핵심 지표 입력·저장]
     G1 --> H[/reports 이동]
     H --> H1[기간/매장/플랫폼 선택]
@@ -181,7 +182,7 @@ const iaTree = `Paid Ads Dashboard
 │   ├── 상태 탭 — 진행중 / 예정 / 종료
 │   ├── StoreBreakdown — 매장별 캠페인 목록 (예산 분배 없음)
 │   └── 캠페인 카드 그리드
-│       └── 카드 클릭 → 상세 Drawer (개요 / 성과 입력 탭)
+│       └── 행 클릭 → 상세 Drawer (탭 없이 한 패널: 캠페인 정보 → 성과)
 ├── /dashboard?new=1 — 캠페인 등록 폼 (Dialog, 딥링크 가능)
 ├── /stores — 매장 마스터 관리
 │   └── 매장 리스트 + 추가/수정 폼
@@ -296,7 +297,7 @@ export const Doc = {
         <Box
           component="pre"
           sx={{
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             p: 2,
             mb: 4,
             fontSize: 12,
@@ -312,7 +313,7 @@ export const Doc = {
         <Box
           component="pre"
           sx={{
-            backgroundColor: 'grey.100',
+            backgroundColor: 'surface.muted',
             p: 2,
             mb: 1,
             fontSize: 12,
@@ -435,7 +436,7 @@ const entities = [
       { field: 'heldViews', type: 'number | null', format: 'Tier 2 · 영상 지표', desc: '완전시청수', example: '9800' },
       { field: 'engagements', type: 'number | null', format: 'Tier 3 · goal=engagement일 때만', desc: '좋아요+댓글+공유+저장 합계', example: '3200' },
       { field: 'conversions', type: 'number | null', format: 'Tier 4 · goal=conversion/store_visit일 때만', desc: 'Results/Conversions', example: '62' },
-      { field: 'recordedAt / reportedAt', type: 'string | null', format: 'ISO 8601 date', desc: '입력 시점 / 보고 완료 일자 (null이면 미보고)', example: '"2026-09-02"' },
+      { field: 'recordedAt', type: 'string | null', format: 'ISO 8601 date', desc: '입력 시점. reportedAt(보고 완료 일자)은 삭제됐다 — "공식 보고가 됐나"라는 개념이 필요 없었고, 미보고 판정은 지금 "값이 하나라도 있나"로 한다', example: '"2026-09-02"' },
       { field: 'resultUrl', type: 'string | null', format: 'URL', desc: '리포트/스크린샷 링크', example: '"https://drive.google.com/..."' },
       { field: 'source', type: "enum ('manual' | 'api')", format: 'API 연동 필드', desc: '수동 입력 vs API 자동 수집 구분. API 값이 있으면 기본, 사용자 override 가능', example: '"manual"' },
     ],
@@ -593,7 +594,7 @@ export const ComponentList = {
                 <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{c.name}</TableCell>
                 <TableCell sx={{ fontSize: 13 }}>{c.usage}</TableCell>
                 <TableCell>
-                  <Chip label={c.type} size="small" color={typeColor(c.type)} variant="outlined" sx={{ borderRadius: '4px' }} />
+                  <Chip label={c.type} size="small" color={typeColor(c.type)} variant="outlined" sx={{ borderRadius: (t) => `${t.shape.radius.control}px` }} />
                 </TableCell>
                 <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{c.note}</TableCell>
               </TableRow>

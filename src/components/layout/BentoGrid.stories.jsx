@@ -290,7 +290,7 @@ export const Documentation = {
 </BentoGrid>
 
 // 프리셋 사용
-import { BENTO_PRESETS } from './BentoGrid';
+import { BENTO_PRESETS } from './bentoPresets';
 
 <BentoGrid columns={3}>
   {items.map((item, i) => (

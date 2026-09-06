@@ -22,15 +22,23 @@ export default {
 LocalizedDateField와 같은 이유로 새 날짜 피커 라이브러리 없이 직접 만들었다
 — 이 프로젝트의 "영어 전용 MM/DD/YYYY" 표시 요구사항을 로케일 의존 없이
 지키기 위함.
+
+값이 있을 때는 캘린더 아이콘 왼쪽에 × 지우기 버튼(aria-label "Clear dates")이
+나타나, 한 번의 클릭으로 시작일·종료일을 모두 빈 상태로 되돌린다. 아래 Default
+스토리처럼 범위가 이미 선택된 상태에서 확인할 수 있다.
         `,
       },
     },
   },
   argTypes: {
     value: { control: 'object', description: '{ start, end } ISO 8601 date, 미선택이면 빈 문자열' },
-    error: { control: 'boolean' },
-    helperText: { control: 'text' },
-    onChange: { action: 'changed' },
+    label: {
+      control: 'text',
+      description: '접근성용 라벨. 내부 입력에 aria-label로 직접 연결된다 — 호출부가 위에 시각적 캡션만 얹는 경우가 많아 넘기지 않으면 스크린리더가 읽을 이름이 없다',
+    },
+    error: { control: 'boolean', description: '에러 상태' },
+    helperText: { control: 'text', description: '에러/도움말 텍스트' },
+    onChange: { action: 'changed', description: '범위 변경 핸들러 ({ start, end }) => void' },
   },
 };
 
@@ -51,6 +59,7 @@ export const Default = {
     );
   },
   args: {
+    label: 'Campaign Dates',
     value: { start: '2026-08-01', end: '2026-08-31' },
   },
 };
@@ -64,10 +73,14 @@ export const Empty = {
       </Box>
     );
   },
+  args: {
+    label: 'Campaign Dates',
+  },
 };
 
 export const WithError = {
   args: {
+    label: 'Campaign Dates',
     value: { start: '2026-08-31', end: '2026-08-01' },
     error: true,
     helperText: 'End date must be after start date.',

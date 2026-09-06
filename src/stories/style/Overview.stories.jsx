@@ -112,8 +112,20 @@ export const Default = {
           <Typography variant="h4" sx={ { fontWeight: 700, mb: 1 } }>
             Theme Structure
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={ { mb: 3 } }>
+          <Typography variant="body2" color="text.secondary" sx={ { mb: 1 } }>
             클릭하여 펼치기/접기 | <code>src/styles/themes/default.js</code>
+          </Typography>
+          {/* 이 문서의 값은 **지금 선택된 테마**에서 읽는다 — 툴바의 Design 스위치로
+              바꾸면 아래 트리와 표가 통째로 그 테마 값으로 바뀐다. 두 테마가 있다는
+              사실을 여기서 말하지 않으면, 다른 문서의 단정문("전역 radius는 0이고
+              역할 단위로만 예외를 둔다")이 한쪽 테마에서만 참인 줄 모르게 된다. */}
+          <Typography variant="body2" color="text.secondary" sx={ { mb: 3 } }>
+            디자인 시스템은 <strong>두 벌</strong>입니다 — <code>default.js</code>(프로젝트 기본)와{ ' ' }
+            <code>carbon.js</code>(IBM Carbon White). 상단 툴바의 <strong>Design</strong> 스위치(앱에서는 좌측
+            레일의 Design 버튼)로 오가고, 이 페이지의 값은 지금 선택된 쪽에서 읽습니다. 컴포넌트는 값을
+            모르고 토큰만 읽으므로 같은 화면이 두 시스템에서 다 성립해야 합니다 — 예를 들어 radius 역할
+            토큰은 기본 테마에서 6/8/3px이고 Carbon에서는 셋 다 0입니다(Carbon은 radius를 쓰지 않습니다).
+            새 토큰은 <strong>모든 테마에 같은 키로</strong> 추가해야 합니다.
           </Typography>
 
           <Box sx={ { p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 } }>
@@ -166,8 +178,17 @@ export const TableView = {
           { key: 'text.secondary', value: theme.palette.text.secondary },
           { key: 'background.default', value: theme.palette.background.default },
           { key: 'background.paper', value: theme.palette.background.paper },
+          { key: 'text.disabled', value: theme.palette.text.disabled },
           { key: 'accent.main', value: theme.palette.accent.main },
+          { key: 'accent.dark', value: theme.palette.accent.dark },
           { key: 'accent.tint', value: theme.palette.accent.tint },
+          { key: 'accent.tintHover', value: theme.palette.accent.tintHover },
+          { key: 'accent.ring', value: theme.palette.accent.ring },
+          { key: 'chart.bar', value: theme.palette.chart.bar },
+          { key: 'chart.barEmphasis', value: theme.palette.chart.barEmphasis },
+          { key: 'chart.grid', value: theme.palette.chart.grid },
+          { key: 'chart.gridStrong', value: theme.palette.chart.gridStrong },
+          { key: 'surface.default', value: theme.palette.surface.default },
           { key: 'surface.sunken', value: theme.palette.surface.sunken },
           { key: 'surface.muted', value: theme.palette.surface.muted },
           { key: 'divider', value: theme.palette.divider },
@@ -213,6 +234,21 @@ export const TableView = {
           { key: 'radius.container', value: `${theme.shape.radius.container}px` },
           { key: 'radius.inlay', value: `${theme.shape.radius.inlay}px` },
         ],
+      },
+      {
+        title: 'customShadows',
+        description: '그림자 — 떠 있는 것(메뉴·팝오버·드로어)에만 쓴다. 면의 위계는 1px divider와 여백이 만든다',
+        data: Object.entries(theme.customShadows).map(([key, value]) => ({ key, value })),
+      },
+      {
+        title: 'layout.content',
+        description: '콘텐츠 컨테이너 폭 — 화면마다 maxWidth를 직접 박지 않는다',
+        data: Object.entries(theme.layout.content).map(([key, value]) => ({ key, value })),
+      },
+      {
+        title: 'iconSize',
+        description: '아이콘 크기 세 단계 — 12·13·14·16·18px가 섞여 있던 것을 역할로 모았다',
+        data: Object.entries(theme.iconSize).map(([key, value]) => ({ key, value })),
       },
       {
         title: 'breakpoints',
@@ -291,7 +327,7 @@ export const TableView = {
                           '&:hover': { backgroundColor: 'action.hover' },
                         } }
                       >
-                        <Box component="td" sx={ { p: 1.5, color: 'primary.main' } }>
+                        <Box component="td" sx={ { p: 1.5, color: 'accent.main' } }>
                           { row.key }
                         </Box>
                         <Box component="td" sx={ { p: 1.5, display: 'flex', alignItems: 'center', gap: 1 } }>
@@ -303,7 +339,7 @@ export const TableView = {
                                 backgroundColor: row.value,
                                 border: '1px solid',
                                 borderColor: 'divider',
-                                borderRadius: '2px',
+                                borderRadius: (t) => `${t.shape.radius.inlay}px`,
                               } }
                             />
                           ) }

@@ -25,6 +25,31 @@ export default {
       },
     },
   },
+  argTypes: {
+    variant: {
+      control: 'select',
+      options: ['default', 'compact', 'minimal'],
+      description: '스타일 변형',
+    },
+    accept: {
+      control: 'text',
+      description: '허용 파일 형식 (input의 accept 속성)',
+    },
+    maxSize: {
+      control: { type: 'number' },
+      description: '최대 파일 크기(bytes). 초과하면 파일을 넘기지 않고 에러 메시지를 띄운다',
+    },
+    selectedFile: { control: false, description: '현재 선택된 File 객체 (이름·크기 표시에 사용)' },
+    previewUrl: { control: 'text', description: '선택된 파일의 미리보기 이미지 URL' },
+    isUploading: { control: 'boolean', description: '업로드 중 상태 (진행률 바 표시)' },
+    uploadProgress: {
+      control: { type: 'range', min: 0, max: 100, step: 1 },
+      description: '업로드 진행률 (0-100)',
+    },
+    isComplete: { control: 'boolean', description: '업로드 완료 상태 (완료 아이콘 표시)' },
+    onFileSelect: { action: 'fileSelected', description: '파일 선택 핸들러 (file) => void' },
+    onFileRemove: { action: 'fileRemoved', description: '파일 제거 핸들러' },
+  },
 };
 
 /**

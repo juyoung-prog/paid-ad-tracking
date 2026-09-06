@@ -122,7 +122,7 @@ export const Doc = {
               {tiers.map((t) => (
                 <TableRow key={t.tier}>
                   <TableCell>
-                    <Chip label={`Tier ${t.tier}`} size="small" variant="outlined" color="primary" sx={{ borderRadius: '4px' }} />
+                    <Chip label={`Tier ${t.tier}`} size="small" variant="outlined" color="primary" sx={{ borderRadius: (t) => `${t.shape.radius.control}px` }} />
                   </TableCell>
                   <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{t.components}</TableCell>
                   <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{t.category}</TableCell>

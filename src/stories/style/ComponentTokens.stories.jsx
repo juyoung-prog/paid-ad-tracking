@@ -9,7 +9,7 @@ import TableRow from '@mui/material/TableRow';
 import Divider from '@mui/material/Divider';
 import { DocumentTitle, PageContainer, SectionTitle } from '../../components/storybookDocumentation';
 
-import { componentTokenMap, tokenCategories, componentList } from '../../data/componentTokenMap';
+import { componentTokenMap, tokenCategories, componentList, themeOverrides } from '../../data/componentTokenMap';
 
 export default {
   title: 'Style/Component Tokens',
@@ -129,7 +129,7 @@ export const Default = {
                               minWidth: 24,
                               py: 0.25,
                               px: 0.75,
-                              backgroundColor: count >= 5 ? 'primary.main' : count >= 3 ? 'grey.300' : 'grey.100',
+                              backgroundColor: count >= 5 ? 'chart.barEmphasis' : count >= 3 ? 'chart.bar' : 'surface.muted',
                               color: count >= 5 ? 'white' : 'text.primary',
                               fontSize: 12,
                               fontWeight: 600,
@@ -151,18 +151,44 @@ export const Default = {
 
           <Box sx={ { display: 'flex', gap: 3, mb: 6 } }>
             <Box sx={ { display: 'flex', alignItems: 'center', gap: 1 } }>
-              <Box sx={ { width: 24, height: 20, backgroundColor: 'primary.main' } } />
+              <Box sx={ { width: 24, height: 20, backgroundColor: 'chart.barEmphasis' } } />
               <Typography variant="caption">5+ (많이 사용)</Typography>
             </Box>
             <Box sx={ { display: 'flex', alignItems: 'center', gap: 1 } }>
-              <Box sx={ { width: 24, height: 20, backgroundColor: 'grey.300' } } />
+              <Box sx={ { width: 24, height: 20, backgroundColor: 'chart.bar' } } />
               <Typography variant="caption">3-4 (보통)</Typography>
             </Box>
             <Box sx={ { display: 'flex', alignItems: 'center', gap: 1 } }>
-              <Box sx={ { width: 24, height: 20, backgroundColor: 'grey.100' } } />
+              <Box sx={ { width: 24, height: 20, backgroundColor: 'surface.muted' } } />
               <Typography variant="caption">1-2 (적게 사용)</Typography>
             </Box>
           </Box>
+
+          <SectionTitle
+            title="Theme Overrides"
+            description="테마가 MUI 기본값에서 실제로 바꾼 것 — 화면이 예상과 다르면 여기부터 본다"
+          />
+
+          <TableContainer sx={ { mb: 6 } }>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={ { fontWeight: 600, width: 220 } }>Component</TableCell>
+                  <TableCell sx={ { fontWeight: 600 } }>무엇을 바꿨나</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                { themeOverrides.map((row) => (
+                  <TableRow key={ row.component }>
+                    <TableCell sx={ { fontFamily: 'monospace', fontSize: 13, whiteSpace: 'nowrap' } }>
+                      { row.component }
+                    </TableCell>
+                    <TableCell sx={ { fontSize: 13 } }>{ row.changes }</TableCell>
+                  </TableRow>
+                )) }
+              </TableBody>
+            </Table>
+          </TableContainer>
 
           <SectionTitle title="Component Details" description="컴포넌트별 상세 토큰 정보" />
 
