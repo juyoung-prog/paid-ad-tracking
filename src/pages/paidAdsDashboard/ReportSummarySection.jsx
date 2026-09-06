@@ -26,17 +26,13 @@ import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
 import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
-import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup, SECTION_CARD_SX } from './paidAdsPageUtils';
+import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds, dateMed, dateRange as formatDateRange, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { useViewUrlSync } from './useViewUrlSync';
 import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
 import { PhaseDetailPanel } from '../../components/templates/PhaseDetailPanel';
 
-const PLATFORM_LABEL = {
-  [PLATFORM.META]: 'Meta',
-  [PLATFORM.TIKTOK]: 'TikTok',
-};
 
 // Dashboard의 VIEW_STORAGE_KEY와 같은 규칙, 키만 화면별로 분리 — 두 화면의
 // 마지막 뷰가 서로를 덮어쓰면 안 된다.
@@ -157,67 +153,8 @@ function SectionHeader({ title, scope, action, hasDivider = true, component = 'h
  */
 const PHASE_TIMELINE_MAX_PHASES = 15;
 
-// 같은 이름(phase)의 캠페인을 플랫폼별로 묶어 하나의 타임라인 막대 + Budget
-// Breakdown 한 행으로 합친다 — "G10 Grand Opening"이 Meta/TikTok 두 캠페인으로
-// 나뉘어 있어도 하나의 phase로 취급한다(실사용 피드백: 플랫폼별로 행이
-// 중복돼 보이는 게 불편했음). 기간은 두 플랫폼의 시작일 중 이른 날짜~
-// 종료일 중 늦은 날짜로 합친다(보통 동일하지만, 혹시 다르더라도 안전).
-//
-// 묶음 키는 이름 그대로가 아니라 campaignNameKey()다 — 플랫폼마다 사람이 따로
-// 이름을 지어서 구분자 공백이 흔들린다(schema.js의 함수 주석에 실제 사례).
-// 표시는 그 그룹에서 처음 만난 원본 이름을 쓴다.
-function buildPhaseTimeline(campaigns) {
-  const byName = new Map();
-  campaigns.forEach((c) => {
-    const key = campaignNameKey(c.name);
-    if (!byName.has(key)) byName.set(key, { name: c.name, group: [] });
-    byName.get(key).group.push(c);
-  });
-  return [...byName.entries()]
-    .map(([key, { name, group }]) => {
-      const startDate = group.reduce((min, c) => (c.startDate < min ? c.startDate : min), group[0].startDate);
-      const endDate = group.reduce((max, c) => (c.endDate > max ? c.endDate : max), group[0].endDate);
-      /* 같은 플랫폼 캠페인이 한 phase에 여러 개면(같은 게시물 재부스팅 등) 덮어쓰지
-         않고 누적한다 — 덮어쓰면 totalBudget(전체 합)과 플랫폼 칸의 합이 어긋나서
-         Budget Breakdown 행이 자기 Total과 안 맞게 된다. */
-      const byPlatform = {};
-      group.forEach((c) => {
-        const acc = byPlatform[c.platform] ?? { daily: null, total: 0 };
-        if (c.budgetDaily != null) acc.daily = (acc.daily ?? 0) + c.budgetDaily;
-        acc.total += effectiveBudgetPlanned(c) ?? 0;
-        byPlatform[c.platform] = acc;
-      });
-      const totalBudget = group.reduce((sum, c) => sum + (effectiveBudgetPlanned(c) ?? 0), 0);
-      // 플랫폼별 일일 예산의 합 = 이 phase가 하루에 쓰는 돈. 막대 라벨이
-      // 총액과 함께 이 값을 말한다 — "하루 얼마씩"과 "총 얼마"는 예산을
-      // 판단할 때 서로 대체되지 않는 두 질문이다. 아무 플랫폼도 일일 예산을
-      // 안 쓰면 null(있는 것만 말한다).
-      const dailyValues = group.map((c) => c.budgetDaily).filter((v) => v != null);
-      const totalDaily = dailyValues.length > 0 ? dailyValues.reduce((a, b) => a + b, 0) : null;
-      const days = Math.round((new Date(endDate) - new Date(startDate)) / (1000 * 60 * 60 * 24)) + 1;
-      /* 이 막대가 어느 플랫폼을 덮는지. 합쳐진 막대의 숫자가 두 플랫폼 합계라는
-         사실이 화면에 없으면 한 캠페인 지출로 오독된다. 동시에, phase에 캠페인이
-         하나뿐일 때는 "이게 Meta냐 TikTok이냐"에 답한다 — 원래 신고("ALL일 때
-         구분이 안 간다")의 나머지 절반이다. 순서는 PLATFORM_LABEL 선언 순서로
-         고정한다(데이터 순서를 따르면 동기화 순서에 따라 표기가 흔들린다). */
-      const platformLabel = Object.keys(PLATFORM_LABEL)
-        .filter((p) => byPlatform[p])
-        .map((p) => PLATFORM_LABEL[p])
-        .join(' + ');
-      return {
-        key,
-        name,
-        startDate,
-        endDate,
-        days,
-        byPlatform,
-        platformLabel,
-        totalBudget,
-        totalDaily,
-      };
-    })
-    .sort((a, b) => (a.startDate < b.startDate ? -1 : a.startDate > b.startDate ? 1 : 0));
-}
+/* buildPhaseTimeline은 paidAdsPageUtils로 옮겼다 — Recap이 같은 타임라인을 그린다
+   (Build Plan Recap Phase 4). 묶음 기준·예산 합산 규칙은 그대로다. */
 
 // Performance 탭에서 goal별로 캠페인을 묶어 각각 다른 컬럼의 표를 그린다 —
 // goal에 따라 실제로 의미 있는 지표가 다른데(Awareness는 도달, Traffic은

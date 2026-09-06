@@ -6,3 +6,5 @@ export { CampaignSummaryGrid } from './CampaignSummaryGrid.jsx';
 export { PlatformMetricList } from './PlatformMetricList.jsx';
 export { BenchmarkDelta } from './BenchmarkDelta.jsx';
 export { VerdictChip } from './VerdictChip.jsx';
+export { RecapCampaignTable } from './RecapCampaignTable.jsx';
+export { RecapHeader } from './RecapHeader.jsx';

@@ -7,6 +7,8 @@ import { DashboardPage } from './pages/paidAdsDashboard/DashboardPage';
 import { StoresPage } from './pages/paidAdsDashboard/StoresPage';
 import { ReportsPage } from './pages/paidAdsDashboard/ReportsPage';
 import { SettingsPage } from './pages/paidAdsDashboard/SettingsPage';
+import { RecapPage } from './pages/paidAdsDashboard/RecapPage';
+import { RecapDetailPage } from './pages/paidAdsDashboard/RecapDetailPage';
 
 function App() {
   /* 로그인 게이트는 당분간 끈다(사용자 결정, 2026-08-20) — 링크로 접속하면 바로
@@ -25,6 +27,9 @@ function App() {
             <Route path="/stores" element={<StoresPage />} />
             <Route path="/reports" element={<ReportsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            {/* Recap — 캠페인 종료 후 결과 보고(02-ux-flow 시나리오 7). :event는 campaign_group 값(URL 인코딩) */}
+            <Route path="/recap" element={<RecapPage />} />
+            <Route path="/recap/:event" element={<RecapDetailPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

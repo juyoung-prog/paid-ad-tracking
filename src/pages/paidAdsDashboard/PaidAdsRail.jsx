@@ -10,6 +10,7 @@ import { useSyncRuns } from './useSyncRuns';
 import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
+import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import { useDesignSystem } from '../../styles/themes/designSystemContext';
@@ -23,6 +24,9 @@ import logoUrl from '../../assets/beautymaster-logo.png';
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: <SpaceDashboardOutlinedIcon /> },
   { to: '/reports', label: 'Reports', icon: <AssessmentOutlinedIcon /> },
+  // Recap — 이벤트 종료 후 결과 보고. Reports(진행 확인) 안의 탭이면 이름이
+  // 겹쳐 헷갈리므로 별도 메뉴다(02-ux-flow 시나리오 7).
+  { to: '/recap', label: 'Recap', icon: <SummarizeOutlinedIcon /> },
   { to: '/stores', label: 'Stores', icon: <StorefrontOutlinedIcon /> },
 ];
 

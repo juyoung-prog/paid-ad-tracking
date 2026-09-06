@@ -34,7 +34,8 @@ const tiers = [
 /* ────────────────────────────────────────────────────────────────
    Recap(캠페인 종료 후 결과 보고) 생성 계획 — 2026-09.
    02 UX Flow 시나리오 7을 입력으로, 위와 같은 원칙(데이터는 schema.js 한 파일,
-   컴포넌트는 props만)으로 Phase를 의존 순서대로 잡는다. 아직 구현 전.
+   컴포넌트는 props만)으로 Phase를 의존 순서대로 잡는다.
+   진행: Phase 1~4(1단계) 구현됨 — 2026-09-06. Phase 5~6은 계획.
    ──────────────────────────────────────────────────────────────── */
 
 /** schema.js에 추가할 타입 — 전부 JSDoc @typedef. 저장되는 것과 계산 전용을 나눈다. */
@@ -82,7 +83,7 @@ const recapMock = [
 /** 컴포넌트/페이지 Phase — 의존 순서. 앞 Phase가 끝나야 다음이 시작된다. */
 const recapPhases = [
   {
-    phase: '1', title: '데이터 레이어', stage: '1단계', deps: '없음',
+    phase: '1', title: '데이터 레이어 (구현됨)', stage: '1단계', deps: '없음',
     items: [
       'schema.js — 위 타입·상수·함수 추가. phaseNameOf로 PhaseTimelineChart·ReportSummarySection 리팩토링(동작 동일, 기존 스토리 통과)',
       'paidAdsMockData.js — 위 목 데이터',
@@ -91,21 +92,21 @@ const recapPhases = [
     ],
   },
   {
-    phase: '2', title: '원자 컴포넌트 (Tier 0)', stage: '1단계', deps: 'Phase 1의 BenchmarkStat 타입',
+    phase: '2', title: '원자 컴포넌트 (Tier 0, 구현됨)', stage: '1단계', deps: 'Phase 1의 BenchmarkStat 타입',
     items: [
       'BenchmarkDelta — data-display. props: stat(BenchmarkStat), formattedValue(string), label(string), size("sm"|"md"). 중앙값 대비 화살표·백분위·N, sampleSize 부족이면 not enough data. KpiBar delta와 같은 화살표·톤 문법',
       'VerdictChip — data-display. props: verdict(VERDICT|null), isSuggested(boolean), lang. Chip 위에 구성, good=success / mid=중립 / bad=warning, 제안이면 점선 테두리',
     ],
   },
   {
-    phase: '3', title: '조합 컴포넌트 (Tier 1)', stage: '1단계', deps: 'Phase 2',
+    phase: '3', title: '조합 컴포넌트 (Tier 1, 구현됨)', stage: '1단계', deps: 'Phase 2',
     items: [
       'RecapCampaignTable — data-display. props: rows(RecapCampaignRow[]), platform, lang, onRowClick?. 열: 순위·매장·캠페인·일예산·지출·판정·영상 반응(Reach / Hook·Hold / 조회)·참여 반응·행동. 각 비율 지표 셀에 BenchmarkDelta. PerformanceReportTable의 COLUMN 정의를 공유 모듈로 뽑아 같이 쓴다',
       'RecapHeader — data-display. props: event, dateRange, stores, platforms, spend, plannedBudget, headline(RecapHeadline|null), lang. KpiBar 재활용 + 순위 한 줄',
     ],
   },
   {
-    phase: '4', title: '페이지 조립 + 인쇄 (Tier 5) — 1단계 마감', stage: '1단계', deps: 'Phase 3',
+    phase: '4', title: '페이지 조립 + 인쇄 (Tier 5, 구현됨) — 1단계 마감', stage: '1단계', deps: 'Phase 3',
     items: [
       'RecapPage(/recap) — 이벤트 목록: campaignGroup별 기간·캠페인 수·지출·Recap 상태. usePaidAdsStore 재사용',
       'RecapDetailPage(/recap/:event) — buildRecapRows·buildRecapHeadline 호출은 여기(페이지)까지만. PhaseTimelineChart 읽기 전용 재활용. 하단에 2단계 자리(코멘트·배운 점)는 비워둔다',
@@ -261,7 +262,7 @@ export const Doc = {
           </Table>
         </TableContainer>
 
-        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 데이터는 schema.js 한 파일, 컴포넌트는 props만. 아직 구현 전" />
+        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 데이터는 schema.js 한 파일, 컴포넌트는 props만. Phase 1~4(1단계)는 구현됨, Phase 5~6은 계획" />
 
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>① schema.js 타입 (JSDoc @typedef)</Typography>
         <TableContainer sx={{ mb: 3 }}>

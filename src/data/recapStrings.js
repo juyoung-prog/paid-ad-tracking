@@ -47,6 +47,15 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.section.learnings': { en: 'Learnings' },
   'recap.section.nextSteps': { en: 'Next time' },
   'recap.section.notesPlaceholder': { en: 'Judgments, strengths, weaknesses and lessons will be written here (phase 2).' },
+  'recap.note.strength': { en: 'Strength' },
+  'recap.note.weakness': { en: 'Weakness' },
+  'recap.note.reason': { en: 'Why' },
+  'recap.scope.phases': { en: '{n} phases' },
+  'recap.scope.phase': { en: '1 phase' },
+  'recap.scope.campaigns': { en: '{n} campaigns' },
+  'recap.scope.campaign': { en: '1 campaign' },
+  'recap.scope.lessons': { en: '{n} lessons' },
+  'recap.scope.lesson': { en: '1 lesson' },
 
   // 표 헤더
   'recap.table.rank': { en: '#' },

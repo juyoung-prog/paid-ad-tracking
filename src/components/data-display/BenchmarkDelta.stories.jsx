@@ -56,6 +56,7 @@ KpiBar의 delta와 같은 문법이다 — ▲는 "비교군보다 낫다", ▼�
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어. 1단계는 en만 채워져 있어 다른 언어도 en으로 나온다' },
     size: { control: 'radio', options: ['sm', 'md'], description: '글자 크기 단계 — 표 셀은 sm' },
     hasValue: { control: 'boolean', description: 'false면 값 줄을 생략하고 비교 줄만' },
+    hasMedian: { control: 'boolean', description: 'false면 "· median" 부분을 툴팁에만 남긴다 — 표 셀' },
     sx: { control: 'object', description: '추가 스타일' },
   },
 };
@@ -125,6 +126,10 @@ export const Sizes = {
       <Box>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>hasValue=false</Typography>
         <BenchmarkDelta stat={STATS.top} format={pct} label="Hook" size="sm" hasValue={false} />
+      </Box>
+      <Box>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>hasMedian=false (표 셀)</Typography>
+        <BenchmarkDelta stat={STATS.top} format={pct} label="Hook" size="sm" hasMedian={false} />
       </Box>
     </Stack>
   ),

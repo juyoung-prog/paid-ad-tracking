@@ -447,6 +447,11 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     performanceRecords: state.performanceRecords,
     performanceDaily: state.performanceDaily,
     adAccounts: state.adAccounts,
+    /* Recap(캠페인 종료 후 결과 보고)의 저장 데이터 자리. 1단계는 테이블이 없어
+       빈 배열이다 — Phase 5에서 event_recaps · recap_campaign_notes를 읽어 채운다.
+       페이지가 이 키를 미리 읽게 해 두면 그때 페이지를 열지 않아도 된다. */
+    eventRecaps: [],
+    recapCampaignNotes: [],
     alerts,
     today,
     isLoading,

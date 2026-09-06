@@ -45,6 +45,9 @@ export function createMockPaidAdsStore(overrides = {}) {
     // 계획은 기본으로 비워 둔다 — "아직 계획이 없는 이벤트"가 실제로 흔한
     // 상태이고, 계획이 필요한 스토리만 overrides로 넣게 한다.
     plans: overrides.plans ?? [],
+    // Recap 저장 데이터 — 실스토어와 같은 키. Recap 스토리만 overrides로 넣는다.
+    eventRecaps: overrides.eventRecaps ?? [],
+    recapCampaignNotes: overrides.recapCampaignNotes ?? [],
     /* 목 스토어의 "오늘"은 실시간이 아니라 시나리오 기준일이다 — 목데이터의
        알림·상태(D-3, 최근 종료 등)가 전부 이 날짜 기준으로 설계돼 있어서,
        실제 시각을 쓰면 시간이 지날수록 스토리가 "전부 끝난 캠페인"이 된다. */

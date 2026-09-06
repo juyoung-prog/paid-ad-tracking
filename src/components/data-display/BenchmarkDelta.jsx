@@ -35,12 +35,13 @@ const SIZE = {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {'sm'|'md'} size - 글자 크기 단계. 표 셀은 sm [Optional, 기본값: 'md']
  * @param {boolean} hasValue - false면 값 줄을 생략하고 비교 줄만 그린다(값을 옆 칸이 이미 보여줄 때) [Optional, 기본값: true]
+ * @param {boolean} hasMedian - false면 "· median $3.59"를 줄에서 빼고 툴팁에만 남긴다 — 표 셀처럼 좁은 자리 [Optional, 기본값: true]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <BenchmarkDelta stat={row.benchmarks.cpm} format={money} label="CPM" peerLabel="Grand Opening" size="sm" />
  */
-export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang = 'en', size = 'md', hasValue = true, sx }) {
+export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang = 'en', size = 'md', hasValue = true, hasMedian = true, sx }) {
   const sizes = SIZE[size] ?? SIZE.md;
   const value = stat?.value != null ? format(stat.value) : t('verdict.none', lang);
   const isKnown = stat && stat.peerScope !== 'none' && stat.percentile != null;
@@ -91,7 +92,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
           }}
         >
           {style?.mark}{positionText}
-          {isKnown && (
+          {isKnown && hasMedian && (
             <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
               {' · '}{t('benchmark.vsMedian', lang, { median: format(stat.median) })}
             </Box>

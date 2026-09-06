@@ -60,20 +60,21 @@
 |---|---|---|
 | ConnectionCard | 신규 | 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA — CustomCard 위에 구성, 상태 Chip(연결됨=success, 끊김=warning) 재활용 |
 
-## Recap (`/recap`, `/recap/{event}` — 신규, 2026-09 계획)
+## Recap (`/recap`, `/recap/{event}` — 신규, 2026-09)
 
-> 캠페인 종료 후 결과 보고. Reports(진행 확인)와 목적이 달라 별도 메뉴. 1단계(숫자·벤치마크·인쇄) → 2단계(코멘트 저장) → 3단계(Excel·다국어·AI 초안) 순.
+> 캠페인 종료 후 결과 보고. Reports(진행 확인)와 목적이 달라 별도 메뉴. 1단계(숫자·벤치마크·인쇄)는 구현됨(2026-09-06) → 2단계(코멘트 저장) → 3단계(Excel·다국어·AI 초안) 순.
 
 | 컴포넌트 | 구분 | 역할 |
 |---|---|---|
 | KpiBar | 재활용 | 머리글 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표(`delta`로 벤치마크 대비) |
-| PhaseTimelineChart | 재활용 | 단계 타임라인(읽기 전용, 클릭 없음) |
-| **RecapCampaignTable** | 신규 | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. PerformanceReportTable과 열 정의 공유 |
-| **BenchmarkDelta** | 신규 | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
-| **VerdictChip** | 신규 | good / mid / bad. 자동 제안이면 점선 테두리 |
+| PhaseTimelineChart | 재활용 | 단계 타임라인(읽기 전용, 클릭 없음). buildPhaseTimeline은 Reports와 공유(paidAdsPageUtils) |
+| **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
+| **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. PerformanceReportTable과 열 정의 공유 |
+| **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
+| **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |
 | **RecapNoteEditor** | 신규(2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
 | **LanguageSwitch** | 신규(3단계) | en / ko / zh-Hant 전환 |
-| Print stylesheet | 신규 | `@media print` — 레일·툴바 숨김, 카드 분리 방지 |
+| Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles, data-print 속성) | `@media print` — 레일·툴바 숨김, 카드 분리 방지 |
 
 ## 전역 (모든 화면 공통)
 

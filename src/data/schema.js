@@ -1861,3 +1861,41 @@ export function localizedText(text, lang = RECAP_DEFAULT_LANG) {
   if (requested) return { value: requested, isFallback: false };
   return { value: text[RECAP_DEFAULT_LANG] ?? '', isFallback: lang !== RECAP_DEFAULT_LANG };
 }
+
+/**
+ * Recap 목록 한 줄 — 이벤트(campaignGroup)별 기간·캠페인 수·지출·보고서 상태.
+ * 태그 없는 캠페인(campaignGroup 없음/Unassigned)은 이벤트가 아니라 뺀다.
+ * 최근 끝난 이벤트가 위로 온다.
+ *
+ * @param {Campaign[]} campaigns
+ * @param {PerformanceRecord[]} records
+ * @param {EventRecap[]} [eventRecaps=[]]
+ * @returns {Array<{ eventName: string, startDate: string, endDate: string, campaignCount: number, spend: number|null, platforms: string[], stores: string[], status: 'draft'|'final'|null }>}
+ */
+export function buildRecapEvents(campaigns, records, eventRecaps = []) {
+  const byEvent = new Map();
+  (campaigns ?? []).forEach((c) => {
+    if (!c.campaignGroup || isUnassignedEvent(c.campaignGroup)) return;
+    const key = campaignNameKey(c.campaignGroup);
+    if (!byEvent.has(key)) byEvent.set(key, { eventName: c.campaignGroup, campaigns: [] });
+    byEvent.get(key).campaigns.push(c);
+  });
+  const recapByKey = new Map((eventRecaps ?? []).map((r) => [campaignNameKey(r.eventName), r]));
+
+  return [...byEvent.entries()]
+    .map(([key, { eventName, campaigns: list }]) => {
+      const spends = list.map((c) => latestRecordFor(c.id, records)?.spend).filter((v) => v != null);
+      return {
+        eventName,
+        startDate: list.reduce((min, c) => (c.startDate < min ? c.startDate : min), list[0].startDate),
+        endDate: list.reduce((max, c) => (c.endDate > max ? c.endDate : max), list[0].endDate),
+        campaignCount: list.length,
+        spend: spends.length > 0 ? spends.reduce((a, b) => a + b, 0) : null,
+        // 플랫폼 순서는 데이터 순서가 아니라 PLATFORM 선언 순서 — 동기화 순서에 따라 "TikTok + Meta"로 흔들리지 않게
+        platforms: Object.values(PLATFORM).filter((p) => list.some((c) => c.platform === p)),
+        stores: [...new Set(list.flatMap((c) => c.targetStoreIds ?? []))].sort(),
+        status: recapByKey.get(key)?.status ?? null,
+      };
+    })
+    .sort((a, b) => (a.endDate < b.endDate ? 1 : a.endDate > b.endDate ? -1 : 0));
+}
