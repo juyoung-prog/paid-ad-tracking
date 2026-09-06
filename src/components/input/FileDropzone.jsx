@@ -226,7 +226,7 @@ export function FileDropzone({
             <LinearProgress
               variant="determinate"
               value={uploadProgress}
-              sx={{ width: '60%', height: 6, borderRadius: 0 }}
+              sx={{ width: '60%' }}
             />
           </Box>
         )}

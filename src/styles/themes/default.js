@@ -846,6 +846,68 @@ const components = {
       },
     },
   },
+  /* 아래 셋은 carbon.js에는 있는데 여기엔 없어서 기본 테마에서만 stock MUI로
+     렌더되던 컴포넌트다 — 한 화면 안에서 IconButton만 동그란 hover, Dialog만
+     Material 그림자, 진행 막대만 브랜드 파랑(#0000FF)이었다. */
+  MuiIconButton: {
+    styleOverrides: {
+      root: {
+        // 원형 hover(50%)는 이 테마에서 IconButton 혼자 쓰는 모양이었다 —
+        // 다른 컨트롤과 같은 radius.control로 맞춘다.
+        borderRadius: shape.radius.control,
+        '@media (hover: hover)': {
+          '&:hover': { backgroundColor: palette.action.hover },
+        },
+        // 포커스 링은 OutlinedInput·Button과 같은 문법(accent.ring 3px)
+        '&.Mui-focusVisible': { boxShadow: `0 0 0 3px ${palette.accent.ring}` },
+        variants: [
+          {
+            // color 미지정(default)일 때만 — action.active(검정 54%)는 MUI 잔재라
+            // 팔레트의 보조 글자색으로. color="primary" 등은 그대로 둔다.
+            props: { color: 'default' },
+            style: { color: palette.text.secondary },
+          },
+        ],
+      },
+      sizeSmall: { padding: 4 },
+    },
+  },
+  MuiDialog: {
+    styleOverrides: {
+      paper: {
+        // 떠 있는 면의 문법은 Menu/Popover와 같다 — 경계선이 윤곽, 그림자는 약하게
+        borderRadius: shape.radius.container,
+        border: `1px solid ${palette.divider}`,
+        boxShadow: customShadows.xl,
+      },
+    },
+  },
+  MuiDialogTitle: {
+    styleOverrides: {
+      root: {
+        // 기본 h6(20px/500)는 본문 13~14px 대비 너무 크다 — title 역할 토큰(18px/600)
+        ...typography.title,
+        padding: '20px 24px 8px',
+      },
+    },
+  },
+  MuiDialogActions: {
+    styleOverrides: {
+      root: { padding: '12px 24px 20px' },
+    },
+  },
+  MuiLinearProgress: {
+    styleOverrides: {
+      // 6px 높이 + 절반 라운딩(inlay 3px) = 풀 필 — PacingIndicator·Reports 막대가
+      // sx로 반복하던 값을 테마로 올린다.
+      root: { height: 6, borderRadius: shape.radius.inlay },
+      bar: { borderRadius: shape.radius.inlay },
+      // 트랙은 surface.muted, 채움은 차트 강조색 — 기본값(primary 틴트/primary.main)은
+      // 화면에서 쓰지 않는 브랜드 파랑이다.
+      colorPrimary: { backgroundColor: palette.surface.muted },
+      barColorPrimary: { backgroundColor: palette.chart.barEmphasis },
+    },
+  },
 };
 
 // ============================================================

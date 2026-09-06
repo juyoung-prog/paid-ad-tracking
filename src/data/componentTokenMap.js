@@ -636,6 +636,9 @@ const themeOverrides = [
   { component: 'MuiTableRow', changes: 'hover 배경 action.hover (hover prop을 준 행만)' },
   { component: 'MuiTablePagination', changes: '12px · text.secondary · toolbar minHeight 44' },
   { component: 'MuiDrawer', changes: 'paper 폭 440 (CampaignDetailPanel만 580으로 늘려 쓴다)' },
+  { component: 'MuiIconButton', changes: '**radius.control(원형 아님)** · hover action.hover · focus-visible 3px accent.ring · color 미지정이면 text.secondary · sizeSmall padding 4' },
+  { component: 'MuiDialog / MuiDialogTitle / MuiDialogActions', changes: 'paper는 Menu와 같은 문법(1px divider + radius.container + 약한 그림자) · 제목은 title 역할 토큰(18px/600) · 상하 여백 20/24' },
+  { component: 'MuiLinearProgress', changes: '높이 6 · radius.inlay(풀 필) · 트랙 surface.muted · 채움 chart.barEmphasis (기본 primary.main #0000FF 대신)' },
 ];
 
 /**
