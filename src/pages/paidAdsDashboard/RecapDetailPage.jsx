@@ -6,8 +6,8 @@ import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
-import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
-import TableViewOutlinedIcon from '@mui/icons-material/TableViewOutlined';
+import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
+import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
 import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
 import Tooltip from '@mui/material/Tooltip';
@@ -19,8 +19,10 @@ import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
 import { LanguageSwitch } from '../../components/input/LanguageSwitch';
+import { ExportMenu } from '../../components/input/ExportMenu';
+import { PeerCompareDialog } from '../../components/templates/PeerCompareDialog';
 import { supabase } from '../../lib/supabase';
-import { exportRecapToExcel } from '../../utils/recapExcel';
+import { copyRecapForGoogleSheets } from '../../utils/recapSheets';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { useSupabaseSession } from '../../lib/useSupabaseSession';
@@ -29,6 +31,7 @@ import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline } fr
 import {
   buildRecapRows,
   buildRecapHeadline,
+  buildPeerComparison,
   localizedText,
   campaignNameKey,
   effectiveBudgetPlanned,
@@ -158,6 +161,8 @@ export function RecapDetailPage() {
   const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [draft, setDraft] = useState(null);
+  // 벤치마크 글자를 눌러 연 비교 대화상자 — { campaignId, metricKey } 또는 null
+  const [compareTarget, setCompareTarget] = useState(null);
 
   const recap = useMemo(
     () => (eventRecaps ?? []).find((r) => campaignNameKey(r.eventName) === campaignNameKey(eventName)) ?? null,
@@ -333,14 +338,19 @@ export function RecapDetailPage() {
     notify(t('recap.edit.aiDone', lang), 'success');
   };
 
-  const handleExcel = async () => {
-    try {
-      await exportRecapToExcel({ eventName, byPlatform, platformLabel: PLATFORM_LABEL, recap: shownRecap, headline, lang });
-    } catch (e) {
-      console.error('recap excel export failed', e);
-      notify(t('recap.detail.excelFailed', lang), 'error');
-    }
+  const handleSheets = async () => {
+    const ok = await copyRecapForGoogleSheets({ eventName, byPlatform, platformLabel: PLATFORM_LABEL, recap: shownRecap, headline, lang });
+    notify(t(ok ? 'recap.export.sheetsDone' : 'recap.export.sheetsFailed', lang), ok ? 'success' : 'error');
   };
+  const exportItems = [
+    { key: 'sheets', label: t('recap.export.sheets', lang), hint: t('recap.export.sheetsHint', lang), icon: <TableChartOutlinedIcon />, onSelect: handleSheets },
+    { key: 'pdf', label: t('recap.export.pdf', lang), hint: t('recap.export.pdfHint', lang), icon: <PictureAsPdfOutlinedIcon />, onSelect: () => window.print() },
+  ];
+  /* 비교 대화상자 데이터 — 열 때만 계산한다(schema.js buildPeerComparison). */
+  const compareCampaign = compareTarget ? eventCampaigns.find((c) => c.id === compareTarget.campaignId) ?? null : null;
+  const comparison = compareCampaign
+    ? buildPeerComparison(compareCampaign, campaigns, performanceRecords, { metricKey: compareTarget.metricKey, accountRegionById })
+    : null;
 
 
   const isBusy = isSaving || Boolean(aiMode);
@@ -374,12 +384,7 @@ export function RecapDetailPage() {
       <Button variant="outlined" size="small" startIcon={<EditOutlinedIcon />} onClick={handleEditClick}>
         {t(session ? 'recap.edit.start' : 'recap.edit.signIn', lang)}
       </Button>
-      <Button variant="outlined" size="small" startIcon={<TableViewOutlinedIcon />} onClick={handleExcel}>
-        {t('recap.detail.excel', lang)}
-      </Button>
-      <Button variant="outlined" size="small" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
-        {t('recap.detail.print', lang)}
-      </Button>
+      <ExportMenu items={exportItems} label={t('recap.export', lang)} />
     </Box>
   );
 
@@ -428,6 +433,7 @@ export function RecapDetailPage() {
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
             onRowClick={isEditing ? undefined : (campaignId) => navigate(`/dashboard?campaign=${campaignId}`)}
+            onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
           />
         </Box>
       ))}
@@ -503,6 +509,17 @@ export function RecapDetailPage() {
         </Box>
       )}
 
+      {comparison && (
+        <PeerCompareDialog
+          isOpen
+          onClose={() => setCompareTarget(null)}
+          rows={comparison.rows}
+          scope={comparison.scope}
+          metricKeys={BENCHMARK_METRICS.map((m) => m.key)}
+          initialMetricKey={compareTarget.metricKey}
+          lang={lang}
+        />
+      )}
       <SignInDialog
         isOpen={isSignInOpen}
         onClose={() => setIsSignInOpen(false)}

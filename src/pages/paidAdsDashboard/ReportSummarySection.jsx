@@ -16,6 +16,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TablePagination from '@mui/material/TablePagination';
+import TableSortLabel from '@mui/material/TableSortLabel';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -1060,6 +1061,10 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
   /* goal별 현재 페이지. 표가 goal마다 하나씩 렌더되는데 훅은 map 콜백 안에서
      못 부르므로, 표마다 상태를 따로 두는 대신 goal을 키로 한 객체 하나로 모은다. */
   const [pageByGoal, setPageByGoal] = useState({});
+  /* goal 표마다 정렬 열 — { [goal]: { key: 'CPM', direction: 'asc'|'desc' } }. 비어 있으면
+     기존 순서(schema.js가 준 순서). 캠페인끼리 "CPM 싼 순"으로 훑고 싶다는 요청
+     (2026-09)으로 붙였다 — 열 머리를 누르면 그 열로, 다시 누르면 반대 방향. */
+  const [sortByGoal, setSortByGoal] = useState({});
   const [isDailySpendOpen, setIsDailySpendOpen] = useState(loadDailySpendOpen);
   /* 상세를 볼 캠페인. **id만** 들고 있는다 — 객체를 담아두면 동기화로 목록이
      갱신됐을 때 패널만 옛 값을 계속 보여준다. */
@@ -1409,11 +1414,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
         // 부족하다: 좁혔다 다시 넓히면 손대지도 않은 옛 페이지로 되돌아간다.
         onGroupChange={(key, value) => {
           setPageByGoal({});
+          setSortByGoal({});
           setGroupValues((v) => ({ ...v, [key]: value }));
         }}
         dateRange={dateRange}
         onDateRangeChange={(next) => {
           setPageByGoal({});
+          setSortByGoal({});
           setDateRange(next);
         }}
         sx={{ mb: 3 }}
@@ -1967,7 +1974,48 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
           const pageCount = Math.max(1, Math.ceil(rowsForGoal.length / ROWS_PER_PAGE));
           // 필터가 좁혀져 페이지 수가 줄면 현재 페이지가 범위를 벗어날 수 있다.
           const page = Math.min(pageByGoal[value] ?? 0, pageCount - 1);
-          const visibleRows = rowsForGoal.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
+          /* 정렬은 표 전체에 걸고 그다음 페이지를 자른다 — 페이지 안에서만 정렬하면
+             2페이지의 1등이 1페이지의 꼴찌보다 좋을 수 있다. 값이 없는 행('—')은
+             방향과 무관하게 맨 뒤. Campaign·Platform은 글자순, 지표는 숫자순이고
+             지표 열의 첫 클릭은 "좋은 쪽이 위"(비용은 오름차순, 나머지는 내림차순). */
+          const sort = sortByGoal[value] ?? null;
+          const sortColumn = sort ? dataColumns.find((c) => c.header === sort.key) ?? null : null;
+          const sortedRows = sort
+            ? rowsForGoal.slice().sort((a, b) => {
+                if (sort.key === 'Campaign' || sort.key === 'Platform') {
+                  const av = sort.key === 'Campaign' ? a.name : a.platform;
+                  const bv = sort.key === 'Campaign' ? b.name : b.platform;
+                  return sort.direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+                }
+                if (!sortColumn) return 0;
+                const av = sortColumn.value(a);
+                const bv = sortColumn.value(b);
+                if (av == null && bv == null) return 0;
+                if (av == null) return 1;
+                if (bv == null) return -1;
+                return sort.direction === 'asc' ? av - bv : bv - av;
+              })
+            : rowsForGoal;
+          const isCostHeader = (header) => COST_METRIC_HEADERS.has(header) || header === 'Spend' || header === 'CPE';
+          const toggleSort = (header) => setSortByGoal((prev) => {
+            const current = prev[value];
+            const firstDirection = header === 'Campaign' || header === 'Platform' || isCostHeader(header) ? 'asc' : 'desc';
+            const next = current?.key === header
+              ? { key: header, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+              : { key: header, direction: firstDirection };
+            return { ...prev, [value]: next };
+          });
+          const sortLabel = (header, children) => (
+            <TableSortLabel
+              active={sort?.key === header}
+              direction={sort?.key === header ? sort.direction : (header === 'Campaign' || header === 'Platform' || isCostHeader(header) ? 'asc' : 'desc')}
+              onClick={() => toggleSort(header)}
+              sx={{ '& .MuiTableSortLabel-icon': { fontSize: 14 } }}
+            >
+              {children}
+            </TableSortLabel>
+          );
+          const visibleRows = sortedRows.slice(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE);
           /* 제목에 얹을 **대표** 중앙값 하나. goal마다 그 목적을 정의하는 지표가
              하나씩 있다(도달이면 CPM, 트래픽이면 CTR …). 여러 개를 늘어놓으면
              제목이 다시 표가 되므로 첫 번째 벤치마크 컬럼만 쓴다 — 컬럼 순서가
@@ -2027,12 +2075,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                   </colgroup>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={STICKY_CAMPAIGN_SX}>Campaign</TableCell>
-                      <TableCell>Platform</TableCell>
+                      <TableCell sx={STICKY_CAMPAIGN_SX} sortDirection={sort?.key === 'Campaign' ? sort.direction : false}>{sortLabel('Campaign', 'Campaign')}</TableCell>
+                      <TableCell sortDirection={sort?.key === 'Platform' ? sort.direction : false}>{sortLabel('Platform', 'Platform')}</TableCell>
                       {dataColumns.map((column) => (
                         <TableCell
                           key={`${column.group}-${column.header}`}
                           align="right"
+                          sortDirection={sort?.key === column.header ? sort.direction : false}
                           /* 헤더는 **한 줄**이다. 라벨을 짧게 잡고 줄바꿈을 막는다 —
                              "Video Plays"·"Hook Rate"가 두 줄로 접히면 헤더 행이
                              두 배로 두꺼워지고, 거기에 기준선까지 얹으면 세 줄이
@@ -2043,15 +2092,13 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                             ...(column.isGroupStart ? GROUP_DIVIDER_SX : null),
                           }}
                         >
-                          {column.note ? (
+                          {/* 정렬 라벨이 헤더 글자를 감싸고, ⓘ 툴팁은 그 옆에 남는다 —
+                              라벨 자체를 툴팁 안에 넣으면 클릭이 툴팁 열기와 겹친다. */}
+                          {sortLabel(column.header, column.header)}
+                          {column.note && (
                             <Tooltip title={columnTooltip(column, rowsForGoal)} arrow enterTouchDelay={0}>
-                              <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, cursor: 'help' }}>
-                                {column.header}
-                                <InfoOutlinedIcon sx={(t) => ({ fontSize: t.iconSize.inline, color: 'text.disabled' })} />
-                              </Box>
+                              <InfoOutlinedIcon sx={(t) => ({ fontSize: t.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.25, cursor: 'help' })} />
                             </Tooltip>
-                          ) : (
-                            column.header
                           )}
                         </TableCell>
                       ))}

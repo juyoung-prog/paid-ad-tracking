@@ -9,3 +9,4 @@ export { PhaseDetailPanel } from './PhaseDetailPanel.jsx';
 export { SignInDialog } from './SignInDialog.jsx';
 export { RecapNoteEditor } from './RecapNoteEditor.jsx';
 export { RecapLearningsEditor } from './RecapLearningsEditor.jsx';
+export { PeerCompareDialog } from './PeerCompareDialog.jsx';

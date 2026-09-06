@@ -15,9 +15,11 @@ export default {
         component: `
 ## LanguageSwitch
 
-Recap 문서의 언어 전환(en / ko / zh-Hant) — Build Plan Phase 6. Recap에만 노출하고
-운영자 화면은 영어 그대로다. 버튼 라벨은 각 언어의 자기 이름(EN · 한국어 · 繁中).
-값은 호출부가 URL \`?lang=\`과 동기화한다.
+Recap 문서의 언어 선택(en / ko / zh-Hant) **드롭다운** — Build Plan Phase 6. Recap에만
+노출하고 운영자 화면은 영어 그대로다. 닫혀 있을 때는 짧은 표기(EN · 한국어 · 繁中),
+열면 각 언어의 자기 이름이 나온다. 한때 토글 버튼 셋이었는데 툴바에 내보내기 메뉴가
+더해지면서 드롭다운으로 바꿨다(사용자 결정, 2026-09). 값은 호출부가 URL \`?lang=\`과
+동기화한다.
         `,
       },
     },

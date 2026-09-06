@@ -129,8 +129,9 @@ const recapPhases = [
   {
     phase: '6', title: '내보내기·다국어·초안 (구현됨) — 3단계', stage: '3단계', deps: 'Phase 5 + recap-draft 배포',
     items: [
-      'LanguageSwitch — input. props: value(RECAP_LANG), onChange. ToggleButton 재활용, ?lang= 동기화. recapStrings에 ko / zh-Hant 채움',
-      'Excel 내보내기 — utils/recapExcel.js. 이전 보고서와 같은 시트 구성(플랫폼별 시트 + Learnings). exceljs를 동적 import로(버튼을 누를 때만 내려받는다)',
+      'LanguageSwitch — input. props: value(RECAP_LANG), onChange. Select 드롭다운, ?lang= 동기화. recapStrings에 ko / zh-Hant 채움',
+      'PeerCompareDialog — templates. 벤치마크 글자를 누르면 비교군 캠페인을 나란히(schema.js buildPeerComparison). Reports goal 표에는 열 정렬(TableSortLabel) 추가',
+      'Google Sheets 내보내기 — utils/recapSheets.js. 표를 탭 구분 텍스트로 클립보드에 복사하고 sheets.new를 연다(Google 계정 없이 시트를 직접 만들 수는 없다 — OAuth 연동은 별도 단계). 한때 exceljs Excel이었는데 Google Sheets로 바꿈(사용자 결정, 2026-09). ExportMenu 드롭다운에 PDF(인쇄)와 함께',
       'AI 초안/번역 — Edge Function(recap-draft): 숫자·벤치마크를 주면 strength/weakness/reason 초안과 ko/zh-Hant 번역을 돌려준다. 프론트는 결과를 에디터에 채우기만, 최종 문장은 사람이 다듬는다',
       'RecapNoteEditor에 organicViews/organicEngagements 선택 입력 칸',
     ],

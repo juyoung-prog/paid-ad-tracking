@@ -34,7 +34,7 @@ const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteS
  * 비율 지표 한 칸 — 라벨 위, BenchmarkDelta 아래. 비교군 이름은 stat의 scope를
  * 보고 고른다(phase면 단계 이름, goal이면 goal) — 계산이 아니라 라벨 선택이다.
  */
-function MetricCell({ row, metricKey, format, lang }) {
+function MetricCell({ row, metricKey, format, lang, onBenchmarkClick }) {
   const stat = row.benchmarks?.[metricKey];
   if (!stat) return null;
   const peerLabel = stat.peerScope === 'phase' ? row.phaseName : row.goal;
@@ -42,7 +42,16 @@ function MetricCell({ row, metricKey, format, lang }) {
     <Box sx={{ minWidth: 0 }}>
       <Typography component="span" sx={{ ...META_SX, display: 'block' }}>{metricLabel(metricKey, lang)}</Typography>
       {/* 중앙값은 툴팁에만 — 셀 폭에서 "▲ top 25% · median 28.51%"는 옆 지표와 겹친다 */}
-      <BenchmarkDelta stat={stat} format={format} label={metricLabel(metricKey, lang)} peerLabel={peerLabel} lang={lang} size="sm" hasMedian={false} />
+      <BenchmarkDelta
+        stat={stat}
+        format={format}
+        label={metricLabel(metricKey, lang)}
+        peerLabel={peerLabel}
+        lang={lang}
+        size="sm"
+        hasMedian={false}
+        onClick={onBenchmarkClick ? () => onBenchmarkClick(row.campaignId, metricKey) : undefined}
+      />
     </Box>
   );
 }
@@ -80,13 +89,14 @@ function RawLine({ parts }) {
  * @param {Array<Object>} rows - buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다 [Optional]
+ * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => navigate(`/dashboard?campaign=${id}`)} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, label = 'Recap campaign table', sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -167,7 +177,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, label = 'Rec
                   <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.4 }}>
                     {money(row.spend)}
                   </Typography>
-                  {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} />}
+                  {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
                   <VerdictChip verdict={verdict} isSuggested={isSuggested} lang={lang} size="sm" />
@@ -183,8 +193,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, label = 'Rec
                         [metricLabel('avgWatch', lang), row.avgWatchSeconds != null ? seconds(row.avgWatchSeconds) : null],
                       ]} />
                       <Box sx={{ display: 'flex', gap: 2.5 }}>
-                        <MetricCell row={row} metricKey="hookRate" format={fmtPercent} lang={lang} />
-                        <MetricCell row={row} metricKey="holdRate" format={fmtPercent} lang={lang} />
+                        <MetricCell row={row} metricKey="hookRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                        <MetricCell row={row} metricKey="holdRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                       </Box>
                     </TableCell>
                     <TableCell sx={CELL_SX}>
@@ -193,7 +203,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, label = 'Rec
                         [metricLabel('comments', lang), count(row.comments)],
                         [metricLabel('shares', lang), count(row.shares)],
                       ]} />
-                      <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} />
+                      <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                     </TableCell>
                     <TableCell sx={CELL_SX}>
                       <RawLine parts={[
@@ -202,9 +212,9 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, label = 'Rec
                         [metricLabel('profileVisits', lang), count(row.profileVisits)],
                       ]} />
                       <Box sx={{ display: 'flex', gap: 2.5 }}>
-                        <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} />
-                        <MetricCell row={row} metricKey="cpc" format={money} lang={lang} />
-                        {isConversion && <MetricCell row={row} metricKey="cpa" format={money} lang={lang} />}
+                        <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                        <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                        {isConversion && <MetricCell row={row} metricKey="cpa" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                       </Box>
                     </TableCell>
                   </>

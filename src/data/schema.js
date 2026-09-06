@@ -1899,3 +1899,38 @@ export function buildRecapEvents(campaigns, records, eventRecaps = []) {
     })
     .sort((a, b) => (a.endDate < b.endDate ? 1 : a.endDate > b.endDate ? -1 : 0));
 }
+
+/**
+ * 캠페인 하나와 그 비교군을 나란히 놓는 표 데이터(Recap의 "비교군 보기").
+ * 벤치마크는 중앙값 하나만 말하는데, "BF4 Grand Opening보다 나았나"처럼 개별
+ * 캠페인과 맞대고 싶을 때 쓴다. 주인공 행이 맨 앞이고, 나머지는 initialMetricKey
+ * 기준 좋은 순서다(비용 지표는 낮은 게 앞).
+ *
+ * @param {Campaign} campaign - 주인공
+ * @param {Campaign[]} allCampaigns
+ * @param {PerformanceRecord[]} allRecords
+ * @param {{ metricKey?: string, since?: string, region?: string|null, accountRegionById?: Object<string, string> }} [options]
+ * @returns {{ scope: 'phase'|'goal'|'none', rows: Array<Object> }} rows[i] = getGoalMetricsRow + { eventName, phaseName, startDate, endDate, isSubject }
+ */
+export function buildPeerComparison(campaign, allCampaigns, allRecords, options = {}) {
+  const { metricKey = null, ...peerOptions } = options;
+  const { peers, scope } = buildBenchmarkPeers(campaign, allCampaigns, peerOptions);
+  const toRow = (c, isSubject) => ({
+    ...getGoalMetricsRow(c, latestRecordFor(c.id, allRecords)),
+    eventName: campaignGroupKey(c),
+    phaseName: phaseNameOf(c),
+    startDate: c.startDate,
+    endDate: c.endDate,
+    isSubject,
+  });
+  const lowerIsBetter = BENCHMARK_METRICS.find((m) => m.key === metricKey)?.lowerIsBetter ?? false;
+  const peerRows = peers.map((c) => toRow(c, false)).sort((a, b) => {
+    const av = metricKey ? a[metricKey] : null;
+    const bv = metricKey ? b[metricKey] : null;
+    if (av == null && bv == null) return (b.spend ?? 0) - (a.spend ?? 0);
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return lowerIsBetter ? av - bv : bv - av;
+  });
+  return { scope, rows: [toRow(campaign, true), ...peerRows] };
+}

@@ -51,7 +51,7 @@
 | 컴포넌트 | 구분 | 역할 |
 |---|---|---|
 | KpiBar | 재활용 | 요약 통계 — **계획 대비 변경**: 원래 CampaignSummaryGrid(테두리 박스 그리드)였으나, Dashboard와 같은 개념을 다른 컴포넌트로 보여주는 문제가 있어 KpiBar로 통일. CampaignSummaryGrid는 재사용 후보로 남아있으나 현재 어느 화면에도 연결 안 됨 |
-| **PerformanceReportTable** | 신규(구현됨, 계획 문서에 없었음) | 캠페인별 성과 지표 표, Dashboard Drawer로 딥링크 |
+| **PerformanceReportTable** | 신규(구현됨, 계획 문서에 없었음) | 캠페인별 성과 지표 표, Dashboard Drawer로 딥링크. goal별 표는 ReportSummarySection 안에 있고 열 머리로 정렬된다(2026-09) |
 | FilterBar | 수정 | 기간/매장/플랫폼 선택 |
 
 ## Settings (`/settings`, 신규 — API Integration)
@@ -73,10 +73,12 @@
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |
 | **RecapNoteEditor** | 신규(구현됨, 2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
-| **LanguageSwitch** | 신규(구현됨, 3단계) | en / ko / zh-Hant 전환 — URL ?lang= 동기화 |
+| **LanguageSwitch** | 신규(구현됨, 3단계) | en / ko / zh-Hant 드롭다운 — URL ?lang= 동기화 |
 | **RecapLearningsEditor** | 신규(구현됨, 2단계) | 상태·요약·배운 점 카드·다음 제언 편집 |
 | **SignInDialog** | 신규(구현됨, 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 |
-| recapExcel (utils) | 신규(구현됨, 3단계) | exceljs 동적 import — 플랫폼별 시트 + Learnings 시트 |
+| recapSheets (utils) | 신규(구현됨, 3단계) | Google Sheets — 표를 클립보드에 복사하고 sheets.new를 연다(Excel 대신, 사용자 결정) |
+| **ExportMenu** | 신규(구현됨, 3단계) | Export 드롭다운 — Google Sheets · PDF(인쇄) |
+| **PeerCompareDialog** | 신규(구현됨) | 벤치마크 글자를 누르면 비교군 캠페인을 나란히 — 열 정렬 |
 | recap-draft (Edge Function) | 신규(구현됨, 3단계) | Claude로 빈 코멘트·배운 점 초안과 ko/zh-Hant 번역. 로그인 세션만 호출 가능, 결과는 에디터의 빈 칸에만 채운다 |
 | Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles, data-print 속성) | `@media print` — 레일·툴바 숨김, 카드 분리 방지 |
 
