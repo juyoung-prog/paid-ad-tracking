@@ -62,7 +62,7 @@
 
 ## Recap (`/recap`, `/recap/{event}` — 신규, 2026-09)
 
-> 캠페인 종료 후 결과 보고. Reports(진행 확인)와 목적이 달라 별도 메뉴. 1단계(숫자·벤치마크·인쇄)는 구현됨(2026-09-06) → 2단계(코멘트 저장) → 3단계(Excel·다국어·AI 초안) 순.
+> 캠페인 종료 후 결과 보고. Reports(진행 확인)와 목적이 달라 별도 메뉴. 1·2·3단계 전부 구현됨(2026-09-06). 2단계는 마이그레이션 20(event_recaps · recap_campaign_notes), 3단계는 recap-draft Edge Function + ANTHROPIC_API_KEY 시크릿이 선행 조건.
 
 | 컴포넌트 | 구분 | 역할 |
 |---|---|---|
@@ -72,8 +72,12 @@
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |
-| **RecapNoteEditor** | 신규(2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
-| **LanguageSwitch** | 신규(3단계) | en / ko / zh-Hant 전환 |
+| **RecapNoteEditor** | 신규(구현됨, 2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
+| **LanguageSwitch** | 신규(구현됨, 3단계) | en / ko / zh-Hant 전환 — URL ?lang= 동기화 |
+| **RecapLearningsEditor** | 신규(구현됨, 2단계) | 상태·요약·배운 점 카드·다음 제언 편집 |
+| **SignInDialog** | 신규(구현됨, 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 |
+| recapExcel (utils) | 신규(구현됨, 3단계) | exceljs 동적 import — 플랫폼별 시트 + Learnings 시트 |
+| recap-draft (Edge Function) | 신규(구현됨, 3단계) | Claude로 빈 코멘트·배운 점 초안과 ko/zh-Hant 번역. 로그인 세션만 호출 가능, 결과는 에디터의 빈 칸에만 채운다 |
 | Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles, data-print 속성) | `@media print` — 레일·툴바 숨김, 카드 분리 방지 |
 
 ## 전역 (모든 화면 공통)

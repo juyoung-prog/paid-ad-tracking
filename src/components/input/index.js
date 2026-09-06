@@ -4,3 +4,4 @@ export { TagInput } from './TagInput.jsx';
 export { StoreMultiSelect } from './StoreMultiSelect.jsx';
 export { LocalizedDateField } from './LocalizedDateField.jsx';
 export { DateRangeField } from './DateRangeField.jsx';
+export { LanguageSwitch } from './LanguageSwitch.jsx';

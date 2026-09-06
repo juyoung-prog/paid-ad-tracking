@@ -11,6 +11,10 @@ import {
   performanceRecordToRow,
   rowToPerformanceDaily,
   rowToPlan,
+  rowToEventRecap,
+  eventRecapToRow,
+  rowToRecapCampaignNote,
+  recapCampaignNoteToRow,
 } from './paidAdsMappers';
 import { startOfToday, toLocalISODate } from './paidAdsPageUtils';
 /* 오류는 스토어 경계에서 사람 문장으로 바꾼다 — 화면마다 DB 메시지를 해석하게
@@ -25,6 +29,9 @@ const EMPTY_STATE = {
   performanceRecords: [],
   performanceDaily: [],
   plans: [],
+  // Recap — 사람이 쓴 것만(마이그레이션 20). 숫자는 매번 계산한다.
+  eventRecaps: [],
+  recapCampaignNotes: [],
 };
 
 /** performance_records는 캠페인당 여러 행(날짜×source)이지만 화면 모델은 캠페인당 1건이다. */
@@ -108,7 +115,7 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   // effect 본문에서 동기적으로 setState하면 렌더가 연쇄로 도는 것을 막기 위함이다
   // (react-hooks/set-state-in-effect).
   const fetchAll = useCallback(async () => {
-    const [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes] = await Promise.all([
+    const [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes, recapsRes, notesRes] = await Promise.all([
       supabase.from('stores').select('*').order('id'),
       supabase.from('ad_accounts').select('*').order('id'),
       supabase.from('campaigns').select('*').order('start_date', { ascending: false }),
@@ -116,9 +123,11 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
       fetchAllPerformanceDaily(),
       supabase.from('plans').select('*').order('name'),
       supabase.from('plan_items').select('*').order('sort_order'),
+      supabase.from('event_recaps').select('*').order('updated_at', { ascending: false }),
+      supabase.from('recap_campaign_notes').select('*'),
     ]);
 
-    const failed = [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes]
+    const failed = [storesRes, accountsRes, campaignsRes, performanceRes, dailyRes, plansRes, planItemsRes, recapsRes, notesRes]
       .find((r) => r.error);
     if (failed) {
       return {
@@ -138,6 +147,8 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
         // 계획은 항목과 함께 한 덩어리로 만든다 — 화면이 두 배열을 조인하지
         // 않도록(조인 로직이 화면마다 갈리면 같은 계획이 다르게 보인다).
         plans: (plansRes.data ?? []).map((row) => rowToPlan(row, planItemsRes.data ?? [])),
+        eventRecaps: (recapsRes.data ?? []).map(rowToEventRecap),
+        recapCampaignNotes: (notesRes.data ?? []).map(rowToRecapCampaignNote),
       },
     };
   }, []);
@@ -250,6 +261,61 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
         ? prev.plans.map((p) => (p.id === saved.id ? saved : p))
         : [...prev.plans, saved].sort((a, b) => a.name.localeCompare(b.name)),
     }));
+    return saved;
+  }, []);
+
+  /**
+   * Recap 보고서(이벤트 단위) 저장 — id가 있으면 update, 없으면 insert. 같은
+   * 이벤트로 두 번 만들면 unique(owner_id, event_name)에 걸리므로, 그때는 기존
+   * 행을 찾아 update한다(두 탭에서 동시에 "Edit"를 누른 경우). 저장된 행을
+   * 돌려주고 상태에 반영한다. 실패하면 null.
+   */
+  const saveEventRecap = useCallback(async (recap) => {
+    const payload = eventRecapToRow(recap);
+    let res = recap.id
+      ? await supabase.from('event_recaps').update(payload).eq('id', recap.id).select().single()
+      : await supabase.from('event_recaps').insert(payload).select().single();
+
+    if (res.error?.code === '23505') {
+      const existing = await supabase.from('event_recaps').select('id').eq('event_name', payload.event_name).maybeSingle();
+      if (existing.data?.id) {
+        res = await supabase.from('event_recaps').update(payload).eq('id', existing.data.id).select().single();
+      }
+    }
+    if (res.error) {
+      setError(describeBackendError(res.error, "Couldn't save the recap. Try again."));
+      return null;
+    }
+    const saved = rowToEventRecap(res.data);
+    setState((prev) => ({
+      ...prev,
+      eventRecaps: prev.eventRecaps.some((r) => r.id === saved.id)
+        ? prev.eventRecaps.map((r) => (r.id === saved.id ? saved : r))
+        : [saved, ...prev.eventRecaps],
+    }));
+    return saved;
+  }, []);
+
+  /**
+   * 캠페인 코멘트 저장 — (recap_id, campaign_id)로 upsert. 한 번에 여러 건을
+   * 받아 왕복을 줄인다(Recap 편집은 표 전체를 한 번에 저장한다).
+   */
+  const saveRecapCampaignNotes = useCallback(async (notes) => {
+    if (!notes || notes.length === 0) return [];
+    const { data, error: upsertError } = await supabase
+      .from('recap_campaign_notes')
+      .upsert(notes.map(recapCampaignNoteToRow), { onConflict: 'recap_id,campaign_id' })
+      .select();
+    if (upsertError) {
+      setError(describeBackendError(upsertError, "Couldn't save the campaign notes. Try again."));
+      return null;
+    }
+    const saved = (data ?? []).map(rowToRecapCampaignNote);
+    setState((prev) => {
+      const byKey = new Map(prev.recapCampaignNotes.map((n) => [`${n.recapId}:${n.campaignId}`, n]));
+      saved.forEach((n) => byKey.set(`${n.recapId}:${n.campaignId}`, n));
+      return { ...prev, recapCampaignNotes: [...byKey.values()] };
+    });
     return saved;
   }, []);
 
@@ -447,11 +513,8 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     performanceRecords: state.performanceRecords,
     performanceDaily: state.performanceDaily,
     adAccounts: state.adAccounts,
-    /* Recap(캠페인 종료 후 결과 보고)의 저장 데이터 자리. 1단계는 테이블이 없어
-       빈 배열이다 — Phase 5에서 event_recaps · recap_campaign_notes를 읽어 채운다.
-       페이지가 이 키를 미리 읽게 해 두면 그때 페이지를 열지 않아도 된다. */
-    eventRecaps: [],
-    recapCampaignNotes: [],
+    eventRecaps: state.eventRecaps,
+    recapCampaignNotes: state.recapCampaignNotes,
     alerts,
     today,
     isLoading,
@@ -459,6 +522,8 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     refresh,
     savePlan,
     deletePlan,
+    saveEventRecap,
+    saveRecapCampaignNotes,
     addCampaign,
     updateCampaign,
     bulkSetCampaignGroup,

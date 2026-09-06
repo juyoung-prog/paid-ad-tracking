@@ -35,7 +35,8 @@ const tiers = [
    Recap(캠페인 종료 후 결과 보고) 생성 계획 — 2026-09.
    02 UX Flow 시나리오 7을 입력으로, 위와 같은 원칙(데이터는 schema.js 한 파일,
    컴포넌트는 props만)으로 Phase를 의존 순서대로 잡는다.
-   진행: Phase 1~4(1단계) 구현됨 — 2026-09-06. Phase 5~6은 계획.
+   진행: Phase 1~6 전부 구현됨 — 2026-09-06. Phase 5는 마이그레이션 20 적용, Phase 6은
+   recap-draft 함수 배포 + ANTHROPIC_API_KEY 시크릿이 선행 조건.
    ──────────────────────────────────────────────────────────────── */
 
 /** schema.js에 추가할 타입 — 전부 JSDoc @typedef. 저장되는 것과 계산 전용을 나눈다. */
@@ -116,7 +117,7 @@ const recapPhases = [
     ],
   },
   {
-    phase: '5', title: '코멘트·배운 점 저장 — 2단계', stage: '2단계', deps: 'Phase 4 + 마이그레이션',
+    phase: '5', title: '코멘트·배운 점 저장 (구현됨) — 2단계', stage: '2단계', deps: 'Phase 4 + 마이그레이션 20',
     items: [
       '마이그레이션 2개 — event_recaps, recap_campaign_notes: owner_id 기본값 auth.uid(), anon read 정책(00000000000019 방식), owner write. LocalizedText는 jsonb',
       'usePaidAdsStore — recaps/notes 읽기 + upsert 함수. 저장 실패는 BackendErrorBanner 문법 그대로',
@@ -126,10 +127,10 @@ const recapPhases = [
     ],
   },
   {
-    phase: '6', title: '내보내기·다국어·초안 — 3단계', stage: '3단계', deps: 'Phase 5',
+    phase: '6', title: '내보내기·다국어·초안 (구현됨) — 3단계', stage: '3단계', deps: 'Phase 5 + recap-draft 배포',
     items: [
       'LanguageSwitch — input. props: value(RECAP_LANG), onChange. ToggleButton 재활용, ?lang= 동기화. recapStrings에 ko / zh-Hant 채움',
-      'Excel 내보내기 — utils/recapExcel.js. 이전 보고서와 같은 시트 구성(플랫폼별 시트 + Learnings). 라이브러리는 exceljs 후보(CDN 스크립트 대신 번들) — 결정 필요',
+      'Excel 내보내기 — utils/recapExcel.js. 이전 보고서와 같은 시트 구성(플랫폼별 시트 + Learnings). exceljs를 동적 import로(버튼을 누를 때만 내려받는다)',
       'AI 초안/번역 — Edge Function(recap-draft): 숫자·벤치마크를 주면 strength/weakness/reason 초안과 ko/zh-Hant 번역을 돌려준다. 프론트는 결과를 에디터에 채우기만, 최종 문장은 사람이 다듬는다',
       'RecapNoteEditor에 organicViews/organicEngagements 선택 입력 칸',
     ],
@@ -262,7 +263,7 @@ export const Doc = {
           </Table>
         </TableContainer>
 
-        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 데이터는 schema.js 한 파일, 컴포넌트는 props만. Phase 1~4(1단계)는 구현됨, Phase 5~6은 계획" />
+        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 데이터는 schema.js 한 파일, 컴포넌트는 props만. Phase 1~6 구현됨(2026-09-06)" />
 
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>① schema.js 타입 (JSDoc @typedef)</Typography>
         <TableContainer sx={{ mb: 3 }}>

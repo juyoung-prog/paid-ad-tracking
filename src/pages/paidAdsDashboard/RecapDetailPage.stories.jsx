@@ -85,6 +85,16 @@ export const NotFound = {
   render: () => render(recapStore(), '/recap/Nope%20Event'),
 };
 
+/** 한국어 — ?lang=ko. 화면 문구는 한국어, 저장된 문장은 ko 칸이 비어 en으로 대체되고 "(영어)" 표시가 붙는다 */
+export const Korean = {
+  render: () => render(recapStore(), '/recap/G10%20Opening?lang=ko'),
+};
+
+/** 번체중문 — ?lang=zh-Hant */
+export const TraditionalChinese = {
+  render: () => render(recapStore(), '/recap/G10%20Opening?lang=zh-Hant'),
+};
+
 /** 로딩 중 */
 export const Loading = {
   render: () => render(recapStore({ isLoading: true }), '/recap/G10%20Opening'),

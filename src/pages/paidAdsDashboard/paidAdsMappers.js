@@ -255,3 +255,77 @@ export function rowToPlan(row, itemRows = []) {
       .sort((a, b) => a.sortOrder - b.sortOrder || a.startDate.localeCompare(b.startDate)),
   };
 }
+
+// ============================================================
+// Recap — event_recaps · recap_campaign_notes (마이그레이션 20)
+// 언어별 문장은 jsonb 한 칸(LocalizedText)이라 그대로 오간다.
+// ============================================================
+
+/** DB의 jsonb LocalizedText → 앱. 빈 객체·문자열은 null로 정리한다 */
+function localizedFromRow(value) {
+  if (!value || typeof value !== 'object') return null;
+  return { en: value.en ?? '', ko: value.ko ?? null, 'zh-Hant': value['zh-Hant'] ?? null };
+}
+
+/** 앱 LocalizedText → DB. en이 비어 있으면 아예 null(빈 칸을 저장하지 않는다) */
+function localizedToRow(value) {
+  if (!value || !(value.en ?? '').trim()) return null;
+  return { en: value.en.trim(), ko: value.ko?.trim() || null, 'zh-Hant': value['zh-Hant']?.trim() || null };
+}
+
+export function rowToEventRecap(row) {
+  return {
+    id: row.id,
+    eventName: row.event_name,
+    status: row.status ?? 'draft',
+    summary: localizedFromRow(row.summary),
+    learnings: Array.isArray(row.learnings)
+      ? row.learnings.map((item) => ({ title: localizedFromRow(item?.title) ?? { en: '', ko: null, 'zh-Hant': null }, body: localizedFromRow(item?.body) ?? { en: '', ko: null, 'zh-Hant': null } }))
+      : [],
+    nextSteps: localizedFromRow(row.next_steps),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** owner_id는 DB default(auth.uid())에 맡긴다 — 클라이언트가 소유자를 적지 않는다 */
+export function eventRecapToRow(recap) {
+  return {
+    event_name: recap.eventName.trim(),
+    status: recap.status ?? 'draft',
+    summary: localizedToRow(recap.summary),
+    learnings: (recap.learnings ?? [])
+      .map((item) => ({ title: localizedToRow(item.title), body: localizedToRow(item.body) }))
+      .filter((item) => item.title || item.body),
+    next_steps: localizedToRow(recap.nextSteps),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+export function rowToRecapCampaignNote(row) {
+  return {
+    id: row.id,
+    recapId: row.recap_id,
+    campaignId: row.campaign_id,
+    verdict: row.verdict ?? null,
+    strength: localizedFromRow(row.strength),
+    weakness: localizedFromRow(row.weakness),
+    reason: localizedFromRow(row.reason),
+    organicViews: row.organic_views != null ? Number(row.organic_views) : null,
+    organicEngagements: row.organic_engagements != null ? Number(row.organic_engagements) : null,
+  };
+}
+
+export function recapCampaignNoteToRow(note) {
+  return {
+    recap_id: note.recapId,
+    campaign_id: note.campaignId,
+    verdict: note.verdict ?? null,
+    strength: localizedToRow(note.strength),
+    weakness: localizedToRow(note.weakness),
+    reason: localizedToRow(note.reason),
+    organic_views: note.organicViews ?? null,
+    organic_engagements: note.organicEngagements ?? null,
+    updated_at: new Date().toISOString(),
+  };
+}

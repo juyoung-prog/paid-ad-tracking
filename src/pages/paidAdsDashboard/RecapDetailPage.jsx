@@ -1,17 +1,30 @@
-import { useMemo } from 'react';
-import { Link as RouterLink, useNavigate, useParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
+import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PrintOutlinedIcon from '@mui/icons-material/PrintOutlined';
+import TableViewOutlinedIcon from '@mui/icons-material/TableViewOutlined';
+import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
+import TranslateOutlinedIcon from '@mui/icons-material/TranslateOutlined';
+import Tooltip from '@mui/material/Tooltip';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
+import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
+import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
+import { SignInDialog } from '../../components/templates/SignInDialog';
+import { LanguageSwitch } from '../../components/input/LanguageSwitch';
+import { supabase } from '../../lib/supabase';
+import { exportRecapToExcel } from '../../utils/recapExcel';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { usePaidAdsStore } from './usePaidAdsStore';
+import { useSupabaseSession } from '../../lib/useSupabaseSession';
+import { useSnackbar } from '../../hooks/useSnackbar';
 import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline } from './paidAdsPageUtils';
 import {
   buildRecapRows,
@@ -21,12 +34,61 @@ import {
   effectiveBudgetPlanned,
   planTotal,
   RECAP_DEFAULT_LANG,
+  RECAP_LANG,
+  BENCHMARK_METRICS,
 } from '../../data/schema';
 import { t } from '../../data/recapStrings';
 import { money } from '../../utils/format';
 
 /** "1 phase" / "3 phases" — 단수·복수 문구는 문자열 표에서 */
 const countScope = (n, key, lang) => t(n === 1 ? `recap.scope.${key}` : `recap.scope.${key}s`, lang, { n });
+
+const LANGS = Object.values(RECAP_LANG);
+const OTHER_LANGS = LANGS.filter((l) => l !== RECAP_DEFAULT_LANG);
+
+/** LocalizedText의 빈 언어 칸만 채운다 — 사람이 쓴 글은 절대 덮지 않는다 */
+const fillEmpty = (text, lang, value) => {
+  if (!value) return text ?? null;
+  const current = text?.[lang];
+  if (current && current.trim()) return text;
+  return { en: '', ko: null, 'zh-Hant': null, ...(text ?? {}), [lang]: value };
+};
+
+/** AI에 보낼 숫자 요약 — 표 한 행을 지표·벤치마크 문장으로 줄인다 */
+const rowForAi = (row, platformLabel) => ({
+  campaignId: row.campaignId,
+  phase: row.phaseName,
+  platform: platformLabel[row.platform] ?? row.platform,
+  goal: row.goal,
+  period: `${row.startDate} – ${row.endDate}`,
+  rank: row.rank,
+  suggestedVerdict: row.suggestedVerdict,
+  spend: row.spend,
+  reach: row.reach,
+  impressions: row.impressions,
+  clicks: row.clicks,
+  videoPlays: row.videoPlays,
+  likes: row.likes,
+  comments: row.comments,
+  shares: row.shares,
+  conversions: row.conversions,
+  metrics: Object.fromEntries(BENCHMARK_METRICS.map((m) => {
+    const b = row.benchmarks?.[m.key];
+    return [m.key, b?.peerScope === 'none' || b?.percentile == null
+      ? { value: b?.value ?? null, benchmark: 'not enough data' }
+      : { value: b.value, median: b.median, percentile: b.percentile, peers: b.sampleSize, scope: b.peerScope }];
+  })),
+});
+
+/** 빈 코멘트 — 편집을 시작할 때 캠페인마다 하나씩 만든다 */
+const emptyNote = (campaignId, recapId) => ({
+  id: null, recapId, campaignId, verdict: null, strength: null, weakness: null, reason: null, organicViews: null, organicEngagements: null,
+});
+
+/** 저장할 가치가 있는 코멘트인가 — 판정·문장·오가닉 중 하나라도 있거나, 이미 저장된 행이면 */
+const hasNoteContent = (note) =>
+  Boolean(note.id) || note.verdict != null || note.organicViews != null || note.organicEngagements != null
+  || ['strength', 'weakness', 'reason'].some((key) => Object.values(note[key] ?? {}).some((v) => (v ?? '').trim()));
 
 /** 카드 제목 행 — Dashboard 목록 카드·Reports SectionHeader와 같은 자리(px 2, 아래 1px 선) */
 function SectionHeader({ title, scope }) {
@@ -58,31 +120,54 @@ function LocalizedParagraph({ text, lang, sx }) {
  * RecapDetailPage
  *
  * 이벤트 하나의 결과 보고서(/recap/:event) — 02-ux-flow 시나리오 7. 머리글(순위
- * 한 줄 포함) → 단계 타임라인 → 플랫폼별 캠페인 표(벤치마크 포함) → 코멘트·배운
- * 점(저장된 게 있으면 읽기 전용, 없으면 2단계 안내). 인쇄(브라우저 인쇄 = PDF)는
- * PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다.
+ * 한 줄 포함) → 요약 → 단계 타임라인 → 플랫폼별 캠페인 표(벤치마크 포함) →
+ * Notes(캠페인별 판정·장점·아쉬운 점·이유) → Learnings(배운 점·다음 제언).
+ *
+ * **읽기는 누구나, 쓰기는 로그인.** Edit를 누르면 세션이 없을 때만 SignInDialog가
+ * 뜬다(앱 전체 로그인 게이트는 꺼져 있다 — App.jsx). 편집은 로컬 draft에 쌓였다가
+ * Save에서 saveEventRecap → saveRecapCampaignNotes 순으로 한 번에 저장된다.
+ * 편집 중에는 표의 판정 칩도 draft를 따라 바뀐다(buildRecapRows에 draft의
+ * notesById를 넘긴다).
  *
  * 계산은 전부 schema.js(buildRecapRows · buildRecapHeadline · localizedText)와
- * paidAdsPageUtils(buildPhaseTimeline)가 하고, 이 페이지는 합계 몇 개를 더해
- * 컴포넌트에 넘길 뿐이다. 언어는 1단계에서 en 고정 — 3단계에서 ?lang=으로 바뀐다.
+ * paidAdsPageUtils(buildPhaseTimeline)가 한다. 인쇄(브라우저 인쇄 = PDF)는
+ * PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. 언어는 URL ?lang=이 소유한다(3단계).
  */
 export function RecapDetailPage() {
   const { event: eventParam } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const eventName = decodeURIComponent(eventParam ?? '');
-  const lang = RECAP_DEFAULT_LANG;
+  // 언어는 URL이 소유한다(?lang=ko) — 링크를 받은 사람이 그 언어로 연다. 모르는 값은 en.
+  const langParam = searchParams.get('lang');
+  const lang = LANGS.includes(langParam) ? langParam : RECAP_DEFAULT_LANG;
+  const setLang = (next) => setSearchParams((prev) => {
+    const params = new URLSearchParams(prev);
+    if (next === RECAP_DEFAULT_LANG) params.delete('lang'); else params.set('lang', next);
+    return params;
+  }, { replace: true });
   const {
     campaigns, performanceRecords, plans, adAccounts, eventRecaps, recapCampaignNotes, today, isLoading, error, refresh,
+    saveEventRecap, saveRecapCampaignNotes,
   } = usePaidAdsStore();
+  const { session } = useSupabaseSession();
+  const { notify, SnackbarComponent } = useSnackbar();
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
+  const [isSignInOpen, setIsSignInOpen] = useState(false);
+  const [draft, setDraft] = useState(null);
 
   const recap = useMemo(
     () => (eventRecaps ?? []).find((r) => campaignNameKey(r.eventName) === campaignNameKey(eventName)) ?? null,
     [eventRecaps, eventName]
   );
-  const notesById = useMemo(
-    () => Object.fromEntries((recapCampaignNotes ?? []).filter((n) => !recap || n.recapId === recap.id).map((n) => [n.campaignId, n])),
+  const storedNotesById = useMemo(
+    () => Object.fromEntries((recapCampaignNotes ?? []).filter((n) => recap && n.recapId === recap.id).map((n) => [n.campaignId, n])),
     [recapCampaignNotes, recap]
   );
+  const notesById = isEditing && draft ? draft.notesById : storedNotesById;
   const accountRegionById = useMemo(
     () => Object.fromEntries((adAccounts ?? []).map((a) => [a.id, a.region])),
     [adAccounts]
@@ -96,6 +181,50 @@ export function RecapDetailPage() {
     () => buildRecapHeadline(eventName, campaigns, performanceRecords),
     [eventName, campaigns, performanceRecords]
   );
+
+  const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
+
+  const startEditing = () => {
+    setDraft({
+      recap: recap
+        ? { ...recap, learnings: (recap.learnings ?? []).map((l) => ({ ...l })) }
+        : { id: null, eventName, status: 'draft', summary: null, learnings: [], nextSteps: null },
+      notesById: Object.fromEntries(allRows.map((r) => [r.campaignId, storedNotesById[r.campaignId] ?? emptyNote(r.campaignId, recap?.id ?? null)])),
+    });
+    setIsEditing(true);
+  };
+
+  const handleEditClick = () => {
+    if (!session) { setIsSignInOpen(true); return; }
+    startEditing();
+  };
+
+  const handleSave = async () => {
+    if (!draft) return;
+    setIsSaving(true);
+    const savedRecap = await saveEventRecap(draft.recap);
+    if (!savedRecap) {
+      setIsSaving(false);
+      notify(t('recap.edit.failed', lang), 'error');
+      return;
+    }
+    const notes = Object.values(draft.notesById)
+      .filter(hasNoteContent)
+      .map((n) => ({ ...n, recapId: savedRecap.id }));
+    const savedNotes = await saveRecapCampaignNotes(notes);
+    setIsSaving(false);
+    if (savedNotes === null) {
+      notify(t('recap.edit.failed', lang), 'error');
+      return;
+    }
+    notify(t('recap.edit.saved', lang), 'success');
+    setIsEditing(false);
+    setDraft(null);
+  };
+
+  const updateDraftRecap = (patch) => setDraft((d) => ({ ...d, recap: { ...d.recap, ...patch } }));
+  const updateDraftNote = (campaignId, patch) =>
+    setDraft((d) => ({ ...d, notesById: { ...d.notesById, [campaignId]: { ...d.notesById[campaignId], ...patch } } }));
 
   if (isLoading) {
     return (
@@ -127,7 +256,6 @@ export function RecapDetailPage() {
   }
 
   // 머리글 합계 — 표 행(레코드 최신값 기준)에서 더한다. 계획 예산은 계획 문서가 있으면 그 값.
-  const allRows = Object.values(byPlatform).flat();
   const spendValues = allRows.map((r) => r.spend).filter((v) => v != null);
   const spend = spendValues.length > 0 ? spendValues.reduce((a, b) => a + b, 0) : null;
   const plan = (plans ?? []).find((p) => campaignNameKey(p.name) === campaignNameKey(eventName)) ?? null;
@@ -143,7 +271,117 @@ export function RecapDetailPage() {
     if (r.spend != null) acc[key] = (acc[key] ?? 0) + r.spend;
     return acc;
   }, {});
+  const shownRecap = isEditing && draft ? draft.recap : recap;
   const notedRows = allRows.filter((r) => r.note && (r.note.strength || r.note.weakness || r.note.reason));
+  const editRows = platformOrder.flatMap((p) => byPlatform[p]);
+  const headlineTextForAi = headline
+    ? `${t(headline.rank === 1 ? 'recap.headline.best' : 'recap.headline.rank', 'en', { rank: headline.rank, total: headline.total, metric: headline.metricKey })} (${headline.peerEvents.join(' > ')})`
+    : null;
+
+  /* AI 초안·번역 — Edge Function이 문장만 돌려주고, 여기서 **빈 칸에만** 채운다.
+     사람이 이미 쓴 글은 어떤 경우에도 덮지 않는다. 저장은 여전히 Save가 한다. */
+  const runAi = async (mode) => {
+    if (!draft) return;
+    setAiMode(mode);
+    const rows = editRows.map((r) => rowForAi(r, PLATFORM_LABEL));
+    const { data, error: fnError } = await supabase.functions.invoke('recap-draft', {
+      body: {
+        mode,
+        lang,
+        targets: OTHER_LANGS,
+        event: { name: eventName, period: `${startDate} – ${endDate}`, stores, platforms, headline: headlineTextForAi },
+        rows,
+        recap: draft.recap,
+        notes: draft.notesById,
+      },
+    });
+    setAiMode(null);
+    const languages = data?.languages;
+    if (fnError || !Array.isArray(languages)) {
+      notify(data?.error ?? t('recap.edit.aiFailed', lang), 'error');
+      return;
+    }
+    setDraft((d) => {
+      let recapNext = { ...d.recap };
+      const notesNext = { ...d.notesById };
+      languages.forEach((block) => {
+        const target = block.lang;
+        if (!LANGS.includes(target)) return;
+        recapNext = {
+          ...recapNext,
+          summary: fillEmpty(recapNext.summary, target, block.summary),
+          nextSteps: fillEmpty(recapNext.nextSteps, target, block.nextSteps),
+          learnings: (block.learnings ?? []).length > 0 && (recapNext.learnings ?? []).every((l) => !(l.title?.[target] ?? '').trim() && !(l.body?.[target] ?? '').trim())
+            ? (recapNext.learnings?.length > 0
+              ? recapNext.learnings.map((l, i) => ({ title: fillEmpty(l.title, target, block.learnings[i]?.title), body: fillEmpty(l.body, target, block.learnings[i]?.body) }))
+              : block.learnings.map((l) => ({ title: fillEmpty(null, target, l.title), body: fillEmpty(null, target, l.body) })))
+            : recapNext.learnings,
+        };
+        (block.notes ?? []).forEach((n) => {
+          const existing = notesNext[n.campaignId];
+          if (!existing) return;
+          notesNext[n.campaignId] = {
+            ...existing,
+            strength: fillEmpty(existing.strength, target, n.strength),
+            weakness: fillEmpty(existing.weakness, target, n.weakness),
+            reason: fillEmpty(existing.reason, target, n.reason),
+          };
+        });
+      });
+      return { ...d, recap: recapNext, notesById: notesNext };
+    });
+    notify(t('recap.edit.aiDone', lang), 'success');
+  };
+
+  const handleExcel = async () => {
+    try {
+      await exportRecapToExcel({ eventName, byPlatform, platformLabel: PLATFORM_LABEL, recap: shownRecap, headline, lang });
+    } catch (e) {
+      console.error('recap excel export failed', e);
+      notify(t('recap.detail.excelFailed', lang), 'error');
+    }
+  };
+
+
+  const isBusy = isSaving || Boolean(aiMode);
+  const actions = isEditing ? (
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }} data-print="hide">
+      <LanguageSwitch value={lang} onChange={setLang} />
+      <Tooltip title={t('recap.edit.aiDraftHint', lang)}>
+        <span>
+          <Button variant="outlined" size="small" startIcon={<AutoAwesomeOutlinedIcon />} disabled={isBusy} onClick={() => runAi('draft')}>
+            {aiMode === 'draft' ? t('recap.edit.aiWorking', lang) : t('recap.edit.aiDraft', lang)}
+          </Button>
+        </span>
+      </Tooltip>
+      <Tooltip title={t('recap.edit.aiTranslateHint', lang)}>
+        <span>
+          <Button variant="outlined" size="small" startIcon={<TranslateOutlinedIcon />} disabled={isBusy} onClick={() => runAi('translate')}>
+            {aiMode === 'translate' ? t('recap.edit.aiWorking', lang) : t('recap.edit.aiTranslate', lang)}
+          </Button>
+        </span>
+      </Tooltip>
+      <Button variant="text" size="small" disabled={isBusy} onClick={() => { setIsEditing(false); setDraft(null); }}>
+        {t('recap.edit.cancel', lang)}
+      </Button>
+      <Button variant="contained" size="small" disabled={isBusy} onClick={handleSave}>
+        {isSaving ? t('recap.edit.saving', lang) : t('recap.edit.save', lang)}
+      </Button>
+    </Box>
+  ) : (
+    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }} data-print="hide">
+      <LanguageSwitch value={lang} onChange={setLang} />
+      <Button variant="outlined" size="small" startIcon={<EditOutlinedIcon />} onClick={handleEditClick}>
+        {t(session ? 'recap.edit.start' : 'recap.edit.signIn', lang)}
+      </Button>
+      <Button variant="outlined" size="small" startIcon={<TableViewOutlinedIcon />} onClick={handleExcel}>
+        {t('recap.detail.excel', lang)}
+      </Button>
+      <Button variant="outlined" size="small" startIcon={<PrintOutlinedIcon />} onClick={() => window.print()}>
+        {t('recap.detail.print', lang)}
+      </Button>
+    </Box>
+  );
 
   return (
     <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
@@ -160,23 +398,13 @@ export function RecapDetailPage() {
         stores={stores}
         platforms={platforms}
         headline={headline}
-        status={recap?.status ?? null}
+        status={shownRecap?.status ?? null}
         lang={lang}
-        actions={
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<PrintOutlinedIcon />}
-            onClick={() => window.print()}
-            data-print="hide"
-          >
-            {t('recap.detail.print', lang)}
-          </Button>
-        }
+        actions={actions}
         sx={{ mb: 3 }}
       />
 
-      {recap?.summary && (
+      {!isEditing && recap?.summary && (
         <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14 }} />
       )}
 
@@ -199,14 +427,32 @@ export function RecapDetailPage() {
             rows={byPlatform[platform]}
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
-            onRowClick={(campaignId) => navigate(`/dashboard?campaign=${campaignId}`)}
+            onRowClick={isEditing ? undefined : (campaignId) => navigate(`/dashboard?campaign=${campaignId}`)}
           />
         </Box>
       ))}
 
       <Box sx={SECTION_CARD_SX} data-print="card">
-        <SectionHeader title={t('recap.section.notes', lang)} scope={notedRows.length > 0 ? countScope(notedRows.length, 'campaign', lang) : null} />
-        {notedRows.length === 0 ? (
+        <SectionHeader
+          title={t('recap.section.notes', lang)}
+          scope={isEditing ? countScope(editRows.length, 'campaign', lang) : (notedRows.length > 0 ? countScope(notedRows.length, 'campaign', lang) : null)}
+        />
+        {isEditing && draft ? (
+          <Box>
+            {editRows.map((r, i) => (
+              <RecapNoteEditor
+                key={r.campaignId}
+                note={draft.notesById[r.campaignId]}
+                campaignLabel={`${r.phaseName} · ${PLATFORM_LABEL[r.platform] ?? r.platform}`}
+                suggestedVerdict={r.suggestedVerdict}
+                onChange={(patch) => updateDraftNote(r.campaignId, patch)}
+                lang={lang}
+                isDisabled={isBusy}
+                sx={{ px: 2, py: 2, borderBottom: i < editRows.length - 1 ? '1px solid' : 0, borderColor: 'divider' }}
+              />
+            ))}
+          </Box>
+        ) : notedRows.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5 }}>{t('recap.section.notesPlaceholder', lang)}</Typography>
         ) : (
           <Box>
@@ -230,7 +476,12 @@ export function RecapDetailPage() {
         )}
       </Box>
 
-      {recap && (recap.learnings?.length > 0 || recap.nextSteps) && (
+      {isEditing && draft ? (
+        <Box sx={SECTION_CARD_SX} data-print="card">
+          <SectionHeader title={t('recap.section.learnings', lang)} />
+          <RecapLearningsEditor recap={draft.recap} onChange={updateDraftRecap} lang={lang} isDisabled={isBusy} sx={{ p: 2 }} />
+        </Box>
+      ) : recap && (recap.learnings?.length > 0 || recap.nextSteps) && (
         <Box sx={SECTION_CARD_SX} data-print="card">
           <SectionHeader title={t('recap.section.learnings', lang)} scope={recap.learnings?.length ? countScope(recap.learnings.length, 'lesson', lang) : null} />
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2, p: 2 }}>
@@ -251,6 +502,15 @@ export function RecapDetailPage() {
           )}
         </Box>
       )}
+
+      <SignInDialog
+        isOpen={isSignInOpen}
+        onClose={() => setIsSignInOpen(false)}
+        onSignedIn={() => { setIsSignInOpen(false); startEditing(); }}
+        title={t('recap.edit.signIn', lang)}
+        description={t('recap.edit.signInHint', lang)}
+      />
+      <SnackbarComponent />
     </PageContainer>
   );
 }

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Skeleton from '@mui/material/Skeleton';
 import Table from '@mui/material/Table';
@@ -9,9 +9,10 @@ import TableRow from '@mui/material/TableRow';
 import Typography from '@mui/material/Typography';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
+import { LanguageSwitch } from '../../components/input/LanguageSwitch';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL } from './paidAdsPageUtils';
-import { buildRecapEvents, RECAP_DEFAULT_LANG } from '../../data/schema';
+import { buildRecapEvents, RECAP_DEFAULT_LANG, RECAP_LANG } from '../../data/schema';
 import { t } from '../../data/recapStrings';
 import { money, dateRange } from '../../utils/format';
 
@@ -28,17 +29,27 @@ import { money, dateRange } from '../../utils/format';
  */
 export function RecapPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { campaigns, performanceRecords, eventRecaps, isLoading, error, refresh } = usePaidAdsStore();
-  const lang = RECAP_DEFAULT_LANG;
+  const langParam = searchParams.get('lang');
+  const lang = Object.values(RECAP_LANG).includes(langParam) ? langParam : RECAP_DEFAULT_LANG;
+  const langQuery = lang === RECAP_DEFAULT_LANG ? '' : `?lang=${lang}`;
   const events = isLoading ? [] : buildRecapEvents(campaigns, performanceRecords, eventRecaps);
 
   return (
     <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="display" component="h1">{t('recap.title', lang)}</Typography>
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, maxWidth: 720 }}>
-          {t('recap.list.subtitle', lang)}
-        </Typography>
+      <Box sx={{ mb: 3, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
+        <Box>
+          <Typography variant="display" component="h1">{t('recap.title', lang)}</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, maxWidth: 720 }}>
+            {t('recap.list.subtitle', lang)}
+          </Typography>
+        </Box>
+        <LanguageSwitch
+          value={lang}
+          onChange={(next) => setSearchParams(next === RECAP_DEFAULT_LANG ? {} : { lang: next }, { replace: true })}
+          sx={{ flexShrink: 0 }}
+        />
       </Box>
 
       {error && <BackendErrorBanner error={error} onRetry={refresh} sx={{ mb: 2 }} />}
@@ -69,7 +80,7 @@ export function RecapPage() {
             </TableHead>
             <TableBody>
               {events.map((event) => {
-                const go = () => navigate(`/recap/${encodeURIComponent(event.eventName)}`);
+                const go = () => navigate(`/recap/${encodeURIComponent(event.eventName)}${langQuery}`);
                 return (
                   <TableRow
                     key={event.eventName}
