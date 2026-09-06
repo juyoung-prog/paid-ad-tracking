@@ -1522,6 +1522,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number} sampleSize - 값이 있는 비교 캠페인 수
  * @property {boolean} lowerIsBetter
  * @property {'phase'|'goal'|'none'} peerScope - 비교군을 어떤 기준으로 잡았나
+ * @property {'top'|'mid'|'bottom'|null} band - 백분위 구간(VERDICT_PERCENTILE 기준). 컴포넌트가 톤·화살표를 고르는 근거 — 경계값을 컴포넌트가 알지 않게 여기서 정한다
  */
 
 /**
@@ -1659,15 +1660,30 @@ export function benchmarkStat(metricKey, value, peerRows, peerScope = 'none') {
   const lowerIsBetter = meta?.lowerIsBetter ?? false;
   const peerValues = (peerRows ?? []).map((r) => r?.[metricKey]).filter((v) => v != null && Number.isFinite(v));
   const enough = peerScope !== 'none' && peerValues.length >= BENCHMARK_MIN_PEERS;
+  const percentile = enough ? percentileRank(peerValues, value, lowerIsBetter) : null;
   return {
     metricKey,
     value: value ?? null,
     median: enough ? median(peerValues) : null,
-    percentile: enough ? percentileRank(peerValues, value, lowerIsBetter) : null,
+    percentile,
     sampleSize: peerValues.length,
     lowerIsBetter,
     peerScope: enough ? peerScope : 'none',
+    band: percentileBand(percentile),
   };
+}
+
+/**
+ * 백분위 → 구간. 판정(suggestVerdict)과 같은 경계를 쓴다 — 표의 셀 색과 판정 칩이
+ * 서로 다른 말을 하지 않게.
+ * @param {number|null} percentile
+ * @returns {'top'|'mid'|'bottom'|null}
+ */
+export function percentileBand(percentile) {
+  if (percentile == null) return null;
+  if (percentile >= VERDICT_PERCENTILE.good) return 'top';
+  if (percentile <= VERDICT_PERCENTILE.bad) return 'bottom';
+  return 'mid';
 }
 
 /**

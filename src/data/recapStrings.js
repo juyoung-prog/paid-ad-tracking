@@ -83,9 +83,11 @@ export const RECAP_STRINGS = Object.freeze({
 
   // 벤치마크
   'benchmark.vsMedian': { en: 'median {median}' },
+  'benchmark.percentile.best': { en: 'best of {n}' },
   'benchmark.percentile.top': { en: 'top {pct}%' },
-  'benchmark.percentile.bottom': { en: 'bottom {pct}%' },
   'benchmark.percentile.mid': { en: 'mid' },
+  'benchmark.percentile.bottom': { en: 'bottom {pct}%' },
+  'benchmark.percentile.lowest': { en: 'lowest of {n}' },
   'benchmark.sample': { en: 'of {n} similar' },
   'benchmark.sample.phase': { en: 'vs {n} {phase} campaigns' },
   'benchmark.sample.goal': { en: 'vs {n} {goal} campaigns' },
