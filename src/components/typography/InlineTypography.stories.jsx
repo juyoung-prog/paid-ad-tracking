@@ -176,6 +176,7 @@ export const Documentation = {
               Powered by
               <InlineObject size={ 1.5 } spacing={ 0.3 }>
                 <Box
+                  component="span"
                   sx={ {
                     width: '100%',
                     height: '100%',
@@ -200,11 +201,13 @@ export const Documentation = {
               Status:
               <InlineObject size={ 0.8 } rounded spacing={ 0.3 }>
                 <Box
+                  component="span"
                   sx={ {
                     width: '100%',
                     height: '100%',
                     backgroundColor: 'success.main',
                     borderRadius: '50%',
+                    display: 'block',
                   } }
                 />
               </InlineObject>

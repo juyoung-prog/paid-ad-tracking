@@ -807,17 +807,19 @@ export const testVideos = {
       tags: ['motion', 'liquid', 'abstract'],
     },
     {
-      id: 3141210,
-      alt: 'Gradient color transition',
+      /* 원래 3141210(Gradient color transition)이었는데 Pexels가 그 파일을 내려서
+         403이 됐다 — 스토리에서 조용히 빈 플레이어가 됐다. 살아 있는 파일로 교체. */
+      id: 3130284,
+      alt: 'Ink diffusing in water',
       photographer: 'Rostislav Uzunov',
       duration: 8,
       aspectRatio: '16/9',
       src: {
-        hd: 'https://videos.pexels.com/video-files/3141210/3141210-hd_1920_1080_30fps.mp4',
-        sd: 'https://videos.pexels.com/video-files/3141210/3141210-sd_640_360_30fps.mp4',
+        hd: 'https://videos.pexels.com/video-files/3130284/3130284-hd_1920_1080_30fps.mp4',
+        sd: 'https://videos.pexels.com/video-files/3130284/3130284-sd_640_360_30fps.mp4',
       },
       poster: createImageSizes(3109807).medium,
-      tags: ['motion', 'gradient', 'transition'],
+      tags: ['motion', 'ink', 'transition'],
     },
     {
       id: 5377684,
