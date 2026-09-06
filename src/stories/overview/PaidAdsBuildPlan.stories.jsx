@@ -31,20 +31,117 @@ const tiers = [
   { tier: '4', components: 'FilterBar 수정', category: 'templates', dep: '없음 (옵션 세트만 교체)' },
 ];
 
-/* Recap(캠페인 종료 후 결과 보고, 2026-09 계획) — 같은 Tier 규칙으로 생성 순서를 잡는다.
-   1단계는 DB 변경 없이 화면과 계산만, 2단계에서 테이블 2개, 3단계는 내보내기·다국어. */
-const recapTiers = [
-  { tier: '0', components: 'BenchmarkDelta, VerdictChip', category: 'data-display', dep: '없음 (원자) — 1단계', phase: '1' },
-  { tier: '1', components: 'RecapCampaignTable', category: 'data-display', dep: 'Tier 0 + PerformanceReportTable 열 정의 공유 — 1단계', phase: '1' },
-  { tier: '2', components: 'Print stylesheet (@media print)', category: 'PaidAdsShell', dep: '없음 — 1단계', phase: '1' },
-  { tier: '3', components: 'RecapNoteEditor', category: 'templates', dep: 'event_recaps · recap_campaign_notes 테이블 + 로그인 게이트 — 2단계', phase: '2' },
-  { tier: '4', components: 'LanguageSwitch, Excel export', category: 'input, utils', dep: '언어별 문자열 표 · LocalizedText 칸 — 3단계', phase: '3' },
+/* ────────────────────────────────────────────────────────────────
+   Recap(캠페인 종료 후 결과 보고) 생성 계획 — 2026-09.
+   02 UX Flow 시나리오 7을 입력으로, 위와 같은 원칙(데이터는 schema.js 한 파일,
+   컴포넌트는 props만)으로 Phase를 의존 순서대로 잡는다. 아직 구현 전.
+   ──────────────────────────────────────────────────────────────── */
+
+/** schema.js에 추가할 타입 — 전부 JSDoc @typedef. 저장되는 것과 계산 전용을 나눈다. */
+const recapTypes = [
+  { name: 'LocalizedText', kind: '저장', fields: '{ en: string, ko: string|null, "zh-Hant": string|null }', note: '영어 필수. 비어 있는 언어는 화면에서 en으로 대체하고 isFallback 표시' },
+  { name: 'EventRecap', kind: '저장', fields: 'id, ownerId, eventName, status(RECAP_STATUS), summary: LocalizedText|null, learnings: Array<{ title: LocalizedText, body: LocalizedText }>, nextSteps: LocalizedText|null, createdAt, updatedAt', note: 'eventName = Campaign.campaignGroup. 이벤트당 1건' },
+  { name: 'RecapCampaignNote', kind: '저장', fields: 'id, recapId, campaignId, verdict: VERDICT|null, strength / weakness / reason: LocalizedText|null, organicViews: number|null, organicEngagements: number|null', note: '캠페인당 1건. verdict가 null이면 화면은 suggestedVerdict를 점선 칩으로' },
+  { name: 'BenchmarkStat', kind: '계산 전용', fields: 'metricKey, value: number|null, median: number|null, percentile: number|null(0~100, "높을수록 좋음"으로 정규화), sampleSize: number, lowerIsBetter: boolean, peerScope: "phase"|"goal"|"none"', note: 'sampleSize < BENCHMARK_MIN_PEERS면 median/percentile null, peerScope "none" → 컴포넌트는 not enough data' },
+  { name: 'RecapCampaignRow', kind: '계산 전용', fields: 'getGoalMetricsRow(...)의 모든 필드 + storeCode, phaseName, dailyBudget, rank, benchmarks: Record<metricKey, BenchmarkStat>, suggestedVerdict: VERDICT|null, note: RecapCampaignNote|null', note: '표 한 행. 정렬·순위까지 끝난 상태로 컴포넌트에 내려간다' },
+  { name: 'RecapHeadline', kind: '계산 전용', fields: '{ metricKey, rank, total, peerEvents: string[] } | null', note: '머리글 한 줄("역대 오프닝 5개 중 CPM 2위")의 재료. 문장은 recapStrings가 만든다' },
 ];
 
-const recapLogic = [
-  { block: 'schema.js 벤치마크 함수 (순수)', content: 'buildBenchmarkPeers(campaign, allCampaigns) — 같은 platform + 같은 단계 이름(→ goal → not enough data 순 fallback), 2024년 이후만 · benchmarkStats(values, value, lowerIsBetter) — 중앙값·백분위·N · suggestVerdict(percentiles, goal) — 상위 30% good / 하위 30% bad' },
-  { block: '페이지 (Tier 5)', content: 'RecapPage(목록) · RecapDetailPage(/recap/:event) — Reports의 buildPhaseTimeline·goalRows 계산을 재사용, 레일에 Recap 메뉴 추가' },
-  { block: 'Recap 문자열 표', content: 'recapStrings.js — { en, ko, "zh-Hant" } 키로 화면 문구. 1단계는 en만 채우고 나머지 키는 비워둔다(빈 값이면 en으로 대체)' },
+/** schema.js 상수 — 기존 Object.freeze 패턴 그대로 */
+const recapEnums = [
+  { name: 'RECAP_STATUS', value: "{ DRAFT: 'draft', FINAL: 'final' }" },
+  { name: 'VERDICT', value: "{ GOOD: 'good', MID: 'mid', BAD: 'bad' }" },
+  { name: 'RECAP_LANG', value: "{ EN: 'en', KO: 'ko', ZH_HANT: 'zh-Hant' } + RECAP_DEFAULT_LANG = 'en'" },
+  { name: 'BENCHMARK_METRICS', value: "[{ key: 'cpm', lowerIsBetter: true }, { key: 'cpc', lowerIsBetter: true }, { key: 'ctr' }, { key: 'hookRate' }, { key: 'holdRate' }, { key: 'engagementRate' }] — 비율 지표만" },
+  { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm', 'hookRate'], traffic: ['ctr', 'cpc'], engagement: ['engagementRate'], conversion: ['cpa'], store_visit: ['cpa'] } — 판정 제안과 머리글 순위에 쓰는 대표 지표" },
+  { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
+  { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 대표 지표 백분위 평균이 70 이상 good, 30 이하 bad, 사이 mid' },
+];
+
+/** schema.js 순수 함수 — 입력/출력만 적는다. 컴포넌트는 이 결과를 props로 받을 뿐 안에서 다시 계산하지 않는다. */
+const recapFunctions = [
+  { name: 'phaseNameOf(campaign)', io: 'Campaign → string', note: '캠페인명에서 매장 코드 접두사(G10_)와 기간 접미사(_0617~0707)를 뗀 단계 이름("Grand Opening"). 지금 PhaseTimelineChart.displayName과 ReportSummarySection.buildPhaseTimeline에 나뉘어 있는 규칙을 여기로 올리고 둘이 이걸 쓰게 한다(기존 스토리 통과 확인)' },
+  { name: 'buildBenchmarkPeers(campaign, allCampaigns, { since, region })', io: '→ { peers: Campaign[], scope: "phase"|"goal"|"none" }', note: '같은 platform + 같은 phaseNameOf + 다른 campaignGroup + startDate ≥ since. 3개 미만이면 같은 platform + 같은 goal로, 그래도 미만이면 scope "none". region을 주면 같은 지역 계정만' },
+  { name: 'median(values)', io: 'number[] → number|null', note: '빈 배열이면 null' },
+  { name: 'percentileRank(values, value, lowerIsBetter)', io: '→ number|null (0~100)', note: '"높을수록 좋음"으로 정규화 — CPM·CPC는 뒤집는다. 동점은 절반으로 센다' },
+  { name: 'benchmarkStat(metricKey, value, peerRows)', io: '→ BenchmarkStat', note: 'peerRows는 getGoalMetricsRow 결과 배열. null 값은 표본에서 뺀다' },
+  { name: 'suggestVerdict(benchmarks, goal)', io: 'Record<key, BenchmarkStat>, GOAL → VERDICT|null', note: 'GOAL_HEADLINE_METRICS의 백분위 평균으로 VERDICT_PERCENTILE 판정. 대표 지표가 전부 not enough data면 null' },
+  { name: 'buildRecapRows(eventName, campaigns, records, options)', io: '→ { byPlatform: Record<platform, RecapCampaignRow[]>, peerEvents: string[] }', note: '이벤트 캠페인마다 getGoalMetricsRow → benchmarks → suggestedVerdict → 플랫폼별로 대표 지표 백분위 순 정렬 후 rank 부여. notesById를 주면 note를 붙인다' },
+  { name: 'buildRecapHeadline(eventName, rows, allCampaigns, records)', io: '→ RecapHeadline|null', note: '같은 단계 구성의 다른 이벤트들과 이벤트 단위 대표 지표(지출 가중)를 비교해 순위. 이벤트가 3개 미만이면 null' },
+  { name: 'localizedText(text, lang)', io: 'LocalizedText|null, RECAP_LANG → { value: string, isFallback: boolean }', note: '요청 언어가 비면 en. 컴포넌트는 이 결과만 받는다(언어 판단을 컴포넌트가 하지 않는다)' },
+  { name: 'recapStrings (src/data/recapStrings.js, 별도 파일)', io: 't(key, lang, params) → string', note: '화면 문구 표 { key: { en, ko, "zh-Hant" } }. 1단계는 en만 채우고 나머지는 빈 값(→ en 대체). 문장 조립("Top 25% of 12 similar campaigns")은 여기서만' },
+];
+
+/** paidAdsMockData.js 추가분 — 스토리가 벤치마크 숫자와 not enough data 양쪽을 다 보여줄 수 있어야 한다 */
+const recapMock = [
+  { name: 'mockEventRecaps', content: "'G10 Opening' draft 1건 — summary·learnings 2개·nextSteps, en만 채우고 ko/zh-Hant는 null(fallback 표시 확인용)" },
+  { name: 'mockRecapCampaignNotes', content: '캠페인 3건 — verdict good/null/bad, strength·weakness·reason, organicViews는 1건만' },
+  { name: '비교군 캠페인 + 레코드', content: "BF4 Opening(2026-04)·BF3 Opening(2025-10)·G09 Opening(2025-06)의 Grand Opening / Coming Soon 캠페인 — Meta는 단계별 3개 이상(숫자가 나온다), TikTok Coming Soon은 2개(not enough data가 나온다)" },
+];
+
+/** 컴포넌트/페이지 Phase — 의존 순서. 앞 Phase가 끝나야 다음이 시작된다. */
+const recapPhases = [
+  {
+    phase: '1', title: '데이터 레이어', stage: '1단계', deps: '없음',
+    items: [
+      'schema.js — 위 타입·상수·함수 추가. phaseNameOf로 PhaseTimelineChart·ReportSummarySection 리팩토링(동작 동일, 기존 스토리 통과)',
+      'paidAdsMockData.js — 위 목 데이터',
+      'recapStrings.js — en 문구 표',
+      '검증: Storybook "Test Data" 카테고리에 벤치마크 계산 결과를 표로 찍는 스토리 하나(컴포넌트 없이 함수만)',
+    ],
+  },
+  {
+    phase: '2', title: '원자 컴포넌트 (Tier 0)', stage: '1단계', deps: 'Phase 1의 BenchmarkStat 타입',
+    items: [
+      'BenchmarkDelta — data-display. props: stat(BenchmarkStat), formattedValue(string), label(string), size("sm"|"md"). 중앙값 대비 화살표·백분위·N, sampleSize 부족이면 not enough data. KpiBar delta와 같은 화살표·톤 문법',
+      'VerdictChip — data-display. props: verdict(VERDICT|null), isSuggested(boolean), lang. Chip 위에 구성, good=success / mid=중립 / bad=warning, 제안이면 점선 테두리',
+    ],
+  },
+  {
+    phase: '3', title: '조합 컴포넌트 (Tier 1)', stage: '1단계', deps: 'Phase 2',
+    items: [
+      'RecapCampaignTable — data-display. props: rows(RecapCampaignRow[]), platform, lang, onRowClick?. 열: 순위·매장·캠페인·일예산·지출·판정·영상 반응(Reach / Hook·Hold / 조회)·참여 반응·행동. 각 비율 지표 셀에 BenchmarkDelta. PerformanceReportTable의 COLUMN 정의를 공유 모듈로 뽑아 같이 쓴다',
+      'RecapHeader — data-display. props: event, dateRange, stores, platforms, spend, plannedBudget, headline(RecapHeadline|null), lang. KpiBar 재활용 + 순위 한 줄',
+    ],
+  },
+  {
+    phase: '4', title: '페이지 조립 + 인쇄 (Tier 5) — 1단계 마감', stage: '1단계', deps: 'Phase 3',
+    items: [
+      'RecapPage(/recap) — 이벤트 목록: campaignGroup별 기간·캠페인 수·지출·Recap 상태. usePaidAdsStore 재사용',
+      'RecapDetailPage(/recap/:event) — buildRecapRows·buildRecapHeadline 호출은 여기(페이지)까지만. PhaseTimelineChart 읽기 전용 재활용. 하단에 2단계 자리(코멘트·배운 점)는 비워둔다',
+      'PaidAdsRail에 Recap 메뉴, App.jsx 라우트 2개, useViewUrlSync에 lang 파라미터 자리',
+      '@media print — PaidAdsShell 레벨: 레일·툴바 숨김, 섹션 카드 page-break-inside: avoid, 표 폭 축소. 브라우저 인쇄 = PDF',
+      'Storybook: Page 카테고리에 RecapPage/RecapDetailPage 스토리(목 데이터), 인쇄 미리보기 스토리',
+    ],
+  },
+  {
+    phase: '5', title: '코멘트·배운 점 저장 — 2단계', stage: '2단계', deps: 'Phase 4 + 마이그레이션',
+    items: [
+      '마이그레이션 2개 — event_recaps, recap_campaign_notes: owner_id 기본값 auth.uid(), anon read 정책(00000000000019 방식), owner write. LocalizedText는 jsonb',
+      'usePaidAdsStore — recaps/notes 읽기 + upsert 함수. 저장 실패는 BackendErrorBanner 문법 그대로',
+      'RecapNoteEditor — templates. props: note(RecapCampaignNote|null), suggestedVerdict, lang, onChange, isSaving. 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
+      'RecapLearningsEditor — templates. props: learnings, nextSteps, lang, onChange. 카드 추가·삭제·순서',
+      '로그인 게이트 — Recap 편집 버튼에서만 켠다(읽기는 그대로 공개). 지금 꺼둔 LoginPage 재사용',
+    ],
+  },
+  {
+    phase: '6', title: '내보내기·다국어·초안 — 3단계', stage: '3단계', deps: 'Phase 5',
+    items: [
+      'LanguageSwitch — input. props: value(RECAP_LANG), onChange. ToggleButton 재활용, ?lang= 동기화. recapStrings에 ko / zh-Hant 채움',
+      'Excel 내보내기 — utils/recapExcel.js. 이전 보고서와 같은 시트 구성(플랫폼별 시트 + Learnings). 라이브러리는 exceljs 후보(CDN 스크립트 대신 번들) — 결정 필요',
+      'AI 초안/번역 — Edge Function(recap-draft): 숫자·벤치마크를 주면 strength/weakness/reason 초안과 ko/zh-Hant 번역을 돌려준다. 프론트는 결과를 에디터에 채우기만, 최종 문장은 사람이 다듬는다',
+      'RecapNoteEditor에 organicViews/organicEngagements 선택 입력 칸',
+    ],
+  },
+];
+
+const recapChecklist = [
+  '중앙값·백분위·판정·순위는 schema.js에서만 계산한다 — BenchmarkDelta·VerdictChip·RecapCampaignTable은 계산 결과(BenchmarkStat, RecapCampaignRow)만 받는다',
+  '언어 대체(빈 ko → en)는 localizedText()가 정하고 컴포넌트는 { value, isFallback }만 받는다',
+  '문장 조립("Top 25% of 12")은 recapStrings.js에서만 — 컴포넌트 안에 영어 문자열 리터럴을 두지 않는다',
+  '페이지(RecapDetailPage)만 schema.js 함수를 호출한다. 컴포넌트 파일은 schema.js를 import하지 않는다(스토리는 예외)',
+  '1단계는 DB 변경 0건 — Phase 1~4가 끝나면 마이그레이션 없이 배포 가능해야 한다',
+  '기존 Reports·PhaseTimelineChart 스토리가 phaseNameOf 리팩토링 후에도 그대로 통과한다',
 ];
 
 const checklist = [
@@ -164,52 +261,132 @@ export const Doc = {
           </Table>
         </TableContainer>
 
-        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 같은 Tier 규칙, 단계별로 나눠 만든다" />
-        <TableContainer sx={{ mb: 2 }}>
+        <SectionTitle title="Recap 생성 계획 (2026-09 추가)" description="캠페인 종료 후 결과 보고 — 02 UX Flow 시나리오 7. 데이터는 schema.js 한 파일, 컴포넌트는 props만. 아직 구현 전" />
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>① schema.js 타입 (JSDoc @typedef)</Typography>
+        <TableContainer sx={{ mb: 3 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, width: '8%' }}>Tier</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>컴포넌트</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: '16%' }}>카테고리</TableCell>
-                <TableCell sx={{ fontWeight: 600, width: '32%' }}>의존 / 단계</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '18%' }}>타입</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '9%' }}>구분</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>필드</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '28%' }}>비고</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {recapTiers.map((t) => (
-                <TableRow key={`recap-${t.tier}`}>
-                  <TableCell>
-                    <Chip label={`Tier ${t.tier}`} size="small" variant="outlined" color={t.phase === '1' ? 'primary' : 'default'} sx={{ borderRadius: (th) => `${th.shape.radius.control}px` }} />
-                  </TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{t.components}</TableCell>
-                  <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{t.category}</TableCell>
-                  <TableCell sx={{ fontSize: 13 }}>{t.dep}</TableCell>
+              {recapTypes.map((t) => (
+                <TableRow key={t.name}>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{t.name}</TableCell>
+                  <TableCell><Chip label={t.kind} size="small" variant="outlined" color={t.kind === '저장' ? 'primary' : 'default'} sx={{ borderRadius: (th) => `${th.shape.radius.control}px` }} /></TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{t.fields}</TableCell>
+                  <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{t.note}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>② schema.js 상수 (Object.freeze)</Typography>
+        <TableContainer sx={{ mb: 3 }}>
+          <Table size="small">
+            <TableBody>
+              {recapEnums.map((e) => (
+                <TableRow key={e.name}>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, width: '25%' }}>{e.name}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{e.value}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>③ schema.js 순수 함수 — 입력 → 출력</Typography>
+        <TableContainer sx={{ mb: 3 }}>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600, width: '30%' }}>함수</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '22%' }}>입력 → 출력</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>규칙</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {recapFunctions.map((f) => (
+                <TableRow key={f.name}>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{f.name}</TableCell>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{f.io}</TableCell>
+                  <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{f.note}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>④ 목 데이터 (paidAdsMockData.js)</Typography>
+        <TableContainer sx={{ mb: 3 }}>
+          <Table size="small">
+            <TableBody>
+              {recapMock.map((m) => (
+                <TableRow key={m.name}>
+                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 600, width: '25%' }}>{m.name}</TableCell>
+                  <TableCell sx={{ fontSize: 13 }}>{m.content}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>⑤ 생성 순서 — Phase 1 → 6 (의존 순)</Typography>
         <TableContainer sx={{ mb: 1 }}>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ fontWeight: 600, width: '25%' }}>로직 레이어</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>내용</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '9%' }}>Phase</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '18%' }}>이름 / 단계</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>만드는 것 (컴포넌트는 props만 적는다)</TableCell>
+                <TableCell sx={{ fontWeight: 600, width: '15%' }}>의존</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {recapLogic.map((b) => (
-                <TableRow key={b.block}>
-                  <TableCell sx={{ fontWeight: 600 }}>{b.block}</TableCell>
-                  <TableCell sx={{ fontFamily: 'monospace', fontSize: 12 }}>{b.content}</TableCell>
+              {recapPhases.map((ph) => (
+                <TableRow key={ph.phase}>
+                  <TableCell>
+                    <Chip label={`Phase ${ph.phase}`} size="small" variant="outlined" color={ph.stage === '1단계' ? 'primary' : 'default'} sx={{ borderRadius: (th) => `${th.shape.radius.control}px` }} />
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 13 }}>
+                    <Box sx={{ fontWeight: 600 }}>{ph.title}</Box>
+                    <Box sx={{ fontSize: 12, color: 'text.secondary' }}>{ph.stage}</Box>
+                  </TableCell>
+                  <TableCell>
+                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
+                      {ph.items.map((it) => (
+                        <Typography component="li" variant="body2" key={it} sx={{ mb: 0.5, fontSize: 12.5 }}>{it}</Typography>
+                      ))}
+                    </Box>
+                  </TableCell>
+                  <TableCell sx={{ fontSize: 12, color: 'text.secondary' }}>{ph.deps}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </TableContainer>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-          1단계(Tier 0~2 + 페이지)는 DB 변경이 없어 먼저 배포할 수 있다. 2단계는 마이그레이션 2개(event_recaps · recap_campaign_notes, anon read + owner write RLS)와 Recap 편집에서만 켜는 로그인 게이트가 선행 조건이다. 3단계의 AI 초안/번역(Claude API)은 Edge Function으로 두고 프론트는 결과만 받는다.
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+          Phase 1~4가 1단계다 — DB 변경이 없어 먼저 배포할 수 있다. Phase 5는 마이그레이션 2개와 Recap 편집에서만 켜는 로그인 게이트가 선행 조건. Phase 6의 AI 초안/번역은 Edge Function으로 두고 프론트는 결과만 받는다.
         </Typography>
+
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>⑥ Recap 분리 원칙 체크리스트</Typography>
+        <TableContainer sx={{ mb: 4 }}>
+          <Table size="small">
+            <TableBody>
+              {recapChecklist.map((c) => (
+                <TableRow key={c}>
+                  <TableCell sx={{ fontSize: 13 }}>{c}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
 
         <SectionTitle title="분리 원칙 체크리스트" />
         <TableContainer>
