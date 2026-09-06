@@ -22,7 +22,7 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.list.column.spend': { en: 'Spend', ko: '지출', 'zh-Hant': '花費' },
   'recap.list.column.status': { en: 'Report', ko: '보고서', 'zh-Hant': '報告' },
   'recap.status.draft': { en: 'Draft', ko: '작성 중', 'zh-Hant': '草稿' },
-  'recap.status.final': { en: 'Final', ko: '확정', 'zh-Hant': '定稿' },
+  'recap.status.final': { en: 'Ready', ko: '완료', 'zh-Hant': '完成' },
   'recap.status.none': { en: 'Not started', ko: '시작 전', 'zh-Hant': '尚未開始' },
   'recap.detail.back': { en: 'All recaps', ko: '전체 보고서', 'zh-Hant': '所有報告' },
   'recap.detail.notFound': { en: 'No campaigns are tagged with this event.', ko: '이 이벤트로 태그된 캠페인이 없습니다.', 'zh-Hant': '沒有標記為此活動的廣告。' },
@@ -67,6 +67,7 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.table.video': { en: 'Video', ko: '영상 반응', 'zh-Hant': '影片反應' },
   'recap.table.engagement': { en: 'Engagement', ko: '참여 반응', 'zh-Hant': '互動反應' },
   'recap.table.action': { en: 'Action', ko: '행동', 'zh-Hant': '行動' },
+  'recap.table.verdictHint': { en: 'Rated from this campaign\'s relative performance across the efficiency metrics that matter for its goal, against comparable past campaigns. A dashed badge is a suggestion not yet confirmed by a person.', ko: '이 캠페인의 목표에 맞는 효율 지표들이 비교 가능한 과거 캠페인 대비 어디쯤인지로 매깁니다. 점선 배지는 아직 사람이 확인하지 않은 제안값입니다.', 'zh-Hant': '依此廣告在其目標相關效率指標上、相對於可比過往廣告的表現評定。虛線徽章為尚未經人工確認的建議值。' },
   'recap.table.noData': { en: 'No performance data', ko: '성과 데이터 없음', 'zh-Hant': '無成效資料' },
   'recap.table.empty': { en: 'No campaigns on this platform.', ko: '이 플랫폼에는 캠페인이 없습니다.', 'zh-Hant': '此平台沒有廣告。' },
 
@@ -102,6 +103,24 @@ export const RECAP_STRINGS = Object.freeze({
   'benchmark.sample.goal': { en: 'vs {n} {goal} campaigns', ko: '{goal} 캠페인 {n}개 기준', 'zh-Hant': '對比 {n} 支 {goal} 廣告' },
   'benchmark.notEnough': { en: 'not enough data', ko: '비교 데이터 부족', 'zh-Hant': '資料不足' },
   'benchmark.tooltip': { en: '{label}: {value}. Median of {n} comparable campaigns: {median}. This campaign ranks in the {position}.', ko: '{label}: {value}. 비교 가능한 캠페인 {n}개의 중앙값: {median}. 이 캠페인은 {position}에 해당합니다.', 'zh-Hant': '{label}：{value}。{n} 支可比廣告的中位數：{median}。此廣告位於{position}。' },
+
+  // 핵심 요약(Key takeaways) — 숫자를 해석한 문장. 재료는 schema.js buildRecapTakeaways
+  'recap.takeaways.title': { en: 'Key takeaways', ko: '핵심 요약', 'zh-Hant': '重點摘要' },
+  'recap.takeaways.empty': { en: 'Not enough comparable campaigns yet to draw conclusions — the tables below still show what ran.', ko: '결론을 내릴 만큼 비교 가능한 캠페인이 아직 없습니다. 아래 표에서 집행 내용은 볼 수 있습니다.', 'zh-Hant': '可比廣告尚不足以得出結論——下方表格仍可查看投放內容。' },
+  'recap.takeaways.label.best': { en: 'Best performer', ko: '가장 좋았던 캠페인', 'zh-Hant': '表現最佳' },
+  'recap.takeaways.label.weakest': { en: 'Needs improvement', ko: '개선이 필요한 캠페인', 'zh-Hant': '待改善' },
+  'recap.takeaways.label.platform': { en: 'Platform difference', ko: '플랫폼 차이', 'zh-Hant': '平台差異' },
+  'recap.takeaways.label.recommendation': { en: 'Recommendation', ko: '다음 제언', 'zh-Hant': '建議' },
+  'recap.takeaways.best': { en: '{platform} {phase} delivered the strongest {goal} efficiency — {metric} {position} among comparable campaigns.', ko: '{platform} {phase}이(가) {goal} 효율이 가장 좋았습니다 — 비교 가능한 캠페인 중 {metric} {position}.', 'zh-Hant': '{platform} {phase} 的{goal}效率最佳——在可比廣告中 {metric} {position}。' },
+  'recap.takeaways.weakest': { en: '{platform} {phase} underperformed on {metrics} — {position} among comparable campaigns.', ko: '{platform} {phase}은(는) {metrics}에서 뒤처졌습니다 — 비교 가능한 캠페인 중 {position}.', 'zh-Hant': '{platform} {phase} 在 {metrics} 表現落後——在可比廣告中 {position}。' },
+  'recap.takeaways.platform': { en: '{cheaper} reached its audience at {pct}% lower CPM than {pricier}. CPM is comparable across platforms; hook and hold rates are not.', ko: '{cheaper}가 {pricier}보다 {pct}% 낮은 CPM으로 도달했습니다. CPM은 플랫폼 간 비교가 되지만 Hook·Hold는 정의가 달라 비교하지 않습니다.', 'zh-Hant': '{cheaper} 以低於 {pricier} {pct}% 的 CPM 觸及受眾。CPM 可跨平台比較，Hook 與 Hold 則不可。' },
+  'recap.takeaways.recommendation': { en: 'Consider shifting more launch-period budget toward {platform} {phase}, and revisiting the creative or targeting of {weakPlatform} {weakPhase} before reusing it.', ko: '다음에는 출시 기간 예산을 {platform} {phase} 쪽으로 더 배분하고, {weakPlatform} {weakPhase}는 소재나 타겟을 손본 뒤 재사용하는 것을 권합니다.', 'zh-Hant': '建議下次將更多開幕期預算投向 {platform} {phase}，並在重複使用 {weakPlatform} {weakPhase} 前先調整素材或受眾。' },
+  'recap.takeaways.recommendationBestOnly': { en: 'Consider shifting more launch-period budget toward {platform} {phase} next time — it was the most efficient use of spend in this event.', ko: '다음에는 출시 기간 예산을 {platform} {phase} 쪽으로 더 배분하는 것을 권합니다 — 이번 이벤트에서 지출 대비 가장 효율적이었습니다.', 'zh-Hant': '建議下次將更多開幕期預算投向 {platform} {phase}——這是本次活動中花費效率最高的部分。' },
+  'goal.awareness': { en: 'awareness', ko: '인지', 'zh-Hant': '認知' },
+  'goal.traffic': { en: 'traffic', ko: '트래픽', 'zh-Hant': '流量' },
+  'goal.engagement': { en: 'engagement', ko: '참여', 'zh-Hant': '互動' },
+  'goal.conversion': { en: 'conversion', ko: '전환', 'zh-Hant': '轉換' },
+  'goal.store_visit': { en: 'store-visit', ko: '매장 방문', 'zh-Hant': '到店' },
 
   // 판정
   'verdict.good': { en: 'Good', ko: '좋음', 'zh-Hant': '良好' },
@@ -192,4 +211,22 @@ export function t(key, lang = RECAP_DEFAULT_LANG, params = {}) {
  */
 export function metricLabel(metricKey, lang = RECAP_DEFAULT_LANG) {
   return t(`metric.${metricKey}`, lang);
+}
+
+/**
+ * 벤치마크 위치 문구 — "best of 5" · "top 25%" · "mid" · "bottom 9%" · "lowest of 4".
+ * BenchmarkDelta 셀, Google Sheets 내보내기, 핵심 요약 문장이 같은 말을 쓰게 한 곳에 둔다.
+ * 양 끝(백분위 100/0)은 퍼센트가 아니라 말로 — "top 0%"는 읽히지 않는다.
+ *
+ * @param {{ percentile: number|null, band: string|null, sampleSize: number, peerScope: string }} stat - schema.js benchmarkStat() 결과
+ * @param {string} [lang]
+ * @returns {string} 비교군이 없으면 "not enough data"
+ */
+export function benchmarkPositionText(stat, lang = RECAP_DEFAULT_LANG) {
+  if (!stat || stat.peerScope === 'none' || stat.percentile == null) return t('benchmark.notEnough', lang);
+  if (stat.percentile >= 100) return t('benchmark.percentile.best', lang, { n: stat.sampleSize + 1 });
+  if (stat.percentile <= 0) return t('benchmark.percentile.lowest', lang, { n: stat.sampleSize + 1 });
+  if (stat.band === 'top') return t('benchmark.percentile.top', lang, { pct: 100 - stat.percentile });
+  if (stat.band === 'bottom') return t('benchmark.percentile.bottom', lang, { pct: stat.percentile });
+  return t('benchmark.percentile.mid', lang);
 }

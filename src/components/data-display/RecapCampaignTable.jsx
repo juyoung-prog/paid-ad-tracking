@@ -4,7 +4,9 @@ import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { VerdictChip } from './VerdictChip';
@@ -65,7 +67,7 @@ function RawLine({ parts }) {
       {shown.map(([label, v], i) => (
         <Box component="span" key={label} sx={{ whiteSpace: 'nowrap' }}>
           {i > 0 && ' · '}
-          {label} <Box component="span" sx={{ color: 'text.primary', fontVariantNumeric: 'tabular-nums' }}>{v}</Box>
+          {label} <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{v}</Box>
         </Box>
       ))}
     </Typography>
@@ -120,7 +122,13 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.campaign', lang)}</TableCell>
             <TableCell align="right" sx={HEAD_SX}>{t('recap.table.dailyBudget', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.spend', lang)}</TableCell>
-            <TableCell sx={HEAD_SX}>{t('recap.table.verdict', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>
+              {t('recap.table.verdict', lang)}
+              {/* 판정이 어디서 오는지는 툴팁 한 줄로 — 표 안에 설명문을 두지 않는다 */}
+              <Tooltip title={t('recap.table.verdictHint', lang)} arrow enterTouchDelay={0}>
+                <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
+              </Tooltip>
+            </TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.video', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.engagement', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.action', lang)}</TableCell>

@@ -1,7 +1,7 @@
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { t } from '../../data/recapStrings';
+import { t, benchmarkPositionText } from '../../data/recapStrings';
 
 /** 구간 → 톤·기호. 기호는 "더 좋다/나쁘다"를 말한다(값이 높다/낮다가 아니다) */
 const BAND_STYLE = {
@@ -10,9 +10,12 @@ const BAND_STYLE = {
   bottom: { tone: 'warning.main', mark: '▼ ' },
 };
 
+/* 셀 안 위계: 라벨(호출부) → **값**(가장 강하게) → 비교 줄(보조). 값은 sm에서도
+   13px/600이다 — 표에서 12px/500이면 옆의 원본 지표(Reach·Plays)와 무게가 같아져
+   "무엇이 판단 근거인가"가 안 보였다(경영진용 보고서 리뷰, 2026-09). */
 const SIZE = {
-  md: { value: 13, caption: 11 },
-  sm: { value: 12, caption: 10.5 },
+  md: { value: 14, valueWeight: 600, caption: 11 },
+  sm: { value: 13, valueWeight: 600, caption: 10.5 },
 };
 
 /**
@@ -49,19 +52,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
   const band = isKnown ? (stat.band ?? 'mid') : null;
   const style = band ? BAND_STYLE[band] : null;
 
-  /* 양 끝은 퍼센트가 아니라 말로 — "top 0%"·"bottom 0%"는 읽히지 않는다.
-     100은 비교군 전부보다 낫다는 뜻이고 0은 전부보다 못하다는 뜻이다. */
-  const positionText = !isKnown
-    ? t('benchmark.notEnough', lang)
-    : stat.percentile >= 100
-      ? t('benchmark.percentile.best', lang, { n: stat.sampleSize + 1 })
-      : stat.percentile <= 0
-        ? t('benchmark.percentile.lowest', lang, { n: stat.sampleSize + 1 })
-        : band === 'top'
-          ? t('benchmark.percentile.top', lang, { pct: 100 - stat.percentile })
-          : band === 'bottom'
-            ? t('benchmark.percentile.bottom', lang, { pct: stat.percentile })
-            : t('benchmark.percentile.mid', lang);
+  const positionText = benchmarkPositionText(stat, lang);
 
   const tooltip = isKnown
     ? t('benchmark.tooltip', lang, {
@@ -77,7 +68,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
     <Tooltip title={tooltip} placement="top" enterDelay={400}>
       <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0, ...sx }}>
         {hasValue && (
-          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: 500, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>
+          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: sizes.valueWeight, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>
             {value}
           </Typography>
         )}

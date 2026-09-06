@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { KpiBar } from './KpiBar';
+import { RecapStatusBadge } from './RecapStatusBadge';
 import { t, metricLabel } from '../../data/recapStrings';
 import { money, moneyWhole, dateRange, EMPTY } from '../../utils/format';
 
@@ -48,7 +49,6 @@ export function RecapHeader({
   sx,
 }) {
   const metaLine = [dateRange(startDate, endDate), stores.join(', ') || null, platforms.join(' + ') || null].filter(Boolean).join(' · ');
-  const statusLabel = status ? t(`recap.status.${status}`, lang) : t('recap.status.none', lang);
 
   const kpis = [
     { label: t('recap.kpi.campaigns', lang), value: campaignCount },
@@ -76,23 +76,7 @@ export function RecapHeader({
             <Typography variant="display" component="h1" sx={{ minWidth: 0 }}>
               {eventName}
             </Typography>
-            <Typography
-              component="span"
-              sx={(theme) => ({
-                fontSize: 11,
-                fontWeight: 600,
-                px: 0.75,
-                py: 0.25,
-                borderRadius: `${theme.shape.radius.control}px`,
-                border: '1px solid',
-                borderColor: 'divider',
-                color: status === 'final' ? 'success.main' : 'text.secondary',
-                backgroundColor: 'surface.sunken',
-                whiteSpace: 'nowrap',
-              })}
-            >
-              {statusLabel}
-            </Typography>
+            <RecapStatusBadge status={status} lang={lang} />
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
             {metaLine}

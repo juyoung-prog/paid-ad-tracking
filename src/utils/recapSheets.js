@@ -12,7 +12,7 @@
  * React import 금지 — 순수 유틸.
  */
 import { localizedText, BENCHMARK_METRICS } from '../data/schema';
-import { t, metricLabel } from '../data/recapStrings';
+import { t, metricLabel, benchmarkPositionText } from '../data/recapStrings';
 
 const GOOGLE_SHEETS_NEW_URL = 'https://sheets.new';
 
@@ -25,16 +25,7 @@ const asText = (v) => (v == null ? '' : String(v).replace(/[\t\r\n]+/g, ' '));
 function benchmarkText(stat, isMoney, lang) {
   if (!stat || stat.peerScope === 'none' || stat.percentile == null) return t('benchmark.notEnough', lang);
   const median = isMoney ? asMoney(stat.median) : `${asPercent(stat.median)}%`;
-  const position = stat.percentile >= 100
-    ? t('benchmark.percentile.best', lang, { n: stat.sampleSize + 1 })
-    : stat.percentile <= 0
-      ? t('benchmark.percentile.lowest', lang, { n: stat.sampleSize + 1 })
-      : stat.band === 'top'
-        ? t('benchmark.percentile.top', lang, { pct: 100 - stat.percentile })
-        : stat.band === 'bottom'
-          ? t('benchmark.percentile.bottom', lang, { pct: stat.percentile })
-          : t('benchmark.percentile.mid', lang);
-  return `${position} (${t('benchmark.vsMedian', lang, { median })})`;
+  return `${benchmarkPositionText(stat, lang)} (${t('benchmark.vsMedian', lang, { median })})`;
 }
 
 /**

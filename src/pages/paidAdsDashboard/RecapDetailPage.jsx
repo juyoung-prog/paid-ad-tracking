@@ -15,6 +15,7 @@ import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
+import { RecapTakeaways } from '../../components/data-display/RecapTakeaways';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
@@ -32,6 +33,7 @@ import {
   buildRecapRows,
   buildRecapHeadline,
   buildPeerComparison,
+  buildRecapTakeaways,
   localizedText,
   campaignNameKey,
   effectiveBudgetPlanned,
@@ -188,6 +190,7 @@ export function RecapDetailPage() {
   );
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
+  const takeaways = useMemo(() => buildRecapTakeaways(byPlatform), [byPlatform]);
 
   const startEditing = () => {
     setDraft({
@@ -412,6 +415,12 @@ export function RecapDetailPage() {
       {!isEditing && recap?.summary && (
         <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14 }} />
       )}
+
+      {/* 핵심 요약 — 표가 증거, 이 카드가 해석. KPI를 더 늘리지 않고 이 칸이 "그래서 어땠나"를 말한다. */}
+      <Box sx={SECTION_CARD_SX} data-print="card">
+        <SectionHeader title={t('recap.takeaways.title', lang)} />
+        <RecapTakeaways items={takeaways} platformLabel={PLATFORM_LABEL} lang={lang} />
+      </Box>
 
       <Box sx={SECTION_CARD_SX} data-print="card">
         <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />

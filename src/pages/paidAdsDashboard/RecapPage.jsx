@@ -10,6 +10,7 @@ import Typography from '@mui/material/Typography';
 import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { LanguageSwitch } from '../../components/input/LanguageSwitch';
+import { RecapStatusBadge } from '../../components/data-display/RecapStatusBadge';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL } from './paidAdsPageUtils';
 import { buildRecapEvents, RECAP_DEFAULT_LANG, RECAP_LANG } from '../../data/schema';
@@ -108,9 +109,7 @@ export function RecapPage() {
                     <TableCell sx={{ whiteSpace: 'nowrap' }}>{dateRange(event.startDate, event.endDate)}</TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{event.campaignCount}</TableCell>
                     <TableCell align="right" sx={{ fontVariantNumeric: 'tabular-nums' }}>{money(event.spend)}</TableCell>
-                    <TableCell sx={{ color: event.status === 'final' ? 'success.main' : 'text.secondary', fontWeight: event.status ? 600 : 400 }}>
-                      {t(event.status ? `recap.status.${event.status}` : 'recap.status.none', lang)}
-                    </TableCell>
+                    <TableCell><RecapStatusBadge status={event.status} lang={lang} /></TableCell>
                   </TableRow>
                 );
               })}

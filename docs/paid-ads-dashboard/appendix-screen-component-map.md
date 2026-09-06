@@ -68,7 +68,9 @@
 |---|---|---|
 | KpiBar | 재활용 | 머리글 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표(`delta`로 벤치마크 대비) |
 | PhaseTimelineChart | 재활용 | 단계 타임라인(읽기 전용, 클릭 없음). buildPhaseTimeline은 Reports와 공유(paidAdsPageUtils) |
-| **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
+| **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태 배지·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
+| **RecapTakeaways** | 신규(구현됨, 2026-09) | 머리글과 타임라인 사이 "Key takeaways" — 표가 증거, 이 칸이 해석(schema.js buildRecapTakeaways) |
+| **RecapStatusBadge** | 신규(구현됨, 2026-09) | Not started / Draft / Ready 배지 — 목록 Report 열과 머리글 공용 |
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |

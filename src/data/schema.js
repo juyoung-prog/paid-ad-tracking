@@ -1934,3 +1934,68 @@ export function buildPeerComparison(campaign, allCampaigns, allRecords, options 
   });
   return { scope, rows: [toRow(campaign, true), ...peerRows] };
 }
+
+/**
+ * 핵심 요약(Key takeaways)의 **재료** — 문장은 recapStrings가 만든다. 표에 이미
+ * 있는 숫자를 반복하지 않고 해석만 남긴다: 가장 좋았던 캠페인, 뒤처진 캠페인,
+ * 플랫폼 차이(비교 가능한 CPM만), 다음 제언. 최대 4개.
+ *
+ * 근거가 없으면 만들지 않는다 — 벤치마크가 하나도 없는 이벤트는 빈 배열이다.
+ *
+ * @param {Object<string, Array<Object>>} byPlatform - buildRecapRows().byPlatform
+ * @returns {Array<{ kind: 'best'|'weakest'|'platform'|'recommendation', campaignId?: string, platform?: string, phaseName?: string, goal?: string, metricKey?: string, metricKeys?: string[], stat?: BenchmarkStat, cheaper?: string, pricier?: string, pct?: number, weakPlatform?: string, weakPhaseName?: string }>}
+ */
+export function buildRecapTakeaways(byPlatform) {
+  const rows = Object.values(byPlatform ?? {}).flat();
+  const scored = rows
+    .map((row) => ({ row, score: headlineScore(row.benchmarks, row.goal), keys: GOAL_HEADLINE_METRICS[row.goal] ?? [] }))
+    .filter((x) => x.score >= 0)
+    .sort((a, b) => b.score - a.score);
+  const items = [];
+
+  // 대표 지표 중 백분위가 가장 높은/낮은 것 — 문장에 붙일 근거 하나
+  const pickStat = (entry, isBest) => entry.keys
+    .map((k) => entry.row.benchmarks?.[k])
+    .filter((b) => b && b.percentile != null)
+    .sort((a, b) => (isBest ? b.percentile - a.percentile : a.percentile - b.percentile))[0] ?? null;
+
+  const best = scored[0] ?? null;
+  const bestStat = best ? pickStat(best, true) : null;
+  if (best && bestStat) {
+    items.push({ kind: 'best', campaignId: best.row.campaignId, platform: best.row.platform, phaseName: best.row.phaseName, goal: best.row.goal, metricKey: bestStat.metricKey, stat: bestStat });
+  }
+
+  // 뒤처진 캠페인 — 대표 지표 중 하나라도 하위 구간이어야 한다(그냥 2등을 지목하지 않는다)
+  const weakest = scored.length >= 2 ? scored[scored.length - 1] : null;
+  const weakKeys = weakest ? weakest.keys.filter((k) => weakest.row.benchmarks?.[k]?.band === 'bottom') : [];
+  const weakStat = weakest ? pickStat(weakest, false) : null;
+  if (weakest && weakKeys.length > 0 && weakStat) {
+    items.push({ kind: 'weakest', campaignId: weakest.row.campaignId, platform: weakest.row.platform, phaseName: weakest.row.phaseName, goal: weakest.row.goal, metricKeys: weakKeys, stat: weakStat });
+  }
+
+  // 플랫폼 차이 — 정의가 같은 CPM으로만, 이벤트 단위 합산(분자·분모)으로, 15% 이상 벌어질 때만
+  const platforms = Object.keys(byPlatform ?? {}).filter((p) => (byPlatform[p] ?? []).length > 0);
+  if (platforms.length >= 2) {
+    const cpmByPlatform = platforms
+      .map((p) => ({ platform: p, cpm: aggregateMetric(byPlatform[p], 'cpm') }))
+      .filter((x) => x.cpm != null && x.cpm > 0)
+      .sort((a, b) => a.cpm - b.cpm);
+    if (cpmByPlatform.length >= 2) {
+      const [cheaper, pricier] = [cpmByPlatform[0], cpmByPlatform[cpmByPlatform.length - 1]];
+      const pct = Math.round((1 - cheaper.cpm / pricier.cpm) * 100);
+      if (pct >= 15) items.push({ kind: 'platform', cheaper: cheaper.platform, pricier: pricier.platform, pct });
+    }
+  }
+
+  if (best && bestStat) {
+    const hasWeak = items.some((i) => i.kind === 'weakest');
+    items.push({
+      kind: 'recommendation',
+      platform: best.row.platform,
+      phaseName: best.row.phaseName,
+      weakPlatform: hasWeak ? weakest.row.platform : null,
+      weakPhaseName: hasWeak ? weakest.row.phaseName : null,
+    });
+  }
+  return items.slice(0, 4);
+}
