@@ -1999,3 +1999,179 @@ export function buildRecapTakeaways(byPlatform) {
   }
   return items.slice(0, 4);
 }
+
+// ============================================================
+// Recap — 데이터 기반 캠페인 해석(Strength · Weakness · Why)과 이벤트 단위 패턴
+//
+// 원칙: 숫자는 "무엇이 일어났나"만 말한다. 이유(소재·타겟·메시지·피로도)는
+// 데이터에 없으므로 **절대 지어내지 않는다**. 각 문장은 근거 수준을 달고 나간다 —
+//   observed : 지표 값 자체
+//   compared : 비교군 순위·백분위
+//   inferred : 관측된 패턴의 해석("~일 수 있다") — 불확실성을 문장에 남긴다
+//   unknown  : 근거 부족
+// 문장은 recapStrings가 만들고 여기는 재료(종류·지표·근거)만 돌려준다.
+// ============================================================
+
+/** 지표 → 그 지표가 말하는 것(문장의 "무엇"). 문구 키는 recapStrings의 aspect.* */
+export const METRIC_ASPECT = Object.freeze({
+  cpm: 'reach',
+  cpc: 'click',
+  ctr: 'click',
+  cpa: 'result',
+  hookRate: 'hook',
+  holdRate: 'hold',
+  engagementRate: 'engagement',
+});
+
+/** 근거 수준 */
+export const INSIGHT_LEVEL = Object.freeze({
+  OBSERVED: 'observed',
+  COMPARED: 'compared',
+  INFERRED: 'inferred',
+  UNKNOWN: 'unknown',
+});
+
+/** 지출이 계획을 이만큼 넘으면 관측 사실로 적는다 */
+const OVERSPEND_RATIO = 0.2;
+
+/** 비교군이 있는 벤치마크만 */
+const knownStats = (row) => Object.values(row.benchmarks ?? {}).filter((b) => b && b.peerScope !== 'none' && b.percentile != null);
+
+/**
+ * 캠페인 한 줄의 해석 — { strength, weakness, reason }. 각 항목은
+ * { level, kind, ... } 또는 null(근거 없음). 표에 있는 숫자를 반복하지 않고
+ * "비교군 중 어디"만 근거로 붙인다.
+ *
+ * - strength: 대표 지표 우선, 상위 구간(top/best)인 벤치마크 중 백분위 최고
+ * - weakness: 하위 구간(bottom/lowest)인 벤치마크 중 백분위 최저. 없으면 계획 대비
+ *   20% 이상 초과 지출(observed)
+ * - reason: 관측된 패턴의 해석(inferred). 패턴이 없으면 unknown
+ *
+ * @param {Object} row - buildRecapRows()의 행(benchmarks 포함)
+ * @param {{ plannedBudget?: number|null }} [options]
+ * @returns {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object }}
+ */
+export function buildCampaignInsight(row, options = {}) {
+  const hasData = row && (row.spend != null || row.impressions != null);
+  const stats = hasData ? knownStats(row) : [];
+  const headline = new Set(GOAL_HEADLINE_METRICS[row?.goal] ?? []);
+  const byPct = (a, b) => b.percentile - a.percentile;
+  // 대표 지표를 먼저, 그다음 나머지 — 같은 구간이면 백분위 순
+  const rank = (list, dir) => list.slice().sort((a, b) => {
+    const h = Number(headline.has(b.metricKey)) - Number(headline.has(a.metricKey));
+    return h !== 0 ? h : (dir === 'top' ? byPct(a, b) : -byPct(a, b));
+  });
+
+  if (!hasData) return { hasData: false, strength: null, weakness: null, reason: { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noData' } };
+
+  const top = rank(stats.filter((b) => b.band === 'top'), 'top');
+  const bottom = rank(stats.filter((b) => b.band === 'bottom'), 'bottom');
+
+  const strength = top[0]
+    ? { level: INSIGHT_LEVEL.COMPARED, kind: 'ranked', metricKey: top[0].metricKey, aspect: METRIC_ASPECT[top[0].metricKey], stat: top[0], scope: top[0].peerScope, n: top[0].sampleSize }
+    : null;
+
+  let weakness = bottom[0]
+    ? { level: INSIGHT_LEVEL.COMPARED, kind: 'ranked', metricKey: bottom[0].metricKey, aspect: METRIC_ASPECT[bottom[0].metricKey], stat: bottom[0], scope: bottom[0].peerScope, n: bottom[0].sampleSize }
+    : null;
+  const planned = options.plannedBudget ?? null;
+  if (!weakness && planned && row.spend != null && row.spend > planned * (1 + OVERSPEND_RATIO)) {
+    weakness = { level: INSIGHT_LEVEL.OBSERVED, kind: 'overspend', pct: Math.round((row.spend / planned - 1) * 100) };
+  }
+
+  // Why — 두 지표의 조합만 해석한다. 하나뿐이면 방향을 말할 근거가 없다.
+  const band = (key) => row.benchmarks?.[key]?.band ?? null;
+  const known = (key) => row.benchmarks?.[key]?.peerScope !== 'none' && row.benchmarks?.[key]?.percentile != null;
+  const reachTop = band('cpm') === 'top';
+  const reachBottom = band('cpm') === 'bottom';
+  const clickTop = band('ctr') === 'top' || band('cpc') === 'top';
+  const clickBottom = band('ctr') === 'bottom' || band('cpc') === 'bottom';
+  const hookTop = band('hookRate') === 'top';
+  const hookBottom = band('hookRate') === 'bottom';
+  const holdTop = band('holdRate') === 'top';
+  const holdBottom = band('holdRate') === 'bottom';
+
+  let reason;
+  if (stats.length === 0) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPeers' };
+  else if (reachTop && clickBottom) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'reachNotAction' };
+  else if (reachBottom && clickTop) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'actionNotReach' };
+  else if (hookTop && holdBottom) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'hookNotHold' };
+  else if (hookBottom && holdTop) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'holdNotHook' };
+  else if (top.length >= 2 && bottom.length === 0) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'allStrong' };
+  else if (bottom.length >= 2 && top.length === 0) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'allWeak' };
+  else if ((known('cpm') || known('ctr') || known('cpc')) && top.length + bottom.length === 1) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'singleSignal', metricKey: (top[0] ?? bottom[0]).metricKey, aspect: METRIC_ASPECT[(top[0] ?? bottom[0]).metricKey], isStrong: top.length === 1 };
+  else reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPattern' };
+
+  return { hasData: true, strength, weakness, reason };
+}
+
+/**
+ * 이벤트 단위 패턴(Learnings)과 제언(Next time)의 재료. 개별 캠페인 하나로는 만들지
+ * 않는다 — 여러 캠페인이 같은 방향을 가리키거나(consistent), 단계끼리 갈리거나
+ * (phase), 플랫폼끼리 갈릴 때(platform, 이 이벤트 안에서만)만 항목이 생긴다.
+ *
+ * @param {Object<string, Array<Object>>} byPlatform - buildRecapRows().byPlatform
+ * @returns {{ learnings: Array<Object>, nextSteps: Array<Object> }}
+ */
+export function buildRecapPatterns(byPlatform) {
+  const rows = Object.values(byPlatform ?? {}).flat();
+  const learnings = [];
+  const nextSteps = [];
+
+  // 1) 같은 지표가 여러 캠페인에서 같은 방향 — 상위 2개 이상 / 하위 2개 이상
+  const withData = rows.filter((r) => r.spend != null || r.impressions != null);
+  // CTR과 CPC는 둘 다 "클릭 효율"이라 같은 aspect가 두 번 나오지 않게 한 번만 — 먼저 잡힌 지표가 대표
+  const seenAspect = new Set();
+  ['cpm', 'ctr', 'cpc', 'hookRate', 'holdRate', 'engagementRate'].forEach((key) => {
+    if (seenAspect.has(METRIC_ASPECT[key])) return;
+    const known = withData.filter((r) => r.benchmarks?.[key]?.peerScope !== 'none' && r.benchmarks?.[key]?.percentile != null);
+    if (known.length < 2) return;
+    const tops = known.filter((r) => r.benchmarks[key].band === 'top');
+    const bottoms = known.filter((r) => r.benchmarks[key].band === 'bottom');
+    if (tops.length >= 2 && tops.length > bottoms.length) { learnings.push({ kind: 'consistentStrong', metricKey: key, aspect: METRIC_ASPECT[key], count: tops.length, total: known.length }); seenAspect.add(METRIC_ASPECT[key]); }
+    else if (bottoms.length >= 2 && bottoms.length > tops.length) { learnings.push({ kind: 'consistentWeak', metricKey: key, aspect: METRIC_ASPECT[key], count: bottoms.length, total: known.length }); seenAspect.add(METRIC_ASPECT[key]); }
+  });
+
+  // 2) 단계 차이 — 같은 플랫폼 안에서 클릭 효율(CTR)이 가장 높은 단계가 플랫폼마다 같을 때
+  const platforms = Object.keys(byPlatform ?? {}).filter((p) => (byPlatform[p] ?? []).length > 0);
+  const bestPhaseByPlatform = platforms.map((p) => {
+    const list = (byPlatform[p] ?? []).filter((r) => r.ctr != null);
+    if (list.length < 2) return null;
+    const sorted = list.slice().sort((a, b) => b.ctr - a.ctr);
+    const best = sorted[0]; const worst = sorted[sorted.length - 1];
+    if (!best || !worst || best.ctr <= 0 || worst.ctr <= 0 || best.ctr / worst.ctr < 1.5) return null;
+    return { platform: p, best: best.phaseName, worst: worst.phaseName };
+  }).filter(Boolean);
+  if (bestPhaseByPlatform.length > 0) {
+    const [first] = bestPhaseByPlatform;
+    const agree = bestPhaseByPlatform.every((x) => phaseKey(x.best) === phaseKey(first.best));
+    if (agree && (bestPhaseByPlatform.length >= 2 || platforms.length === 1)) {
+      learnings.push({ kind: 'phaseClicks', bestPhase: first.best, worstPhase: first.worst, platforms: bestPhaseByPlatform.map((x) => x.platform) });
+      nextSteps.push({ kind: 'shiftToPhase', phase: first.best });
+    }
+  }
+
+  // 3) 플랫폼 차이(이 이벤트 안에서만) — 정의가 같은 CPM과 CTR을 이벤트 단위로 합산
+  if (platforms.length >= 2) {
+    const agg = platforms.map((p) => ({ platform: p, cpm: aggregateMetric(byPlatform[p], 'cpm'), ctr: aggregateMetric(byPlatform[p], 'ctr') }));
+    const cpmOk = agg.filter((x) => x.cpm != null && x.cpm > 0).sort((a, b) => a.cpm - b.cpm);
+    const ctrOk = agg.filter((x) => x.ctr != null && x.ctr > 0).sort((a, b) => b.ctr - a.ctr);
+    if (cpmOk.length >= 2 && ctrOk.length >= 2) {
+      const cheaper = cpmOk[0]; const pricier = cpmOk[cpmOk.length - 1];
+      const clickier = ctrOk[0]; const lessClicky = ctrOk[ctrOk.length - 1];
+      const cpmGap = 1 - cheaper.cpm / pricier.cpm;
+      const ctrGap = 1 - lessClicky.ctr / clickier.ctr;
+      if (cpmGap >= 0.15 && ctrGap >= 0.15) {
+        if (cheaper.platform !== clickier.platform) {
+          learnings.push({ kind: 'platformSplit', reachPlatform: cheaper.platform, clickPlatform: clickier.platform });
+          nextSteps.push({ kind: 'splitByPlatform', reachPlatform: cheaper.platform, clickPlatform: clickier.platform });
+        } else {
+          learnings.push({ kind: 'platformBoth', platform: cheaper.platform, other: pricier.platform });
+          nextSteps.push({ kind: 'leanOnPlatform', platform: cheaper.platform });
+        }
+      }
+    }
+  }
+
+  return { learnings: learnings.slice(0, 4), nextSteps: nextSteps.slice(0, 3) };
+}

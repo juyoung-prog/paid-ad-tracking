@@ -71,6 +71,8 @@
 | **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태 배지·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
 | **RecapTakeaways** | 신규(구현됨, 2026-09) | 머리글과 타임라인 사이 "Key takeaways" — 표가 증거, 이 칸이 해석(schema.js buildRecapTakeaways) |
 | **RecapStatusBadge** | 신규(구현됨, 2026-09) | Not started / Draft / Ready 배지 — 목록 Report 열과 머리글 공용 |
+| **RecapCampaignInsights** | 신규(구현됨, 2026-09) | Notes 본문 — 사람 글 우선, 없으면 데이터 해석(근거 수준 표시, 원인 안 지어냄) |
+| **RecapPatterns** | 신규(구현됨, 2026-09) | Learnings 안 "데이터에서 본 패턴" + 자동 Next time — 캠페인 2개 이상이 뒷받침할 때만 |
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |

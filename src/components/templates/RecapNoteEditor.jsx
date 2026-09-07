@@ -32,12 +32,13 @@ function withLang(text, lang, value) {
  * @param {function} onChange - (patch) => void. 바뀐 필드만 담은 부분 객체 [Required]
  * @param {string} lang - 편집할 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {boolean} isDisabled - 저장 중 등 잠금 [Optional, 기본값: false]
+ * @param {string} hint - 문장 칸 아래 안내 한 줄(예: "데이터 해석은 저장 전까지 자동으로 보인다") [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <RecapNoteEditor note={draft.notes[row.campaignId]} campaignLabel="Grand Opening · Meta" suggestedVerdict={row.suggestedVerdict} onChange={(patch) => updateNote(row.campaignId, patch)} />
  */
-export function RecapNoteEditor({ note, campaignLabel, suggestedVerdict = null, onChange, lang = 'en', isDisabled = false, sx }) {
+export function RecapNoteEditor({ note, campaignLabel, suggestedVerdict = null, onChange, lang = 'en', isDisabled = false, hint, sx }) {
   const verdict = note?.verdict ?? null;
 
   return (
@@ -88,6 +89,8 @@ export function RecapNoteEditor({ note, campaignLabel, suggestedVerdict = null, 
           />
         ))}
       </Box>
+
+      {hint && <Typography sx={{ fontSize: 11, color: 'text.secondary', mt: 0.75 }}>{hint}</Typography>}
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5, mt: 1.5, maxWidth: 560 }}>
         {[['organicViews', 'recap.edit.organicViews'], ['organicEngagements', 'recap.edit.organicEngagements']].map(([key, labelKey]) => (
