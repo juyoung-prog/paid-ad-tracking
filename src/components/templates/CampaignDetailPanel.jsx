@@ -258,10 +258,9 @@ export function CampaignDetailPanel({
             표 아래 펼침(셰브론)을 없애고 여기로 옮겼다(2026-09-07) — 줄을 누르면 다 나온다 */}
         {insights && (
           <Box sx={{ mb: 3 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Campaign insights</Typography>
-            <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.control}px`, overflow: 'hidden' })}>
-              {insights}
-            </Box>
+            {/* 상자 없이 — Daily spend와 같은 제목 위계, 여백과 옅은 선만으로 나눈다(드로어 안의 카드가 되지 않게) */}
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Campaign insights</Typography>
+            {insights}
           </Box>
         )}
 

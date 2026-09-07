@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { BenchmarkArrow } from './BenchmarkArrow';
 import { t, metricLabel, benchmarkPositionText } from '../../data/recapStrings';
 
@@ -85,13 +86,36 @@ export function RecapCampaignInsightPanel({ row, localize, lang = 'en', layout =
   });
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: layout === 'grid' ? { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } : { xs: '1fr', md: FIELDS.map((f) => FIELD_SPAN[f]).join(' ') }, gap: layout === 'grid' ? 2 : { xs: 1.5, md: 3 }, px: 2, py: 1.5, ...sx }}>
-      {cells.map(({ field, conclusion, evidence, level, isFallback }) => {
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: layout === 'grid' ? { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } : { xs: '1fr', md: FIELDS.map((f) => FIELD_SPAN[f]).join(' ') },
+        columnGap: layout === 'grid' ? 3 : { xs: 1.5, md: 3 },
+        rowGap: layout === 'grid' ? 0 : 1.5,
+        ...(layout === 'grid' ? { px: 0, py: 0 } : { px: 2, py: 1.5 }),
+        ...sx,
+      }}
+    >
+      {cells.map(({ field, conclusion, evidence, level, isFallback }, index) => {
         const isEmpty = !conclusion;
         const tone = FIELD_TONE[field];
         const hint = level === 'written' ? t('insight.writtenHint', lang) : t('insight.levelHint', lang, { level: t(`insight.level.${level}`, lang) });
+        // grid(드로어): 줄 사이만 아주 옅은 1px 선, 열 사이는 여백 — 상자·배경 없이 위계를 잡는다
+        const isSecondRow = layout === 'grid' && index >= 2;
         return (
-          <Box key={field} sx={{ minWidth: 0, maxWidth: 480 }}>
+          <Box
+            key={field}
+            sx={(theme) => ({
+              minWidth: 0,
+              maxWidth: 480,
+              ...(layout === 'grid' && {
+                // 첫 줄은 제목에 바로 붙고(pt 0), 둘째 줄은 옅은 선 위아래로 숨을 쉰다
+                pt: isSecondRow ? 1.25 : 0,
+                pb: 1.25,
+                borderTop: isSecondRow ? `1px solid ${alpha(theme.palette.divider, 0.7)}` : 0,
+              }),
+            })}
+          >
             {/* 근거 수준은 라벨 툴팁에만 — 칸마다 "· compared"를 붙이면 임원 눈에는 소음이다 */}
             <Tooltip title={isEmpty ? '' : hint} placement="top" enterDelay={400}>
               <Typography component="span" sx={{ display: 'inline-block', fontSize: 11, fontWeight: 500, color: 'text.secondary', mb: 0.5, cursor: isEmpty ? 'default' : 'help' }}>

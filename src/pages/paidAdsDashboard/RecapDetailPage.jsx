@@ -586,7 +586,7 @@ export function RecapDetailPage() {
             onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
             /* 캠페인 해석은 이 페이지의 재료(벤치마크 구간)로만 만든다 — Performance에는 없다 */
             insights={insightById[detailCampaign.id] ? (
-              <RecapCampaignInsightPanel row={insightById[detailCampaign.id]} localize={localize} lang={lang} layout="grid" sx={{ px: 1.5, py: 1.25 }} />
+              <RecapCampaignInsightPanel row={insightById[detailCampaign.id]} localize={localize} lang={lang} layout="grid" />
             ) : undefined}
           />
         );

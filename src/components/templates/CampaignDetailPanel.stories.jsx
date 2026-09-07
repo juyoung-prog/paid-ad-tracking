@@ -240,7 +240,7 @@ export const WithInsights = {
     const { byPlatform } = buildRecapRows('G10 Opening', mockRecapCampaigns, mockRecapPerformanceRecords);
     const row = (byPlatform.meta ?? [])[1] ?? (byPlatform.meta ?? [])[0];
     const insights = row ? (
-      <RecapCampaignInsightPanel row={{ ...row, insight: buildCampaignInsight(row) }} localize={(text) => localizedText(text, 'en')} layout="grid" sx={{ px: 1.5, py: 1.25 }} />
+      <RecapCampaignInsightPanel row={{ ...row, insight: buildCampaignInsight(row) }} localize={(text) => localizedText(text, 'en')} layout="grid" />
     ) : null;
     return <Harness campaign={CAMPAIGN} performance={PERFORMANCE} dailyRows={DAILY_ROWS} insights={insights} />;
   },

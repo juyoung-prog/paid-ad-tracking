@@ -102,5 +102,5 @@ export const Korean = {
 /** 드로어 안(≈560px)에서 쓰는 2×2 — CampaignDetailPanel의 "Campaign insights" 섹션이 이 모양이다 */
 export const GridInDrawer = {
   args: { row: withInsight(metaRows[1] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize, layout: 'grid' },
-  render: (args) => <Box sx={(theme) => ({ maxWidth: 560, border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.control}px` })}><RecapCampaignInsightPanel {...args} sx={{ px: 1.5, py: 1.25 }} /></Box>,
+  render: (args) => <Box sx={(theme) => ({ maxWidth: 560, border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.control}px` })}><RecapCampaignInsightPanel {...args} sx={{ p: 1.5 }} /></Box>,
 };
