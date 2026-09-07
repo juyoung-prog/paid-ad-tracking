@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { BenchmarkArrow } from './BenchmarkArrow';
 import { t, benchmarkPositionText } from '../../data/recapStrings';
 
 /** 구간 → 톤·기호 방향. 기호는 "더 좋다/나쁘다"를 말한다(값이 높다/낮다가 아니다). mid는 기호 없음 */
@@ -9,43 +10,6 @@ const BAND_STYLE = {
   mid: { tone: 'text.secondary', direction: null },
   bottom: { tone: 'warning.main', direction: 'down' },
 };
-
-/**
- * 비교군 대비 위치 기호 — Lucide arrow-up-right / arrow-down-right 기하를 svg로 그린다
- * (stroke 1.5, 둥근 끝, fill 없음). 글자 ▲▼는 면으로 채운 삼각형이라 주식 시세판처럼
- * 무거웠다. 시간 추세(trending)가 아니라 **상대 위치**라 대각 화살표다. 색은
- * currentColor — 옆 글자와 같은 톤(success/warning)을 따른다.
- */
-function BandArrow({ direction, size }) {
-  return (
-    <Box
-      component="svg"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      sx={{ flexShrink: 0, mr: '3px', fill: 'none' }}
-    >
-      {direction === 'up' ? (
-        <>
-          <path d="M7 7h10v10" />
-          <path d="M7 17 17 7" />
-        </>
-      ) : (
-        <>
-          {/* Lucide arrow-down-right 원본 경로 — 화살촉은 세로+가로 두 변(v10H7). 한 변이 빠지면 L자가 된다 */}
-          <path d="m7 7 10 10" />
-          <path d="M17 7v10H7" />
-        </>
-      )}
-    </Box>
-  );
-}
 
 /* 셀 안 위계: 라벨(호출부) → **값**(가장 강하게) → 비교 줄(보조). 값은 sm에서도
    13px/600이다 — 표에서 12px/500이면 옆의 원본 지표(Reach·Plays)와 무게가 같아져
@@ -140,7 +104,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
             }),
           }}
         >
-          {style?.direction && <BandArrow direction={style.direction} size={Math.round(sizes.caption + 1)} />}
+          {style?.direction && <BenchmarkArrow direction={style.direction} size={Math.round(sizes.caption + 1)} />}
           {positionText}
           {isKnown && hasMedian && (
             <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>

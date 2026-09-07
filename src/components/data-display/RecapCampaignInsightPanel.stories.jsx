@@ -23,21 +23,20 @@ export default {
         component: `
 ## RecapCampaignInsightPanel
 
-Recap 캠페인 표의 한 줄을 펼치면 바로 아래에 나오는 해석 — **What worked · What could
-improve · Why · Recommendation**. 표의 숫자를 읽고, 같은 줄을 펼쳐서, 무엇이 좋았고
-무엇을 고칠지, 데이터가 설명할 수 있는 것과 없는 것, 다음에 할 일을 그 자리에서 읽는다.
+보고서 캠페인 표의 한 줄을 펼치면 바로 아래에 나오는 **간결한 진단 요약** — What worked ·
+Could improve · Why · Next action. 칸마다 작은 라벨 → 짧은 결론(2~6단어, 가장 강하게) →
+한 줄 근거(↗↘ + "Hook top 9%"). 임원이 5~10초에 읽는 게 목표라 문단을 쓰지 않는다.
 
-### 근거 수준
-- **observed** — 지표 값 자체(예: 계획보다 20% 초과 지출)
-- **compared** — 비교군 순위·백분위("best of 5", "bottom 26%")
-- **inferred** — 관측된 패턴의 해석과 거기서 나온 다음 실험. "~일 수 있다"로만 말하고,
-  소재·타겟·메시지 같은 데이터에 없는 원인은 절대 적지 않는다
-- **unknown** — 근거 부족("Not enough evidence to determine why.")
+### 근거 수준은 툴팁에만
+observed / compared / inferred / unknown / written은 라벨에 마우스를 올리면 보인다 —
+논리(\`schema.js\` \`buildCampaignInsight()\`)는 그대로고, 칸마다 "· compared"를 붙이던
+표시만 뺐다. 추론(inferred)을 측정값처럼 보이게 하지 않는다: Why의 결론은 "Exposure,
+not action"처럼 패턴 이름이고 근거 줄에 "cause not in data"가 따라온다.
 
 ### 비우는 규칙
-근거 없는 칸은 그리지 않는다 — 네 칸을 억지로 채우지 않는다. Recommendation은
-장점·약점 재료가 있을 때만 나오고, "관측 결과 → 다음에 확인할 것"이지 일반론이 아니다.
-성과 데이터가 아예 없으면 한 줄 안내만. 사람이 쓴 글(written)은 자동 문장보다 우선.
+원인을 모르면 "Insufficient evidence / No reliable causal signal". 성과 데이터가 없으면
+장점·약점 "—", Why "Insufficient data", Next action "Collect more performance data".
+소재·타겟·메시지 같은 데이터에 없는 원인은 적지 않는다. 사람이 쓴 글(written)이 결론 자리에 온다.
         `,
       },
     },
@@ -68,7 +67,7 @@ export const StrengthOnly = {
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
 };
 
-/** 비교군이 없는 TikTok — Why · unknown 한 칸만 */
+/** 비교군이 없는 TikTok — 장점·약점 "—", Why "No comparable campaigns" */
 export const NoPeers = {
   args: { row: withInsight(tiktokRows[0] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
@@ -80,7 +79,7 @@ export const WithWrittenNote = {
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
 };
 
-/** 성과 데이터가 없는 캠페인 — 한 줄 안내만 */
+/** 성과 데이터가 없는 캠페인 — "—" / "—" / Insufficient data / Collect more performance data */
 export const NoData = {
   args: { row: withInsight({ ...metaRows[0], spend: null, impressions: null, reach: null, clicks: null, note: null, benchmarks: {} }), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
