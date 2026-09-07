@@ -47,6 +47,8 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
   },
   argTypes: {
     renderDetail: { control: false, description: '(row) => ReactNode. 있으면 줄 끝에 화살표가 붙고 누르면 그 줄 아래에 펼쳐진다(한 번에 한 줄)' },
+    expandedId: { control: 'text', description: '펼친 줄의 campaignId(제어형). 안 주면 표가 스스로 기억한다' },
+    onExpandedChange: { action: 'expandedChange', description: '(campaignId|null) => void' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
     onRowClick: { action: 'rowClicked', description: '행 클릭 핸들러 (campaignId) => void' },

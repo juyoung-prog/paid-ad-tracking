@@ -123,6 +123,8 @@ function RawLine({ parts }) {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다. 없고 renderDetail이 있으면 행 클릭이 해석을 펼치고 접는다(화살표와 같은 동작) — 보고서에서 줄을 눌렀다고 다른 페이지로 가지 않는다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
+ * @param {string|null} expandedId - 펼친 줄의 campaignId. 주면 제어형(타임라인 행 클릭으로 페이지가 펼치는 용도) — onExpandedChange로 바뀐 값을 돌려받는다. 안 주면 표가 스스로 기억한다 [Optional]
+ * @param {function} onExpandedChange - (campaignId|null) => void. expandedId와 짝 [Optional]
  * @param {function} renderDetail - (row) => ReactNode. 있으면 줄 오른쪽 끝에 화살표가 붙고, 누르면 그 줄 바로 아래에 반환값이 펼쳐진다(한 번에 한 줄). 캠페인 해석(RecapCampaignInsightPanel)을 숫자 옆에 두는 용도 — 줄 클릭(onRowClick)과는 별개다 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
@@ -130,11 +132,18 @@ function RawLine({ parts }) {
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => navigate(`/dashboard?campaign=${id}`)} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, renderDetail, label = 'Recap campaign table', sx }) {
-  // 펼친 줄은 한 번에 하나 — 숫자 줄과 해석 줄이 번갈아 나오면 표가 아니라 목록이 된다
-  const [expandedId, setExpandedId] = useState(null);
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, renderDetail, expandedId: controlledExpandedId, onExpandedChange, label = 'Recap campaign table', sx }) {
+  // 펼친 줄은 한 번에 하나 — 숫자 줄과 해석 줄이 번갈아 나오면 표가 아니라 목록이 된다.
+  // expandedId prop이 오면 그 값을 따르고(제어형), 없으면 내부 상태.
+  const [ownExpandedId, setOwnExpandedId] = useState(null);
+  const isControlled = controlledExpandedId !== undefined;
+  const expandedId = isControlled ? controlledExpandedId : ownExpandedId;
   const isExpandable = Boolean(renderDetail);
-  const toggle = (campaignId) => setExpandedId((current) => (current === campaignId ? null : campaignId));
+  const toggle = (campaignId) => {
+    const next = expandedId === campaignId ? null : campaignId;
+    if (!isControlled) setOwnExpandedId(next);
+    onExpandedChange?.(next);
+  };
   // 줄 클릭 — 명시된 핸들러가 우선, 없으면 펼침/접기. 벤치마크 버튼·화살표는 stopPropagation으로 빠진다
   const handleRow = onRowClick ?? (isExpandable ? toggle : undefined);
 
@@ -187,6 +196,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             return [
               <TableRow
                 key={row.campaignId}
+                id={`recap-row-${row.campaignId}`}
                 hover={Boolean(handleRow)}
                 tabIndex={handleRow ? 0 : undefined}
                 onClick={handleRow ? () => handleRow(row.campaignId) : undefined}

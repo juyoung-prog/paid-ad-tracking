@@ -165,6 +165,10 @@ export function RecapDetailPage() {
   const { notify, SnackbarComponent } = useSnackbar();
 
   const [isEditing, setIsEditing] = useState(false);
+  /* 타임라인 행을 누르면 그 단계의 캠페인 줄을 표에서 펼치고 거기로 스크롤한다 — 플랫폼
+     표마다 한 줄씩(Meta·TikTok에 같은 단계가 있으면 둘 다). 표의 화살표로 바꾼 값도 여기로 온다. */
+  const [expandedByPlatform, setExpandedByPlatform] = useState({});
+  const [focusedPhaseKey, setFocusedPhaseKey] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
   const [isSignInOpen, setIsSignInOpen] = useState(false);
@@ -443,7 +447,21 @@ export function RecapDetailPage() {
         <PhaseTimelineChart
           phases={phases}
           today={today}
+          emphasizedKey={focusedPhaseKey ?? undefined}
           barSuffix={(phase) => (spendByPhaseKey[phase.key] != null ? `${money(spendByPhaseKey[phase.key])} spent` : null)}
+          onPhaseClick={(phase) => {
+            const next = {};
+            let firstId = null;
+            platformOrder.forEach((p) => {
+              const hit = byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key);
+              next[p] = hit?.campaignId ?? null;
+              if (hit && !firstId) firstId = hit.campaignId;
+            });
+            setExpandedByPlatform(next);
+            setFocusedPhaseKey(phase.key);
+            // 펼침이 그려진 다음 프레임에 첫 줄로 — 줄 위쪽이 화면 중간쯤 오게
+            if (firstId) requestAnimationFrame(() => document.getElementById(`recap-row-${firstId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+          }}
         />
       </Box>
 
@@ -459,6 +477,8 @@ export function RecapDetailPage() {
             label={`${PLATFORM_LABEL[platform]} recap table`}
             /* 줄 클릭은 해석 펼침(표 기본 동작) — 보고서를 읽다가 대시보드로 튕기지 않는다 */
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
+            expandedId={expandedByPlatform[platform] ?? null}
+            onExpandedChange={(campaignId) => setExpandedByPlatform((prev) => ({ ...prev, [platform]: campaignId }))}
             renderDetail={(row) => (
               <RecapCampaignInsightPanel row={insightById[row.campaignId] ?? row} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />
             )}
