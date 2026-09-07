@@ -114,8 +114,9 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
  * 없으면 제안값을 보여준다. Efficiency 칸은 두 줄(2026-09-07): **배지 = 예산 효율**(목표별 대표 KPI의 결과당
- * 비용을 우리 기준값 EFFICIENCY_STANDARD와 견줌 — 비교군 없어도 나온다, 툴팁에 값·기준값), **아래 "vs past"** =
- * 같은 KPI를 과거 비교군(같은 플랫폼·목표, 다른 이벤트, 3개 이상)과 견준 순위(없으면 not enough data).
+ * 비용 ÷ 비교군 중앙값 — 80% 이하 Good / 120% 초과 Weak, 툴팁에 값·중앙값·N), **아래 "vs past"** = 같은 KPI를
+ * 같은 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위. 둘 다 benchmarks[대표 KPI] 하나에서
+ * 나오므로 "Fair인데 best of 12" 같은 어긋남이 없다. 비교군 3개 미만이면 배지 "—" + 순위 not enough data.
  * 셀의 ↗↘도 같은 비교군이다. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만 "Over 23%" 한 줄(RECAP_PACING_FLAG).
  *
  * 상호작용은 하나다(2026-09-07): **숫자 줄 어디를 눌러도** onRowClick — 보고서는 이걸로
@@ -133,6 +134,7 @@ function SecondaryMetrics({ parts, minWidth }) {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체(#·매장·썸네일·이름·기간·예산·지표·빈 곳)가 버튼이고 Tab/Enter로도 눌린다. hover는 중립 면 140ms [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
+ * @param {Object<string, string>} platformLabel - 플랫폼 값 → 표시명(배지 툴팁 문장용) [Optional, 기본값: {}]
  * @param {string|null} selectedId - 타임라인에서 찾아온 줄의 campaignId. 그 줄에 옅은 accent 배경 + 왼쪽 2px accent 선 — "내가 고른 캠페인이 이것"이라는 방향 표시 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
@@ -140,7 +142,7 @@ function SecondaryMetrics({ parts, minWidth }) {
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedId={selectedCampaignId} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedId = null, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedId = null, platformLabel = {}, label = 'Recap campaign table', sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -177,6 +179,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <Box sx={{ display: 'grid', rowGap: 0.75, py: 0.25 }}>
                     <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.effTitle', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effBody', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effGoals', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{t('recap.table.effBands', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effRanking', lang)}</Typography>
                   </Box>
@@ -194,15 +197,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
           {rows.map((row) => {
             const hasData = row.spend != null || row.impressions != null;
             const verdict = row.note?.verdict ?? row.suggestedVerdict ?? null;
-            // Efficiency 칸의 두 줄: 배지 = 우리 기준 대비 예산 효율, 아래 = 같은 대표 KPI의 과거 캠페인 대비 순위
+            // Efficiency 칸의 두 줄 — 배지와 순위가 **같은** benchmarks[대표 KPI](같은 비교군·같은 값)에서 나온다
             const eff = row.budgetEfficiency ?? null;
             const kpiKey = (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
             const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
             const badgeHint = row.note?.verdict
               ? ''
               : eff?.verdict
-                ? [t('recap.table.standardHint', lang, { metric: metricLabel(eff.metricKey, lang), value: kpiFormat(eff.metricKey)(eff.value), standard: kpiFormat(eff.metricKey)(eff.standard), pct: Math.round(eff.ratio * 100), platform: row.platform, goal: t(`goal.${row.goal}`, lang) }), eff.isProvisional ? t('recap.table.standardProvisional', lang) : null, t('recap.table.suggestedNote', lang)].filter(Boolean).join(' ')
-                : hasData ? t('recap.table.noStandard', lang) : '';
+                ? `${t('recap.table.standardHint', lang, { metric: metricLabel(eff.metricKey, lang), value: kpiFormat(eff.metricKey)(eff.value), median: kpiFormat(eff.metricKey)(eff.median), n: eff.sampleSize, total: eff.sampleSize + 1, pct: Math.round(eff.ratio * 100), platform: platformLabel[row.platform] ?? row.platform, goal: t(`goal.${row.goal}`, lang) })} ${t('recap.table.suggestedNote', lang)}`
+                : hasData ? t('recap.table.noComparison', lang) : '';
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedId === row.campaignId;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);

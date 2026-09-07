@@ -1549,9 +1549,8 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 예산 효율 판정(우리 기준값 대비, budgetEfficiency) — 사람이 verdict를 안 고르면 이것
- * @property {{ verdict: string|null, metricKey: string|null, value: number|null, standard: number|null, ratio: number|null, isProvisional: boolean }} budgetEfficiency
- * @property {'good'|'mid'|'bad'|null} peerVerdict - 과거 비교군 대비 판정(suggestVerdict). 비교군 없으면 null
+ * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 예산 효율 판정(대표 KPI ÷ 비교군 중앙값, budgetEfficiency) — 사람이 verdict를 안 고르면 이것. 비교군 3개 미만이면 null
+ * @property {{ verdict: string|null, metricKey: string|null, value: number|null, median: number|null, ratio: number|null, sampleSize: number, peerScope: string }} budgetEfficiency
  * @property {RecapCampaignNote|null} note
  */
 
@@ -1782,10 +1781,9 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       thumbnailUrl: c.thumbnailUrl ?? null,
       rank: 0,
       benchmarks,
-      // 배지(제안 판정)는 우리 기준값 대비 예산 효율 — 비교군 없이도 나온다. 과거 캠페인 대비 순위는 benchmarks[대표 KPI]
-      budgetEfficiency: budgetEfficiency(row),
-      suggestedVerdict: budgetEfficiency(row).verdict,
-      peerVerdict: suggestVerdict(benchmarks, c.goal),
+      // 배지(제안 판정) = 대표 KPI가 비교군 중앙값 대비 얼마인가 — 아래 순위와 같은 benchmarks[대표 KPI]에서 나온다
+      budgetEfficiency: budgetEfficiency(benchmarks, c.goal),
+      suggestedVerdict: budgetEfficiency(benchmarks, c.goal).verdict,
       note: notesById[c.id] ?? null,
     };
   });
@@ -2071,42 +2069,26 @@ export function buildRecapTakeaways(byPlatform) {
 /** 계획 대비 집행률을 표에 표시하는 문턱 — +20% 이상 초과 또는 −30% 이하 미달일 때만. 그 안은 조용히 */
 export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
 
-/**
- * 예산 효율 기준값 — "쓴 돈 대비 반응"을 판정하는 **우리 기준**(2026-09-07). 플랫폼·목표별 대표 KPI
- * (GOAL_HEADLINE_METRICS)의 결과당 비용 하나. 값은 2024-01-01 이후 우리 캠페인 전체의 중앙값에서 출발했고
- * (산출: Meta 인지 13건 · 참여 5건 · 트래픽 55건, TikTok 인지 25건 · 참여 4건 · 트래픽 1건), 언제든 손으로
- * 바꾼다 — 외부 업계 평균은 섞지 않는다. 표본이 1건인 TikTok 트래픽은 임시값. 없는 목표(전환·매장 방문)는
- * 판정하지 않는다. 비교군(다른 캠페인과의 순위)과는 별개의 질문이다.
- */
-export const EFFICIENCY_STANDARD = Object.freeze({
-  [PLATFORM.META]: Object.freeze({
-    [GOAL.AWARENESS]: Object.freeze({ metricKey: 'cpm', value: 2.68 }),
-    [GOAL.ENGAGEMENT]: Object.freeze({ metricKey: 'cpe', value: 2.09 }),
-    [GOAL.TRAFFIC]: Object.freeze({ metricKey: 'cpc', value: 0.64 }),
-  }),
-  [PLATFORM.TIKTOK]: Object.freeze({
-    [GOAL.AWARENESS]: Object.freeze({ metricKey: 'cpm', value: 3.39 }),
-    [GOAL.ENGAGEMENT]: Object.freeze({ metricKey: 'cpe', value: 1.83 }),
-    [GOAL.TRAFFIC]: Object.freeze({ metricKey: 'cpc', value: 2.13, isProvisional: true }),
-  }),
-});
-/** 기준값 대비 비율 → 판정. 80% 이하 good, 120% 초과 bad, 사이 mid(비용 지표라 낮을수록 좋다) */
+/** 비교군 중앙값 대비 비율 → 판정. 80% 이하 good, 120% 초과 bad, 사이 mid(비용 지표라 낮을수록 좋다) */
 export const EFFICIENCY_BAND = Object.freeze({ good: 0.8, bad: 1.2 });
 
 /**
- * 예산 효율 판정 — 이 캠페인의 결과당 비용을 EFFICIENCY_STANDARD와 견준다. 비교군이 없어도 나온다.
- * @param {{ platform: string, goal: string }} row - getGoalMetricsRow() 결과(cpm/cpc/cpe/cpa 포함)
- * @returns {{ verdict: 'good'|'mid'|'bad'|null, metricKey: string|null, value: number|null, standard: number|null, ratio: number|null, isProvisional: boolean }}
+ * 예산 효율 판정 — "이 목표의 결과당 비용이 비교 가능한 과거 캠페인의 중앙값 대비 얼마인가"(2026-09-07).
+ * 대표 KPI(GOAL_HEADLINE_METRICS)의 benchmarkStat에서 값·중앙값을 읽는다 — 그 stat이 쓰는 비교군(같은 플랫폼 +
+ * 같은 목표 + 같은 단계 우선, 다른 이벤트, 3개 이상)이 곧 배지의 비교군이라 아래 순위("best of 12")와 한 근거에서
+ * 나온다. 비교군이 3개 미만이면 판정하지 않는다(외부 업계 평균으로 대체하지 않는다). 계획 예산·집행률은 여기 안 섞는다.
+ * @param {Object<string, BenchmarkStat>} benchmarks - buildRecapRows 행의 benchmarks
+ * @param {string} goal
+ * @returns {{ verdict: 'good'|'mid'|'bad'|null, metricKey: string|null, value: number|null, median: number|null, ratio: number|null, sampleSize: number, peerScope: 'phase'|'goal'|'none' }}
  */
-export function budgetEfficiency(row) {
-  const standard = EFFICIENCY_STANDARD[row?.platform]?.[row?.goal] ?? null;
-  const none = { verdict: null, metricKey: standard?.metricKey ?? null, value: null, standard: standard?.value ?? null, ratio: null, isProvisional: Boolean(standard?.isProvisional) };
-  if (!standard) return none;
-  const value = row?.[standard.metricKey];
-  if (value == null || !Number.isFinite(value) || !(standard.value > 0)) return none;
-  const ratio = value / standard.value;
+export function budgetEfficiency(benchmarks, goal) {
+  const metricKey = (GOAL_HEADLINE_METRICS[goal] ?? [])[0] ?? null;
+  const stat = metricKey ? benchmarks?.[metricKey] : null;
+  const none = { verdict: null, metricKey, value: stat?.value ?? null, median: null, ratio: null, sampleSize: stat?.sampleSize ?? 0, peerScope: 'none' };
+  if (!stat || stat.peerScope === 'none' || stat.median == null || stat.value == null || !(stat.median > 0)) return none;
+  const ratio = stat.value / stat.median;
   const verdict = ratio <= EFFICIENCY_BAND.good ? VERDICT.GOOD : ratio > EFFICIENCY_BAND.bad ? VERDICT.BAD : VERDICT.MID;
-  return { verdict, metricKey: standard.metricKey, value, standard: standard.value, ratio, isProvisional: Boolean(standard.isProvisional) };
+  return { verdict, metricKey, value: stat.value, median: stat.median, ratio, sampleSize: stat.sampleSize, peerScope: stat.peerScope };
 }
 
 export const METRIC_ASPECT = Object.freeze({

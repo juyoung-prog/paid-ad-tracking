@@ -431,7 +431,7 @@ Paid Ads Dashboard
 | 항목 | 정의 |
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
-| 예산 효율 배지 | 비교군과 별개 — 목표별 대표 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용)를 **우리 기준값**(`EFFICIENCY_STANDARD`, 2024년 이후 우리 캠페인 중앙값, 손으로 조정)과 견줘 80% 이하 Good / 80~120% Fair / 120% 초과 Weak. 비교군 없어도 나온다. 표의 Efficiency 칸은 위 배지 + 아래 "vs past"(같은 KPI의 비교군 순위) 두 줄 |
+| 예산 효율 배지 | 목표별 대표 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA)의 결과당 비용 ÷ **같은 비교군의 중앙값** → 80% 이하 Good / 80~120% Fair / 120% 초과 Weak(`EFFICIENCY_BAND`). 비교군 3개 미만이면 "—". 표의 Efficiency 칸은 위 배지 + 아래 "vs past"(같은 KPI·같은 비교군 순위) 두 줄 — 한 근거에서 나온다. 계획 예산·집행률은 섞지 않는다 |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
 | 판정 제안 | 대표 지표(goal이 awareness면 CPM·Hook, traffic이면 CTR·CPC, engagement면 참여율)의 백분위 평균이 상위 30%면 `good`, 하위 30%면 `bad`, 그 사이 `mid` |

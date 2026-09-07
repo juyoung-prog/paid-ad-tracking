@@ -502,6 +502,7 @@ export function RecapDetailPage() {
                다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
             onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
             selectedId={selectedCampaignId}
+            platformLabel={PLATFORM_LABEL}
           />
         </Box>
       ))}
