@@ -38,8 +38,9 @@ function BandArrow({ direction, size }) {
         </>
       ) : (
         <>
+          {/* Lucide arrow-down-right 원본 경로 — 화살촉은 세로+가로 두 변(v10H7). 한 변이 빠지면 L자가 된다 */}
           <path d="m7 7 10 10" />
-          <path d="M17 7v10" />
+          <path d="M17 7v10H7" />
         </>
       )}
     </Box>
