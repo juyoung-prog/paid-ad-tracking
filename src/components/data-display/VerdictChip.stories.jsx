@@ -17,10 +17,10 @@ export default {
 예산 효율 판정(good / mid / bad) 한 칸 — 이전 보고서의 좋음/보통/아쉬움 칸이다
 (Build Plan Phase 2).
 
-### 채운 칩과 점선 칩
-사람이 고른 판정은 옅은 틴트를 채운 칩, 벤치마크가 **제안한** 판정(\`isSuggested\`)은
-점선 테두리만 있는 칩이다 — 아직 사람이 확인하지 않은 값이라는 뜻이고, 2단계에서
-사람이 고르면 채운 칩으로 바뀐다. 판정이 없으면 "—".
+### 모양은 하나, 제안값은 툴팁으로
+옅은 틴트 배경 + 같은 색 글자(500) + 아주 옅은 실선 테두리, 세로 4~5px · 가로 7~8px,
+radius.control. 벤치마크가 **제안한** 판정(\`isSuggested\`)도 모양은 같고 툴팁
+"suggested"로만 구분한다 — 점선 칩은 표 안에서 시끄러워 뺐다(2026-09). 판정이 없으면 "—".
 
 ### 색
 상태색 success(good)·warning(bad)만 쓴다. error는 "고장"의 색이라 성과 판정에
@@ -34,7 +34,7 @@ export default {
   },
   argTypes: {
     verdict: { control: 'select', options: ['good', 'mid', 'bad', null], description: '판정' },
-    isSuggested: { control: 'boolean', description: '벤치마크가 제안한 값이면 점선 테두리 + 툴팁' },
+    isSuggested: { control: 'boolean', description: '벤치마크가 제안한 값이면 툴팁 "suggested"(모양은 같다)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
     size: { control: 'radio', options: ['sm', 'md'], description: '높이 단계 — 표 셀은 sm' },
     sx: { control: 'object', description: '추가 스타일' },

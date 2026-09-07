@@ -28,7 +28,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 ### 셀 구성
 - **Campaign**: 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title
 - **Spend**: 지출 + 그 아래 CPM 벤치마크
-- **Efficiency**: 사람이 고른 판정이 있으면 채운 칩, 없으면 제안값을 점선 칩으로
+- **Efficiency**: 사람이 고른 판정이 있으면 그것, 없으면 제안값(같은 모양, 툴팁 "suggested")을
 - **Video**: Reach · Plays · Avg 한 줄 + Hook / Hold 벤치마크
 - **Engagement**: Like · Cmt · Share 한 줄 + 참여율 벤치마크
 - **Action**: Clicks · Results · Profile 한 줄 + CTR / CPC (+ conversion goal이면 CPA)
@@ -60,7 +60,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 /**
  * Meta — 비교군이 충분한 쪽. 확인 포인트:
  * - 순위가 대표 지표 백분위 순인가(Grand Opening 1위)
- * - Grand Opening의 판정은 사람이 고른 good(채운 칩), Coming Soon은 제안값(점선 칩), Now Open은 "—"
+ * - Grand Opening의 판정은 사람이 고른 good, Coming Soon은 제안값(툴팁 "suggested"), Now Open은 "—"
  * - Now Open(store_visit)은 비교군이 없어 전 지표 "not enough data"이고 Action 칸에 CPA가 추가로 보이는가
  * - Spend 아래 CPM이 "best of 5"처럼 양 끝 표현을 쓰는가
  */

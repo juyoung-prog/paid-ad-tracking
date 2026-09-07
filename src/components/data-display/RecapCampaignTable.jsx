@@ -112,7 +112,7 @@ function RawLine({ parts }) {
  * 따른다 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 ·
  * 행동. 비율 지표(CPM·Hook·Hold·참여율·CTR·CPC·CPA)마다 BenchmarkDelta로
  * "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이 없으면 제안값을
- * 점선 칩으로 보여준다.
+ * 같은 모양의 칩(툴팁 "suggested")으로 보여준다.
  *
  * 계산은 하지 않는다 — rows는 schema.js buildRecapRows()가 순위·벤치마크·판정
  * 제안까지 끝낸 결과다. 이 컴포넌트는 그 값을 자리에 놓고 utils/format으로

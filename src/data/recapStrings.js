@@ -67,7 +67,7 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.table.video': { en: 'Video', ko: '영상 반응', 'zh-Hant': '影片反應' },
   'recap.table.engagement': { en: 'Engagement', ko: '참여 반응', 'zh-Hant': '互動反應' },
   'recap.table.action': { en: 'Action', ko: '행동', 'zh-Hant': '行動' },
-  'recap.table.verdictHint': { en: 'Rated from this campaign\'s relative performance across the efficiency metrics that matter for its goal, against comparable past campaigns. A dashed badge is a suggestion not yet confirmed by a person.', ko: '이 캠페인의 목표에 맞는 효율 지표들이 비교 가능한 과거 캠페인 대비 어디쯤인지로 매깁니다. 점선 배지는 아직 사람이 확인하지 않은 제안값입니다.', 'zh-Hant': '依此廣告在其目標相關效率指標上、相對於可比過往廣告的表現評定。虛線徽章為尚未經人工確認的建議值。' },
+  'recap.table.verdictHint': { en: 'Rated from this campaign\'s relative performance across the efficiency metrics that matter for its goal, against comparable past campaigns. Hover a badge to see whether it is a suggestion not yet confirmed by a person.', ko: '이 캠페인의 목표에 맞는 효율 지표들이 비교 가능한 과거 캠페인 대비 어디쯤인지로 매깁니다. 배지에 마우스를 올리면 아직 사람이 확인하지 않은 제안값인지 알 수 있습니다.', 'zh-Hant': '依此廣告在其目標相關效率指標上、相對於可比過往廣告的表現評定。將滑鼠移到徽章上可查看是否為尚未經人工確認的建議值。' },
   'recap.table.noData': { en: 'No performance data', ko: '성과 데이터 없음', 'zh-Hant': '無成效資料' },
   'recap.table.empty': { en: 'No campaigns on this platform.', ko: '이 플랫폼에는 캠페인이 없습니다.', 'zh-Hant': '此平台沒有廣告。' },
 

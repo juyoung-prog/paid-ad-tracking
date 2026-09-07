@@ -20,7 +20,7 @@ function withLang(text, lang, value) {
  * Recap 표의 캠페인 한 줄에 대한 사람의 판단 — 판정(good/mid/bad), 장점·아쉬운
  * 점·이유, 그리고 선택 입력인 오가닉 조회·참여. 벤치마크가 제안한 판정이 있으면
  * "Use suggestion" 버튼으로 받아들일 수 있고, 아무것도 고르지 않으면 화면은
- * 제안값을 점선 칩으로 계속 보여준다(판정 null = "아직 사람이 안 정함").
+ * 제안값을 칩(툴팁 "suggested")으로 계속 보여준다(판정 null = "아직 사람이 안 정함").
  *
  * 언어별 칸(LocalizedText) 중 `lang` 하나만 편집한다 — 3단계에서 언어 탭이 이
  * prop을 바꾼다. 저장은 하지 않는다(onChange로 patch만 올린다). 문구는 recapStrings.
