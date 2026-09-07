@@ -33,6 +33,10 @@ const COLUMN_WIDTH = {
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1.25 };
 const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap' };
+/* 짝 지표(Hook | Hold, CTR | CPC) 사이 — 20px는 한 덩어리로 읽혀 30px로(2026-09-07). 세 개(CTR·CPC·CPA)가
+   드는 conversion 줄은 248px 셀에 안 들어가 20px 유지 */
+const PAIR_GAP = 3.75;
+const TRIPLE_GAP = 2.5;
 
 /**
  * 비율 지표 한 칸 — 라벨 위, BenchmarkDelta 아래. 비교군 이름은 stat의 scope를
@@ -60,16 +64,20 @@ function MetricCell({ row, metricKey, format, lang, onBenchmarkClick }) {
   );
 }
 
-/** 원본 지표 한 줄 — "Reach 151,000 · Plays 250,000" */
+/**
+ * 원본 지표 한 줄 — "Reach 151,000 · Plays 250,000". 셀 안 위계의 맨 아래(3차 정보)라 라벨(text.secondary)보다
+ * 한 단 더 옅게(secondary의 78% alpha) — 값(13px/600)·순위(초록/주황)와 경쟁하지 않게. text.disabled는
+ * AA 미달이라 글에 안 쓴다
+ */
 function RawLine({ parts }) {
   const shown = parts.filter(([, v]) => v != null);
   if (shown.length === 0) return null;
   return (
-    <Typography component="span" sx={{ ...META_SX, display: 'block', mb: 0.75, whiteSpace: 'normal' }}>
+    <Typography component="span" sx={(theme) => ({ ...META_SX, color: alpha(theme.palette.text.secondary, 0.78), display: 'block', mb: 0.75, whiteSpace: 'normal' })}>
       {shown.map(([label, v], i) => (
         <Box component="span" key={label} sx={{ whiteSpace: 'nowrap' }}>
           {i > 0 && ' · '}
-          {label} <Box component="span" sx={{ color: 'text.secondary', fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{v}</Box>
+          {label} <Box component="span" sx={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{v}</Box>
         </Box>
       ))}
     </Typography>
@@ -236,7 +244,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         [metricLabel('videoPlays', lang), count(row.videoPlays)],
                         [metricLabel('avgWatch', lang), row.avgWatchSeconds != null ? seconds(row.avgWatchSeconds) : null],
                       ]} />
-                      <Box sx={{ display: 'flex', gap: 2.5 }}>
+                      <Box sx={{ display: 'flex', gap: PAIR_GAP }}>
                         <MetricCell row={row} metricKey="hookRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         <MetricCell row={row} metricKey="holdRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                       </Box>
@@ -255,7 +263,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         [metricLabel('conversions', lang), count(row.conversions)],
                         [metricLabel('profileVisits', lang), count(row.profileVisits)],
                       ]} />
-                      <Box sx={{ display: 'flex', gap: 2.5 }}>
+                      <Box sx={{ display: 'flex', gap: isConversion ? TRIPLE_GAP : PAIR_GAP }}>
                         <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         {isConversion && <MetricCell row={row} metricKey="cpa" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
