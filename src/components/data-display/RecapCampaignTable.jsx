@@ -19,15 +19,17 @@ const fmtPercent = (v) => percent(v, { digits: 2 });
 
 /** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다 */
 const COLUMN_WIDTH = {
-  rank: 36,
-  store: 56,
-  campaign: 220,
-  dailyBudget: 88,
-  spend: 132,
-  verdict: 96,
+  rank: 32,
+  store: 52,
+  // 286: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07).
+  // 그만큼 순위·매장·일예산·지출·판정·참여 열을 4~8px씩 줄여 표 전체는 1296(본문 1318 안)로 유지한다
+  campaign: 286,
+  dailyBudget: 80,
+  spend: 124,
+  verdict: 84,
   video: 224,
-  engagement: 176,
-  action: 248,
+  engagement: 168,
+  action: 246,
 };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
