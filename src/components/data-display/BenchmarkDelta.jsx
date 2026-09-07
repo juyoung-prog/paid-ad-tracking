@@ -130,7 +130,8 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
               border: 0,
               p: 0,
               m: 0,
-              font: 'inherit',
+              // font 축약형은 위의 fontSize·fontWeight를 덮어써 셀 글자(13px/400)로 커졌다 — 글꼴만 물려받는다
+              fontFamily: 'inherit',
               cursor: 'pointer',
               textAlign: 'left',
               '&:hover': { textDecoration: 'underline', textUnderlineOffset: 3 },
