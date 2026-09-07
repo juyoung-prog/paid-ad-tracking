@@ -35,10 +35,10 @@ function columnsFor(summary, platformLabel, lang) {
   let next = null;
   if (summary.next) {
     const n = summary.next;
-    const review = n.weakPhaseName ? t('recap.exec.next.reviewWeak', lang, { platform: platform(n.weakPlatform), phase: n.weakPhaseName }) : null;
+    // 근거는 지표 하나만 — "…를 재사용 전에 점검"은 ATTENTION 칸이 이미 말해서 붙이지 않는다
     next = n.kind === 'platform'
-      ? { headline: t('recap.exec.next.platform', lang, { cheaper: platform(n.cheaper) }), evidence: [t('recap.exec.next.platformEvidence', lang, { pct: n.pct, pricier: platform(n.pricier) }), review].filter(Boolean).join(' · ') }
-      : { headline: t('recap.exec.next.best', lang, { platform: platform(n.platform), phase: n.phaseName }), evidence: review ?? t('recap.exec.next.bestEvidence', lang) };
+      ? { headline: t('recap.exec.next.platform', lang, { cheaper: platform(n.cheaper) }), evidence: t('recap.exec.next.platformEvidence', lang, { pct: n.pct, pricier: platform(n.pricier) }) }
+      : { headline: t('recap.exec.next.best', lang, { platform: platform(n.platform), phase: n.phaseName }), evidence: t('recap.exec.next.bestEvidence', lang) };
   }
   return [
     { kind: 'best', ...best },
