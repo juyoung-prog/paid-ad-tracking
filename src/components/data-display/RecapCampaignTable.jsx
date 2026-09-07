@@ -182,6 +182,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const isSuggested = !row.note?.verdict && Boolean(row.suggestedVerdict);
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isExpanded = isExpandable && expandedId === row.campaignId;
+            const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
             const detailId = `recap-detail-${row.campaignId}`;
             return [
               <TableRow
@@ -214,7 +215,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 }}
               >
                 <TableCell sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{row.rank}</TableCell>
-                <TableCell sx={{ ...CELL_SX, fontWeight: 600, whiteSpace: 'nowrap' }}>{row.storeCode}</TableCell>
+                {/* 매장이 여럿인 캠페인("G01, G02, …")은 56px 열을 넘쳐 옆 칸 글자와 겹쳤다 —
+                    첫 매장 + "+N" 두 줄로, 전체 목록은 title로. 말줄임(ellipsis)은 안 쓴다:
+                    열 안쪽 폭이 24px라 "BF4"도 "B…"가 된다 */}
+                <TableCell sx={{ ...CELL_SX, fontWeight: 600, whiteSpace: 'nowrap' }} title={stores.length > 1 ? row.storeCode : undefined}>
+                  {stores[0] ?? row.storeCode}
+                  {stores.length > 1 && (
+                    <Typography component="span" sx={{ ...META_SX, display: 'block', fontWeight: 500 }}>+{stores.length - 1}</Typography>
+                  )}
+                </TableCell>
                 <TableCell sx={CELL_SX}>
                   <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }} title={row.name}>
                     {row.phaseName}
