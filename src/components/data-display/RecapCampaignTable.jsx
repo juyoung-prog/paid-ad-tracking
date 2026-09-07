@@ -33,21 +33,25 @@ const COLUMN_WIDTH = {
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1 };
 const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap' };
-/* 짝 지표(Hook | Hold, CTR | CPC) 사이 — 20px는 한 덩어리로 읽혀 30px로(2026-09-07). 세 개(CTR·CPC·CPA)가
-   드는 conversion 줄은 248px 셀에 안 들어가 20px 유지 */
-const PAIR_GAP = 3.75;
-const TRIPLE_GAP = 2.5;
+/* 대표 지표 자리(slot) — 값 길이("↗ lowest of 12")와 무관하게 두 번째 지표(Hold·CPC)가 모든 줄에서 같은 x에
+   오도록 첫 자리에 고정 폭을 준다. 셀 안쪽 폭: Video 192 · Action 216. 세 개(CTR·CPC·CPA)가 드는
+   conversion 줄은 자리를 좁힌다 */
+const KPI_SLOT = { video: 80, action: 88, triple: 60 };
+const KPI_GAP = 3;
+const TRIPLE_GAP = 1.5;
+/** 캠페인 목표 — 캠페인 데이터의 goal(드로어와 같은 원천). 없거나 모르는 값이면 표시하지 않는다 */
+const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 'store_visit'];
 
 /**
  * 비율 지표 한 칸 — 라벨 위, BenchmarkDelta 아래. 비교군 이름은 stat의 scope를
  * 보고 고른다(phase면 단계 이름, goal이면 goal) — 계산이 아니라 라벨 선택이다.
  */
-function MetricCell({ row, metricKey, format, lang, onBenchmarkClick }) {
+function MetricCell({ row, metricKey, format, lang, onBenchmarkClick, minWidth }) {
   const stat = row.benchmarks?.[metricKey];
   if (!stat) return null;
   const peerLabel = stat.peerScope === 'phase' ? row.phaseName : row.goal;
   return (
-    <Box sx={{ minWidth: 0 }}>
+    <Box sx={{ minWidth: minWidth ?? 0, flexShrink: 0 }}>
       <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(metricKey, lang)}</Typography>
       {/* 중앙값은 툴팁에만 — 셀 폭에서 "▲ top 25% · median 28.51%"는 옆 지표와 겹친다 */}
       <BenchmarkDelta
@@ -74,7 +78,7 @@ function SecondaryMetrics({ parts, minWidth }) {
   const shown = parts.filter(([, v]) => v != null);
   if (shown.length === 0) return null;
   return (
-    <Box sx={{ display: 'flex', gap: 1.5, mb: 0.5 }}>
+    <Box sx={{ display: 'flex', gap: 1.5, mb: 1 }}>
       {shown.map(([label, v]) => (
         <Box key={label} sx={{ minWidth, flexShrink: 0 }}>
           <Typography component="span" sx={(theme) => ({ ...META_SX, lineHeight: 1.3, color: alpha(theme.palette.text.secondary, 0.78), display: 'block' })}>{label}</Typography>
@@ -217,8 +221,10 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }} title={row.name}>
                         {row.phaseName}
                       </Typography>
+                      {/* 기간 · 목표 — 목표는 KPI가 아니라 맥락이라 기간과 같은 줄, 같은 크기·색. 데이터에 없으면 기간만 */}
                       <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal' }}>
                         {dateRangeWithDays(row.startDate, row.endDate)}
+                        {GOAL_KEYS.includes(row.goal) && ` · ${t(`goalLabel.${row.goal}`, lang)}`}
                       </Typography>
                     </Box>
                   </Box>
@@ -245,8 +251,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         [metricLabel('videoPlays', lang), count(row.videoPlays)],
                         [metricLabel('avgWatch', lang), row.avgWatchSeconds != null ? seconds(row.avgWatchSeconds) : null],
                       ]} />
-                      <Box sx={{ display: 'flex', gap: PAIR_GAP }}>
-                        <MetricCell row={row} metricKey="hookRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                      <Box sx={{ display: 'flex', gap: KPI_GAP }}>
+                        <MetricCell row={row} metricKey="hookRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.video} />
                         <MetricCell row={row} metricKey="holdRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                       </Box>
                     </TableCell>
@@ -264,9 +270,9 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         [metricLabel('conversions', lang), count(row.conversions)],
                         [metricLabel('profileVisits', lang), count(row.profileVisits)],
                       ]} />
-                      <Box sx={{ display: 'flex', gap: isConversion ? TRIPLE_GAP : PAIR_GAP }}>
-                        <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
-                        <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                      <Box sx={{ display: 'flex', gap: isConversion ? TRIPLE_GAP : KPI_GAP }}>
+                        <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={isConversion ? KPI_SLOT.triple : KPI_SLOT.action} />
+                        <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={isConversion ? KPI_SLOT.triple : undefined} />
                         {isConversion && <MetricCell row={row} metricKey="cpa" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                       </Box>
                     </TableCell>
