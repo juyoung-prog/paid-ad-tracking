@@ -46,7 +46,7 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.section.notes': { en: 'Notes', ko: '코멘트', 'zh-Hant': '評語' },
   'recap.section.learnings': { en: 'Learnings', ko: '배운 점', 'zh-Hant': '學到的事' },
   'recap.section.nextSteps': { en: 'Next time', ko: '다음에는', 'zh-Hant': '下次' },
-  'recap.section.notesPlaceholder': { en: 'Judgments, strengths, weaknesses and lessons will be written here (phase 2).', ko: '판정, 장점, 아쉬운 점, 배운 점은 여기에 적습니다(2단계).', 'zh-Hant': '判斷、優點、不足與心得將在此撰寫（第二階段）。' },
+  'recap.section.notesPlaceholder': { en: 'No notes yet. Press Edit to add a verdict, strengths, weaknesses and the reason for each campaign.', ko: '아직 코멘트가 없습니다. Edit를 눌러 캠페인별 판정·장점·아쉬운 점·이유를 적으세요.', 'zh-Hant': '尚無評語。按下「編輯」為每支廣告填寫評定、優點、不足與原因。' },
   'recap.note.strength': { en: 'Strength', ko: '장점', 'zh-Hant': '優點' },
   'recap.note.weakness': { en: 'Weakness', ko: '아쉬운 점', 'zh-Hant': '不足' },
   'recap.note.reason': { en: 'Why', ko: '이유', 'zh-Hant': '原因' },
