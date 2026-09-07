@@ -18,14 +18,15 @@ export default {
         component: `
 ## RecapPatterns
 
-Learnings 카드 안의 **데이터에서 본 패턴**. 개별 캠페인 하나로는 항목을 만들지
-않는다 — \`schema.js\`의 \`buildRecapPatterns()\`는 캠페인 2개 이상이 같은 방향을
-가리킬 때(같은 지표 상위/하위), 단계 간 CTR이 1.5배 이상 갈릴 때(플랫폼마다 같은
-방향), 이 이벤트 안에서 플랫폼 CPM·CTR이 15% 이상 갈릴 때만 항목을 낸다.
+Learnings 카드 안의 **임원용 패턴 + 행동 요약**. 2×2 항목마다 "지표 이름 — 상태
+(Strong / Mixed / Weak, 점 + 글자) — 한 줄 근거('4 of 6 · top CPM band')"라 상태만 훑어도
+이벤트가 읽힌다. 아래 Recommended action은 첫 줄이 결정, 둘째 줄이 이유.
 
-캠페인 이름("Grand Opening", "Coming Soon")에서 메시지 전략을 추정하지 않는다 —
-"Grand Opening 캠페인이 Coming Soon보다 클릭 효율이 높았다"까지만 말한다.
-자동 Next time은 사람이 쓴 제언이 없을 때만 보인다.
+항목은 \`schema.js\`의 \`buildRecapPatterns()\`가 캠페인 2개 이상이 같은 방향일 때만
+만든다(상위/하위 구간, 양쪽 다 2개 이상이면 Mixed). 단계 간 CTR 1.5배, 이벤트 안 플랫폼
+CPM·CTR 15% 차이는 중립 상태의 패턴으로. 방법론 설명은 본문이 아니라 카드 제목의 ⓘ
+툴팁에 있다. 캠페인 이름에서 메시지 전략을 추정하지 않는다. 자동 제언은 사람이 쓴
+제언이 없을 때만 보인다.
         `,
       },
     },

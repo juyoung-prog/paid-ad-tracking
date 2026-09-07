@@ -5,6 +5,7 @@ import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { alpha } from '@mui/material/styles';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
@@ -101,11 +102,17 @@ const hasNoteContent = (note) =>
   || ['strength', 'weakness', 'reason'].some((key) => Object.values(note[key] ?? {}).some((v) => (v ?? '').trim()));
 
 /** 카드 제목 행 — Dashboard 목록 카드·Reports SectionHeader와 같은 자리(px 2, 아래 1px 선) */
-function SectionHeader({ title, scope }) {
+function SectionHeader({ title, scope, hint }) {
   return (
     <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
       <Typography variant="title" component="h2" sx={{ minWidth: 0, color: 'text.primary' }}>
         {title}
+        {/* 방법론 설명은 본문이 아니라 제목 옆 ⓘ 툴팁에 — 결과와 경쟁하지 않게 */}
+        {hint && (
+          <Tooltip title={hint} arrow enterTouchDelay={0}>
+            <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.75, cursor: 'help' })} />
+          </Tooltip>
+        )}
         {scope && (
           <Typography component="span" variant="body2" sx={{ ml: 1.5, fontWeight: 400, color: 'text.secondary' }}>{scope}</Typography>
         )}
@@ -518,7 +525,7 @@ export function RecapDetailPage() {
         </Box>
       ) : (
         <Box sx={SECTION_CARD_SX} data-print="card">
-          <SectionHeader title={t('recap.section.learnings', lang)} scope={hasWrittenLearnings ? countScope(recap.learnings.length, 'lesson', lang) : null} />
+          <SectionHeader title={t('recap.section.learnings', lang)} scope={hasWrittenLearnings ? countScope(recap.learnings.length, 'lesson', lang) : null} hint={t('learn.hint', lang)} />
           {hasWrittenLearnings && (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2, p: 2, pb: hasWrittenNextSteps ? 0 : 2 }}>
               {recap.learnings.map((item, i) => (

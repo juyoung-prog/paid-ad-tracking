@@ -2178,6 +2178,8 @@ export function buildRecapPatterns(byPlatform) {
     const bottoms = known.filter((r) => r.benchmarks[key].band === 'bottom');
     if (tops.length >= 2 && tops.length > bottoms.length) { learnings.push({ kind: 'consistentStrong', metricKey: key, aspect: METRIC_ASPECT[key], count: tops.length, total: known.length }); seenAspect.add(METRIC_ASPECT[key]); }
     else if (bottoms.length >= 2 && bottoms.length > tops.length) { learnings.push({ kind: 'consistentWeak', metricKey: key, aspect: METRIC_ASPECT[key], count: bottoms.length, total: known.length }); seenAspect.add(METRIC_ASPECT[key]); }
+    // 양쪽이 같이 2개 이상이면 "엇갈림" — 방향을 지어내지 않고 Mixed로 보고한다
+    else if (tops.length >= 2 && bottoms.length >= 2) { learnings.push({ kind: 'mixed', metricKey: key, aspect: METRIC_ASPECT[key], count: tops.length, countBottom: bottoms.length, total: known.length }); seenAspect.add(METRIC_ASPECT[key]); }
   });
 
   // 2) 단계 차이 — 같은 플랫폼 안에서 클릭 효율(CTR)이 가장 높은 단계가 플랫폼마다 같을 때
@@ -2195,7 +2197,7 @@ export function buildRecapPatterns(byPlatform) {
     const agree = bestPhaseByPlatform.every((x) => phaseKey(x.best) === phaseKey(first.best));
     if (agree && (bestPhaseByPlatform.length >= 2 || platforms.length === 1)) {
       learnings.push({ kind: 'phaseClicks', bestPhase: first.best, worstPhase: first.worst, platforms: bestPhaseByPlatform.map((x) => x.platform) });
-      nextSteps.push({ kind: 'shiftToPhase', phase: first.best });
+      nextSteps.push({ kind: 'shiftToPhase', phase: first.best, worstPhase: first.worst });
     }
   }
 
