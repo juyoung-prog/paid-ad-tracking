@@ -2038,6 +2038,40 @@ const OVERSPEND_RATIO = 0.2;
 const knownStats = (row) => Object.values(row.benchmarks ?? {}).filter((b) => b && b.peerScope !== 'none' && b.percentile != null);
 
 /**
+ * 임원용 핵심 요약 세 칸 — buildRecapTakeaways()의 재료를 BEST RESULT / ATTENTION / NEXT MOVE로
+ * 합성한다. "플랫폼 차이"는 칸을 따로 갖지 않고 NEXT MOVE의 근거로 들어간다. 계산은
+ * 새로 하지 않는다 — 벤치마크·순위는 이미 takeaways 재료에 있다.
+ *
+ * @param {Object<string, Array<RecapCampaignRowExtra>>} byPlatform
+ * @returns {{ best: Object|null, attention: Object|null, next: Object|null }}
+ *   best      { platform, phaseName, metricKey, aspect, stat }
+ *   attention { platform, phaseName, metricKey, aspect, stat } | null (하위 구간 캠페인 없음)
+ *   next      { kind: 'platform'|'best', cheaper?, pricier?, pct?, platform?, phaseName?, weakPlatform?, weakPhaseName? } | null
+ */
+export function buildRecapExecutiveSummary(byPlatform) {
+  const items = buildRecapTakeaways(byPlatform);
+  const by = (kind) => items.find((i) => i.kind === kind) ?? null;
+  const bestItem = by('best');
+  const weakItem = by('weakest');
+  const platformItem = by('platform');
+  const rec = by('recommendation');
+
+  const best = bestItem
+    ? { platform: bestItem.platform, phaseName: bestItem.phaseName, metricKey: bestItem.metricKey, aspect: METRIC_ASPECT[bestItem.metricKey], stat: bestItem.stat }
+    : null;
+  const attention = weakItem
+    ? { platform: weakItem.platform, phaseName: weakItem.phaseName, metricKey: weakItem.stat.metricKey, aspect: METRIC_ASPECT[weakItem.stat.metricKey], stat: weakItem.stat }
+    : null;
+  let next = null;
+  if (platformItem) {
+    next = { kind: 'platform', cheaper: platformItem.cheaper, pricier: platformItem.pricier, pct: platformItem.pct, weakPlatform: rec?.weakPlatform ?? null, weakPhaseName: rec?.weakPhaseName ?? null };
+  } else if (rec) {
+    next = { kind: 'best', platform: rec.platform, phaseName: rec.phaseName, weakPlatform: rec.weakPlatform, weakPhaseName: rec.weakPhaseName };
+  }
+  return { best, attention, next };
+}
+
+/**
  * 캠페인 한 줄의 해석 — { strength, weakness, reason }. 각 항목은
  * { level, kind, ... } 또는 null(근거 없음). 표에 있는 숫자를 반복하지 않고
  * "비교군 중 어디"만 근거로 붙인다.

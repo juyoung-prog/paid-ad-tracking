@@ -1,111 +1,117 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { t, metricLabel, benchmarkPositionText } from '../../data/recapStrings';
-import { money, percent } from '../../utils/format';
 
-/** 지표 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
-const metricValue = (metricKey, value) => (value == null ? null : (['cpm', 'cpc', 'cpa'].includes(metricKey) ? money(value) : percent(value, { digits: 2 })));
-/** 순위 문구는 문장 앞에 오므로 첫 글자만 대문자로(한글·중문은 그대로) */
-const capitalize = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
-
-/** 항목 종류별 왼쪽 색점 — 색은 성과 톤(좋음 success, 부족 warning), 나머지는 중립 */
-const KIND_DOT = {
-  best: 'success.main',
-  weakest: 'warning.main',
-  platform: 'text.disabled',
-  recommendation: 'accent.main',
-};
+/** 칸 → 보조 색. 결론 글자가 주인공이라 색은 라벨 옆 아이콘에만 */
+const COLUMN_TONE = { best: 'success.main', attention: 'warning.main', next: 'accent.main' };
 
 /**
- * 재료(schema.js buildRecapTakeaways 결과) 하나를 문장으로. 숫자는 이미 표에 있으니
- * 여기서는 "무엇이 좋았고 무엇을 바꿀지"만 말한다. 문장 조립은 recapStrings에서.
+ * 라벨 옆 얇은 선 아이콘(Lucide 기하) — circle-check / circle-alert / arrow-right.
+ * 14px, stroke 1.5, fill 없음. 아이콘 라이브러리를 늘리지 않는다.
  */
-function sentenceFor(item, platformLabel, lang) {
+function ColumnIcon({ kind }) {
+  const paths = {
+    best: [<circle key="c" cx="12" cy="12" r="10" />, <path key="p" d="m9 12 2 2 4-4" />],
+    attention: [<circle key="c" cx="12" cy="12" r="10" />, <path key="l" d="M12 8v4" />, <path key="d" d="M12 16h.01" />],
+    next: [<path key="a" d="M5 12h14" />, <path key="b" d="m12 5 7 7-7 7" />],
+  }[kind];
+  return (
+    <Box component="svg" viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden sx={{ flexShrink: 0, fill: 'none', color: COLUMN_TONE[kind] }}>
+      {paths}
+    </Box>
+  );
+}
+
+/** 문장 조립은 recapStrings에서만 — 여기서는 어느 문구에 어느 재료를 넣을지 고른다 */
+function columnsFor(summary, platformLabel, lang) {
   const platform = (p) => platformLabel[p] ?? p;
-  switch (item.kind) {
-    case 'best':
-      return t('recap.takeaways.best', lang, {
-        platform: platform(item.platform),
-        phase: item.phaseName,
-        metric: metricLabel(item.metricKey, lang),
-        value: metricValue(item.metricKey, item.stat?.value) ?? '',
-        position: capitalize(benchmarkPositionText(item.stat, lang)),
-      });
-    case 'weakest':
-      return t('recap.takeaways.weakest', lang, {
-        platform: platform(item.platform),
-        phase: item.phaseName,
-        metric: metricLabel(item.stat?.metricKey ?? item.metricKeys[0], lang),
-        value: metricValue(item.stat?.metricKey ?? item.metricKeys[0], item.stat?.value) ?? '',
-        position: capitalize(benchmarkPositionText(item.stat, lang)),
-      });
-    case 'platform':
-      return t('recap.takeaways.platform', lang, { cheaper: platform(item.cheaper), pricier: platform(item.pricier), pct: item.pct });
-    case 'recommendation':
-      return item.weakPhaseName
-        ? t('recap.takeaways.recommendation', lang, {
-          platform: platform(item.platform), phase: item.phaseName, weakPlatform: platform(item.weakPlatform), weakPhase: item.weakPhaseName,
-        })
-        : t('recap.takeaways.recommendationBestOnly', lang, { platform: platform(item.platform), phase: item.phaseName });
-    default:
-      return '';
+  const aspect = (a) => t(`aspect.${a}`, lang);
+  const best = summary.best
+    ? { headline: `${platform(summary.best.platform)} ${summary.best.phaseName}`, evidence: t('recap.exec.best.evidence', lang, { aspect: aspect(summary.best.aspect), metric: metricLabel(summary.best.metricKey, lang), position: benchmarkPositionText(summary.best.stat, lang) }) }
+    : null;
+  const attention = summary.attention
+    ? { headline: `${platform(summary.attention.platform)} ${summary.attention.phaseName}`, evidence: t('recap.exec.attention.evidence', lang, { aspect: aspect(summary.attention.aspect), metric: metricLabel(summary.attention.metricKey, lang), position: benchmarkPositionText(summary.attention.stat, lang) }) }
+    : { headline: t('recap.exec.attention.none', lang), evidence: t('recap.exec.attention.noneEvidence', lang) };
+  let next = null;
+  if (summary.next) {
+    const n = summary.next;
+    const review = n.weakPhaseName ? t('recap.exec.next.reviewWeak', lang, { platform: platform(n.weakPlatform), phase: n.weakPhaseName }) : null;
+    next = n.kind === 'platform'
+      ? { headline: t('recap.exec.next.platform', lang, { cheaper: platform(n.cheaper) }), evidence: [t('recap.exec.next.platformEvidence', lang, { pct: n.pct, pricier: platform(n.pricier) }), review].filter(Boolean).join(' · ') }
+      : { headline: t('recap.exec.next.best', lang, { platform: platform(n.platform), phase: n.phaseName }), evidence: review ?? t('recap.exec.next.bestEvidence', lang) };
   }
+  return [
+    { kind: 'best', ...best },
+    { kind: 'attention', ...attention },
+    { kind: 'next', ...next },
+  ].filter((c) => c.headline);
 }
 
 /**
  * RecapTakeaways 컴포넌트
  *
- * Recap 머리글과 타임라인 사이의 "핵심 요약" — 표가 증거라면 이 칸은 해석이다.
- * 가장 좋았던 캠페인, 뒤처진 캠페인, 플랫폼 차이, 다음 제언을 최대 4개, 각각
- * 짧은 라벨 + 문장 하나로. 표에 이미 있는 숫자를 반복하지 않고 "비교 가능한
- * 캠페인 중 best of 5" 같은 상대 위치만 붙인다.
+ * 보고서 머리글과 타임라인 사이의 **임원용 핵심 요약** — 세 칸 한 줄: BEST RESULT ·
+ * ATTENTION · NEXT MOVE. 각 칸은 작은 라벨 → 큰 결론 한 줄 → 작은 근거 한 줄이라
+ * 가운데 줄만 읽어도 "무엇이 이겼고, 무엇을 봐야 하고, 다음에 뭘 할지"가 잡힌다.
+ * 표에 있는 숫자를 나열하지 않고 가장 강한 근거 하나만 붙인다.
  *
- * 계산은 하지 않는다 — items는 schema.js buildRecapTakeaways() 결과(종류·캠페인·
- * 지표·벤치마크)이고, 문장은 recapStrings가 만든다. 근거가 없어 items가 비면
- * "아직 결론을 내릴 수 없다"고만 말한다.
+ * 계산은 하지 않는다 — summary는 schema.js buildRecapExecutiveSummary() 결과이고,
+ * 문장은 recapStrings가 만든다. 근거가 없어 best·next가 모두 비면 "아직 결론을
+ * 내릴 수 없다"고만 말한다. 색은 라벨 아이콘에만(success / warning / accent).
  *
  * Props:
- * @param {Array<{ kind: 'best'|'weakest'|'platform'|'recommendation' }>} items - buildRecapTakeaways() 결과 [Required]
+ * @param {{ best: Object|null, attention: Object|null, next: Object|null }} summary - buildRecapExecutiveSummary() 결과 [Required]
  * @param {Object<string, string>} platformLabel - 플랫폼 값 → 표시명(예: { meta: 'Meta' }) [Optional, 기본값: {}]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <RecapTakeaways items={buildRecapTakeaways(byPlatform)} platformLabel={PLATFORM_LABEL} lang={lang} />
+ * <RecapTakeaways summary={buildRecapExecutiveSummary(byPlatform)} platformLabel={PLATFORM_LABEL} lang={lang} />
  */
-export function RecapTakeaways({ items, platformLabel = {}, lang = 'en', sx }) {
-  if (!items || items.length === 0) {
+export function RecapTakeaways({ summary, platformLabel = {}, lang = 'en', sx }) {
+  if (!summary || (!summary.best && !summary.next)) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
         {t('recap.takeaways.empty', lang)}
       </Typography>
     );
   }
+  const columns = columnsFor(summary, platformLabel, lang);
   return (
-    <Box component="ul" sx={{ listStyle: 'none', m: 0, px: 2, py: 0.5, ...sx }}>
-      {items.map((item, i) => (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: { xs: '1fr', md: `repeat(${columns.length}, minmax(0, 1fr))` },
+        ...sx,
+      }}
+    >
+      {columns.map((col, i) => (
         <Box
-          component="li"
-          key={`${item.kind}-${i}`}
+          key={col.kind}
           sx={{
-            display: 'grid',
-            gridTemplateColumns: '8px minmax(0, 1fr)',
-            columnGap: 1.5,
-            alignItems: 'start',
-            py: 1.25,
-            borderBottom: i < items.length - 1 ? '1px solid' : 0,
+            minWidth: 0,
+            px: 2.5,
+            py: 2.25,
+            // 칸 사이는 카드가 아니라 얇은 구분선 하나 — 데스크톱은 세로선, 모바일은 가로선
+            borderLeft: { xs: 0, md: i > 0 ? '1px solid' : 0 },
+            borderTop: { xs: i > 0 ? '1px solid' : 0, md: 0 },
             borderColor: 'divider',
           }}
         >
-          <Box aria-hidden sx={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: KIND_DOT[item.kind] ?? 'text.disabled', mt: '5px' }} />
-          <Box sx={{ minWidth: 0 }}>
-            <Typography component="span" sx={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'text.secondary', lineHeight: 1.4 }}>
-              {t(`recap.takeaways.label.${item.kind}`, lang)}
-            </Typography>
-            <Typography component="span" sx={{ display: 'block', fontSize: 13.5, color: 'text.primary', lineHeight: 1.55, mt: 0.25 }}>
-              {sentenceFor(item, platformLabel, lang)}
+          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
+            <ColumnIcon kind={col.kind} />
+            <Typography component="span" sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary', lineHeight: 1 }}>
+              {t(`recap.exec.label.${col.kind}`, lang)}
             </Typography>
           </Box>
+          <Typography component="p" sx={{ m: 0, fontSize: 16, fontWeight: 600, color: 'text.primary', lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+            {col.headline}
+          </Typography>
+          {col.evidence && (
+            <Typography component="p" sx={{ m: 0, mt: 0.5, fontSize: 12, color: 'text.secondary', lineHeight: 1.5 }}>
+              {col.evidence}
+            </Typography>
+          )}
         </Box>
       ))}
     </Box>

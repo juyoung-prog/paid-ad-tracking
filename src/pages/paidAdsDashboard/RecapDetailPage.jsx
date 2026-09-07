@@ -36,7 +36,7 @@ import {
   buildRecapRows,
   buildRecapHeadline,
   buildPeerComparison,
-  buildRecapTakeaways,
+  buildRecapExecutiveSummary,
   buildCampaignInsight,
   buildRecapPatterns,
   localizedText,
@@ -200,7 +200,7 @@ export function RecapDetailPage() {
   );
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
-  const takeaways = useMemo(() => buildRecapTakeaways(byPlatform), [byPlatform]);
+  const executiveSummary = useMemo(() => buildRecapExecutiveSummary(byPlatform), [byPlatform]);
   const patterns = useMemo(() => buildRecapPatterns(byPlatform), [byPlatform]);
 
   const startEditing = () => {
@@ -439,7 +439,7 @@ export function RecapDetailPage() {
       {/* 핵심 요약 — 표가 증거, 이 카드가 해석. KPI를 더 늘리지 않고 이 칸이 "그래서 어땠나"를 말한다. */}
       <Box sx={SECTION_CARD_SX} data-print="card">
         <SectionHeader title={t('recap.takeaways.title', lang)} />
-        <RecapTakeaways items={takeaways} platformLabel={PLATFORM_LABEL} lang={lang} />
+        <RecapTakeaways summary={executiveSummary} platformLabel={PLATFORM_LABEL} lang={lang} />
       </Box>
 
       <Box sx={SECTION_CARD_SX} data-print="card">

@@ -69,7 +69,7 @@
 | KpiBar | 재활용 | 머리글 요약 — 캠페인 수 · 지출 · 계획 대비 · 대표 지표(`delta`로 벤치마크 대비) |
 | PhaseTimelineChart | 재활용 | 단계 타임라인(읽기 전용, 클릭 없음). buildPhaseTimeline은 Reports와 공유(paidAdsPageUtils) |
 | **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태 배지·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
-| **RecapTakeaways** | 신규(구현됨, 2026-09) | 머리글과 타임라인 사이 "Key takeaways" — 표가 증거, 이 칸이 해석(schema.js buildRecapTakeaways) |
+| **RecapTakeaways** | 신규(구현됨, 2026-09) | 임원용 핵심 요약 세 칸 — BEST RESULT · ATTENTION · NEXT MOVE(라벨 → 결론 → 근거 한 줄). 재료는 buildRecapExecutiveSummary() |
 | **RecapStatusBadge** | 신규(구현됨, 2026-09) | Not started / Draft / Ready 배지 — 목록 Report 열과 머리글 공용 |
 | **RecapCampaignInsightPanel** | 신규(구현됨, 2026-09) | 캠페인 표의 줄을 펼치면(renderDetail) 그 아래에 What worked·What could improve·Why·Recommendation — 사람 글 우선, 없으면 데이터 해석(근거 수준 표시). 근거 없는 칸은 비운다 |
 | **RecapPatterns** | 신규(구현됨, 2026-09) | Learnings 안 "데이터에서 본 패턴" + 자동 Next time — 캠페인 2개 이상이 뒷받침할 때만 |
