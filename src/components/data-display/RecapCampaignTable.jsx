@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
+import SvgIcon from '@mui/material/SvgIcon';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -8,7 +9,6 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
 import { BenchmarkDelta } from './BenchmarkDelta';
@@ -30,8 +30,22 @@ const COLUMN_WIDTH = {
   engagement: 176,
   action: 248,
 };
-/** 펼침 화살표 열 — renderDetail이 있을 때만 붙는다 */
-const EXPAND_WIDTH = 40;
+/** 펼침 화살표 열 — renderDetail이 있을 때만 붙는다. 28px 히트 영역 + 오른쪽 여백 */
+const EXPAND_WIDTH = 44;
+const EXPAND_HIT = 28;
+
+/**
+ * 얇은 선 셰브론 — @mui/icons-material의 ExpandMore는 면으로 채운 화살표라 표 안에서
+ * 무겁다. MUI SvgIcon에 stroke 경로 하나(Lucide chevron-down 형태)로 그린다 —
+ * 아이콘 라이브러리를 늘리지 않는다.
+ */
+function ThinChevronDownIcon(props) {
+  return (
+    <SvgIcon viewBox="0 0 24 24" {...props}>
+      <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+    </SvgIcon>
+  );
+}
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1.25 };
@@ -244,18 +258,34 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </TableCell>
                   </>
                 )}
+                {/* 조용한 컨트롤 — 기본은 투명, hover에만 옅은 면. 줄 높이는 그대로(히트 영역 28px < 줄 높이) */}
                 {isExpandable && (
-                  <TableCell sx={{ ...CELL_SX, px: 0.5, textAlign: 'center' }}>
+                  <TableCell sx={{ ...CELL_SX, pl: 0, pr: 1.5, verticalAlign: 'middle' }}>
                     <IconButton
-                      size="small"
                       aria-label={t(isExpanded ? 'recap.table.collapse' : 'recap.table.expand', lang)}
                       aria-expanded={isExpanded}
                       aria-controls={isExpanded ? detailId : undefined}
                       onClick={(event) => { event.stopPropagation(); toggle(row.campaignId); }}
                       onKeyDown={(event) => event.stopPropagation()}
-                      sx={{ color: isExpanded ? 'accent.main' : 'text.secondary', p: 0.5, mt: -0.25 }}
+                      sx={(theme) => ({
+                        width: EXPAND_HIT,
+                        height: EXPAND_HIT,
+                        p: 0,
+                        ml: 'auto',
+                        display: 'flex',
+                        color: 'text.secondary',
+                        borderRadius: `${theme.shape.radius.control}px`,
+                        transition: theme.transitions.create(['background-color', 'color'], { duration: theme.transitions.duration.shortest }),
+                        '@media (hover: hover)': { '&:hover': { backgroundColor: 'action.hover', color: 'text.primary' } },
+                      })}
                     >
-                      <ExpandMoreIcon sx={(theme) => ({ fontSize: theme.iconSize.control, transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shortest }), transform: isExpanded ? 'rotate(180deg)' : 'none' })} />
+                      <ThinChevronDownIcon
+                        sx={(theme) => ({
+                          fontSize: 15,
+                          transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
+                          transform: isExpanded ? 'rotate(180deg)' : 'none',
+                        })}
+                      />
                     </IconButton>
                   </TableCell>
                 )}
