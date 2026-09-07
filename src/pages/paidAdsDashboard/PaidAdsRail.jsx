@@ -8,9 +8,9 @@ import { useSnackbar } from '../../hooks/useSnackbar';
 import { PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined';
-import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import QueryStatsOutlinedIcon from '@mui/icons-material/QueryStatsOutlined';
 import StorefrontOutlinedIcon from '@mui/icons-material/StorefrontOutlined';
-import SummarizeOutlinedIcon from '@mui/icons-material/SummarizeOutlined';
+import DescriptionOutlinedIcon from '@mui/icons-material/DescriptionOutlined';
 import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
 import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
 import { useDesignSystem } from '../../styles/themes/designSystemContext';
@@ -23,10 +23,11 @@ import logoUrl from '../../assets/beautymaster-logo.png';
  */
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: <SpaceDashboardOutlinedIcon /> },
-  { to: '/reports', label: 'Reports', icon: <AssessmentOutlinedIcon /> },
-  // Recap — 이벤트 종료 후 결과 보고. Reports(진행 확인) 안의 탭이면 이름이
-  // 겹쳐 헷갈리므로 별도 메뉴다(02-ux-flow 시나리오 7).
-  { to: '/recap', label: 'Recap', icon: <SummarizeOutlinedIcon /> },
+  /* 이름 체계(2026-09): Dashboard(지금 무슨 일이) → Performance(광고가 어떻게 되고 있나, /reports)
+     → Reports(무슨 일이 있었고 무엇을 배웠나 — 이벤트 종료 후 보고서, /recap) → Stores.
+     내부 경로는 그대로다 — /reports를 바꾸면 기존 링크가 다른 화면을 가리키게 된다. */
+  { to: '/reports', label: 'Performance', icon: <QueryStatsOutlinedIcon /> },
+  { to: '/recap', label: 'Reports', icon: <DescriptionOutlinedIcon /> },
   { to: '/stores', label: 'Stores', icon: <StorefrontOutlinedIcon /> },
 ];
 
@@ -111,7 +112,7 @@ const SYNCED_CLASS = 'rail-synced';
  * @param {boolean} isActive - 활성 상태 여부 [Optional, 기본값: false]
  *
  * Example usage:
- * <RailRow to="/reports" icon={<AssessmentOutlinedIcon />} label="Reports" isActive />
+ * <RailRow to="/reports" icon={<QueryStatsOutlinedIcon />} label="Performance" isActive />
  */
 function RailRow({ icon, label, to, isActive = false }) {
   return (

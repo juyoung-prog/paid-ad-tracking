@@ -13,18 +13,18 @@ import { RECAP_DEFAULT_LANG } from './schema';
 /** @type {Object<string, { en: string, ko?: string|null, 'zh-Hant'?: string|null }>} */
 export const RECAP_STRINGS = Object.freeze({
   // 페이지·머리글
-  'recap.title': { en: 'Recap', ko: 'Recap', 'zh-Hant': 'Recap' },
+  'recap.title': { en: 'Reports', ko: '보고서', 'zh-Hant': '報告' },
   'recap.list.subtitle': { en: 'Post-campaign reports by event. Numbers come from synced data; judgments and lessons are written here.', ko: '이벤트별 캠페인 결과 보고서입니다. 숫자는 동기화 데이터에서 자동으로 오고, 판단과 배운 점은 여기서 씁니다.', 'zh-Hant': '依活動整理的行銷成效報告。數字來自同步資料，判斷與心得在此撰寫。' },
   'recap.list.empty': { en: 'No events yet. Tag campaigns with an Event on the Dashboard to see them here.', ko: '아직 이벤트가 없습니다. Dashboard에서 캠페인에 Event를 태그하면 여기에 나타납니다.', 'zh-Hant': '尚無活動。請在 Dashboard 為廣告加上 Event 標籤後即會顯示於此。' },
   'recap.list.column.event': { en: 'Event', ko: '이벤트', 'zh-Hant': '活動' },
   'recap.list.column.period': { en: 'Period', ko: '기간', 'zh-Hant': '期間' },
   'recap.list.column.campaigns': { en: 'Campaigns', ko: '캠페인', 'zh-Hant': '廣告' },
   'recap.list.column.spend': { en: 'Spend', ko: '지출', 'zh-Hant': '花費' },
-  'recap.list.column.status': { en: 'Report', ko: '보고서', 'zh-Hant': '報告' },
+  'recap.list.column.status': { en: 'Status', ko: '상태', 'zh-Hant': '狀態' },
   'recap.status.draft': { en: 'Draft', ko: '작성 중', 'zh-Hant': '草稿' },
   'recap.status.final': { en: 'Ready', ko: '완료', 'zh-Hant': '完成' },
   'recap.status.none': { en: 'Not started', ko: '시작 전', 'zh-Hant': '尚未開始' },
-  'recap.detail.back': { en: 'All recaps', ko: '전체 보고서', 'zh-Hant': '所有報告' },
+  'recap.detail.back': { en: 'All reports', ko: '전체 보고서', 'zh-Hant': '所有報告' },
   'recap.detail.notFound': { en: 'No campaigns are tagged with this event.', ko: '이 이벤트로 태그된 캠페인이 없습니다.', 'zh-Hant': '沒有標記為此活動的廣告。' },
   'recap.detail.print': { en: 'Print / PDF', ko: '인쇄 / PDF', 'zh-Hant': '列印 / PDF' },
 
@@ -194,8 +194,8 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.edit.save': { en: 'Save', ko: '저장', 'zh-Hant': '儲存' },
   'recap.edit.saving': { en: 'Saving…', ko: '저장 중…', 'zh-Hant': '儲存中…' },
   'recap.edit.cancel': { en: 'Cancel', ko: '취소', 'zh-Hant': '取消' },
-  'recap.edit.saved': { en: 'Recap saved.', ko: '보고서를 저장했습니다.', 'zh-Hant': '報告已儲存。' },
-  'recap.edit.failed': { en: "Couldn't save the recap.", ko: '보고서를 저장하지 못했습니다.', 'zh-Hant': '無法儲存報告。' },
+  'recap.edit.saved': { en: 'Report saved.', ko: '보고서를 저장했습니다.', 'zh-Hant': '報告已儲存。' },
+  'recap.edit.failed': { en: "Couldn't save the report.", ko: '보고서를 저장하지 못했습니다.', 'zh-Hant': '無法儲存報告。' },
   'recap.edit.signIn': { en: 'Sign in to edit', ko: '로그인 후 편집', 'zh-Hant': '登入後編輯' },
   'recap.edit.signInHint': { en: 'Reading is open to anyone with the link. Writing needs your account.', ko: '읽기는 링크만 있으면 누구나 가능합니다. 쓰기는 계정이 필요합니다.', 'zh-Hant': '有連結即可閱讀，撰寫需要帳號。' },
   'recap.edit.status': { en: 'Report status', ko: '보고서 상태', 'zh-Hant': '報告狀態' },
