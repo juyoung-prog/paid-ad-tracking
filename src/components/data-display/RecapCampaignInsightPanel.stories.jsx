@@ -27,6 +27,11 @@ export default {
 Could improve · Why · Next action. 칸마다 작은 라벨 → 짧은 결론(2~6단어, 가장 강하게) →
 한 줄 근거(↗↘ + "Hook top 9%"). 임원이 5~10초에 읽는 게 목표라 문단을 쓰지 않는다.
 
+### 어디에 나오나
+2026-09-07부터 표 아래 펼침이 아니라 캠페인 상세 드로어(CampaignDetailPanel)의 **Campaign insights**
+섹션(예산 페이싱 뒤, 일별 지출 앞)에 \`layout="grid"\`(2×2)로 들어간다. 표의 줄을 누르면 성과·예산·
+해석이 한 드로어에 다 있다 — 숨은 셰브론을 찾을 필요가 없다.
+
 ### 근거 수준은 툴팁에만
 observed / compared / inferred / unknown / written은 라벨에 마우스를 올리면 보인다 —
 논리(\`schema.js\` \`buildCampaignInsight()\`)는 그대로고, 칸마다 "· compared"를 붙이던
@@ -48,6 +53,7 @@ action도 "Keep the strong hook"이 아니라 "Improve engagement without losing
     platformLabel: { control: 'object', description: '플랫폼 값 → 표시명' },
     localize: { control: false, description: 'LocalizedText → { value, isFallback }' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
+    layout: { control: 'select', options: ['row', 'grid'], description: "'row' 4열 한 줄(넓은 자리) / 'grid' 2×2(드로어)" },
     sx: { control: 'object', description: '추가 스타일' },
   },
 };
@@ -91,4 +97,10 @@ export const NoData = {
 export const Korean = {
   args: { row: withInsight(metaRows[1] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize: (text) => localizedText(text, 'ko'), lang: 'ko' },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
+};
+
+/** 드로어 안(≈560px)에서 쓰는 2×2 — CampaignDetailPanel의 "Campaign insights" 섹션이 이 모양이다 */
+export const GridInDrawer = {
+  args: { row: withInsight(metaRows[1] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize, layout: 'grid' },
+  render: (args) => <Box sx={(theme) => ({ maxWidth: 560, border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.control}px` })}><RecapCampaignInsightPanel {...args} sx={{ px: 1.5, py: 1.25 }} /></Box>,
 };

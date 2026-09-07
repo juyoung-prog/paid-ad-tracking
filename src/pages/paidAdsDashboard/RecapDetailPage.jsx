@@ -177,9 +177,8 @@ export function RecapDetailPage() {
   const { notify, SnackbarComponent } = useSnackbar();
 
   const [isEditing, setIsEditing] = useState(false);
-  /* 타임라인 행을 누르면 그 단계의 캠페인 줄을 표에서 펼치고 거기로 스크롤한다 — 플랫폼
-     표마다 한 줄씩(Meta·TikTok에 같은 단계가 있으면 둘 다). 표의 화살표로 바꾼 값도 여기로 온다. */
-  const [expandedByPlatform, setExpandedByPlatform] = useState({});
+  /* 타임라인 행을 누르면 그 단계의 캠페인 줄로 스크롤하고 선택 표시만 한다 — 드로어는 열지 않는다
+     (사용자가 그 줄을 누르면 연다). 막대는 emphasizedKey로 강조. */
   const [focusedPhaseKey, setFocusedPhaseKey] = useState(null);
   /* 타임라인에서 찾아온 캠페인 — 표의 그 줄에 선택 표시(옅은 accent 면 + 왼쪽 선). 펼침과는 별개 상태:
      빈 곳·다른 캠페인을 누르면 표시만 사라지고 해석은 그대로 열려 있다. 시간이 지나도 저절로 안 사라진다. */
@@ -321,7 +320,7 @@ export function RecapDetailPage() {
   }, {});
   const shownRecap = isEditing && draft ? draft.recap : recap;
   const editRows = platformOrder.flatMap((p) => byPlatform[p]);
-  /* 캠페인 해석은 표의 줄을 펼치면 그 자리에 — 사람이 쓴 글이 있으면 그것, 없으면 데이터
+  /* 캠페인 해석은 캠페인 상세 드로어의 "Campaign insights"에 — 사람이 쓴 글이 있으면 그것, 없으면 데이터
      해석(원인은 지어내지 않는다). 계획 예산은 캠페인 단위 값(effectiveBudgetPlanned)으로
      초과 지출 판정에만 쓴다. 편집 중에는 draft의 코멘트가 바로 반영된다. */
   const insightById = Object.fromEntries(editRows.map((r) => {
@@ -479,18 +478,10 @@ export function RecapDetailPage() {
           emphasizedKey={focusedPhaseKey ?? undefined}
           barSuffix={(phase) => (spendByPhaseKey[phase.key] != null ? `${money(spendByPhaseKey[phase.key])} spent` : null)}
           onPhaseClick={(phase) => {
-            const next = {};
-            let firstId = null;
-            platformOrder.forEach((p) => {
-              const hit = byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key);
-              next[p] = hit?.campaignId ?? null;
-              if (hit && !firstId) firstId = hit.campaignId;
-            });
-            setExpandedByPlatform(next);
+            // 스크롤 목적지는 플랫폼 순서상 첫 줄 하나 — 선택 표시도 그 한 줄에만(여러 줄을 동시에 칠하지 않는다)
+            const firstId = platformOrder.map((p) => byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key)?.campaignId).find(Boolean) ?? null;
             setFocusedPhaseKey(phase.key);
-            // 선택 표시는 스크롤 목적지 한 줄에만 — 여러 줄을 동시에 칠하지 않는다
             setSelectedCampaignId(firstId);
-            // 펼침이 그려진 다음 프레임에 첫 줄로 — 줄 위쪽이 화면 중간쯤 오게
             if (firstId) requestAnimationFrame(() => document.getElementById(`recap-row-${firstId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           }}
         />
@@ -507,20 +498,10 @@ export function RecapDetailPage() {
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
-            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(썸네일·이름만 누르던 것은 찾기 어려웠다, 2026-09-07).
-               다른 캠페인을 건드리면(줄·화살표) 타임라인 선택 표시는 풀린다 — 화살표는 stopPropagation이라 document
-               리스너에 안 닿아서 여기서 직접 처리한다. 같은 줄이면 그대로 */
+            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출).
+               다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
             onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
             selectedId={selectedCampaignId}
-            expandedId={expandedByPlatform[platform] ?? null}
-            onExpandedChange={(campaignId) => {
-              setExpandedByPlatform((prev) => ({ ...prev, [platform]: campaignId }));
-              const touched = campaignId ?? expandedByPlatform[platform];
-              if (touched && touched !== selectedCampaignId) setSelectedCampaignId(null);
-            }}
-            renderDetail={(row) => (
-              <RecapCampaignInsightPanel row={insightById[row.campaignId] ?? row} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />
-            )}
           />
         </Box>
       ))}
@@ -603,6 +584,10 @@ export function RecapDetailPage() {
             today={today}
             onClose={() => setDetailCampaignId(null)}
             onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
+            /* 캠페인 해석은 이 페이지의 재료(벤치마크 구간)로만 만든다 — Performance에는 없다 */
+            insights={insightById[detailCampaign.id] ? (
+              <RecapCampaignInsightPanel row={insightById[detailCampaign.id]} localize={localize} lang={lang} layout="grid" sx={{ px: 1.5, py: 1.25 }} />
+            ) : undefined}
           />
         );
       })()}

@@ -140,9 +140,9 @@ const recapPhases = [
     phase: '7', title: '임원용 다듬기 (구현됨) — 2026-09-07', stage: '다듬기', deps: 'Phase 6',
     items: [
       'Key takeaways → RecapTakeaways 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): schema.js buildRecapExecutiveSummary()가 기존 takeaways 재료를 합성. 라벨 → 16px 결론 → 12px 근거, 플랫폼 CPM 차이는 NEXT MOVE의 근거',
-      '캠페인 해석 → 별도 Notes 카드 대신 표의 줄 아래로(RecapCampaignTable renderDetail + RecapCampaignInsightPanel). What worked · Could improve · Why · Next action, 결론 → ↗↘ 근거 한 줄. schema.js buildCampaignInsight()가 벤치마크 구간에서만 재료를 만들고 원인은 지어내지 않는다(근거 수준은 라벨 툴팁). 줄 클릭도 펼침(대시보드 이동 없음), 타임라인 행 클릭 → 그 단계 줄 펼침',
+      '캠페인 해석 → 별도 Notes 카드 대신 캠페인 상세 드로어의 Campaign insights 섹션으로(RecapCampaignInsightPanel layout=grid, 예산 페이싱 뒤). 한때 표의 줄 아래 펼침(셰브론)이었으나 찾기 어려워 뺐다. What worked · Could improve · Why · Next action, 결론 → ↗↘ 근거 한 줄. schema.js buildCampaignInsight()가 벤치마크 구간에서만 재료를 만들고 원인은 지어내지 않는다. 표의 숫자 줄 전체 클릭 = 드로어, 타임라인 행 클릭 = 그 줄로 스크롤 + 선택 표시',
       'Learnings → RecapPatterns 플레이북: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE 2×2(상태 → 제목 → 근거) + NEXT EVENT 한 문장. schema.js buildRecapPlaybook()이 buildRecapPatterns() 재료(캠페인 2개 이상 같은 방향, 양쪽 2개 이상이면 mixed, 플랫폼 CPM·CTR 차이)를 행동으로 합성 — 회고 요약은 Key takeaways가 맡는다. 방법론은 카드 제목 ⓘ 툴팁',
-      '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), 펼침 셰브론은 Lucide chevron-down 기하(14px, stroke 1.5, 28px 히트), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
+      '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
       '내비 이름: Reports → Performance, Recap → Reports(레일·목록 제목·"All reports"·저장 알림). 내부 경로 유지',
       'recap-draft SYSTEM 프롬프트도 같은 규칙(원인 지어내지 않기, 이벤트 범위) — 바꾼 뒤 재배포 필요',
     ],

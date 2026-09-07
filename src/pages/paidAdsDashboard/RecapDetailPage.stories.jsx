@@ -51,9 +51,8 @@ export default {
 1. **머리글**(RecapHeader) — 이벤트·상태·기간·매장·플랫폼, KPI, 순위 한 줄. 오른쪽에 언어 드롭다운·Edit·Export
 2. 저장된 요약 한 단락(있을 때)
 3. **Key takeaways**(RecapTakeaways) — 임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE
-4. **단계 타임라인**(PhaseTimelineChart) — 막대 옆에 실지출. 행을 누르면 아래 표에서 그 단계의 줄을 펼치고 스크롤한다
-5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 숫자 줄 아무 데나 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel: 소재·View ad·Ads Manager·Billing·예산·페이싱·일별 지출)가 이 페이지 위에 열린다. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론으로
-   그 줄 아래에 **캠페인 해석**(RecapCampaignInsightPanel: What worked · Could improve · Why · Next action)이 펼쳐진다(한 번에 한 줄)
+4. **단계 타임라인**(PhaseTimelineChart) — 막대 옆에 실지출. 행을 누르면 아래 표의 그 단계 줄로 스크롤하고 선택 표시만 한다(드로어는 열지 않는다)
+5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 숫자 줄 아무 데나 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel)가 이 페이지 위에 열린다: 소재·View ad·Ads Manager·Billing·예산·페이싱·**Campaign insights**(What worked · Could improve · Why · Next action, 2×2)·일별 지출. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론·아래 펼침은 없다
 6. **Learnings** — 사람이 쓴 배운 점(있을 때) + 다음 이벤트 플레이북(RecapPatterns: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)
 
 편집 모드(Edit, 로그인)에서만 캠페인별 코멘트 카드(Notes, RecapNoteEditor)와 Learnings 편집기가 카드로 나온다.
@@ -66,7 +65,8 @@ buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 
 - Key takeaways 세 칸 — 가운데 결론 줄만 읽어도 이벤트가 잡히는지
 - Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
 - Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
-- 타임라인 "Grand Opening" 행 클릭 → Meta·TikTok 표의 그 줄이 펼쳐지고, 스크롤 목적지 줄에 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 빈 곳을 누르면 표시만 사라지고 해석은 열려 있다
+- 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
+- 줄 클릭 → 드로어에 Campaign insights 섹션(예산 페이싱 뒤)
 - Learnings: 플레이북 2×2 + NEXT EVENT 한 문장
         `,
       },

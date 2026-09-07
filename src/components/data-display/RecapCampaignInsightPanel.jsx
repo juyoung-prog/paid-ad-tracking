@@ -59,17 +59,21 @@ function cellFor(field, item, row, lang) {
  * performance"처럼 관측된 지표를 기준으로 말한다. 성과 데이터가 없으면 장점·약점 "—" /
  * Why "Insufficient data" / Next "Collect more performance data".
  *
+ * 2026-09-07부터는 표 아래 펼침이 아니라 CampaignDetailPanel(드로어)의 "Campaign insights"
+ * 섹션에 layout="grid"(2×2)로 들어간다 — 표의 숨은 셰브론을 찾지 않아도 줄을 누르면 다 보인다.
+ *
  * Props:
  * @param {{ campaignId: string, phaseName: string, platform: string, goal: string, note: object|null, insight: { hasData: boolean, strength: object|null, weakness: object|null, reason: object, recommendation: object|null } }} row - 캠페인 행 + 해석 재료 [Required]
  * @param {Object<string, string>} platformLabel - 플랫폼 값 → 표시명 [Optional, 기본값: {}]
  * @param {function} localize - LocalizedText → { value, isFallback } (schema.js localizedText를 lang에 묶어 넘긴다) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
+ * @param {'row'|'grid'} layout - 'row'는 넓은 자리(md 이상 4열 한 줄), 'grid'는 드로어처럼 좁은 자리(2×2) [Optional, 기본값: 'row']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <RecapCampaignInsightPanel row={rowWithInsight} localize={(text) => localizedText(text, lang)} lang={lang} />
+ * <RecapCampaignInsightPanel row={rowWithInsight} localize={(text) => localizedText(text, lang)} lang={lang} layout="grid" />
  */
-export function RecapCampaignInsightPanel({ row, localize, lang = 'en', sx }) {
+export function RecapCampaignInsightPanel({ row, localize, lang = 'en', layout = 'row', sx }) {
   const hasData = Boolean(row.insight?.hasData);
   const cells = FIELDS.map((field) => {
     const written = localize(row.note?.[field]);
@@ -81,7 +85,7 @@ export function RecapCampaignInsightPanel({ row, localize, lang = 'en', sx }) {
   });
 
   return (
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: FIELDS.map((f) => FIELD_SPAN[f]).join(' ') }, gap: { xs: 1.5, md: 3 }, px: 2, py: 1.5, ...sx }}>
+    <Box sx={{ display: 'grid', gridTemplateColumns: layout === 'grid' ? { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' } : { xs: '1fr', md: FIELDS.map((f) => FIELD_SPAN[f]).join(' ') }, gap: layout === 'grid' ? 2 : { xs: 1.5, md: 3 }, px: 2, py: 1.5, ...sx }}>
       {cells.map(({ field, conclusion, evidence, level, isFallback }) => {
         const isEmpty = !conclusion;
         const tone = FIELD_TONE[field];

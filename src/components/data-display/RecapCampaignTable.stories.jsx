@@ -1,7 +1,6 @@
 import Box from '@mui/material/Box';
 import { RecapCampaignTable } from './RecapCampaignTable';
-import { RecapCampaignInsightPanel } from './RecapCampaignInsightPanel';
-import { buildRecapRows, buildCampaignInsight, localizedText } from '../../data/schema';
+import { buildRecapRows } from '../../data/schema';
 import { mockRecapCampaigns, mockRecapPerformanceRecords, mockRecapCampaignNotes } from '../../data/paidAdsMockData';
 
 /* 스토리는 계산하지 않는다 — schema.js buildRecapRows()가 순위·벤치마크·판정
@@ -26,7 +25,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 "비슷한 캠페인 대비 어디쯤"이 붙는다.
 
 ### 셀 구성
-- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title. 보고서에서는 숫자 줄 전체가 드로어 버튼(onRowClick)이라 칸 안에 따로 버튼이 없다
+- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title. 줄 전체가 드로어 버튼(onRowClick)이라 칸 안에 따로 버튼이 없고, 줄 끝 셰브론·아래 펼침도 없다(2026-09-07 — 해석은 드로어의 Campaign insights로)
 - **Spend**: 지출 + 그 아래 CPM 벤치마크
 - **Efficiency**: 사람이 고른 판정이 있으면 그것, 없으면 제안값(같은 모양, 툴팁 "suggested")을
 - **Video**: Reach · Plays · Avg 한 줄 + Hook / Hold 벤치마크
@@ -46,14 +45,10 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
     },
   },
   argTypes: {
-    renderDetail: { control: false, description: '(row) => ReactNode. 있으면 줄 끝에 화살표가 붙고 누르면 그 줄 아래에 펼쳐진다(한 번에 한 줄)' },
-    selectedId: { control: 'text', description: '타임라인에서 찾아온 줄의 campaignId — 옅은 accent 면 + 왼쪽 2px 선. 펼침과 별개' },
-    expandedId: { control: 'text', description: '펼친 줄의 campaignId(제어형). 안 주면 표가 스스로 기억한다' },
-    onExpandedChange: { action: 'expandedChange', description: '(campaignId|null) => void' },
+    selectedId: { control: 'text', description: '타임라인에서 찾아온 줄의 campaignId — 옅은 accent 면 + 왼쪽 2px 선' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
-    onRowClick: { action: 'rowClicked', description: '숫자 줄 전체 클릭 (campaignId) => void — 보고서는 이걸로 캠페인 상세 드로어를 연다. 화살표·벤치마크·해석 줄은 예외' },
-    onCampaignClick: { action: 'campaignClicked', description: '썸네일·이름만 버튼으로 만들 때. onRowClick이 있으면 불필요' },
+    onRowClick: { action: 'rowClicked', description: '숫자 줄 전체 클릭 (campaignId) => void — 보고서는 이걸로 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다. 벤치마크 글자는 예외' },
     label: { control: 'text', description: '스크롤 영역 접근성 이름' },
     sx: { control: 'object', description: '추가 스타일' },
   },
@@ -90,7 +85,7 @@ export const NoPerformanceData = {
   },
 };
 
-/** onRowClick — 숫자 줄 전체가 버튼(보고서에서는 캠페인 상세 드로어). hover는 중립 면, 화살표·벤치마크 글자는 줄 클릭에서 빠진다. Tab으로 행에 포커스, Enter로 눌린다 */
+/** onRowClick — 숫자 줄 전체가 버튼(보고서에서는 캠페인 상세 드로어). hover는 중립 면 140ms, 벤치마크 글자는 줄 클릭에서 빠진다. Tab으로 행에 포커스, Enter로 눌린다 */
 export const Clickable = {
   args: { rows: byPlatform.meta },
   render: (args) => <RecapCampaignTable {...args} />,
@@ -112,59 +107,10 @@ export const Narrow = {
 };
 
 /**
- * 줄 끝 화살표로 캠페인 해석을 그 자리에 펼친다(renderDetail) — 숫자와 해석을 같은
- * 줄에서 읽는다. 한 번에 한 줄만 열리고, 줄 클릭(onRowClick)과는 별개다.
- */
-export const Expandable = {
-  args: {
-    rows: byPlatform.meta,
-    onRowClick: undefined,
-    renderDetail: (row) => (
-      <RecapCampaignInsightPanel
-        row={{ ...row, insight: buildCampaignInsight(row) }}
-        platformLabel={{ meta: 'Meta', tiktok: 'TikTok' }}
-        localize={(text) => localizedText(text, 'en')}
-      />
-    ),
-  },
-  render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
-};
-
-/**
- * 보고서 페이지의 실제 조합 — 숫자 줄 전체(onRowClick) → 캠페인 상세 드로어(액션 로그),
- * 줄 끝 화살표 → 해석 펼침(툴팁 "Show insights"/"Hide insights"). 펼친 해석 줄은 눌리지 않는다.
- */
-export const RowOpensDrawer = {
-  args: {
-    rows: byPlatform.meta,
-    renderDetail: (row) => (
-      <RecapCampaignInsightPanel
-        row={{ ...row, insight: buildCampaignInsight(row) }}
-        platformLabel={{ meta: 'Meta', tiktok: 'TikTok' }}
-        localize={(text) => localizedText(text, 'en')}
-      />
-    ),
-  },
-  render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
-};
-
-/**
  * 타임라인에서 찾아온 줄(selectedId) — 옅은 accent 면 + 첫 칸 왼쪽 2px 선, 글자·지표 색은 그대로.
- * 펼침(expandedId)과 별개라 둘을 같이 줘도 해석 줄에는 색이 없다.
+ * 줄을 누르면 드로어(onRowClick)가 열리고, hover 위에서도 선택 표시는 유지된다.
  */
 export const SelectedFromTimeline = {
-  args: {
-    rows: byPlatform.meta,
-    onRowClick: undefined,
-    selectedId: byPlatform.meta[1]?.campaignId,
-    expandedId: byPlatform.meta[1]?.campaignId,
-    renderDetail: (row) => (
-      <RecapCampaignInsightPanel
-        row={{ ...row, insight: buildCampaignInsight(row) }}
-        platformLabel={{ meta: 'Meta', tiktok: 'TikTok' }}
-        localize={(text) => localizedText(text, 'en')}
-      />
-    ),
-  },
+  args: { rows: byPlatform.meta, selectedId: byPlatform.meta[1]?.campaignId },
   render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
 };

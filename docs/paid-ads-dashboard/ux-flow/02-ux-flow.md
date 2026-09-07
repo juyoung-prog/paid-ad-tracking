@@ -216,7 +216,7 @@ Paid Ads Dashboard
         ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄
         ├── 단계 타임라인 (PhaseTimelineChart 재활용)
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
-        │   └── 줄 끝 화살표 → 그 줄 아래 캠페인 해석 — What worked · What could improve · Why · Recommendation (사람 글 우선, 없으면 데이터 해석; 코멘트 편집은 편집 모드의 Notes 카드)
+        │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer(Performance와 같은 CampaignDetailPanel) — 성과 · 예산 페이싱 · Campaign insights(What worked · Could improve · Why · Next action, 사람 글 우선, 없으면 데이터 해석) · 일별 지출. 타임라인 행 클릭은 그 줄로 스크롤 + 선택 표시만
         ├── 배운 점 · 다음 제언 (2단계, 언어별)
         └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)
 ```
