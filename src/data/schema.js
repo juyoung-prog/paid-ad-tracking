@@ -1946,6 +1946,17 @@ export function buildRecapEvents(campaigns, records, eventRecaps = []) {
 export function buildPeerComparison(campaign, allCampaigns, allRecords, options = {}) {
   const { metricKey = null, ...peerOptions } = options;
   const { peers, scope } = buildBenchmarkPeers(campaign, allCampaigns, peerOptions);
+  /* 지표 하나에서 주인공이 몇 등인지 — "#1 of 12". 값이 있는 행만 세고, 비용 지표는 낮은 값이 앞.
+     표의 "best of 12"와 같은 비교군·같은 값에서 나오므로 대화상자와 표가 다른 말을 하지 않는다 */
+  const rankOf = (rows, key) => {
+    if (!key) return null;
+    const lower = BENCHMARK_METRICS.find((m) => m.key === key)?.lowerIsBetter ?? false;
+    const subjectValue = rows.find((r) => r.isSubject)?.[key];
+    const valued = rows.filter((r) => r[key] != null && Number.isFinite(r[key]));
+    if (subjectValue == null || valued.length < 2) return null;
+    const better = valued.filter((r) => !r.isSubject && (lower ? r[key] < subjectValue : r[key] > subjectValue)).length;
+    return { rank: better + 1, total: valued.length, value: subjectValue, lowerIsBetter: lower };
+  };
   const toRow = (c, isSubject) => ({
     ...getGoalMetricsRow(c, latestRecordFor(c.id, allRecords)),
     eventName: campaignGroupKey(c),
@@ -1963,7 +1974,20 @@ export function buildPeerComparison(campaign, allCampaigns, allRecords, options 
     if (bv == null) return -1;
     return lowerIsBetter ? av - bv : bv - av;
   });
-  return { scope, rows: [toRow(campaign, true), ...peerRows] };
+  const rows = [toRow(campaign, true), ...peerRows];
+  const primaryMetricKey = (GOAL_HEADLINE_METRICS[campaign.goal] ?? [])[0] ?? null;
+  return {
+    scope,
+    rows,
+    platform: campaign.platform,
+    goal: campaign.goal,
+    phaseName: phaseNameOf(campaign),
+    peerCount: peerRows.length,
+    primaryMetricKey,
+    primary: scope === 'none' ? null : rankOf(rows, primaryMetricKey),
+    selectedMetricKey: metricKey,
+    selected: scope === 'none' || !metricKey || metricKey === primaryMetricKey ? null : rankOf(rows, metricKey),
+  };
 }
 
 /**

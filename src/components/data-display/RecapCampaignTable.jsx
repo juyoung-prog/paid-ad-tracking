@@ -159,7 +159,20 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>
               {t('recap.table.verdict', lang)}
               {/* 판정이 어디서 오는지는 툴팁 한 줄로 — 표 안에 설명문을 두지 않는다 */}
-              <Tooltip title={`${t('recap.table.verdictHint', lang)} ${t('recap.table.peerHint', lang)}`} arrow enterTouchDelay={0}>
+              {/* 툴팁은 빠른 설명만 — 정의·비교군 규칙 같은 방법론은 비교 대화상자와 문서에 */}
+              <Tooltip
+                arrow
+                enterTouchDelay={0}
+                slotProps={{ tooltip: { sx: { maxWidth: 340 } } }}
+                title={(
+                  <Box sx={{ display: 'grid', rowGap: 0.75, py: 0.25 }}>
+                    <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.effTitle', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effBody', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{t('recap.table.effBands', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effRanking', lang)}</Typography>
+                  </Box>
+                )}
+              >
                 <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
               </Tooltip>
             </TableCell>

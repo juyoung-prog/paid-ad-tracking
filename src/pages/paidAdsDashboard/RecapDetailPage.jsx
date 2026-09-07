@@ -596,10 +596,10 @@ export function RecapDetailPage() {
         <PeerCompareDialog
           isOpen
           onClose={() => setCompareTarget(null)}
-          rows={comparison.rows}
-          scope={comparison.scope}
+          {...comparison}
           metricKeys={BENCHMARK_METRICS.map((m) => m.key)}
           initialMetricKey={compareTarget.metricKey}
+          platformLabel={PLATFORM_LABEL}
           lang={lang}
         />
       )}

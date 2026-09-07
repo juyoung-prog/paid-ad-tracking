@@ -6,9 +6,9 @@ import { t, benchmarkPositionText } from '../../data/recapStrings';
 
 /** 구간 → 톤·기호 방향. 기호는 "더 좋다/나쁘다"를 말한다(값이 높다/낮다가 아니다). mid는 기호 없음 */
 const BAND_STYLE = {
-  top: { tone: 'success.main', direction: 'up' },
-  mid: { tone: 'text.secondary', direction: null },
-  bottom: { tone: 'warning.main', direction: 'down' },
+  top: { tone: 'success.main', hoverTone: 'success.dark', direction: 'up' },
+  mid: { tone: 'text.secondary', hoverTone: 'text.primary', direction: null },
+  bottom: { tone: 'warning.main', hoverTone: 'warning.dark', direction: 'down' },
 };
 
 /* 셀 안 위계: 라벨(호출부) → **값**(가장 강하게) → 비교 줄(보조). 값은 sm에서도
@@ -99,7 +99,8 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
               fontFamily: 'inherit',
               cursor: 'pointer',
               textAlign: 'left',
-              '&:hover': { textDecoration: 'underline', textUnderlineOffset: 3 },
+              // hover: 밑줄 + 같은 계열의 한 단 진한 색 — "눌러서 비교군을 볼 수 있다"
+              '&:hover': { textDecoration: 'underline', textUnderlineOffset: 3, color: style?.hoverTone ?? 'text.primary' },
               '&:focus-visible': { outline: 'none', boxShadow: (theme) => `0 0 0 3px ${theme.palette.accent.ring}`, borderRadius: 2 },
             }),
           }}
