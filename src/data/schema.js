@@ -117,6 +117,7 @@ export const ALERT_TYPE = Object.freeze({
  * @property {'ended_early'|'archived'|null} manualStatus - 유일한 수동 override. status SSOT 규칙 참고
  * @property {string|null} creativeUrl - URL, Ads Manager 소재/캠페인 링크 또는 실제 영상/게시물 링크. "View Ad" 외부 링크로만 쓰임(사람이 타이핑)
  * @property {string|null} thumbnailUrl - 이미지(업로드 전용, data URI 또는 정적 파일 경로). CampaignThumbnail 미리보기로만 쓰임(없으면 플랫폼색 이니셜 대체) — creativeUrl과는 별개 값
+ * @property {{ metricKey: string, value: number }|null} [kpiTarget] - 이 캠페인의 목표치(예: { metricKey: 'cpm', value: 3 }). 보고서의 "vs target"에만 쓰이고 없으면 비운다. 아직 저장 칸이 없다(2026-09-07 — 다음 단계에서 Plan/캠페인 폼에 입력 칸을 붙인다)
  * @property {string|null} adLink - 소비자가 보는 실제 광고 게시물 링크(서버 소유 — 동기화가 썸네일과 같은 광고에서 뽑아 채움). View ad는 creativeUrl(수동) 우선, 없으면 이 값
  * @property {string|null} notes
  * @property {string} createdAt - ISO 8601 datetime
@@ -1485,6 +1486,22 @@ export const GOAL_HEADLINE_METRICS = Object.freeze({
 });
 
 /**
+ * 목표별 **종합 성과(Performance) 평가 규칙** — 가중치 점수가 아니라 구간(band) 규칙이다(2026-09-07).
+ * primary: 목표를 말하는 지표(여럿이면 하나라도 하위면 하위, 전부 상위면 상위, 아니면 중간)
+ * important: 판정을 한 단 내릴 수 있는 진단 지표(하나라도 하위면 Good → Fair)
+ * secondary: 판정에는 안 쓰고 한 줄 설명("· weak hold")에만 쓴다
+ * 규칙: primary 상위 → Good(important에 하위가 있으면 Fair) · primary 중간 → Fair · primary 하위 → Weak ·
+ * primary 벤치마크가 하나도 없으면 판정 없음. 없는 지표는 감점하지 않는다. 설정을 바꾸려면 이 표만 고친다.
+ */
+export const GOAL_PERFORMANCE_RULES = Object.freeze({
+  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], important: ['hookRate', 'holdRate'], secondary: ['engagementRate', 'ctr', 'cpc'] }),
+  [GOAL.TRAFFIC]: Object.freeze({ primary: ['cpc', 'ctr'], important: [], secondary: ['hookRate', 'holdRate', 'engagementRate'] }),
+  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['cpe', 'engagementRate'], important: [], secondary: ['hookRate', 'holdRate', 'ctr', 'cpc'] }),
+  [GOAL.CONVERSION]: Object.freeze({ primary: ['cpa'], important: [], secondary: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
+  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['cpa'], important: [], secondary: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
+});
+
+/**
  * 비교군 최소 수 — 이보다 적으면 벤치마크도, 판정(Good/Fair/Weak)도, 순위("best of N")도 만들지 않는다.
  * 표본이 모자라면 "—"와 "Not enough comparison data"다. 억지로 판정을 만들지 않는다(2026-09-07 원칙).
  */
@@ -1549,8 +1566,10 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {null} suggestedVerdict - 자동 판정 없음(2026-09-07). 사람이 고른 판정은 note.verdict
+ * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 종합 성과(Performance) 자동 판정(buildPerformanceVerdict). 사람이 고른 note.verdict가 우선
+ * @property {{ verdict: string|null, primaryBand: string|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }} performance - 종합 성과 판정 재료
  * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
+ * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
  */
 
@@ -1783,8 +1802,11 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 세 층을 섞지 않는다: budgetEfficiency = 이 캠페인의 결과당 비용(과거 무관) · benchmarks = 과거 비교 · pacingRatio = 계획 대비 집행
       budgetEfficiency: budgetEfficiency(row, c.goal),
-      // 자동 판정(Good/Fair/Weak)은 없다 — 사람이 고른 note.verdict만 남는다
-      suggestedVerdict: null,
+      // 종합 성과(Performance) — 목표별 규칙(GOAL_PERFORMANCE_RULES)을 같은 benchmarks에 적용. 사람이 고른 note.verdict가 있으면 그것이 우선
+      performance: buildPerformanceVerdict(benchmarks, c.goal),
+      suggestedVerdict: buildPerformanceVerdict(benchmarks, c.goal).verdict,
+      // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
+      kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
       note: notesById[c.id] ?? null,
     };
   });
@@ -2069,6 +2091,31 @@ export function buildRecapTakeaways(byPlatform) {
 /** 지표 → 그 지표가 말하는 것(문장의 "무엇"). 문구 키는 recapStrings의 aspect.* */
 /** 계획 대비 집행률을 표에 표시하는 문턱 — +20% 이상 초과 또는 −30% 이하 미달일 때만. 그 안은 조용히 */
 export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
+
+/**
+ * 종합 성과 판정 — GOAL_PERFORMANCE_RULES를 benchmarks(과거 비교군 구간)에 적용한다. 임원용 한 단어(Good/Fair/Weak) +
+ * 설명 재료. 구간이 없는 지표는 무시하고, primary 구간이 하나도 없으면 판정하지 않는다(억지로 만들지 않는다).
+ * 비용 효율(KPI 값)·목표치 비교·과거 순위와는 별개 층 — 이 판정은 "목표에 맞는 지표들이 비교군 대비 어디였나"만 말한다.
+ * @param {Object<string, BenchmarkStat>} benchmarks
+ * @param {string} goal
+ * @returns {{ verdict: 'good'|'mid'|'bad'|null, primaryBand: 'top'|'mid'|'bottom'|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }}
+ */
+export function buildPerformanceVerdict(benchmarks, goal) {
+  const rule = GOAL_PERFORMANCE_RULES[goal] ?? null;
+  const band = (key) => { const s = benchmarks?.[key]; return s && s.peerScope !== 'none' && s.percentile != null ? s.band : null; };
+  if (!rule) return { verdict: null, primaryBand: null, weakDiag: null, strongDiag: null, primaryKeys: [] };
+  const primaryBands = rule.primary.map(band).filter(Boolean);
+  const primaryBand = primaryBands.length === 0 ? null : primaryBands.includes('bottom') ? 'bottom' : primaryBands.every((b) => b === 'top') ? 'top' : 'mid';
+  const diag = (keys, want) => keys.find((k) => band(k) === want) ?? null;
+  const weakImportant = diag(rule.important, 'bottom');
+  const weakDiag = weakImportant ?? diag(rule.secondary, 'bottom');
+  const strongDiag = diag(rule.important, 'top') ?? diag(rule.secondary, 'top');
+  let verdict = null;
+  if (primaryBand === 'top') verdict = weakImportant ? VERDICT.MID : VERDICT.GOOD;
+  else if (primaryBand === 'mid') verdict = VERDICT.MID;
+  else if (primaryBand === 'bottom') verdict = VERDICT.BAD;
+  return { verdict, primaryBand, weakDiag, strongDiag, primaryKeys: rule.primary };
+}
 
 /**
  * 예산 효율 — "이 캠페인이 쓴 돈으로 목표에 맞는 결과 하나에 얼마가 들었나"(2026-09-07). **이 캠페인의 지출과 결과만**으로

@@ -12,7 +12,8 @@ import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS } from '../../data/schema';
+import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, METRIC_ASPECT, GOAL_PERFORMANCE_RULES } from '../../data/schema';
+import { VerdictChip } from './VerdictChip';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
 
 /** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
@@ -22,15 +23,18 @@ const fmtPercent = (v) => percent(v, { digits: 2 });
 
 /** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다 */
 const COLUMN_WIDTH = {
-  rank: 28,
-  store: 50,
-  // 282: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07)
-  campaign: 282,
+  rank: 26,
+  store: 46,
+  // 250: "Jul 6 – Aug 31 (57 days) · Awareness"는 한 줄, 가장 긴 조합은 "·" 뒤에서 목표만 다음 줄로(2026-09-07 Performance 열을 위해 32 양보)
+  campaign: 250,
+  // 종합 성과 배지 + 한 줄 설명(11px, 두 줄까지 감싼다)
+  performance: 96,
   dailyBudget: 80,
-  spend: 120,
-  // 118: 배지 + 아래 "vs past · ↗ lowest of 12"(≈85px) 한 줄
+  // 실제 총지출만
+  spend: 100,
+  // 비용 효율: KPI 라벨 + 값 + (vs target) + "vs past · ↗ lowest of 12"(≈79px)
   verdict: 118,
-  // 대표 지표 자리 + "↗ lowest of 12"(≈85px)가 나란히 들어가는 폭: Video 75+24+85, Engagement 73+8+85, Action 82+24+85. 합 1316 ≤ 본문 1318
+  // 대표 지표 자리 + "↗ lowest of 12"(≈79px)가 나란히 들어가는 폭: Video 75+24+79, Engagement 73+8+79, Action 82+24+79. 합 1354
   video: 216,
   engagement: 198,
   action: 224,
@@ -112,7 +116,9 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
  * 판정 · 영상 반응 · 참여 반응 · 행동. Spend는 실제 총지출만, Efficiency는 목표별 결과당 비용 + 과거 순위. 비율 지표(Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 비워 둔다. Efficiency 칸은 서로 다른 두 층(2026-09-07): **위 = 예산 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
+ * 없으면 비워 둔다. 평가 층(2026-09-07): **Performance** = 목표별 규칙(GOAL_PERFORMANCE_RULES)을 과거 비교군 구간에 적용한
+ * 한 단어(Good/Fair/Weak) + 한 줄 설명("Strong cost · weak hold"), 사람이 고른 note.verdict가 우선, 근거 부족이면 "—".
+ * **Cost efficiency**는 서로 다른 두 층: **위 = 비용 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
  * — 인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA. 과거·비교군·기준값 무관, 성과만 있으면 항상), **아래 "vs past"** =
  * 같은 KPI를 과거 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위(없으면 "—" + 툴팁 "Not enough
  * comparison data" — 위 값이 못 미덥다는 뜻이 아니다). Good/Fair/Weak 자동 배지는 없다. 계획 대비 집행률은 세 번째 층으로
@@ -163,6 +169,25 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.rank', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.store', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.campaign', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>
+              {t('recap.table.performance', lang)}
+              {/* 종합 판정이 무엇을 보는지 — 목표별 규칙은 GOAL_PERFORMANCE_RULES, 여기선 짧은 설명만 */}
+              <Tooltip
+                arrow
+                enterTouchDelay={0}
+                slotProps={{ tooltip: { sx: { maxWidth: 340 } } }}
+                title={(
+                  <Box sx={{ display: 'grid', rowGap: 0.75, py: 0.25 }}>
+                    <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.perfTitle', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.perfBody', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.perfBody2', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.perfBody3', lang)}</Typography>
+                  </Box>
+                )}
+              >
+                <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
+              </Tooltip>
+            </TableCell>
             <TableCell align="right" sx={HEAD_SX}>{t('recap.table.dailyBudget', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.spend', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>
@@ -200,6 +225,28 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
             const hasComparison = Boolean(kpiStat && kpiStat.peerScope !== 'none' && kpiStat.percentile != null);
             const effHint = eff?.value != null ? t('recap.table.effValueHint', lang, { metric: metricLabel(eff.metricKey, lang), basis: t(`recap.table.effBasis.${eff.metricKey}`, lang) }) : '';
+            /* 종합 성과(Performance) — 사람이 고른 판정이 우선, 없으면 목표별 규칙(GOAL_PERFORMANCE_RULES) 판정. 한 줄 설명은
+               비용 구간 + 두드러진 진단 지표 하나: "Strong cost · weak hold". 규칙·근거는 툴팁 */
+            const perf = row.performance ?? null;
+            const humanVerdict = row.note?.verdict ?? null;
+            const perfVerdict = humanVerdict ?? perf?.verdict ?? null;
+            const short = (key) => t(`aspectShort.${METRIC_ASPECT[key] ?? 'reach'}`, lang);
+            const perfNote = !humanVerdict && perf?.primaryBand
+              ? [t(`perf.cost.${perf.primaryBand}`, lang), perf.weakDiag ? t('perf.diag.weak', lang, { x: short(perf.weakDiag) }) : perf.strongDiag ? t('perf.diag.strong', lang, { x: short(perf.strongDiag) }) : null].filter(Boolean).join(' · ')
+              : '';
+            const perfRule = GOAL_PERFORMANCE_RULES[row.goal];
+            const perfHint = humanVerdict
+              ? t('recap.table.perfWritten', lang)
+              : perfVerdict && perfRule
+                ? t('recap.table.perfRule', lang, { primary: perfRule.primary.map((k) => metricLabel(k, lang)).join(' + '), important: perfRule.important.length ? t('recap.table.perfRuleImportant', lang, { important: perfRule.important.map((k) => short(k)).join('/') }) : '' })
+                : hasData ? t('recap.table.perfNotEnoughHint', lang) : '';
+            // vs target — 캠페인에 설정된 목표치가 있을 때만(없으면 줄 자체를 생략, 과거 평균으로 대체하지 않는다)
+            const targetRatio = eff?.value != null && row.kpiTarget > 0 ? eff.value / row.kpiTarget : null;
+            const targetTone = targetRatio == null ? null : targetRatio <= 0.95 ? 'success.main' : targetRatio >= 1.05 ? 'warning.main' : 'text.secondary';
+            const targetText = targetRatio == null ? null
+              : targetRatio <= 0.95 ? t('recap.table.targetBetter', lang, { pct: Math.round((1 - targetRatio) * 100), target: kpiFormat(eff.metricKey)(row.kpiTarget) })
+                : targetRatio >= 1.05 ? t('recap.table.targetWorse', lang, { pct: Math.round((targetRatio - 1) * 100), target: kpiFormat(eff.metricKey)(row.kpiTarget) })
+                  : t('recap.table.targetOn', lang, { target: kpiFormat(eff.metricKey)(row.kpiTarget) });
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedId === row.campaignId;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
@@ -271,6 +318,19 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </Box>
                   </Box>
                 </TableCell>
+                <TableCell sx={CELL_SX}>
+                  {/* 종합 성과 — 배지(Good/Fair/Weak) + 한 줄 설명. 판정 없으면 "—" + "Not enough data". 툴팁에 규칙 */}
+                  <Tooltip title={perfHint} placement="top" enterDelay={300}>
+                    <Box sx={{ minWidth: 0, cursor: perfHint ? 'help' : 'default' }}>
+                      <VerdictChip verdict={perfVerdict} isSuggested={false} lang={lang} size="sm" />
+                      {perfVerdict ? (
+                        perfNote && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{perfNote}</Typography>
+                      ) : (
+                        hasData && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{t('recap.table.perfNotEnough', lang)}</Typography>
+                      )}
+                    </Box>
+                  </Tooltip>
+                </TableCell>
                 <TableCell align="right" sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {row.dailyBudget != null ? `${money(row.dailyBudget)}/day` : EMPTY}
                   {/* 집행률은 성과가 아니라 운영 상태 — 계획 대비 +20% 이상·−30% 이하일 때만 작게. 그 안은 조용히 */}
@@ -295,6 +355,10 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       <Box sx={{ minWidth: 0, cursor: 'help' }}>
                         <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(eff.metricKey, lang)}</Typography>
                         <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>{kpiFormat(eff.metricKey)(eff.value)}</Typography>
+                        {/* vs target — 설정된 목표치가 있을 때만. 비용 지표라 낮으면 초록, 높으면 주황, ±5%는 중립 */}
+                        {targetText && (
+                          <Typography component="span" sx={{ display: 'block', fontSize: 10.5, fontWeight: 500, lineHeight: 1.3, mt: 0.25, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
+                        )}
                       </Box>
                     </Tooltip>
                   ) : (

@@ -49,7 +49,7 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
     push([t('recap.section.campaigns', lang, { platform: platformLabel[platform] ?? platform })]);
     push([
       t('recap.table.rank', lang), t('recap.table.store', lang), t('recap.table.campaign', lang), 'Campaign name', 'Start', 'End',
-      t('recap.table.dailyBudget', lang), t('recap.table.spend', lang), t('recap.table.verdict', lang),
+      t('recap.table.dailyBudget', lang), t('recap.table.spend', lang), t('recap.table.performance', lang),
       metricLabel('reach', lang), metricLabel('impressions', lang), metricLabel('videoPlays', lang), metricLabel('clicks', lang),
       metricLabel('likes', lang), metricLabel('comments', lang), metricLabel('shares', lang), metricLabel('conversions', lang),
       ...BENCHMARK_METRICS.flatMap((m) => [metricLabel(m.key, lang), `${metricLabel(m.key, lang)} vs peers`]),

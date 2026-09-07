@@ -431,7 +431,9 @@ Paid Ads Dashboard
 | 항목 | 정의 |
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
-| 예산 효율 | **이 캠페인만**의 결과당 비용 — 목표별 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용 = 지출 ÷ 좋아요+댓글+공유 · 전환 CPA). 과거·비교군·기준값을 쓰지 않으므로 성과만 있으면 항상 값이 있고, Good/Fair/Weak 자동 판정은 없다(`budgetEfficiency`). 표의 Efficiency 칸은 위 = 이 값, 아래 "vs past" = 같은 KPI의 과거 비교군 순위(별개 층, 3개 미만이면 "—" + "Not enough comparison data"). 계획 대비 집행률(pacing)은 세 번째 층 |
+| 종합 성과(Performance) | 목표별 규칙(`GOAL_PERFORMANCE_RULES`: primary 지표 + important 진단 지표)을 과거 비교군 구간에 적용한 Good/Fair/Weak — primary 상위 → Good(important 하위면 Fair) · 중간 → Fair · 하위 → Weak · 구간 없으면 판정 없음. 가중치 점수가 아니라 투명한 구간 규칙. 사람이 고른 판정이 우선 |
+| 목표치(vs target) | 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 결과당 비용과 견줘 "↓ 20% vs target $3.00". 없으면 줄을 생략 — 과거 평균으로 대체하지 않는다. 저장 칸은 다음 단계 |
+| 비용 효율 | **이 캠페인만**의 결과당 비용 — 목표별 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용 = 지출 ÷ 좋아요+댓글+공유 · 전환 CPA). 과거·비교군·기준값을 쓰지 않으므로 성과만 있으면 항상 값이 있고, Good/Fair/Weak 자동 판정은 없다(`budgetEfficiency`). 표의 Efficiency 칸은 위 = 이 값, 아래 "vs past" = 같은 KPI의 과거 비교군 순위(별개 층, 3개 미만이면 "—" + "Not enough comparison data"). 계획 대비 집행률(pacing)은 세 번째 층 |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
 | 판정 제안 | 대표 지표(goal이 awareness면 CPM·Hook, traffic이면 CTR·CPC, engagement면 참여율)의 백분위 평균이 상위 30%면 `good`, 하위 30%면 `bad`, 그 사이 `mid` |
