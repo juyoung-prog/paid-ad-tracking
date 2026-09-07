@@ -27,8 +27,8 @@ const COLUMN_WIDTH = {
   store: 46,
   // 250: "Jul 6 – Aug 31 (57 days) · Awareness"는 한 줄, 가장 긴 조합은 "·" 뒤에서 목표만 다음 줄로(2026-09-07 Performance 열을 위해 32 양보)
   campaign: 250,
-  // 종합 성과 배지 + 한 줄 설명(11px, 두 줄까지 감싼다)
-  performance: 96,
+  // 종합 성과 배지 + 짧은 설명("Efficient cost · weak hold", 11px, 두 줄까지). 합 1382 — 1440 폭에서는 ScrollArea가 몇십 px 넘긴다
+  performance: 124,
   dailyBudget: 80,
   // 실제 총지출만
   spend: 100,
