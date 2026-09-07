@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
-import SvgIcon from '@mui/material/SvgIcon';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -35,15 +34,28 @@ const EXPAND_WIDTH = 40;
 const EXPAND_HIT = 28;
 
 /**
- * 얇은 선 셰브론 — @mui/icons-material의 ExpandMore는 면으로 채운 화살표라 표 안에서
- * 무겁다. MUI SvgIcon에 stroke 경로 하나(Lucide chevron-down 형태)로 그린다 —
- * 아이콘 라이브러리를 늘리지 않는다.
+ * 얇은 선 셰브론 — Lucide chevron-down과 같은 기하(polyline 6 9 → 12 15 → 18 9, stroke 1.5,
+ * 둥근 끝). @mui/icons-material의 ExpandMore는 면으로 채운 화살표라 표 안에서 무겁고,
+ * MUI SvgIcon은 svg에 fill:currentColor를 걸어 선 아이콘이 삼각형처럼 보일 수 있어
+ * 날것 svg로 그린다. 아이콘 라이브러리를 늘리지 않는다.
  */
-function ThinChevronDownIcon(props) {
+function ThinChevronDownIcon({ sx }) {
   return (
-    <SvgIcon viewBox="0 0 24 24" {...props}>
-      <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </SvgIcon>
+    <Box
+      component="svg"
+      viewBox="0 0 24 24"
+      width={14}
+      height={14}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+      sx={{ display: 'block', flexShrink: 0, fill: 'none', ...sx }}
+    >
+      <polyline points="6 9 12 15 18 9" fill="none" />
+    </Box>
   );
 }
 
@@ -109,7 +121,7 @@ function RawLine({ parts }) {
  * Props:
  * @param {Array<Object>} rows - buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
- * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다 [Optional]
+ * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다. 없고 renderDetail이 있으면 행 클릭이 해석을 펼치고 접는다(화살표와 같은 동작) — 보고서에서 줄을 눌렀다고 다른 페이지로 가지 않는다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
  * @param {function} renderDetail - (row) => ReactNode. 있으면 줄 오른쪽 끝에 화살표가 붙고, 누르면 그 줄 바로 아래에 반환값이 펼쳐진다(한 번에 한 줄). 캠페인 해석(RecapCampaignInsightPanel)을 숫자 옆에 두는 용도 — 줄 클릭(onRowClick)과는 별개다 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
@@ -123,6 +135,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
   const [expandedId, setExpandedId] = useState(null);
   const isExpandable = Boolean(renderDetail);
   const toggle = (campaignId) => setExpandedId((current) => (current === campaignId ? null : campaignId));
+  // 줄 클릭 — 명시된 핸들러가 우선, 없으면 펼침/접기. 벤치마크 버튼·화살표는 stopPropagation으로 빠진다
+  const handleRow = onRowClick ?? (isExpandable ? toggle : undefined);
 
   if (!rows || rows.length === 0) {
     return (
@@ -172,24 +186,24 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             return [
               <TableRow
                 key={row.campaignId}
-                hover={Boolean(onRowClick)}
-                tabIndex={onRowClick ? 0 : undefined}
-                onClick={onRowClick ? () => onRowClick(row.campaignId) : undefined}
+                hover={Boolean(handleRow)}
+                tabIndex={handleRow ? 0 : undefined}
+                onClick={handleRow ? () => handleRow(row.campaignId) : undefined}
                 onKeyDown={
-                  onRowClick
+                  handleRow
                     ? (event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          onRowClick(row.campaignId);
+                          handleRow(row.campaignId);
                         }
                       }
                     : undefined
                 }
                 sx={{
-                  cursor: onRowClick ? 'pointer' : 'default',
+                  cursor: handleRow ? 'pointer' : 'default',
                   // 펼친 줄은 아래 경계선을 지워 해석 면과 한 덩어리로 읽히게
                   ...(isExpanded && { '& > td': { borderBottom: 0 } }),
-                  ...(onRowClick && {
+                  ...(handleRow && {
                     '&:focus-visible': {
                       outline: '1px solid',
                       outlineColor: 'accent.main',
@@ -281,7 +295,6 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     >
                       <ThinChevronDownIcon
                         sx={(theme) => ({
-                          fontSize: 14,
                           transition: theme.transitions.create('transform', { duration: 160, easing: theme.transitions.easing.easeOut }),
                           transform: isExpanded ? 'rotate(180deg)' : 'none',
                         })}

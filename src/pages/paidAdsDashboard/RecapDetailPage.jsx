@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
@@ -147,7 +147,6 @@ function LocalizedParagraph({ text, lang, sx }) {
  */
 export function RecapDetailPage() {
   const { event: eventParam } = useParams();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const eventName = decodeURIComponent(eventParam ?? '');
   // 언어는 URL이 소유한다(?lang=ko) — 링크를 받은 사람이 그 언어로 연다. 모르는 값은 en.
@@ -458,7 +457,7 @@ export function RecapDetailPage() {
             rows={byPlatform[platform]}
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
-            onRowClick={isEditing ? undefined : (campaignId) => navigate(`/dashboard?campaign=${campaignId}`)}
+            /* 줄 클릭은 해석 펼침(표 기본 동작) — 보고서를 읽다가 대시보드로 튕기지 않는다 */
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
             renderDetail={(row) => (
               <RecapCampaignInsightPanel row={insightById[row.campaignId] ?? row} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />

@@ -1,6 +1,12 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { t, metricLabel, benchmarkPositionText } from '../../data/recapStrings';
+import { money, percent } from '../../utils/format';
+
+/** 지표 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
+const metricValue = (metricKey, value) => (value == null ? null : (['cpm', 'cpc', 'cpa'].includes(metricKey) ? money(value) : percent(value, { digits: 2 })));
+/** 순위 문구는 문장 앞에 오므로 첫 글자만 대문자로(한글·중문은 그대로) */
+const capitalize = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : text);
 
 /** 항목 종류별 왼쪽 색점 — 색은 성과 톤(좋음 success, 부족 warning), 나머지는 중립 */
 const KIND_DOT = {
@@ -21,16 +27,17 @@ function sentenceFor(item, platformLabel, lang) {
       return t('recap.takeaways.best', lang, {
         platform: platform(item.platform),
         phase: item.phaseName,
-        goal: t(`goal.${item.goal}`, lang),
         metric: metricLabel(item.metricKey, lang),
-        position: benchmarkPositionText(item.stat, lang),
+        value: metricValue(item.metricKey, item.stat?.value) ?? '',
+        position: capitalize(benchmarkPositionText(item.stat, lang)),
       });
     case 'weakest':
       return t('recap.takeaways.weakest', lang, {
         platform: platform(item.platform),
         phase: item.phaseName,
-        metrics: item.metricKeys.map((k) => metricLabel(k, lang)).join(' · '),
-        position: benchmarkPositionText(item.stat, lang),
+        metric: metricLabel(item.stat?.metricKey ?? item.metricKeys[0], lang),
+        value: metricValue(item.stat?.metricKey ?? item.metricKeys[0], item.stat?.value) ?? '',
+        position: capitalize(benchmarkPositionText(item.stat, lang)),
       });
     case 'platform':
       return t('recap.takeaways.platform', lang, { cheaper: platform(item.cheaper), pricier: platform(item.pricier), pct: item.pct });
