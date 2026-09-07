@@ -35,7 +35,7 @@ function cellFor(field, item, row, lang) {
   // recommendation
   const params = {
     keep: item.keepAspect ? short(item.keepAspect) : '', test: item.testAspect ? short(item.testAspect) : '',
-    aspect: item.aspect ? aspect(item.aspect) : '', metric: item.metricKey ? metricLabel(item.metricKey, lang) : '', pct: item.pct ?? '',
+    aspect: item.aspect ? aspect(item.aspect) : '', aspectShort: item.aspect ? short(item.aspect) : '', metric: item.metricKey ? metricLabel(item.metricKey, lang) : '', pct: item.pct ?? '',
   };
   return { conclusion: t(`insight.next.${item.kind}`, lang, params), evidence: t(`insight.next.${item.kind}.evidence`, lang, params), level: item.level };
 }
@@ -50,8 +50,14 @@ function cellFor(field, item, row, lang) {
  *
  * 근거 수준(observed / compared / inferred / unknown)은 화면에 늘어놓지 않고 라벨의
  * 툴팁에만 둔다 — 논리는 그대로(schema.js buildCampaignInsight). 사람이 쓴 글이 있으면
- * 그것이 결론 자리에 오고 툴팁은 "written". 원인을 모르면 "Insufficient evidence",
- * 성과 데이터가 없으면 장점·약점 "—" / Why "Insufficient data" / Next "Collect more data".
+ * 그것이 결론 자리에 오고 툴팁은 "written".
+ *
+ * Why는 원인을 단정하지 않는다(2026-09-07): 비율 지표만으로는 창의·타겟·메시지·사용자
+ * 행동을 알 수 없어 결론은 항상 "Insufficient evidence"이고, 근거 줄에 관측된 지표 패턴
+ * ("Strong hook but weak hold — no causal signal in metrics")만 적는다. Next action도
+ * "Keep the strong hook"처럼 원인을 아는 척하지 않고 "Improve engagement without losing hook
+ * performance"처럼 관측된 지표를 기준으로 말한다. 성과 데이터가 없으면 장점·약점 "—" /
+ * Why "Insufficient data" / Next "Collect more performance data".
  *
  * Props:
  * @param {{ campaignId: string, phaseName: string, platform: string, goal: string, note: object|null, insight: { hasData: boolean, strength: object|null, weakness: object|null, reason: object, recommendation: object|null } }} row - 캠페인 행 + 해석 재료 [Required]

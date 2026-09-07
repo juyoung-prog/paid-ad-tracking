@@ -2144,7 +2144,7 @@ export function buildRecapPlaybook(byPlatform) {
  * - strength: 대표 지표 우선, 상위 구간(top/best)인 벤치마크 중 백분위 최고
  * - weakness: 하위 구간(bottom/lowest)인 벤치마크 중 백분위 최저. 없으면 계획 대비
  *   20% 이상 초과 지출(observed)
- * - reason: 관측된 패턴의 해석(inferred). 패턴이 없으면 unknown
+ * - reason: 관측된 지표 패턴(강한 CPM·약한 클릭 등)만 — 원인은 데이터로 세울 수 없어 level은 항상 unknown
  * - recommendation: 위 세 재료에서만 나오는 다음 실험(inferred). 관측 결과 → 다음에
  *   확인할 것이지, 마케팅 일반론이 아니다. 근거가 없으면 null(칸을 비운다)
  *   · keepAndTest: 장점·약점이 둘 다 있을 때 — 장점을 낸 설정은 유지, 약점 지표를 개선 대상으로
@@ -2196,15 +2196,18 @@ export function buildCampaignInsight(row, options = {}) {
   const holdTop = band('holdRate') === 'top';
   const holdBottom = band('holdRate') === 'bottom';
 
+  // Why — 비율 지표만으로는 원인을 세울 수 없다(2026-09-07 규칙). 그래서 level은 전부 UNKNOWN이고,
+  // kind는 "무슨 패턴이 관측됐는지"(강한 CPM·약한 클릭 등) 근거 줄에 적기 위한 것이다.
+  // 창의·타겟·메시지·피로·사용자 행동 같은 원인은 데이터에 없으므로 절대 단정하지 않는다.
   let reason;
   if (stats.length === 0) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPeers' };
-  else if (reachTop && clickBottom) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'reachNotAction' };
-  else if (reachBottom && clickTop) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'actionNotReach' };
-  else if (hookTop && holdBottom) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'hookNotHold' };
-  else if (hookBottom && holdTop) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'holdNotHook' };
-  else if (top.length >= 2 && bottom.length === 0) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'allStrong' };
-  else if (bottom.length >= 2 && top.length === 0) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'allWeak' };
-  else if ((known('cpm') || known('ctr') || known('cpc')) && top.length + bottom.length === 1) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'singleSignal', metricKey: (top[0] ?? bottom[0]).metricKey, aspect: METRIC_ASPECT[(top[0] ?? bottom[0]).metricKey], isStrong: top.length === 1 };
+  else if (reachTop && clickBottom) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'reachNotAction' };
+  else if (reachBottom && clickTop) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'actionNotReach' };
+  else if (hookTop && holdBottom) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'hookNotHold' };
+  else if (hookBottom && holdTop) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'holdNotHook' };
+  else if (top.length >= 2 && bottom.length === 0) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'allStrong' };
+  else if (bottom.length >= 2 && top.length === 0) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'allWeak' };
+  else if ((known('cpm') || known('ctr') || known('cpc')) && top.length + bottom.length === 1) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'singleSignal', metricKey: (top[0] ?? bottom[0]).metricKey, aspect: METRIC_ASPECT[(top[0] ?? bottom[0]).metricKey], isStrong: top.length === 1 };
   else reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPattern' };
 
   // Recommendation — 장점·약점 재료가 있을 때만. 없으면 null이라 칸이 비고, 지어내지 않는다

@@ -30,8 +30,10 @@ Could improve · Why · Next action. 칸마다 작은 라벨 → 짧은 결론(2
 ### 근거 수준은 툴팁에만
 observed / compared / inferred / unknown / written은 라벨에 마우스를 올리면 보인다 —
 논리(\`schema.js\` \`buildCampaignInsight()\`)는 그대로고, 칸마다 "· compared"를 붙이던
-표시만 뺐다. 추론(inferred)을 측정값처럼 보이게 하지 않는다: Why의 결론은 "Exposure,
-not action"처럼 패턴 이름이고 근거 줄에 "cause not in data"가 따라온다.
+표시만 뺐다. Why는 원인을 단정하지 않는다 — 결론은 항상 "Insufficient evidence", 근거 줄에
+관측된 지표 패턴("Strong hook but weak hold — no causal signal in metrics")만 적는다. Next
+action도 "Keep the strong hook"이 아니라 "Improve engagement without losing hook performance"
+처럼 관측된 지표 기준으로 말한다(강한 Hook이 소재가 좋다는 증거는 아니다).
 
 ### 비우는 규칙
 원인을 모르면 "Insufficient evidence / No reliable causal signal". 성과 데이터가 없으면
@@ -55,13 +57,13 @@ const inTable = (children) => (
   <Box sx={{ backgroundColor: 'surface.sunken', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>{children}</Box>
 );
 
-/** 장점·약점 둘 다 → Why + Next action(keepAndTest: "Keep the strong hook / Test for higher …") 네 칸 */
+/** 장점·약점 둘 다 → Why "Insufficient evidence" + Next action(keepAndTest: "Improve … without losing … performance") 네 칸 */
 export const FourFields = {
   args: { row: withInsight(metaRows[1] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
 };
 
-/** 장점만 — Could improve는 "—", Next action은 "Use as the reference point" */
+/** 장점만 — Could improve는 "—", Next action은 "Repeat and confirm … performance" */
 export const StrengthOnly = {
   args: { row: withInsight(metaRows[0]), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
