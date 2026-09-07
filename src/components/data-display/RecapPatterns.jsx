@@ -28,12 +28,12 @@ function cardFor(slot, item, platformLabel, lang) {
 function nextEventFor(item, platformLabel, lang) {
   if (!item) return null;
   const platform = (p) => platformLabel[p] ?? p;
-  const primary = t(`play.next.${item.kind}`, lang, { reachPlatform: platform(item.reachPlatform), clickPlatform: platform(item.clickPlatform), platform: platform(item.platform), phase: item.phase, worstPhase: item.worstPhase });
+  // "CPM, CTR, watch-through, and engagement" — 검증할 지표는 개선·검증 칸의 것만 덧붙인다
   const aspects = (item.validateAspects ?? []).map((a) => t(`learn.aspect.${a}`, lang).toLowerCase());
-  // "CPM, CTR, watch-through and engagement" — 마지막 둘만 and로
-  const list = aspects.length > 1 ? `${aspects.slice(0, -1).join(', ')}${t('play.next.and', lang)}${aspects[aspects.length - 1]}` : aspects[0];
-  const secondary = t('play.next.validate', lang, { aspects: list ? t('play.next.validateJoin', lang, { aspects: list }) : '' });
-  return { primary, secondary };
+  const and = t('play.next.and', lang);
+  const list = aspects.length === 0 ? '' : aspects.length === 1 ? `${and}${aspects[0]}` : `, ${aspects.slice(0, -1).join(', ')}${and}${aspects[aspects.length - 1]}`;
+  const primary = t(`play.next.${item.kind}`, lang, { reachPlatform: platform(item.reachPlatform), clickPlatform: platform(item.clickPlatform), platform: platform(item.platform), phase: item.phase, worstPhase: item.worstPhase, aspects: t('play.next.validateJoin', lang, { aspects: list }) });
+  return { primary, secondary: null };
 }
 
 /**
@@ -42,7 +42,7 @@ function nextEventFor(item, platformLabel, lang) {
  * Learnings 카드 안의 **다음 이벤트 플레이북** — "다음 비슷한 이벤트에서 무엇을 반복하고
  * 무엇을 바꿀까"에만 답한다. 2×2 칸: KEEP(초록 점) · USE SELECTIVELY(파랑 점) · IMPROVE
  * (주황 점) · VALIDATE(회색 점), 칸마다 상태 → 제목 → 근거 한 줄. 아래 NEXT EVENT 줄은
- * 결정 문장(이 카드에서 제목 다음으로 강하다) + 검증 문장(작고 흐리게).
+ * 한 문장 — "이번 결과를 출발 가설로, 집행 중 CPM·CTR·(개선·검증 지표) 검증".
  *
  * 회고 요약("Reach efficiency was consistently strong")은 Key takeaways·표가 이미 말하므로
  * 여기서 반복하지 않는다. 재료는 schema.js buildRecapPlaybook() — 같은 방향 캠페인 2개
@@ -93,7 +93,7 @@ export function RecapPatterns({ playbook, platformLabel = {}, hasWrittenLearning
           {next ? (
             <>
               <Typography sx={{ fontSize: 15, fontWeight: 600, color: 'text.primary', lineHeight: 1.4 }}>{next.primary}</Typography>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mt: 0.375 }}>{next.secondary}</Typography>
+              {next.secondary && <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mt: 0.375 }}>{next.secondary}</Typography>}
             </>
           ) : (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>{t('learn.action.empty', lang)}</Typography>

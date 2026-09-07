@@ -67,7 +67,7 @@ buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 
 - Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
 - Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
 - 타임라인 "Grand Opening" 행 클릭 → Meta·TikTok 표의 그 줄이 펼쳐진다
-- Learnings: 플레이북 2×2 + NEXT EVENT(결정 + 검증 문장)
+- Learnings: 플레이북 2×2 + NEXT EVENT 한 문장
         `,
       },
     },

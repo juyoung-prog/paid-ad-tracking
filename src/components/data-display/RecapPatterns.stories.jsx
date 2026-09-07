@@ -21,7 +21,7 @@ export default {
 Learnings 카드 안의 **다음 이벤트 플레이북** — "다음 비슷한 이벤트에서 무엇을 반복하고
 무엇을 바꿀까"에만 답한다. 2×2 칸 **KEEP · USE SELECTIVELY · IMPROVE · VALIDATE**(점 색
 success / accent / warning / disabled), 칸마다 상태 → 제목 → 근거 한 줄. 아래 **NEXT EVENT**
-줄은 결정 문장(15px/600) + 검증 문장(12px 보조).
+줄은 한 문장(15px/600) — "이번 결과를 출발 가설로 삼고 집행 중 CPM·CTR·(개선·검증 지표)를 검증".
 
 ### 반복하지 않는다
 "Reach efficiency was consistently strong" 같은 회고 요약은 Key takeaways와 표가 이미
