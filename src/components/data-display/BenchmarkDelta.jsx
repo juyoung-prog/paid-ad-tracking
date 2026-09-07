@@ -3,37 +3,12 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { t, benchmarkPositionText } from '../../data/recapStrings';
 
-/** 구간 → 톤·기호 방향. 기호는 "더 좋다/나쁘다"를 말한다(값이 높다/낮다가 아니다) */
+/** 구간 → 톤·기호. 기호는 "더 좋다/나쁘다"를 말한다(값이 높다/낮다가 아니다) */
 const BAND_STYLE = {
-  top: { tone: 'success.main', direction: 'up' },
-  mid: { tone: 'text.secondary', direction: null },
-  bottom: { tone: 'warning.main', direction: 'down' },
+  top: { tone: 'success.main', mark: '▲ ' },
+  mid: { tone: 'text.secondary', mark: '' },
+  bottom: { tone: 'warning.main', mark: '▼ ' },
 };
-
-/**
- * 얇은 선 셰브론(Lucide chevron-up/down 기하) — 글자 ▲▼는 면으로 채운 삼각형이라
- * 표 안에서 무겁다. 10px에서는 stroke 2가 화면상 약 0.8px로, 1.5는 끊겨 보여서 2.
- * 색은 currentColor라 톤(success/warning)을 따라간다.
- */
-function DirectionChevron({ direction, size }) {
-  return (
-    <Box
-      component="svg"
-      viewBox="0 0 24 24"
-      width={size}
-      height={size}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-      sx={{ flexShrink: 0, mr: 0.375, fill: 'none' }}
-    >
-      <polyline points={direction === 'up' ? '6 15 12 9 18 15' : '6 9 12 15 18 9'} fill="none" />
-    </Box>
-  );
-}
 
 /* 셀 안 위계: 라벨(호출부) → **값**(가장 강하게) → 비교 줄(보조). 값은 sm에서도
    13px/600이다 — 표에서 12px/500이면 옆의 원본 지표(Reach·Plays)와 무게가 같아져
@@ -47,9 +22,9 @@ const SIZE = {
  * BenchmarkDelta 컴포넌트
  *
  * 지표 값 한 개와 그 아래 "비슷한 캠페인 대비 어디쯤인가" 한 줄. Recap 표의 비율
- * 지표 셀과 KPI 옆에 쓴다. KpiBar의 delta와 같은 문법 — 기호(얇은 선 셰브론 ∧∨)와
- * 색이 같이 움직이되, 기호는 값의 높낮이가 아니라 **좋고 나쁨**을 말한다(CPM은
- * 낮을수록 좋아서 값이 중앙값보다 낮아도 위). 색만으로 구분하지 않는 건 색각 이상 때문.
+ * 지표 셀과 KPI 옆에 쓴다. KpiBar의 delta와 같은 문법 — 기호(▲▼)와 색이 같이
+ * 움직이되, 기호는 값의 높낮이가 아니라 **좋고 나쁨**을 말한다(CPM은 낮을수록
+ * 좋아서 값이 중앙값보다 낮아도 ▲). 색만으로 구분하지 않는 건 색각 이상 때문.
  *
  * 계산은 하지 않는다 — 중앙값·백분위·구간(band)은 schema.js의 benchmarkStat이
  * 정해서 넘긴다. 이 컴포넌트는 그 결과를 글자로 바꿀 뿐이다. 비교군이 부족하면
@@ -102,8 +77,6 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
           type={isKnown && onClick ? 'button' : undefined}
           onClick={isKnown && onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
           sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
             fontSize: sizes.caption,
             lineHeight: 1.3,
             fontWeight: isKnown ? 600 : 400,
@@ -127,8 +100,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
             }),
           }}
         >
-          {style?.direction && <DirectionChevron direction={style.direction} size={Math.round(sizes.caption)} />}
-          {positionText}
+          {style?.mark}{positionText}
           {isKnown && hasMedian && (
             <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary' }}>
               {' · '}{t('benchmark.vsMedian', lang, { median: format(stat.median) })}
