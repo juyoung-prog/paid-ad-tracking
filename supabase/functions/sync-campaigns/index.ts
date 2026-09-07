@@ -317,6 +317,49 @@ async function fetchMetaCampaigns(accessToken: string, externalAccountId: string
 }
 
 /**
+ * 캠페인별 광고 세트(ad set) 예산 합산 — Meta는 예산을 캠페인(CBO)이 아니라 **광고 세트**에
+ * 거는 설정이 흔하다. 그 캠페인은 campaigns 응답의 daily_budget/lifetime_budget이 비어
+ * 있어서 화면의 일예산이 '—'로 떴다(실데이터: G10 Now Open·Coming Soon·1 Month Deals).
+ * TikTok의 fetchTikTokAdGroupBudgets와 같은 발상 — 한 단계 아래를 계정 단위로 한 번
+ * 읽어 캠페인별로 더한다. 삭제·보관된 세트는 제외. 금액은 센트.
+ *
+ * 실패해도 캠페인 저장은 진행한다(예산만 못 채운 부분 성공).
+ */
+async function fetchMetaAdSetBudgets(
+  accessToken: string,
+  externalAccountId: string
+): Promise<{ byCampaign: Map<string, { daily: number | null; total: number | null }>; errorMessage: string | null }> {
+  const byCampaign = new Map<string, { daily: number | null; total: number | null }>();
+  const fields = 'id,campaign_id,daily_budget,lifetime_budget,effective_status';
+  let url: string | null =
+    `https://graph.facebook.com/v19.0/act_${externalAccountId}/adsets?fields=${fields}&limit=500&access_token=${accessToken}`;
+
+  for (let page = 0; url && page < MAX_PAGES; page += 1) {
+    const res: Response = await fetchWithTimeout(url);
+    const json: any = await res.json();
+    if (json?.error) {
+      console.error('Meta adsets 조회 실패', json.error);
+      return { byCampaign, errorMessage: `Meta adsets 조회 실패 — ${json.error.message}` };
+    }
+    for (const adSet of json.data ?? []) {
+      const status = String(adSet?.effective_status ?? '');
+      if (status === 'DELETED' || status === 'ARCHIVED') continue;
+      const campaignId = String(adSet?.campaign_id ?? '');
+      if (!campaignId) continue;
+      const daily = adSet?.daily_budget != null ? Number(adSet.daily_budget) / 100 : 0;
+      const total = adSet?.lifetime_budget != null ? Number(adSet.lifetime_budget) / 100 : 0;
+      if (!daily && !total) continue;
+      const acc = byCampaign.get(campaignId) ?? { daily: null, total: null };
+      if (daily) acc.daily = (acc.daily ?? 0) + daily;
+      if (total) acc.total = (acc.total ?? 0) + total;
+      byCampaign.set(campaignId, acc);
+    }
+    url = json.paging?.next ?? null;
+  }
+  return { byCampaign, errorMessage: null };
+}
+
+/**
  * 캠페인별 소재 썸네일을 계정 단위로 한 번에 읽는다.
  *
  * 왜 필요한가: 화면의 캠페인 목록은 소재 썸네일로 캠페인을 구분하는데, 실계정
@@ -495,7 +538,12 @@ function mapMetaCampaign(
   base: Pick<CampaignRow, 'owner_id' | 'platform' | 'account_id'>,
   stores: StoreIndex,
   creatives?: Map<string, CreativeInfo>,
+  adSetBudgets?: Map<string, { daily: number | null; total: number | null }>,
 ): CampaignRow {
+  // 캠페인 예산(CBO)이 있으면 그것, 없으면 광고 세트 예산의 합 — 둘은 설정 방식이 달라 한 캠페인은 한쪽만 갖는다
+  const adSet = adSetBudgets?.get(String(item.id));
+  const campaignDaily = item.daily_budget != null ? Number(item.daily_budget) / 100 : null;
+  const campaignTotal = Number(item.lifetime_budget ?? 0) / 100;
   const createdAt = new Date(item.created_time ?? Date.now());
   // Meta의 status는 ACTIVE/PAUSED/ARCHIVED/DELETED.
   const fallback = fallbackRange(createdAt, item.status === 'ACTIVE', new Date(item.updated_time ?? item.created_time ?? Date.now()));
@@ -513,8 +561,8 @@ function mapMetaCampaign(
     end_date: endDate < startDate ? startDate : endDate,
     // Meta는 금액을 최소 화폐 단위(센트)로 준다. 두 예산은 서로 대체재가 아니라
     // 설정 방식이 다른 값이라 각자 자리에 넣는다 — 캠페인은 둘 중 하나만 갖는다.
-    budget_planned: Number(item.lifetime_budget ?? 0) / 100,
-    budget_daily: item.daily_budget != null ? Number(item.daily_budget) / 100 : null,
+    budget_planned: campaignTotal || (adSet?.total ?? 0),
+    budget_daily: campaignDaily ?? adSet?.daily ?? null,
     goal: mapMetaGoal(item.objective),
     thumbnail_url: creatives?.get(String(item.id))?.thumb ?? null,
     ad_link: creatives?.get(String(item.id))?.link ?? null,
@@ -927,6 +975,14 @@ Deno.serve(async (req) => {
       if (adGroups.errorMessage) errors.push(`${key}: ${adGroups.errorMessage}`);
       adGroupBudgets = adGroups.byCampaign;
     }
+    /* Meta도 같은 이유로 광고 세트를 한 번 더 읽는다 — 캠페인 예산(CBO) 없이 세트마다
+       예산을 건 캠페인은 campaigns 응답만으로는 일예산이 비어 '—'로 떴다(fetchMetaAdSetBudgets 주석). */
+    let adSetBudgets: Map<string, { daily: number | null; total: number | null }> | undefined;
+    if (conn.platform === 'meta' && raw.length > 0) {
+      const adSets = await fetchMetaAdSetBudgets(conn.access_token, externalAccountId);
+      if (adSets.errorMessage) errors.push(`${key}: ${adSets.errorMessage}`);
+      adSetBudgets = adSets.byCampaign;
+    }
 
     /* 소재 썸네일도 한 단계 아래(광고)에 있어서 한 번 더 읽는다. 예산과 같은
        이유로 캠페인이 0건이면 호출을 아낀다. */
@@ -947,7 +1003,7 @@ Deno.serve(async (req) => {
 
     const rows: CampaignRow[] = raw.map((item: any) =>
       conn.platform === 'meta'
-        ? mapMetaCampaign(item, base, stores, creatives)
+        ? mapMetaCampaign(item, base, stores, creatives, adSetBudgets)
         : mapTikTokCampaign(item, base, stores, adGroupBudgets, creatives)
     );
     if (rows.length === 0) continue;
