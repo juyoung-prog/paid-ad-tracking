@@ -59,7 +59,7 @@ const recapEnums = [
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 벤치마크 구간(band top/bottom) 경계: 백분위 70 이상 top, 30 이하 bottom. 셀 ↗↘ 색과 해석(What worked / Could improve)이 쓴다' },
   { name: 'budgetEfficiency(row, goal)', value: "→ { metricKey, value } — 이 캠페인의 목표별 결과당 비용(과거·비교군·기준값 무관). 과거 비교(benchmarks)·목표치(kpiTarget)·집행률(pacingRatio)과 층을 나눈다" },
-  { name: 'PERFORMANCE_STANDARDS / GOAL_PERFORMANCE_RULES / buildPerformanceVerdict(row, platform, goal)', value: "플랫폼·지표별 good/weak 문턱(2024년 이후 우리 사분위 시드, 설정으로 조정) + 목표별 { primary, important, secondary } 지표 표 + 구간 규칙(primary 상위 → Good, important 하위면 Fair · 중간 → Fair · 하위 → Weak · 구간 없으면 null) — 표의 Performance 열. **현재 값**만 쓰고 과거 비교군은 안 쓴다(2026-09-07). 가중치 점수 없음" },
+  { name: 'PERFORMANCE_TARGETS / GOAL_PERFORMANCE_RULES / buildPerformanceVerdict(row, platform, goal, kpiTarget)', value: "팀이 설정하는 플랫폼·지표별 good/weak 문턱(제품 설정값, 캠페인 kpiTarget이 있으면 그것 우선) + 목표별 { primary, important, secondary } 지표 표 + 구간 규칙(primary 상위 → Good, important 하위면 Fair · 중간 → Fair · 하위 → Weak · 구간 없으면 null) — 표의 Performance 열. **현재 값**만 쓰고 과거 캠페인 분포·중앙값·백분위·순위는 어디에도 안 쓴다(2026-09-07). 가중치 점수 없음" },
 ];
 
 /** schema.js 순수 함수 — 입력/출력만 적는다. 컴포넌트는 이 결과를 props로 받을 뿐 안에서 다시 계산하지 않는다. */

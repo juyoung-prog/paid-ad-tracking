@@ -116,9 +116,10 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
  * 판정 · 영상 반응 · 참여 반응 · 행동. Spend는 실제 총지출만, Efficiency는 목표별 결과당 비용 + 과거 순위. 비율 지표(Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 비워 둔다. 평가 층(2026-09-07): **Performance** = 이 캠페인의 **현재 값**을 우리 기준 범위(PERFORMANCE_STANDARDS)에 대고
- * 목표별 규칙(GOAL_PERFORMANCE_RULES)으로 합친 한 단어(Good/Fair/Weak) + 한 줄 설명("Efficient reach cost · weak hold").
- * 과거 비교군과 무관해 성과만 있으면 나온다. 사람이 고른 note.verdict가 우선, 기준 범위가 없는 목표(전환)만 "—".
+ * 없으면 비워 둔다. 평가 층(2026-09-07): **Performance** = 이 캠페인의 **현재 값**을 설정 목표 기준(PERFORMANCE_TARGETS, 캠페인
+ * kpiTarget이 있으면 그것)에 대고 목표별 규칙(GOAL_PERFORMANCE_RULES)으로 합친 한 단어(Good/Fair/Weak) + 한 줄 설명("Efficient cost ·
+ * weak hold"). 과거 캠페인 데이터는 어디에도 안 쓴다(그건 vs past의 것) — 성과만 있으면 나온다. 사람이 고른 note.verdict가 우선,
+ * 기준이 설정되지 않은 목표(전환)만 "—".
  * **Cost efficiency**는 서로 다른 두 층: **위 = 비용 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
  * — 인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA. 과거·비교군·기준값 무관, 성과만 있으면 항상), **아래 "vs past"** =
  * 같은 KPI를 과거 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위(없으면 "—" + 툴팁 "Not enough
@@ -328,7 +329,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       {perfVerdict ? (
                         perfNote && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{perfNote}</Typography>
                       ) : (
-                        /* 성과 데이터가 있는데 판정이 없는 건 이 목표의 기준 범위가 없을 때뿐(전환·매장 방문) — "데이터 없음"이 아니다 */
+                        /* 성과 데이터가 있는데 판정이 없는 건 이 목표의 성과 기준이 설정되지 않았을 때뿐(전환·매장 방문) — "데이터 없음"이 아니다 */
                         hasData && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{t('recap.table.perfNoStandard', lang)}</Typography>
                       )}
                     </Box>
