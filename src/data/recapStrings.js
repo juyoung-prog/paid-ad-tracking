@@ -219,7 +219,7 @@ export const RECAP_STRINGS = Object.freeze({
   'insight.rec.improve': { en: 'In the next comparable campaign, set this campaign\'s {metric} as the floor to beat for {aspect}, and check it early rather than at the end.', ko: '다음 비교 가능한 캠페인에서는 이 캠페인의 {metric}을 {aspect}의 최소 기준으로 두고, 끝나고 나서가 아니라 초반에 확인하세요.', 'zh-Hant': '下一支可比廣告中，以本廣告的 {metric} 作為{aspect}的最低門檻，並在早期而非結束時檢查。' },
   'insight.rec.budget': { en: 'Set the next daily budget with this {pct}% overspend in mind and check spend pace during the run.', ko: '다음 일예산은 이번 {pct}% 초과 지출을 감안해 정하고 집행 중 지출 속도를 확인하세요.', 'zh-Hant': '下次的每日預算須考量此次 {pct}% 的超支，並在投放期間檢查花費速度。' },
   'recap.table.openCampaign': { en: 'Open campaign details', ko: '캠페인 상세 열기', 'zh-Hant': '開啟廣告詳情' },
-  'recap.table.expand': { en: 'View insights', ko: '해석 보기', 'zh-Hant': '查看解讀' },
+  'recap.table.expand': { en: 'Show insights', ko: '해석 보기', 'zh-Hant': '查看解讀' },
   'recap.table.collapse': { en: 'Hide insights', ko: '해석 닫기', 'zh-Hant': '收起解讀' },
   'insight.reason.noPattern': { en: 'Not enough evidence to determine why.', ko: '이유를 판단할 근거가 부족합니다.', 'zh-Hant': '證據不足以判斷原因。' },
   // 이벤트 단위 패턴(Learnings 자동 생성) — 여러 캠페인이 같은 방향일 때만

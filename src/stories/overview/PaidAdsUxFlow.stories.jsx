@@ -227,7 +227,7 @@ const iaTree = `Paid Ads Dashboard
         ├── Key takeaways — 임원용 세 칸 (BEST RESULT · ATTENTION · NEXT MOVE)
         ├── 단계 타임라인 (PhaseTimelineChart 재활용) — 행 클릭 → 아래 표에서 그 단계 줄 펼침
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크 ↗↘)
-        │   ├── 썸네일 · 캠페인 이름 클릭 → 캠페인 상세 Drawer (Performance와 같은 CampaignDetailPanel — 소재 · View ad · Ads Manager · Billing · 예산 · 페이싱 · 일별 지출)
+        │   ├── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer (Performance와 같은 CampaignDetailPanel — 소재 · View ad · Ads Manager · Billing · 예산 · 페이싱 · 일별 지출)
         │   └── 줄 끝 셰브론 → 캠페인 해석 (What worked · Could improve · Why · Next action) — 사람 글 우선, 없으면 데이터 해석
         ├── Learnings — 사람이 쓴 배운 점 + 다음 이벤트 플레이북(KEEP · USE SELECTIVELY · IMPROVE · VALIDATE) + NEXT EVENT
         ├── (편집 모드) 캠페인별 코멘트 카드 — 판정 · 장점 · 아쉬운 점 · 이유 (언어별) · Learnings 편집기

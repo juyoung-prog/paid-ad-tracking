@@ -52,7 +52,7 @@ export default {
 2. 저장된 요약 한 단락(있을 때)
 3. **Key takeaways**(RecapTakeaways) — 임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE
 4. **단계 타임라인**(PhaseTimelineChart) — 막대 옆에 실지출. 행을 누르면 아래 표에서 그 단계의 줄을 펼치고 스크롤한다
-5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 캠페인 칸의 썸네일·이름을 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel: 소재·View ad·Ads Manager·Billing·예산·페이싱·일별 지출)가 이 페이지 위에 열린다. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론으로
+5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 숫자 줄 아무 데나 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel: 소재·View ad·Ads Manager·Billing·예산·페이싱·일별 지출)가 이 페이지 위에 열린다. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론으로
    그 줄 아래에 **캠페인 해석**(RecapCampaignInsightPanel: What worked · Could improve · Why · Next action)이 펼쳐진다(한 번에 한 줄)
 6. **Learnings** — 사람이 쓴 배운 점(있을 때) + 다음 이벤트 플레이북(RecapPatterns: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)
 

@@ -26,7 +26,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 "비슷한 캠페인 대비 어디쯤"이 붙는다.
 
 ### 셀 구성
-- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title. onCampaignClick이 있으면 썸네일·이름이 버튼(드로어), 기간은 평문
+- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title. 보고서에서는 숫자 줄 전체가 드로어 버튼(onRowClick)이라 칸 안에 따로 버튼이 없다
 - **Spend**: 지출 + 그 아래 CPM 벤치마크
 - **Efficiency**: 사람이 고른 판정이 있으면 그것, 없으면 제안값(같은 모양, 툴팁 "suggested")을
 - **Video**: Reach · Plays · Avg 한 줄 + Hook / Hold 벤치마크
@@ -52,8 +52,8 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
     onExpandedChange: { action: 'expandedChange', description: '(campaignId|null) => void' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
-    onRowClick: { action: 'rowClicked', description: '행 전체 클릭 핸들러 (campaignId) => void. 보고서는 주지 않는다' },
-    onCampaignClick: { action: 'campaignClicked', description: '썸네일·캠페인 이름 클릭 (campaignId) => void — 캠페인 상세 드로어를 여는 용도' },
+    onRowClick: { action: 'rowClicked', description: '숫자 줄 전체 클릭 (campaignId) => void — 보고서는 이걸로 캠페인 상세 드로어를 연다. 화살표·벤치마크·해석 줄은 예외' },
+    onCampaignClick: { action: 'campaignClicked', description: '썸네일·이름만 버튼으로 만들 때. onRowClick이 있으면 불필요' },
     label: { control: 'text', description: '스크롤 영역 접근성 이름' },
     sx: { control: 'object', description: '추가 스타일' },
   },
@@ -90,7 +90,7 @@ export const NoPerformanceData = {
   },
 };
 
-/** onRowClick을 준 경우 — 행 전체가 버튼(예: 딥링크). 보고서 페이지는 주지 않는다 — 썸네일·이름은 드로어, 화살표는 펼침으로 나뉜다 */
+/** onRowClick — 숫자 줄 전체가 버튼(보고서에서는 캠페인 상세 드로어). hover는 중립 면, 화살표·벤치마크 글자는 줄 클릭에서 빠진다. Tab으로 행에 포커스, Enter로 눌린다 */
 export const Clickable = {
   args: { rows: byPlatform.meta },
   render: (args) => <RecapCampaignTable {...args} />,
@@ -131,13 +131,12 @@ export const Expandable = {
 };
 
 /**
- * 썸네일 + 이름 클릭(onCampaignClick) — 보고서 페이지의 실제 조합. 썸네일과 이름을 누르면
- * 캠페인 상세 드로어(액션 로그), 줄 끝 화살표는 해석 펼침. 줄 전체는 눌리지 않는다.
+ * 보고서 페이지의 실제 조합 — 숫자 줄 전체(onRowClick) → 캠페인 상세 드로어(액션 로그),
+ * 줄 끝 화살표 → 해석 펼침(툴팁 "Show insights"/"Hide insights"). 펼친 해석 줄은 눌리지 않는다.
  */
-export const WithCampaignClick = {
+export const RowOpensDrawer = {
   args: {
     rows: byPlatform.meta,
-    onRowClick: undefined,
     renderDetail: (row) => (
       <RecapCampaignInsightPanel
         row={{ ...row, insight: buildCampaignInsight(row) }}

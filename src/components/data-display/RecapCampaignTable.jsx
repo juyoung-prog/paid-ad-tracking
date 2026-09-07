@@ -123,8 +123,8 @@ function RawLine({ parts }) {
  * Props:
  * @param {Array<Object>} rows - buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
- * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행 전체가 Tab/Enter로 활성화된다. 보고서는 주지 않는다 — 줄 전체가 아니라 썸네일·이름(onCampaignClick)과 화살표(renderDetail)가 각각 다른 일을 한다 [Optional]
- * @param {function} onCampaignClick - 썸네일·캠페인 이름 클릭 (campaignId) => void. 있으면 둘이 버튼이 된다 — Performance와 같은 캠페인 상세 드로어를 여는 용도. 기간 글자는 눌리지 않는다 [Optional]
+ * @param {function} onRowClick - 숫자 줄 클릭 핸들러 (campaignId) => void. 있으면 줄 전체(#·매장·썸네일·이름·기간·예산·지표·빈 곳)가 버튼이고 Tab/Enter로도 눌린다 — 보고서는 이걸로 Performance와 같은 캠페인 상세 드로어를 연다(2026-09-07: 썸네일·이름만 누르던 것은 찾기 어려웠다). 화살표·벤치마크 버튼·펼친 해석 줄은 예외(stopPropagation / 별도 줄) [Optional]
+ * @param {function} onCampaignClick - 썸네일·캠페인 이름만 버튼으로 만들 때 (campaignId) => void. onRowClick이 있으면 필요 없다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
  * @param {string|null} selectedId - 타임라인에서 찾아온 줄의 campaignId. 그 줄(숫자 줄만, 해석 줄 제외)에 옅은 accent 배경 + 왼쪽 2px accent 선 — "내가 고른 캠페인이 이것"이라는 방향 표시. 펼침(expandedId)과는 별개 상태라 선택이 풀려도 해석은 접히지 않는다 [Optional]
  * @param {string|null} expandedId - 펼친 줄의 campaignId. 주면 제어형(타임라인 행 클릭으로 페이지가 펼치는 용도) — onExpandedChange로 바뀐 값을 돌려받는다. 안 주면 표가 스스로 기억한다 [Optional]
@@ -148,8 +148,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
     if (!isControlled) setOwnExpandedId(next);
     onExpandedChange?.(next);
   };
-  // 줄 전체 클릭은 명시된 핸들러가 있을 때만 — 썸네일·이름(드로어)과 화살표(펼침)가 서로 다른 일을 하므로
-  // 줄 전체를 누르게 두면 두 동작이 겹친다(2026-09-07). 벤치마크 버튼·화살표는 stopPropagation으로 빠진다
+  // 숫자 줄 전체 = 드로어(onRowClick), 화살표 = 펼침 — 화살표·벤치마크 버튼은 stopPropagation으로 줄 클릭에서 빠지고,
+  // 펼친 해석 줄은 별도 <tr>이라 애초에 줄 클릭 대상이 아니다
   const handleRow = onRowClick;
 
   if (!rows || rows.length === 0) {
@@ -219,12 +219,14 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
                 aria-selected={isSelected || undefined}
                 sx={(theme) => ({
                   cursor: handleRow ? 'pointer' : 'default',
+                  // 줄 hover는 MUI action.hover(중립) — 140ms로 부드럽게. 지표·순위 색은 그대로
+                  transition: theme.transitions.create('background-color', { duration: 140 }),
                   // 펼친 줄은 아래 경계선을 지워 해석 면과 한 덩어리로 읽히게
                   ...(isExpanded && { '& > td': { borderBottom: 0 } }),
                   /* 타임라인에서 찾아온 줄 — 옅은 accent 면 + 첫 칸 왼쪽 2px accent 선(inset shadow라 폭·경계선이 안 바뀐다).
-                     글자·지표 색은 그대로. hover 색보다 우선하도록 &&로 특이도를 올린다 */
+                     글자·지표 색은 그대로. hover 위에서도 선택 면·선이 유지되도록 hover까지 함께 지정한다 */
                   ...(isSelected && {
-                    '&&': { backgroundColor: alpha(theme.palette.accent.main, 0.05) },
+                    '&&, &&:hover': { backgroundColor: alpha(theme.palette.accent.main, 0.06) },
                     '& > td:first-of-type': { boxShadow: `inset 2px 0 0 ${theme.palette.accent.main}` },
                   }),
                   ...(handleRow && {
@@ -341,6 +343,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
                 {/* 조용한 컨트롤 — 기본은 투명, hover에만 옅은 면. 줄 높이는 그대로(히트 영역 28px < 줄 높이) */}
                 {isExpandable && (
                   <TableCell sx={{ ...CELL_SX, pl: 0, pr: 1.5, verticalAlign: 'middle' }}>
+                    <Tooltip title={t(isExpanded ? 'recap.table.collapse' : 'recap.table.expand', lang)} placement="top" enterDelay={400}>
                     <IconButton
                       aria-label={t(isExpanded ? 'recap.table.collapse' : 'recap.table.expand', lang)}
                       aria-expanded={isExpanded}
@@ -366,6 +369,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
                         })}
                       />
                     </IconButton>
+                    </Tooltip>
                   </TableCell>
                 )}
               </TableRow>,

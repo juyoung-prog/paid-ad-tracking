@@ -506,11 +506,11 @@ export function RecapDetailPage() {
             rows={byPlatform[platform]}
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
-            /* 줄 클릭은 해석 펼침(표 기본 동작) — 보고서를 읽다가 대시보드로 튕기지 않는다 */
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
-            /* 다른 캠페인을 건드리면(이름·썸네일·화살표) 선택 표시는 풀린다 — 이 클릭들은 stopPropagation이라
-               document 리스너에 안 닿아서 여기서 직접 처리한다. 같은 줄이면 그대로 */
-            onCampaignClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
+            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(썸네일·이름만 누르던 것은 찾기 어려웠다, 2026-09-07).
+               다른 캠페인을 건드리면(줄·화살표) 타임라인 선택 표시는 풀린다 — 화살표는 stopPropagation이라 document
+               리스너에 안 닿아서 여기서 직접 처리한다. 같은 줄이면 그대로 */
+            onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
             selectedId={selectedCampaignId}
             expandedId={expandedByPlatform[platform] ?? null}
             onExpandedChange={(campaignId) => {
