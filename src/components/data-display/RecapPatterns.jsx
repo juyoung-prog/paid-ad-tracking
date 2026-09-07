@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { t, metricLabel } from '../../data/recapStrings';
 
 /** 재료(schema.js buildRecapPatterns) → 제목·본문. 문장 조립은 recapStrings에서만 */
@@ -81,8 +82,9 @@ export function RecapPatterns({ patterns, platformLabel = {}, hasWrittenLearning
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>{hasWrittenLearnings ? t('pattern.empty', lang) : t('pattern.empty', lang)}</Typography>
       ) : (
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 1.5 }}>
+          {/* 카드 안의 카드가 되지 않게 — 경계는 divider의 절반 농도, 배경·그림자 없음. 위계는 제목·본문이 만든다 */}
           {learnings.map((item, i) => (
-            <Box key={i} sx={(theme) => ({ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.control}px` })}>
+            <Box key={i} sx={(theme) => ({ p: 1.5, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), borderRadius: `${theme.shape.radius.control}px` })}>
               <Typography component="h4" sx={{ fontSize: 13, fontWeight: 600, m: 0, mb: 0.5, lineHeight: 1.4 }}>{item.title}</Typography>
               <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.55 }}>{item.body}</Typography>
             </Box>

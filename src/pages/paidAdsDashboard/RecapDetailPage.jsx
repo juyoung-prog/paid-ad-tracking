@@ -5,6 +5,7 @@ import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
@@ -502,7 +503,7 @@ export function RecapDetailPage() {
           {hasWrittenLearnings && (
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2, p: 2, pb: hasWrittenNextSteps ? 0 : 2 }}>
               {recap.learnings.map((item, i) => (
-                <Box key={i} sx={(theme) => ({ p: 2, backgroundColor: 'surface.sunken', borderRadius: `${theme.shape.radius.control}px` })}>
+                <Box key={i} sx={(theme) => ({ p: 2, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), borderRadius: `${theme.shape.radius.control}px` })}>
                   <Typography component="h3" sx={{ fontSize: 13, fontWeight: 600, m: 0, mb: 0.75 }}>
                     {i + 1}. {localizedText(item.title, lang).value}
                   </Typography>

@@ -30,8 +30,8 @@ const COLUMN_WIDTH = {
   engagement: 176,
   action: 248,
 };
-/** 펼침 화살표 열 — renderDetail이 있을 때만 붙는다. 28px 히트 영역 + 오른쪽 여백 */
-const EXPAND_WIDTH = 44;
+/** 펼침 화살표 열 — renderDetail이 있을 때만 붙는다. 28px 히트 영역 + 오른쪽 여백 12px */
+const EXPAND_WIDTH = 40;
 const EXPAND_HIT = 28;
 
 /**
@@ -42,7 +42,7 @@ const EXPAND_HIT = 28;
 function ThinChevronDownIcon(props) {
   return (
     <SvgIcon viewBox="0 0 24 24" {...props}>
-      <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </SvgIcon>
   );
 }
@@ -136,7 +136,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
   const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
 
   return (
-    <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.store + COLUMN_WIDTH.campaign} sx={sx}>
+    <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.store + COLUMN_WIDTH.campaign} edgeStrength="subtle" sx={sx}>
       <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
         <colgroup>
           {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
@@ -275,14 +275,14 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         display: 'flex',
                         color: 'text.secondary',
                         borderRadius: `${theme.shape.radius.control}px`,
-                        transition: theme.transitions.create(['background-color', 'color'], { duration: theme.transitions.duration.shortest }),
+                        transition: theme.transitions.create(['background-color', 'color'], { duration: 160, easing: theme.transitions.easing.easeOut }),
                         '@media (hover: hover)': { '&:hover': { backgroundColor: 'action.hover', color: 'text.primary' } },
                       })}
                     >
                       <ThinChevronDownIcon
                         sx={(theme) => ({
-                          fontSize: 15,
-                          transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shorter }),
+                          fontSize: 14,
+                          transition: theme.transitions.create('transform', { duration: 160, easing: theme.transitions.easing.easeOut }),
                           transform: isExpanded ? 'rotate(180deg)' : 'none',
                         })}
                       />

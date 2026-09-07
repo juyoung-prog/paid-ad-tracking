@@ -25,6 +25,17 @@ const EDGE_GRADIENT = {
      보이던 문제(i-9)가 돌아온다. */
   bottom: 'linear-gradient(to top, rgba(17, 24, 39, 0.08), rgba(17, 24, 39, 0))',
 };
+/**
+ * edgeStrength='subtle' — 좌우 페이드를 훨씬 옅고 좁게(0.06/16px). 보고서 표(Recap)처럼
+ * 화면에 거의 다 들어와서 몇 px만 넘치는 자리에서는 0.2짜리 띠가 표 오른쪽만 무겁게
+ * 보인다. 신호는 남기되 표의 나머지 경계선과 같은 무게로.
+ */
+const SUBTLE_EDGE_WIDTH = 16;
+const SUBTLE_EDGE_GRADIENT = {
+  start: 'linear-gradient(to right, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0))',
+  end: 'linear-gradient(to left, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0))',
+  bottom: EDGE_GRADIENT.bottom,
+};
 
 /**
  * ScrollArea 컴포넌트
@@ -67,6 +78,7 @@ const EDGE_GRADIENT = {
  * @param {string} label - 스크롤 영역의 접근성 이름. 주면 role="region" + 키보드 포커스가 붙는다(WCAG 2.1.1: 스크롤 영역은 키보드로도 조작 가능해야 함) [Optional]
  * @param {number} startOffset - 좌측 그림자를 그릴 x 위치(px). 고정 열 폭 등 [Optional, 기본값: 0]
  * @param {number|string} maxHeight - 세로 최대 높이. 주면 세로 스크롤도 이 영역이 받는다 [Optional]
+ * @param {'strong'|'subtle'} edgeStrength - 좌우 페이드의 무게. 'strong'(기본)은 0.2/24px — 넘친 열이 있다는 걸 분명히 알려야 하는 운영 표. 'subtle'은 0.06/16px — 거의 다 들어오는 보고서 표(Recap)처럼 가장자리가 조용해야 하는 자리 [Optional, 기본값: 'strong']
  * @param {'fade'|'scrollbar'} scrollHint - 세로 스크롤이 남았다는 신호를 무엇으로 줄지. 'fade'(기본)는 아래 그라데이션, 'scrollbar'는 항상 보이는 얇은 스크롤바 — 표의 마지막 행 위에 페이드가 깔려 그 행이 선택된 것처럼 읽히는 자리(CampaignDetailPanel의 Daily spend)에서 쓴다. 좌우 페이드는 두 모드 모두 그대로다 [Optional, 기본값: 'fade']
  * @param {object} sx - 추가 스타일 오버라이드 [Optional]
  *
@@ -75,7 +87,10 @@ const EDGE_GRADIENT = {
  *   <Table sx={{ minWidth: 1800 }}>...</Table>
  * </ScrollArea>
  */
-export function ScrollArea({ children, label, startOffset = 0, maxHeight, scrollHint = 'fade', sx }) {
+export function ScrollArea({ children, label, startOffset = 0, maxHeight, scrollHint = 'fade', edgeStrength = 'strong', sx }) {
+  const isSubtle = edgeStrength === 'subtle';
+  const gradient = isSubtle ? SUBTLE_EDGE_GRADIENT : EDGE_GRADIENT;
+  const edgeWidth = isSubtle ? SUBTLE_EDGE_WIDTH : EDGE_WIDTH;
   const viewportRef = useRef(null);
   const [edges, setEdges] = useState({ start: false, end: false, bottom: false });
 
@@ -115,8 +130,8 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, scroll
         // 위에 그림자가 지나가면 안 움직이는 열이 움직이는 것처럼 읽힘) 기본
         // 겹침을 유지한다 — 같은 이유의 반대 방향 결정이다.
         { left: 0, right: 0, bottom: 0, height: BOTTOM_EDGE_HEIGHT, zIndex: 3 }
-      : { top: 0, bottom: 0, width: EDGE_WIDTH, ...(side === 'start' ? { left: startOffset } : { right: 0 }) }),
-    background: EDGE_GRADIENT[side],
+      : { top: 0, bottom: 0, width: edgeWidth, ...(side === 'start' ? { left: startOffset } : { right: 0 }) }),
+    background: gradient[side],
     opacity: edges[side] ? 1 : 0,
     pointerEvents: 'none',
     transition: theme.transitions.create('opacity', {
