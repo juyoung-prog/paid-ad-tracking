@@ -220,9 +220,13 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
                     <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={28} sx={(theme) => ({ borderRadius: `${theme.shape.radius.inlay}px` })} />
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }} title={row.name}>
-                        {row.phaseName}
-                      </Typography>
+                      {/* 이름은 한 줄 + CSS 말줄임 — 긴 이름("Instagram post: … ✨")의 이모지·점이 혼자 다음 줄로 내려가면
+                          깨져 보였다(i-26). 전체 이름은 hover 툴팁으로(단계 이름이 원본과 다르거나 길 때만) */}
+                      <Tooltip title={row.name !== row.phaseName || row.phaseName.length > 24 ? row.name : ''} placement="top" enterDelay={500}>
+                        <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {row.phaseName}
+                        </Typography>
+                      </Tooltip>
                       {/* 기간 · 목표 — 목표는 KPI가 아니라 맥락이라 기간과 같은 줄, 같은 크기·색. 데이터에 없으면 기간만 */}
                       <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal' }}>
                         {dateRangeWithDays(row.startDate, row.endDate)}
