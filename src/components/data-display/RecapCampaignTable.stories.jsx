@@ -33,7 +33,9 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 - **Action**: Clicks · Results · Profile 보조 지표 + CTR / CPC (+ conversion goal이면 CPA)
 
 모든 지표가 같은 문법 **라벨 → 값 → 비교**를 쓴다(2026-09-07 — 예전엔 보조 지표만 "Reach 163,290 · Plays 295,857" 문장이라
-메타데이터처럼 읽혔다). 위계는 글자 강도로만: 대표 값 13px/600 primary, 보조 값 12px/500 primary 72%, 라벨 11px secondary.
+메타데이터처럼 읽혔다). 위계는 글자 무게로만, 무게는 지표의 **역할**이 정한다(2026-09-07): 목표의 대표 KPI(인지 CPM ·
+트래픽 CPC · 참여 Cost/eng · 전환 CPA) 700 > 진단 지표(Hook·Hold·Eng. rate·CTR) 600 > 대표가 아닌 비용 지표·수량 지표
+(Reach·Plays·Like·Clicks…) 400. 라벨은 11px secondary, 순위 글자는 그대로.
 보조 지표 항목은 minWidth(52/36/56)로, 대표 지표 첫 자리는 고정 폭(Video 80 · Action 88)으로 값 길이가 달라도
 Hold·CPC가 모든 줄에서 같은 x에 온다. 보조 묶음과 대표 묶음 사이 8px.
 

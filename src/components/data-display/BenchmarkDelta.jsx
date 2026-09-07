@@ -18,6 +18,13 @@ const SIZE = {
   md: { value: 14, valueWeight: 600, caption: 11 },
   sm: { value: 13, valueWeight: 600, caption: 10.5 },
 };
+/* 값의 무게는 지표의 역할이 정한다(2026-09-07): 목표의 대표 KPI가 가장 강하고, 진단 지표(Hook·Hold·CTR·참여율)는
+   세미볼드, 나머지 비용 지표(대표가 아닌 CPM·CPC·CPE)는 보조라 보통 굵기. 순위 글자는 그대로 */
+const EMPHASIS = {
+  primary: { weight: 700, color: 'text.primary' },
+  diagnostic: { weight: 600, color: 'text.primary' },
+  supporting: { weight: 400, color: 'text.primary' },
+};
 
 /**
  * BenchmarkDelta 컴포넌트
@@ -39,6 +46,7 @@ const SIZE = {
  * @param {string} peerLabel - 비교군 이름(툴팁용, 예: "Grand Opening") [Optional, 기본값: '']
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {'sm'|'md'} size - 글자 크기 단계. 표 셀은 sm [Optional, 기본값: 'md']
+ * @param {'primary'|'diagnostic'|'supporting'} emphasis - 값의 무게: 목표의 대표 KPI(700) / 진단 지표(600) / 보조 비용 지표(400). 없으면 size 기본 무게 [Optional]
  * @param {boolean} hasValue - false면 값 줄을 생략하고 비교 줄만 그린다(값을 옆 칸이 이미 보여줄 때) [Optional, 기본값: true]
  * @param {boolean} hasMedian - false면 "· median $3.59"를 줄에서 빼고 툴팁에만 남긴다 — 표 셀처럼 좁은 자리 [Optional, 기본값: true]
  * @param {function} onClick - 있으면 비교 줄이 버튼이 된다(비교군을 나란히 보는 화면을 여는 용도). 비교군이 없으면 붙지 않는다 [Optional]
@@ -47,8 +55,9 @@ const SIZE = {
  * Example usage:
  * <BenchmarkDelta stat={row.benchmarks.cpm} format={money} label="CPM" peerLabel="Grand Opening" size="sm" />
  */
-export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang = 'en', size = 'md', hasValue = true, hasMedian = true, onClick, sx }) {
+export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang = 'en', size = 'md', emphasis, hasValue = true, hasMedian = true, onClick, sx }) {
   const sizes = SIZE[size] ?? SIZE.md;
+  const valueStyle = EMPHASIS[emphasis] ?? { weight: sizes.valueWeight, color: 'text.primary' };
   const value = stat?.value != null ? format(stat.value) : t('verdict.none', lang);
   const isKnown = stat && stat.peerScope !== 'none' && stat.percentile != null;
   const band = isKnown ? (stat.band ?? 'mid') : null;
@@ -70,7 +79,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
     <Tooltip title={tooltip} placement="top" enterDelay={400}>
       <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0, ...sx }}>
         {hasValue && (
-          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: sizes.valueWeight, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>
+          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: valueStyle.weight, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: valueStyle.color }}>
             {value}
           </Typography>
         )}

@@ -54,6 +54,14 @@ const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 'store_vi
  * 비율 지표 한 칸 — 라벨 위, BenchmarkDelta 아래. 비교군 이름은 stat의 scope를
  * 보고 고른다(phase면 단계 이름, goal이면 goal) — 계산이 아니라 라벨 선택이다.
  */
+/** 진단 지표 — 왜 그런 성과가 나왔는지 보는 비율. 세미볼드 */
+const DIAGNOSTIC_KEYS = new Set(['hookRate', 'holdRate', 'engagementRate', 'ctr']);
+/** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 진단 지표(600) > 보조 비용 지표(400) */
+const emphasisOf = (row, metricKey) => {
+  if ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey) return 'primary';
+  return DIAGNOSTIC_KEYS.has(metricKey) ? 'diagnostic' : 'supporting';
+};
+
 function MetricCell({ row, metricKey, format, lang, onBenchmarkClick, minWidth }) {
   const stat = row.benchmarks?.[metricKey];
   if (!stat) return null;
@@ -69,6 +77,7 @@ function MetricCell({ row, metricKey, format, lang, onBenchmarkClick, minWidth }
         peerLabel={peerLabel}
         lang={lang}
         size="sm"
+        emphasis={emphasisOf(row, metricKey)}
         hasMedian={false}
         onClick={onBenchmarkClick ? () => onBenchmarkClick(row.campaignId, metricKey) : undefined}
       />
@@ -78,7 +87,7 @@ function MetricCell({ row, metricKey, format, lang, onBenchmarkClick, minWidth }
 
 /**
  * 보조 지표 묶음 — Reach · Plays · Avg처럼 라벨 → 값 두 줄. 대표 지표(MetricCell)와 같은 문법이되
- * 한 단 조용하다: 라벨은 secondary 78%, 값은 12px/500 text.primary 72%(대표 값은 13px/600 primary).
+ * 한 단 조용하다: 라벨은 secondary 78%, 값은 12px/400 text.primary 72%(수량 지표는 보통 굵기 — 무게는 역할이 정한다).
  * 예전엔 "Reach 163,290 · Plays 295,857" 한 줄 문장이라 메타데이터처럼 읽혔다(2026-09-07).
  * 값 길이가 달라도 열이 흔들리지 않게 항목마다 minWidth를 준다(셀 폭에 맞춰 호출부가 정한다).
  */
@@ -90,7 +99,7 @@ function SecondaryMetrics({ parts, minWidth }) {
       {shown.map(([label, v]) => (
         <Box key={label} sx={{ minWidth, flexShrink: 0 }}>
           <Typography component="span" sx={(theme) => ({ ...META_SX, lineHeight: 1.3, color: alpha(theme.palette.text.secondary, 0.78), display: 'block' })}>{label}</Typography>
-          <Typography component="span" sx={(theme) => ({ display: 'block', fontSize: 12, fontWeight: 500, lineHeight: 1.3, color: alpha(theme.palette.text.primary, 0.72), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' })}>{v}</Typography>
+          <Typography component="span" sx={(theme) => ({ display: 'block', fontSize: 12, fontWeight: 400, lineHeight: 1.3, color: alpha(theme.palette.text.primary, 0.72), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' })}>{v}</Typography>
         </Box>
       ))}
     </Box>
