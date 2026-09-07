@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
@@ -32,7 +32,8 @@ import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { useSupabaseSession } from '../../lib/useSupabaseSession';
 import { useSnackbar } from '../../hooks/useSnackbar';
-import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline } from './paidAdsPageUtils';
+import { PAGE_GUTTER_X, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline, adsManagerUrl, billingUrl } from './paidAdsPageUtils';
+import { CampaignDetailPanel } from '../../components/templates/CampaignDetailPanel';
 import {
   buildRecapRows,
   buildRecapHeadline,
@@ -165,9 +166,13 @@ export function RecapDetailPage() {
     return params;
   }, { replace: true });
   const {
-    campaigns, performanceRecords, plans, adAccounts, eventRecaps, recapCampaignNotes, today, isLoading, error, refresh,
+    campaigns, performanceRecords, performanceDaily, plans, adAccounts, eventRecaps, recapCampaignNotes, today, isLoading, error, refresh,
     saveEventRecap, saveRecapCampaignNotes,
   } = usePaidAdsStore();
+  const navigate = useNavigate();
+  /* 캠페인 상세 드로어 — Performance와 **같은** CampaignDetailPanel을 같은 데이터로 연다(소재·링크·
+     예산·페이싱·일별 지출). 보고서를 읽다가 Performance로 건너가 같은 캠페인을 다시 찾지 않게. */
+  const [detailCampaignId, setDetailCampaignId] = useState(null);
   const { session } = useSupabaseSession();
   const { notify, SnackbarComponent } = useSnackbar();
 
@@ -484,6 +489,7 @@ export function RecapDetailPage() {
             label={`${PLATFORM_LABEL[platform]} recap table`}
             /* 줄 클릭은 해석 펼침(표 기본 동작) — 보고서를 읽다가 대시보드로 튕기지 않는다 */
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
+            onCampaignClick={setDetailCampaignId}
             expandedId={expandedByPlatform[platform] ?? null}
             onExpandedChange={(campaignId) => setExpandedByPlatform((prev) => ({ ...prev, [platform]: campaignId }))}
             renderDetail={(row) => (
@@ -555,6 +561,25 @@ export function RecapDetailPage() {
           />
         </Box>
       )}
+
+      {detailCampaignId && (() => {
+        const detailCampaign = campaigns.find((c) => c.id === detailCampaignId);
+        if (!detailCampaign) return null;
+        const detailAccount = adAccounts.find((a) => a.id === detailCampaign.accountId);
+        return (
+          <CampaignDetailPanel
+            campaign={detailCampaign}
+            performance={performanceRecords.find((r) => r.campaignId === detailCampaign.id)}
+            dailyRows={(performanceDaily ?? []).filter((r) => r.campaignId === detailCampaign.id)}
+            accountLabel={detailAccount?.label}
+            adsManagerHref={adsManagerUrl(detailCampaign, detailAccount)}
+            billingHref={billingUrl(detailAccount)}
+            today={today}
+            onClose={() => setDetailCampaignId(null)}
+            onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
+          />
+        );
+      })()}
 
       {comparison && (
         <PeerCompareDialog

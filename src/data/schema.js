@@ -1756,6 +1756,7 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       startDate: c.startDate,
       endDate: c.endDate,
       dailyBudget: c.budgetDaily ?? null,
+      thumbnailUrl: c.thumbnailUrl ?? null,
       rank: 0,
       benchmarks,
       suggestedVerdict: suggestVerdict(benchmarks, c.goal),

@@ -10,6 +10,7 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
+import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { VerdictChip } from './VerdictChip';
 import { t, metricLabel } from '../../data/recapStrings';
@@ -121,7 +122,8 @@ function RawLine({ parts }) {
  * Props:
  * @param {Array<Object>} rows - buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
- * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다. 없고 renderDetail이 있으면 행 클릭이 해석을 펼치고 접는다(화살표와 같은 동작) — 보고서에서 줄을 눌렀다고 다른 페이지로 가지 않는다 [Optional]
+ * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행 전체가 Tab/Enter로 활성화된다. 보고서는 주지 않는다 — 줄 전체가 아니라 썸네일·이름(onCampaignClick)과 화살표(renderDetail)가 각각 다른 일을 한다 [Optional]
+ * @param {function} onCampaignClick - 썸네일·캠페인 이름 클릭 (campaignId) => void. 있으면 둘이 버튼이 된다 — Performance와 같은 캠페인 상세 드로어를 여는 용도. 기간 글자는 눌리지 않는다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
  * @param {string|null} expandedId - 펼친 줄의 campaignId. 주면 제어형(타임라인 행 클릭으로 페이지가 펼치는 용도) — onExpandedChange로 바뀐 값을 돌려받는다. 안 주면 표가 스스로 기억한다 [Optional]
  * @param {function} onExpandedChange - (campaignId|null) => void. expandedId와 짝 [Optional]
@@ -132,7 +134,7 @@ function RawLine({ parts }) {
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => navigate(`/dashboard?campaign=${id}`)} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, renderDetail, expandedId: controlledExpandedId, onExpandedChange, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignClick, onBenchmarkClick, renderDetail, expandedId: controlledExpandedId, onExpandedChange, label = 'Recap campaign table', sx }) {
   // 펼친 줄은 한 번에 하나 — 숫자 줄과 해석 줄이 번갈아 나오면 표가 아니라 목록이 된다.
   // expandedId prop이 오면 그 값을 따르고(제어형), 없으면 내부 상태.
   const [ownExpandedId, setOwnExpandedId] = useState(null);
@@ -144,8 +146,9 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
     if (!isControlled) setOwnExpandedId(next);
     onExpandedChange?.(next);
   };
-  // 줄 클릭 — 명시된 핸들러가 우선, 없으면 펼침/접기. 벤치마크 버튼·화살표는 stopPropagation으로 빠진다
-  const handleRow = onRowClick ?? (isExpandable ? toggle : undefined);
+  // 줄 전체 클릭은 명시된 핸들러가 있을 때만 — 썸네일·이름(드로어)과 화살표(펼침)가 서로 다른 일을 하므로
+  // 줄 전체를 누르게 두면 두 동작이 겹친다(2026-09-07). 벤치마크 버튼·화살표는 stopPropagation으로 빠진다
+  const handleRow = onRowClick;
 
   if (!rows || rows.length === 0) {
     return (
@@ -235,12 +238,46 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   )}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4 }} title={row.name}>
-                    {row.phaseName}
-                  </Typography>
-                  <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal' }}>
-                    {dateRangeWithDays(row.startDate, row.endDate)}
-                  </Typography>
+                  {/* [썸네일] 이름 / 기간 — 썸네일과 이름만 버튼(드로어), 기간은 평문. 이름이 비슷한 Meta·TikTok 캠페인을 소재로 가른다 */}
+                  <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
+                    <Box
+                      component={onCampaignClick ? 'button' : 'span'}
+                      type={onCampaignClick ? 'button' : undefined}
+                      aria-label={onCampaignClick ? `${row.phaseName} — ${t('recap.table.openCampaign', lang)}` : undefined}
+                      onClick={onCampaignClick ? (event) => { event.stopPropagation(); onCampaignClick(row.campaignId); } : undefined}
+                      sx={(theme) => ({
+                        display: 'block', p: 0, m: 0, border: 0, background: 'none', flexShrink: 0,
+                        borderRadius: `${theme.shape.radius.inlay}px`,
+                        cursor: onCampaignClick ? 'pointer' : 'default',
+                        ...(onCampaignClick && { '&:focus-visible': { outline: 'none', boxShadow: `0 0 0 3px ${theme.palette.accent.ring}` } }),
+                      })}
+                    >
+                      <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={28} sx={(theme) => ({ borderRadius: `${theme.shape.radius.inlay}px` })} />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        component={onCampaignClick ? 'button' : 'span'}
+                        type={onCampaignClick ? 'button' : undefined}
+                        onClick={onCampaignClick ? (event) => { event.stopPropagation(); onCampaignClick(row.campaignId); } : undefined}
+                        title={row.name}
+                        sx={(theme) => ({
+                          display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, color: 'text.primary', textAlign: 'left',
+                          p: 0, m: 0, border: 0, background: 'none', fontFamily: 'inherit',
+                          cursor: onCampaignClick ? 'pointer' : 'default',
+                          /* 파란 링크가 아니라 조용한 hover 밑줄만 — 표 밀도를 지킨다 */
+                          ...(onCampaignClick && {
+                            '&:hover': { textDecoration: 'underline', textUnderlineOffset: 3 },
+                            '&:focus-visible': { outline: 'none', boxShadow: `0 0 0 3px ${theme.palette.accent.ring}`, borderRadius: `${theme.shape.radius.inlay}px` },
+                          }),
+                        })}
+                      >
+                        {row.phaseName}
+                      </Typography>
+                      <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal' }}>
+                        {dateRangeWithDays(row.startDate, row.endDate)}
+                      </Typography>
+                    </Box>
+                  </Box>
                 </TableCell>
                 <TableCell align="right" sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {row.dailyBudget != null ? `${money(row.dailyBudget)}/day` : EMPTY}
