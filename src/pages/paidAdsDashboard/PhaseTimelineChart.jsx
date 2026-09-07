@@ -381,6 +381,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
           return (
             <Box
               key={p.key}
+              data-phase-key={p.key}
               onClick={onPhaseClick ? () => onPhaseClick(p) : undefined}
               onKeyDown={
                 onPhaseClick

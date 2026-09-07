@@ -128,7 +128,7 @@ function SecondaryMetrics({ parts, minWidth }) {
  * Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다.
  * 줄 끝 셰브론과 줄 아래 펼침은 찾기 어려워서 뺐고, 해석은 드로어 안으로 옮겼다.
  * 벤치마크 글자(onBenchmarkClick)는 stopPropagation으로 줄 클릭에서 빠진다.
- * selectedId는 타임라인에서 찾아온 줄 표시(옅은 accent 면 + 왼쪽 2px 선)다.
+ * selectedIds는 타임라인에서 고른 단계에 속한 줄들 표시(옅은 accent 면 + 왼쪽 2px 선) — 단계가 Meta+TikTok이면 두 표에 한 줄씩.
  *
  * 계산은 하지 않는다 — rows는 schema.js buildRecapRows()가 순위·벤치마크·판정
  * 제안까지 끝낸 결과다. 이 컴포넌트는 그 값을 자리에 놓고 utils/format으로
@@ -139,14 +139,14 @@ function SecondaryMetrics({ parts, minWidth }) {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체(#·매장·썸네일·이름·기간·예산·지표·빈 곳)가 버튼이고 Tab/Enter로도 눌린다. hover는 중립 면 140ms [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
- * @param {string|null} selectedId - 타임라인에서 찾아온 줄의 campaignId. 그 줄에 옅은 accent 배경 + 왼쪽 2px accent 선 — "내가 고른 캠페인이 이것"이라는 방향 표시 [Optional]
+ * @param {string[]} selectedIds - 타임라인에서 고른 단계에 속한 캠페인 id들. 해당 줄에 옅은 accent 배경 + 왼쪽 2px accent 선 — "지금 고른 단계의 캠페인"이라는 방향 표시 [Optional, 기본값: []]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedId={selectedCampaignId} />
+ * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedIds={phaseSelection?.ids ?? []} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedId = null, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -248,7 +248,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 : targetRatio >= 1.05 ? t('recap.table.targetWorse', lang, { pct: Math.round((targetRatio - 1) * 100), target: kpiFormat(eff.metricKey)(row.kpiTarget) })
                   : t('recap.table.targetOn', lang, { target: kpiFormat(eff.metricKey)(row.kpiTarget) });
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
-            const isSelected = selectedId === row.campaignId;
+            const isSelected = selectedIds.includes(row.campaignId);
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
             return (
               <TableRow

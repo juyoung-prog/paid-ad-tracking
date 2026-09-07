@@ -177,26 +177,27 @@ export function RecapDetailPage() {
   const { notify, SnackbarComponent } = useSnackbar();
 
   const [isEditing, setIsEditing] = useState(false);
-  /* 타임라인 행을 누르면 그 단계의 캠페인 줄로 스크롤하고 선택 표시만 한다 — 드로어는 열지 않는다
-     (사용자가 그 줄을 누르면 연다). 막대는 emphasizedKey로 강조. */
-  const [focusedPhaseKey, setFocusedPhaseKey] = useState(null);
-  /* 타임라인에서 찾아온 캠페인 — 표의 그 줄에 선택 표시(옅은 accent 면 + 왼쪽 선). 펼침과는 별개 상태:
-     빈 곳·다른 캠페인을 누르면 표시만 사라지고 해석은 그대로 열려 있다. 시간이 지나도 저절로 안 사라진다. */
-  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  /* 타임라인 선택은 **단계** 단위다(2026-09-07): 단계 하나 = 그 단계에 속한 캠페인 전부(Meta+TikTok이면 두 표에 한 줄씩).
+     누르면 막대 하나만 파랗게, 그 단계의 줄들에 옅은 accent 면 + 왼쪽 선, 첫 줄로 스크롤(두 표가 멀어 둘 다 화면에 억지로
+     넣지 않는다). 드로어는 열지 않는다. 파랑 = "지금 고른 단계"라는 뜻뿐이라, 선택된 단계·그 줄들·포털 밖을 누르거나 Escape면
+     막대·줄 표시가 함께 사라진다. 프로그램 스크롤은 클릭이 아니라 선택을 지우지 않는다. */
+  const [phaseSelection, setPhaseSelection] = useState(null); // { key, ids } | null
   useEffect(() => {
-    if (!selectedCampaignId) return undefined;
+    if (!phaseSelection) return undefined;
     const onDocumentClick = (event) => {
       const target = event.target;
       if (!(target instanceof Element)) return;
-      // 선택된 줄 안(화살표·이름 포함), 타임라인(새 선택으로 바뀐다), 드로어·대화상자·메뉴 같은 포털은 "다른 곳"이 아니다
-      if (target.closest(`#recap-row-${CSS.escape(selectedCampaignId)}`)) return;
-      if (target.closest('[data-recap-timeline]')) return;
+      // 선택된 단계의 줄들, 타임라인 단계 행(다른 단계 클릭은 onPhaseClick이 새 선택으로 바꾼다), 드로어·대화상자·메뉴 포털은 "밖"이 아니다
+      if (phaseSelection.ids.some((id) => target.closest(`#recap-row-${CSS.escape(id)}`))) return;
+      if (target.closest('[data-phase-key]')) return;
       if (target.closest('.MuiDrawer-root, .MuiDialog-root, .MuiPopover-root, .MuiMenu-root, .MuiTooltip-popper, .MuiSnackbar-root')) return;
-      setSelectedCampaignId(null);
+      setPhaseSelection(null);
     };
+    const onKeyDown = (event) => { if (event.key === 'Escape') setPhaseSelection(null); };
     document.addEventListener('click', onDocumentClick);
-    return () => document.removeEventListener('click', onDocumentClick);
-  }, [selectedCampaignId]);
+    document.addEventListener('keydown', onKeyDown);
+    return () => { document.removeEventListener('click', onDocumentClick); document.removeEventListener('keydown', onKeyDown); };
+  }, [phaseSelection]);
   const [isSaving, setIsSaving] = useState(false);
   const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
   const [isSignInOpen, setIsSignInOpen] = useState(false);
@@ -475,14 +476,13 @@ export function RecapDetailPage() {
         <PhaseTimelineChart
           phases={phases}
           today={today}
-          emphasizedKey={focusedPhaseKey ?? undefined}
+          emphasizedKey={phaseSelection?.key ?? undefined}
           barSuffix={(phase) => (spendByPhaseKey[phase.key] != null ? `${money(spendByPhaseKey[phase.key])} spent` : null)}
           onPhaseClick={(phase) => {
-            // 스크롤 목적지는 플랫폼 순서상 첫 줄 하나 — 선택 표시도 그 한 줄에만(여러 줄을 동시에 칠하지 않는다)
-            const firstId = platformOrder.map((p) => byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key)?.campaignId).find(Boolean) ?? null;
-            setFocusedPhaseKey(phase.key);
-            setSelectedCampaignId(firstId);
-            if (firstId) requestAnimationFrame(() => document.getElementById(`recap-row-${firstId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+            // 단계에 속한 캠페인 전부(플랫폼마다 한 줄) — Meta를 기본으로 두지 않는다. 스크롤만 첫 줄로
+            const ids = platformOrder.map((p) => byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key)?.campaignId).filter(Boolean);
+            setPhaseSelection(ids.length ? { key: phase.key, ids } : null);
+            if (ids[0]) requestAnimationFrame(() => document.getElementById(`recap-row-${ids[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           }}
         />
       </Box>
@@ -500,8 +500,8 @@ export function RecapDetailPage() {
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
             /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출).
                다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
-            onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
-            selectedId={selectedCampaignId}
+            onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (!phaseSelection?.ids.includes(campaignId)) setPhaseSelection(null); }}
+            selectedIds={phaseSelection?.ids ?? []}
           />
         </Box>
       ))}

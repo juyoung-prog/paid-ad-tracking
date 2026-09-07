@@ -53,7 +53,7 @@ Hold·CPC가 모든 줄에서 같은 x에 온다. 보조 묶음과 대표 묶음
     },
   },
   argTypes: {
-    selectedId: { control: 'text', description: '타임라인에서 찾아온 줄의 campaignId — 옅은 accent 면 + 왼쪽 2px 선' },
+    selectedIds: { control: 'object', description: '타임라인에서 고른 단계에 속한 캠페인 id들 — 해당 줄에 옅은 accent 면 + 왼쪽 2px 선' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
     onRowClick: { action: 'rowClicked', description: '숫자 줄 전체 클릭 (campaignId) => void — 보고서는 이걸로 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다. 벤치마크 글자는 예외' },
@@ -115,10 +115,10 @@ export const Narrow = {
 };
 
 /**
- * 타임라인에서 찾아온 줄(selectedId) — 옅은 accent 면 + 첫 칸 왼쪽 2px 선, 글자·지표 색은 그대로.
+ * 타임라인에서 고른 단계의 줄(selectedIds) — 옅은 accent 면 + 첫 칸 왼쪽 2px 선, 글자·지표 색은 그대로.
  * 줄을 누르면 드로어(onRowClick)가 열리고, hover 위에서도 선택 표시는 유지된다.
  */
 export const SelectedFromTimeline = {
-  args: { rows: byPlatform.meta, selectedId: byPlatform.meta[1]?.campaignId },
+  args: { rows: byPlatform.meta, selectedIds: [byPlatform.meta[1]?.campaignId].filter(Boolean) },
   render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
 };
