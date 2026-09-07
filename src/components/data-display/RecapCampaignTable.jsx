@@ -110,7 +110,7 @@ function SecondaryMetrics({ parts, minWidth }) {
  *
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 이전 보고서의 표 구성을
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
- * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
+ * 판정 · 영상 반응 · 참여 반응 · 행동. Spend는 실제 총지출만, Efficiency는 목표별 결과당 비용 + 과거 순위. 비율 지표(Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
  * 없으면 비워 둔다. Efficiency 칸은 서로 다른 두 층(2026-09-07): **위 = 예산 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
  * — 인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA. 과거·비교군·기준값 무관, 성과만 있으면 항상), **아래 "vs past"** =
@@ -286,7 +286,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.4 }}>
                     {money(row.spend)}
                   </Typography>
-                  {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
+                  {/* Spend는 실제 총지출만 — CPM·순위는 Efficiency 칸의 몫(2026-09-07, 같은 정보가 두 칸에 있었다) */}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
                   {/* 위: 이 캠페인의 결과당 비용 — 라벨(KPI 이름) → 값(700). 성과가 있으면 과거 비교와 무관하게 항상 */}
