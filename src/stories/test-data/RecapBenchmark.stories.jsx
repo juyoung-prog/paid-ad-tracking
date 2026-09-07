@@ -37,7 +37,7 @@ Build Plan Phase 1의 검증 스토리. 컴포넌트 없이 \`schema.js\`의 Rec
 - 비교군 사슬(2026-09-07): 같은 플랫폼 + 같은 goal + 같은 단계(다른 이벤트) → 같은 플랫폼 + 같은 goal → 3개 미만이면 \`none\`
 - Meta 줄 중 같은 goal 비교군이 3개 이상인 것만 scope \`phase\`/\`goal\`, 나머지는 \`none\`(전부 \`not enough data\`)
 - 비용 효율(budgetEfficiency) = goal별 KPI(cpm/cpc/cpe/cpa) 값 그 자체 — 과거·비교군 무관
-- 종합 성과(performance / suggestedVerdict) = 이 캠페인의 현재 값을 설정 목표 기준(PERFORMANCE_TARGETS, 캠페인 kpiTarget 우선)에 댄 구간을 GOAL_PERFORMANCE_RULES로 합침: primary 상위 → Good(important 진단 하위면 Fair) · 중간 → Fair · 하위 → Weak · 기준 없는 목표(전환)는 null. 과거 캠페인 데이터는 쓰지 않는다. 사람이 고른 note.verdict가 우선
+- 종합 성과(performance / suggestedVerdict) = 이 캠페인의 현재 값을 건강 척도(METRIC_HEALTH_SCALE)에 읽은 구간을 GOAL_PERFORMANCE_RULES로 합침: primary 상위 → Good(important 진단 하위면 Fair) · 중간 → Fair · 하위 → Weak · 눈금 없는 목표(CPA 계열)는 null(reason noScale), 값 부족은 null(reason noData). 캠페인 목표치(vs target)·과거 캠페인 데이터(vs past)는 관여하지 않는다. 사람이 고른 note.verdict가 우선
 - 과거 비교 = benchmarks: 비교군 3개 미만이면 순위 없음 — 억지로 만들지 않는다
 - cpe = 지출 ÷ (좋아요+댓글+공유)
 - 순위는 플랫폼 안에서 대표 지표 백분위 순

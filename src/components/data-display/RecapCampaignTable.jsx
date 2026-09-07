@@ -116,10 +116,10 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
  * 판정 · 영상 반응 · 참여 반응 · 행동. Spend는 실제 총지출만, Efficiency는 목표별 결과당 비용 + 과거 순위. 비율 지표(Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 비워 둔다. 평가 층(2026-09-07): **Performance** = 이 캠페인의 **현재 값**을 설정 목표 기준(PERFORMANCE_TARGETS, 캠페인
- * kpiTarget이 있으면 그것)에 대고 목표별 규칙(GOAL_PERFORMANCE_RULES)으로 합친 한 단어(Good/Fair/Weak) + 한 줄 설명("Efficient cost ·
- * weak hold"). 과거 캠페인 데이터는 어디에도 안 쓴다(그건 vs past의 것) — 성과만 있으면 나온다. 사람이 고른 note.verdict가 우선,
- * 기준이 설정되지 않은 목표(전환)만 "—".
+ * 없으면 비워 둔다. 평가 층(2026-09-07) — 네 질문이 각각 따로 계산된다: **Performance** "지금 얼마나 잘 되나" = 이 캠페인의
+ * **현재 값**을 건강 척도(METRIC_HEALTH_SCALE)에 읽고 목표별 규칙(GOAL_PERFORMANCE_RULES)으로 합친 한 단어(Good/Fair/Weak) +
+ * 한 줄 설명("Efficient cost · weak hold"). 목표치(vs target)도 과거 데이터(vs past)도 관여하지 않는다 — 둘 다 "—"여도 판정은 나온다.
+ * 사람이 고른 note.verdict가 우선, "—"는 현재 지표 부족(Not enough data) 또는 CPA 계열(눈금 없음)뿐.
  * **Cost efficiency**는 서로 다른 두 층: **위 = 비용 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
  * — 인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA. 과거·비교군·기준값 무관, 성과만 있으면 항상), **아래 "vs past"** =
  * 같은 KPI를 과거 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위(없으면 "—" + 툴팁 "Not enough
@@ -242,8 +242,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
               ? t('recap.table.perfWritten', lang)
               : perfVerdict && perfRule
                 ? t('recap.table.perfRule', lang, { primary: perfRule.primary.map((k) => metricLabel(k, lang)).join(' + '), important: perfRule.important.length ? t('recap.table.perfRuleImportant', lang, { important: perfRule.important.map((k) => short(k)).join('/') }) : '' })
-                : hasData ? t('recap.table.perfNotEnoughHint', lang) : '';
-            // vs target — 캠페인에 설정된 목표치가 있을 때만(없으면 줄 자체를 생략, 과거 평균으로 대체하지 않는다)
+                : hasData ? (perf?.reason === 'noScale' ? t('recap.table.perfNoScaleHint', lang) : t('recap.table.perfNotEnoughHint', lang)) : '';
+            // vs target — 캠페인에 설정된 목표치(kpiTarget)만. 없으면 "—"(Not set) — 건강 척도·과거 평균으로 대신하지 않는다
             const targetRatio = eff?.value != null && row.kpiTarget > 0 ? eff.value / row.kpiTarget : null;
             const targetTone = targetRatio == null ? null : targetRatio <= 0.95 ? 'success.main' : targetRatio >= 1.05 ? 'warning.main' : 'text.secondary';
             const targetText = targetRatio == null ? null
@@ -329,8 +329,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       {perfVerdict ? (
                         perfNote && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{perfNote}</Typography>
                       ) : (
-                        /* 성과 데이터가 있는데 판정이 없는 건 이 목표의 성과 기준이 설정되지 않았을 때뿐(전환·매장 방문) — "데이터 없음"이 아니다 */
-                        hasData && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{t('recap.table.perfNoStandard', lang)}</Typography>
+                        /* 판정 없음의 이유는 현재 캠페인 자체의 것뿐: 대표 지표 값 부족(noData) 또는 CPA 계열에 눈금 없음(noScale). 목표치·과거 비교 부족 때문이 아니다 */
+                        hasData && <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5 }}>{t(perf?.reason === 'noScale' ? 'recap.table.perfNoStandard' : 'recap.table.perfNotEnough', lang)}</Typography>
                       )}
                     </Box>
                   </Tooltip>
@@ -359,18 +359,27 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       <Box sx={{ minWidth: 0, cursor: 'help' }}>
                         <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(eff.metricKey, lang)}</Typography>
                         <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>{kpiFormat(eff.metricKey)(eff.value)}</Typography>
-                        {/* vs target — 설정된 목표치가 있을 때만. 비용 지표라 낮으면 초록, 높으면 주황, ±5%는 중립 */}
-                        {targetText && (
-                          <Typography component="span" sx={{ display: 'block', fontSize: 10.5, fontWeight: 500, lineHeight: 1.3, mt: 0.25, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
-                        )}
                       </Box>
                     </Tooltip>
                   ) : (
                     <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3 }}>{EMPTY}</Typography>
                   )}
-                  {/* 아래 "vs past": 같은 KPI의 과거 비교군 순위 — 별개 층. 비교군 3개 미만이면 "—"(위 값이 못 미덥다는 뜻이 아니다) */}
+                  {/* "vs target": 이 캠페인에 설정된 목표치 대비 — 있으면 한 줄(낮으면 초록, 높으면 주황, ±5% 중립), 없으면 "—"(Not set). 대체값 없음 */}
+                  {eff?.value != null && (
+                    <Box sx={{ mt: 0.25, display: 'flex', alignItems: 'baseline', gap: 0.75, minWidth: 0 }}>
+                      <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3 }}>{t('recap.table.vsTarget', lang)}</Typography>
+                      {targetText ? (
+                        <Typography component="span" sx={{ fontSize: 10.5, fontWeight: 500, lineHeight: 1.3, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal', minWidth: 0 }}>{targetText}</Typography>
+                      ) : (
+                        <Tooltip title={t('recap.table.targetNotSet', lang)} placement="top" enterDelay={300}>
+                          <Typography component="span" sx={{ fontSize: 10.5, color: 'text.disabled', lineHeight: 1.3, cursor: 'help' }}>{EMPTY}</Typography>
+                        </Tooltip>
+                      )}
+                    </Box>
+                  )}
+                  {/* "vs past": 같은 KPI의 과거 비교군 순위 — 과거 데이터가 쓰이는 유일한 곳. 비교군 3개 미만이면 "—"(위 값이 못 미덥다는 뜻이 아니다) */}
                   {hasData && kpiKey && (
-                    <Box sx={{ mt: 0.75 }}>
+                    <Box sx={{ mt: 0.25 }}>
                       <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{t('recap.table.vsPast', lang)}</Typography>
                       {hasComparison ? (
                         <BenchmarkDelta

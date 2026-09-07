@@ -431,8 +431,8 @@ Paid Ads Dashboard
 | 항목 | 정의 |
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
-| 종합 성과(Performance) | **이 캠페인의 현재 값**을 팀이 설정한 성과 기준(`PERFORMANCE_TARGETS`: 플랫폼·지표별 good/weak 문턱, 제품 설정값. 캠페인에 `kpiTarget`이 있으면 그 지표는 그것을 기준)에 대고 목표별 규칙(`GOAL_PERFORMANCE_RULES`: primary + important 진단)으로 합친 Good/Fair/Weak — primary 상위 → Good(important 하위면 Fair) · 중간 → Fair · 하위 → Weak. **과거 캠페인 분포·중앙값·백분위·순위는 어디에도 쓰지 않는다**(그건 vs past의 것). 성과만 있으면 항상 나오고, 기준이 없는 목표(전환)만 "—". 가중치 점수 없음, 사람이 고른 판정 우선 |
-| 목표치(vs target) | 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 결과당 비용과 견줘 "↓ 20% vs target $3.00". 없으면 줄을 생략 — 과거 평균으로 대체하지 않는다. 저장 칸은 다음 단계 |
+| 종합 성과(Performance) | "지금 얼마나 잘 되나" — **이 캠페인의 현재 값**을 건강 척도(`METRIC_HEALTH_SCALE`: 플랫폼·지표별 healthy/poor 두 눈금, 고정 설정)에 읽고 목표별 규칙(`GOAL_PERFORMANCE_RULES`: primary + important 진단)으로 합친 Good/Fair/Weak — primary 상위 → Good(important 하위면 Fair) · 중간 → Fair · 하위 → Weak. **캠페인 목표치(vs target)도 과거 캠페인 분포·중앙값·백분위·순위(vs past)도 관여하지 않는다** — 둘 다 "—"여도 판정은 나온다. "—"는 현재 지표 부족(Not enough data) 또는 CPA 계열(눈금 없음)뿐. 가중치 점수 없음, 사람이 고른 판정 우선 |
+| 목표치(vs target) | "계획한 목표를 맞췄나" — 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 결과당 비용과 견줘 "↓ 20% vs target $3.00". 없으면 "vs target —"(툴팁 Not set) — 건강 척도·과거 평균으로 대체하지 않는다. 목표치는 Performance 판정에 관여하지 않는다 |
 | 비용 효율 | **이 캠페인만**의 결과당 비용 — 목표별 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용 = 지출 ÷ 좋아요+댓글+공유 · 전환 CPA). 과거·비교군·기준값을 쓰지 않으므로 성과만 있으면 항상 값이 있고, Good/Fair/Weak 자동 판정은 없다(`budgetEfficiency`). 표의 Efficiency 칸은 위 = 이 값, 아래 "vs past" = 같은 KPI의 과거 비교군 순위(별개 층, 3개 미만이면 "—" + "Not enough comparison data"). 계획 대비 집행률(pacing)은 세 번째 층 |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
