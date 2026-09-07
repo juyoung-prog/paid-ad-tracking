@@ -96,7 +96,7 @@ const recapPhases = [
     phase: '2', title: '원자 컴포넌트 (Tier 0, 구현됨)', stage: '1단계', deps: 'Phase 1의 BenchmarkStat 타입',
     items: [
       'BenchmarkDelta — data-display. props: stat(BenchmarkStat), formattedValue(string), label(string), size("sm"|"md"). 중앙값 대비 화살표·백분위·N, sampleSize 부족이면 not enough data. KpiBar delta와 같은 화살표·톤 문법',
-      'VerdictChip — data-display. props: verdict(VERDICT|null), isSuggested(boolean), lang. Chip 위에 구성, good=success / mid=중립 / bad=warning, 제안이면 점선 테두리',
+      'VerdictChip — data-display. props: verdict(VERDICT|null), isSuggested(boolean), lang. good=success / mid=중립 / bad=warning 옅은 틴트 + 옅은 실선 테두리, 제안값은 모양이 같고 툴팁 "suggested"(점선은 2026-09-07 뺐다)',
     ],
   },
   {
@@ -111,7 +111,7 @@ const recapPhases = [
     items: [
       'RecapPage(/recap) — 이벤트 목록: campaignGroup별 기간·캠페인 수·지출·Recap 상태. usePaidAdsStore 재사용',
       'RecapDetailPage(/recap/:event) — buildRecapRows·buildRecapHeadline 호출은 여기(페이지)까지만. PhaseTimelineChart 읽기 전용 재활용. 하단에 2단계 자리(코멘트·배운 점)는 비워둔다',
-      'PaidAdsRail에 Recap 메뉴, App.jsx 라우트 2개, useViewUrlSync에 lang 파라미터 자리',
+      'PaidAdsRail에 메뉴(처음 이름 Recap → 2026-09-07 Reports로 개명, 기존 Reports는 Performance. 내부 경로 /recap·/reports는 그대로), App.jsx 라우트 2개, useViewUrlSync에 lang 파라미터 자리',
       '@media print — PaidAdsShell 레벨: 레일·툴바 숨김, 섹션 카드 page-break-inside: avoid, 표 폭 축소. 브라우저 인쇄 = PDF',
       'Storybook: Page 카테고리에 RecapPage/RecapDetailPage 스토리(목 데이터), 인쇄 미리보기 스토리',
     ],
@@ -134,6 +134,17 @@ const recapPhases = [
       'Google Sheets 내보내기 — utils/recapSheets.js. 표를 탭 구분 텍스트로 클립보드에 복사하고 sheets.new를 연다(Google 계정 없이 시트를 직접 만들 수는 없다 — OAuth 연동은 별도 단계). 한때 exceljs Excel이었는데 Google Sheets로 바꿈(사용자 결정, 2026-09). ExportMenu 드롭다운에 PDF(인쇄)와 함께',
       'AI 초안/번역 — Edge Function(recap-draft): 숫자·벤치마크를 주면 strength/weakness/reason 초안과 ko/zh-Hant 번역을 돌려준다. 프론트는 결과를 에디터에 채우기만, 최종 문장은 사람이 다듬는다',
       'RecapNoteEditor에 organicViews/organicEngagements 선택 입력 칸',
+    ],
+  },
+  {
+    phase: '7', title: '임원용 다듬기 (구현됨) — 2026-09-07', stage: '다듬기', deps: 'Phase 6',
+    items: [
+      'Key takeaways → RecapTakeaways 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): schema.js buildRecapExecutiveSummary()가 기존 takeaways 재료를 합성. 라벨 → 16px 결론 → 12px 근거, 플랫폼 CPM 차이는 NEXT MOVE의 근거',
+      '캠페인 해석 → 별도 Notes 카드 대신 표의 줄 아래로(RecapCampaignTable renderDetail + RecapCampaignInsightPanel). What worked · Could improve · Why · Next action, 결론 → ↗↘ 근거 한 줄. schema.js buildCampaignInsight()가 벤치마크 구간에서만 재료를 만들고 원인은 지어내지 않는다(근거 수준은 라벨 툴팁). 줄 클릭도 펼침(대시보드 이동 없음), 타임라인 행 클릭 → 그 단계 줄 펼침',
+      'Learnings → RecapPatterns 플레이북: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE 2×2(상태 → 제목 → 근거) + NEXT EVENT(결정 + 검증). schema.js buildRecapPlaybook()이 buildRecapPatterns() 재료(캠페인 2개 이상 같은 방향, 양쪽 2개 이상이면 mixed, 플랫폼 CPM·CTR 차이)를 행동으로 합성 — 회고 요약은 Key takeaways가 맡는다. 방법론은 카드 제목 ⓘ 툴팁',
+      '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), 펼침 셰브론은 Lucide chevron-down 기하(14px, stroke 1.5, 28px 히트), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
+      '내비 이름: Reports → Performance, Recap → Reports(레일·목록 제목·"All reports"·저장 알림). 내부 경로 유지',
+      'recap-draft SYSTEM 프롬프트도 같은 규칙(원인 지어내지 않기, 이벤트 범위) — 바꾼 뒤 재배포 필요',
     ],
   },
 ];

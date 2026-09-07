@@ -18,8 +18,8 @@ Recap 표의 캠페인 한 줄에 대한 사람의 판단을 적는 폼(Build Pl
 판정(good/mid/bad), 장점·아쉬운 점·이유, 선택 입력인 오가닉 조회·참여.
 
 ### 제안값과 사람 값
-벤치마크가 제안한 판정은 점선 칩으로 옆에 보이고 "Use suggestion"으로 받아들일 수
-있다. 아무것도 고르지 않으면 판정은 null로 남고, 화면은 제안값을 점선 칩으로 계속
+벤치마크가 제안한 판정은 옆에 칩(툴팁 "suggested")으로 보이고 "Use suggestion"으로
+받아들일 수 있다. 아무것도 고르지 않으면 판정은 null로 남고, 화면은 제안값 칩을 계속
 보여준다 — "아직 사람이 안 정함"이 저장되는 상태다.
 
 ### 언어
@@ -56,7 +56,7 @@ export const Default = {
   render: (args) => <Interactive {...args} />,
 };
 
-/** 빈 코멘트 + 제안 mid — 점선 칩과 "Use suggestion" 버튼 */
+/** 빈 코멘트 + 제안 mid — 제안값 칩과 "Use suggestion" 버튼 */
 export const EmptyWithSuggestion = {
   args: { note: null, campaignLabel: 'Coming Soon · Meta', suggestedVerdict: 'mid' },
   render: (args) => <Interactive {...args} />,

@@ -39,7 +39,7 @@ import {
   buildPeerComparison,
   buildRecapExecutiveSummary,
   buildCampaignInsight,
-  buildRecapPatterns,
+  buildRecapPlaybook,
   localizedText,
   campaignNameKey,
   effectiveBudgetPlanned,
@@ -208,7 +208,7 @@ export function RecapDetailPage() {
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
   const executiveSummary = useMemo(() => buildRecapExecutiveSummary(byPlatform), [byPlatform]);
-  const patterns = useMemo(() => buildRecapPatterns(byPlatform), [byPlatform]);
+  const playbook = useMemo(() => buildRecapPlaybook(byPlatform), [byPlatform]);
 
   const startEditing = () => {
     setDraft({
@@ -546,7 +546,7 @@ export function RecapDetailPage() {
           )}
           {/* 데이터에서 본 패턴은 사람 글과 섞지 않고 그 아래 따로 — 근거 수준이 다르다 */}
           <RecapPatterns
-            patterns={patterns}
+            playbook={playbook}
             platformLabel={PLATFORM_LABEL}
             hasWrittenLearnings={hasWrittenLearnings}
             hasWrittenNextSteps={hasWrittenNextSteps}

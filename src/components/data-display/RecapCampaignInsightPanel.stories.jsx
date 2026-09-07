@@ -55,13 +55,13 @@ const inTable = (children) => (
   <Box sx={{ backgroundColor: 'surface.sunken', borderTop: '1px solid', borderBottom: '1px solid', borderColor: 'divider' }}>{children}</Box>
 );
 
-/** 장점·약점 둘 다 → Why(inferred) + Recommendation(keepAndTest) 네 칸 */
+/** 장점·약점 둘 다 → Why + Next action(keepAndTest: "Keep the strong hook / Test for higher …") 네 칸 */
 export const FourFields = {
   args: { row: withInsight(metaRows[1] ?? metaRows[0]), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),
 };
 
-/** 장점만 — What could improve 칸이 없고 Recommendation은 "기준점으로 삼기" */
+/** 장점만 — Could improve는 "—", Next action은 "Use as the reference point" */
 export const StrengthOnly = {
   args: { row: withInsight(metaRows[0]), platformLabel: PLATFORM_LABEL, localize },
   render: (args) => inTable(<RecapCampaignInsightPanel {...args} />),

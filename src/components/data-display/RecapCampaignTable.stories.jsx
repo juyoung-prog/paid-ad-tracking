@@ -88,7 +88,7 @@ export const NoPerformanceData = {
   },
 };
 
-/** 행 클릭 — Dashboard 드로어로 딥링크할 때. Tab으로 행에 포커스가 가고 Enter로 눌린다 */
+/** onRowClick을 준 경우 — 그 핸들러가 우선한다(예: 딥링크). 보고서 페이지는 주지 않아 줄 클릭이 펼침이다. Tab으로 행에 포커스가 가고 Enter로 눌린다 */
 export const Clickable = {
   args: { rows: byPlatform.meta },
   render: (args) => <RecapCampaignTable {...args} />,

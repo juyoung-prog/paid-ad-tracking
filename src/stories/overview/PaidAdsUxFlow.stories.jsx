@@ -96,12 +96,12 @@ const scenarios = [
     name: '시나리오 7: 캠페인 종료 후 결과 보고 (신규 — Recap, 2026-09)',
     goal: '이벤트(예: G10 Opening)가 끝나면 보고용 문서를 대시보드 안에서 만든다. 숫자는 동기화 데이터로 자동, 사람은 판정·장점·아쉬운 점·배운 점만 쓴다. Reports는 "지금 어떻게 되고 있나"(진행 확인), Recap은 "끝났으니 무엇을 배웠나"(보고) — 목적이 달라 별도 메뉴',
     flow: [
-      '레일에서 Recap 진입 → 이벤트 목록(최근 종료 순, Draft/Final 상태)',
-      '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), 단계 타임라인, 플랫폼별 캠페인 표',
+      '레일 Reports(내부 /recap) 진입 → 이벤트 목록(최근 종료 순, Draft/Ready 상태)',
+      '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), Key takeaways(임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE), 단계 타임라인(행 클릭 → 표의 그 단계 줄 펼침), 플랫폼별 캠페인 표(줄 펼침 → What worked · Could improve · Why · Next action), Learnings(다음 이벤트 플레이북: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)',
       '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·CPC)마다 벤치마크 — 같은 플랫폼·같은 단계의 과거 캠페인 중앙값 대비 차이와 백분위. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
       '판정(good/mid/bad)은 백분위로 자동 제안하고 사람이 바꾼다',
       '캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언 작성 → 저장 (2단계, 로그인 필요)',
-      '인쇄/PDF(1단계) 또는 Excel(3단계)로 내보내거나 링크 공유 — 읽기는 로그인 없이 열린다',
+      'Export 드롭다운 — Google Sheets(표를 클립보드로 복사 후 sheets.new) 또는 PDF(브라우저 인쇄), 언어 드롭다운(en/ko/zh-Hant) — 읽기는 로그인 없이 열린다',
     ],
     success: '이벤트 종료 후 대시보드 밖에서 보고서를 다시 만들지 않는다. 읽는 사람이 숫자를 몰라도 벤치마크로 잘 됐는지 안다',
     exception: '비교군이 3개 미만이면 "not enough data". 직접 등록 캠페인은 지표가 비어 있으면 "—". 2023년 이전 캠페인은 비교군에서 제외. 단계: 1 숫자·벤치마크·인쇄 → 2 코멘트 저장(테이블 2개, 로그인 게이트) → 3 Excel·ko/zh-Hant·AI 초안·오가닉 지표 — 세 단계 모두 구현됨(2026-09-06)',
@@ -214,31 +214,33 @@ const iaTree = `Paid Ads Dashboard
 ├── /dashboard?new=1 — 캠페인 등록 폼 (Dialog, 딥링크 가능)
 ├── /stores — 매장 마스터 관리
 │   └── 매장 리스트 + 추가/수정 폼
-├── /reports — 성과 보고서
+├── /reports — Performance (레일 이름, 2026-09 개명) — 진행 중 성과 분석
 │   ├── 기간 · 매장 · 플랫폼 선택
 │   ├── 요약 통계
 │   └── 내보내기 (CSV/이미지)
 ├── /settings (신규 — API Integration) — 플랫폼 계정 연결 관리
 │   └── 계정별(Meta-GA/Meta-FL/TikTok) 연결 상태 + Connect/재연결 CTA
-└── /recap (신규 — 2026-09) — 캠페인 종료 후 결과 보고
-    ├── 이벤트 목록 (최근 종료 순, Draft/Final 상태)
+└── /recap — Reports (레일 이름, 2026-09 개명) — 캠페인 종료 후 결과 보고
+    ├── 이벤트 목록 (최근 종료 순, Draft/Ready 상태)
     └── /recap/:event — 이벤트 하나의 보고서
-        ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄
-        ├── 단계 타임라인 (PhaseTimelineChart 재활용)
-        ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
-        ├── 캠페인별 코멘트 — 장점 · 아쉬운 점 · 이유 (2단계, 언어별)
-        ├── 배운 점 · 다음 제언 (2단계, 언어별)
-        └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)`;
+        ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄 · 언어 드롭다운 · Edit · Export
+        ├── Key takeaways — 임원용 세 칸 (BEST RESULT · ATTENTION · NEXT MOVE)
+        ├── 단계 타임라인 (PhaseTimelineChart 재활용) — 행 클릭 → 아래 표에서 그 단계 줄 펼침
+        ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크 ↗↘)
+        │   └── 줄 끝 셰브론 / 줄 클릭 → 캠페인 해석 (What worked · Could improve · Why · Next action) — 사람 글 우선, 없으면 데이터 해석
+        ├── Learnings — 사람이 쓴 배운 점 + 다음 이벤트 플레이북(KEEP · USE SELECTIVELY · IMPROVE · VALIDATE) + NEXT EVENT
+        ├── (편집 모드) 캠페인별 코멘트 카드 — 판정 · 장점 · 아쉬운 점 · 이유 (언어별) · Learnings 편집기
+        └── Export — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄) · 언어 전환(en/ko/zh-Hant)`;
 
 const pageList = [
   { page: 'Dashboard', path: '/dashboard', data: 'Campaign(R), PerformanceRecord(R, 집계), Store(R, 필터), AdAccount(R, 필터) — Alert는 저장 없이 재계산' },
   { page: 'Campaign Register', path: '/dashboard?new=1', data: 'Campaign(W, insert), Store(R), AdAccount(R)' },
   { page: 'Campaign Detail Drawer', path: '/dashboard?campaign={id}', data: 'Campaign(R/W, update), PerformanceRecord(R/W, insert)' },
   { page: 'Stores', path: '/stores', data: 'Store(R/W, insert·update)' },
-  { page: 'Reports', path: '/reports', data: 'Campaign(R), PerformanceRecord(R)' },
+  { page: 'Performance (레일 이름 — 내부 /reports)', path: '/reports', data: 'Campaign(R), PerformanceRecord(R)' },
   { page: 'Settings (신규)', path: '/settings', data: "Connection(R, connections_public view만 — 토큰 필드는 프론트에 노출 안 함)" },
-  { page: 'Recap (신규 — 2026-09)', path: '/recap', data: 'Campaign(R, 이벤트 묶음), EventRecap(R, 상태)' },
-  { page: 'Recap Detail (신규 — 2026-09)', path: '/recap/{event}', data: 'Campaign(R), PerformanceRecord(R), PerformanceDaily(R), Plan(R), EventRecap(R/W), RecapCampaignNote(R/W) — 벤치마크는 저장 없이 계산' },
+  { page: 'Reports (레일 이름 — 내부 /recap, 신규 2026-09)', path: '/recap', data: 'Campaign(R, 이벤트 묶음), EventRecap(R, 상태)' },
+  { page: 'Report Detail (내부 /recap/{event}, 신규 2026-09)', path: '/recap/{event}', data: 'Campaign(R), PerformanceRecord(R), PerformanceDaily(R), Plan(R), EventRecap(R/W), RecapCampaignNote(R/W) — 벤치마크는 저장 없이 계산' },
 ];
 
 const routes = [
@@ -628,14 +630,21 @@ const components = [
   { name: 'PacingIndicator', usage: '예산 소진 속도(pacing) 시각화', type: '신규(구현됨)', note: '카테고리: data-display' },
   { name: 'ConnectionCard', usage: 'Settings에서 계정별 연결 상태 + Connect/재연결 CTA', type: '검토 후 미채택', note: '계획은 card 카테고리의 별도 컴포넌트였으나 실제로는 SettingsPage 안에 직접 그렸다 — 계정이 넷뿐이고 다른 화면에서 쓰이지 않는다' },
   { name: 'RecapHeader', usage: 'Recap 머리글 — 이벤트·상태 칩·기간·매장·플랫폼, KpiBar, 순위 한 줄', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar를 안에서 재활용. headline이 null이면 순위 줄 생략' },
-  { name: 'PhaseTimelineChart (Recap)', usage: '이벤트 단계 타임라인', type: '재활용', note: 'pages/paidAdsDashboard/PhaseTimelineChart.jsx — 클릭 없이 읽기 전용' },
+  { name: 'PhaseTimelineChart (Recap)', usage: '이벤트 단계 타임라인 — 행 클릭 → 아래 표에서 그 단계의 캠페인 줄을 펼치고 스크롤(페이지 이동 없음)', type: '재활용', note: 'pages/paidAdsDashboard/PhaseTimelineChart.jsx — onPhaseClick + emphasizedKey' },
   { name: 'BenchmarkDelta', usage: '지표 값 + 중앙값 대비 차이 · 백분위 · N. not enough data 상태 포함', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar delta와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대)' },
-  { name: 'VerdictChip', usage: 'good / mid / bad 판정 표시. 자동 제안이면 점선 테두리', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
+  { name: 'VerdictChip', usage: 'good / mid / bad 판정 표시(Good/Fair/Weak) — 옅은 틴트 + 같은 색 글자 + 옅은 실선 테두리. 자동 제안은 모양이 같고 툴팁 "suggested"', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
   { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — 고정 열 폭 + ScrollArea, 비율 지표마다 BenchmarkDelta' },
   { name: 'RecapNoteEditor', usage: '캠페인 한 줄의 판정 + 장점·아쉬운 점·이유 + 오가닉 선택 입력', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — lang 칸 하나만 편집, 저장은 페이지' },
   { name: 'RecapLearningsEditor', usage: '이벤트 단위 글 — 상태·요약·배운 점 카드·다음 제언', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 캠페인 단위와 저장 대상이 달라 RecapNoteEditor에서 분리' },
   { name: 'SignInDialog', usage: 'Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 앱 전체 게이트는 꺼진 채 쓰기가 필요한 자리에서만' },
   { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 EN · 한국어 · 繁中' },
+  { name: 'RecapTakeaways', usage: 'Key takeaways — 임원용 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): 라벨 → 16px 결론 → 12px 근거', type: '신규(구현됨) — 2026-09 임원용 다듬기', note: '카테고리: data-display — 재료는 schema.js buildRecapExecutiveSummary(), 플랫폼 CPM 차이는 NEXT MOVE의 근거' },
+  { name: 'RecapCampaignInsightPanel', usage: '캠페인 표의 줄을 펼치면 나오는 해석 — What worked · Could improve · Why · Next action(라벨 → 짧은 결론 → ↗↘ 근거 한 줄)', type: '신규(구현됨) — 2026-09 임원용 다듬기', note: '카테고리: data-display — 재료는 buildCampaignInsight(), 근거 수준은 라벨 툴팁. 사람 글(written) 우선, 원인 모르면 "Insufficient evidence"' },
+  { name: 'RecapPatterns', usage: 'Learnings의 다음 이벤트 플레이북 2×2(KEEP · USE SELECTIVELY · IMPROVE · VALIDATE: 상태 → 제목 → 근거) + NEXT EVENT(결정 + 검증 문장)', type: '신규(구현됨) — 2026-09 임원용 다듬기', note: '카테고리: data-display — 재료는 buildRecapPlaybook()(패턴 재료를 행동으로), 회고 요약은 반복하지 않는다. 방법론은 카드 제목 ⓘ 툴팁' },
+  { name: 'BenchmarkArrow', usage: '벤치마크 방향 기호 ↗↘ — Lucide arrow-up-right/down-right 기하의 얇은 선 svg', type: '신규(구현됨) — 2026-09', note: '카테고리: data-display — BenchmarkDelta와 RecapCampaignInsightPanel이 같이 쓴다. ▲▼ 글자 대체' },
+  { name: 'RecapStatusBadge', usage: '보고서 상태 배지 — Draft / Ready / Not started', type: '신규(구현됨) — Recap 2단계', note: '카테고리: data-display — 목록과 머리글에서 같은 모양' },
+  { name: 'PeerCompareDialog', usage: '벤치마크 글자를 누르면 비교군 캠페인을 나란히 보는 대화상자(열 정렬)', type: '신규(구현됨) — Recap 3단계', note: '카테고리: templates — schema.js buildPeerComparison()' },
+  { name: 'ExportMenu', usage: 'Export 드롭다운 — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄)', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — utils/recapSheets.js' },
   { name: 'Print stylesheet (Recap)', usage: '인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소', type: '신규(구현됨) — Recap 1단계', note: '컴포넌트가 아니라 @media print 규칙. PaidAdsShell GlobalStyles + data-print 속성' },
 ];
 

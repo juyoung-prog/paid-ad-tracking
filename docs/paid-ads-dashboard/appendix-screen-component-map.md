@@ -72,7 +72,7 @@
 | **RecapTakeaways** | 신규(구현됨, 2026-09) | 임원용 핵심 요약 세 칸 — BEST RESULT · ATTENTION · NEXT MOVE(라벨 → 결론 → 근거 한 줄). 재료는 buildRecapExecutiveSummary() |
 | **RecapStatusBadge** | 신규(구현됨, 2026-09) | Not started / Draft / Ready 배지 — 목록 Report 열과 머리글 공용 |
 | **RecapCampaignInsightPanel** | 신규(구현됨, 2026-09) | 캠페인 표의 줄을 펼치면(renderDetail) 그 아래에 What worked·Could improve·Why·Next action — 라벨 → 짧은 결론 → 한 줄 근거(↗↘). 근거 수준은 툴팁, 원인 모르면 "Insufficient evidence" |
-| **RecapPatterns** | 신규(구현됨, 2026-09) | Learnings 안 "데이터에서 본 패턴" + 자동 Next time — 캠페인 2개 이상이 뒷받침할 때만 |
+| **RecapPatterns** | 신규(구현됨, 2026-09) | Learnings의 다음 이벤트 플레이북 — KEEP · USE SELECTIVELY · IMPROVE · VALIDATE 2×2 + NEXT EVENT. 재료는 buildRecapPlaybook() |
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. 줄 끝 화살표로 그 줄 아래에 캠페인 해석을 펼친다(renderDetail). PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |

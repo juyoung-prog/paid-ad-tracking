@@ -45,25 +45,29 @@ export default {
         component: `
 ## RecapDetailPage
 
-이벤트 하나의 결과 보고서(\`/recap/:event\`) — 02-ux-flow 시나리오 7, Build Plan
-Phase 4(1단계 마감). 위에서 아래로:
+이벤트 하나의 결과 보고서(\`/recap/:event\`, 레일 이름은 **Reports**) — 02-ux-flow
+시나리오 7, Build Plan Phase 4~7. 위에서 아래로:
 
-1. **머리글**(RecapHeader) — 이벤트·상태·기간·매장·플랫폼, KPI, 순위 한 줄
+1. **머리글**(RecapHeader) — 이벤트·상태·기간·매장·플랫폼, KPI, 순위 한 줄. 오른쪽에 언어 드롭다운·Edit·Export
 2. 저장된 요약 한 단락(있을 때)
-3. **단계 타임라인**(PhaseTimelineChart, 읽기 전용) — 막대 옆에 실지출
-4. **플랫폼별 캠페인 표**(RecapCampaignTable) — 비율 지표마다 벤치마크, 판정 칩
-5. **Notes** — 캠페인별 장점·아쉬운 점·이유(저장된 게 있으면 읽기 전용, 없으면 2단계 안내)
-6. **Learnings** — 배운 점 카드 + 다음 제언(저장된 게 있을 때)
+3. **Key takeaways**(RecapTakeaways) — 임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE
+4. **단계 타임라인**(PhaseTimelineChart) — 막대 옆에 실지출. 행을 누르면 아래 표에서 그 단계의 줄을 펼치고 스크롤한다
+5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론이나 줄 클릭으로
+   그 줄 아래에 **캠페인 해석**(RecapCampaignInsightPanel: What worked · Could improve · Why · Next action)이 펼쳐진다(한 번에 한 줄)
+6. **Learnings** — 사람이 쓴 배운 점(있을 때) + 다음 이벤트 플레이북(RecapPatterns: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)
 
-계산은 schema.js(buildRecapRows · buildRecapHeadline · localizedText)와
-paidAdsPageUtils(buildPhaseTimeline)가 한다. 인쇄 버튼은 브라우저 인쇄(=PDF)를
-부르고, PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다.
+편집 모드(Edit, 로그인)에서만 캠페인별 코멘트 카드(Notes, RecapNoteEditor)와 Learnings 편집기가 카드로 나온다.
+계산은 schema.js(buildRecapRows · buildRecapHeadline · buildRecapExecutiveSummary · buildCampaignInsight ·
+buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
+인쇄를 부르고 PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. Google Sheets는 표를 클립보드에 복사한다.
 
 ### 확인 포인트
 - 머리글 순위 "Best of 5 comparable events by CPM"
-- Meta 표는 벤치마크 숫자, TikTok 표는 전부 not enough data
-- Grand Opening 판정은 채운 Good(사람 값), Coming Soon은 점선(제안), Now Open은 —
-- Notes에 캠페인 3개, Learnings 카드 2개 + Next time
+- Key takeaways 세 칸 — 가운데 결론 줄만 읽어도 이벤트가 잡히는지
+- Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
+- Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
+- 타임라인 "Grand Opening" 행 클릭 → Meta·TikTok 표의 그 줄이 펼쳐진다
+- Learnings: 플레이북 2×2 + NEXT EVENT(결정 + 검증 문장)
         `,
       },
     },

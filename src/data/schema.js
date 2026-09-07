@@ -2072,6 +2072,71 @@ export function buildRecapExecutiveSummary(byPlatform) {
 }
 
 /**
+ * Learnings의 **다음 이벤트 플레이북** — buildRecapPatterns()의 재료를 KEEP / USE SELECTIVELY /
+ * IMPROVE / VALIDATE 네 칸과 NEXT EVENT 한 줄로 합성한다. 회고 요약(Key takeaways)을 반복하지
+ * 않고 "다음에 무엇을 반복하고 무엇을 바꿀지"만 말한다. 계산은 새로 하지 않는다 —
+ * 근거는 전부 패턴 재료(같은 방향 캠페인 2개 이상, 이벤트 단위 플랫폼 CPM·CTR 차이)다.
+ *
+ * 칸을 채울 근거가 없으면 null — 지어내지 않는다(칸이 빈다).
+ *   keep          { kind: 'platformReach'|'platformBoth'|'phase'|'strong', … }
+ *   useSelectively{ kind: 'platformClicks'|'platformOther', … }
+ *   improve       { kind: 'weak', aspect, metricKey, count, total }
+ *   validate      { kind: 'mixed'|'uncovered', aspect, … }
+ *   nextEvent     { kind: 'split'|'lean'|'phase', …, validateAspects: string[] } | null
+ *
+ * @param {Object<string, Array<RecapCampaignRowExtra>>} byPlatform
+ */
+export function buildRecapPlaybook(byPlatform) {
+  const { learnings, nextSteps } = buildRecapPatterns(byPlatform);
+  const find = (kind) => learnings.find((l) => l.kind === kind) ?? null;
+  // learnings는 화면용으로 잘릴 수 있어 플랫폼 재료는 nextSteps에서도 찾는다(같은 계산의 결과)
+  const stepSplit = nextSteps.find((n) => n.kind === 'splitByPlatform') ?? null;
+  const stepLean = nextSteps.find((n) => n.kind === 'leanOnPlatform') ?? null;
+  const split = find('platformSplit') ?? (stepSplit && { reachPlatform: stepSplit.reachPlatform, clickPlatform: stepSplit.clickPlatform });
+  const both = find('platformBoth') ?? (stepLean && { platform: stepLean.platform, other: null });
+  const phase = find('phaseClicks');
+  const strongs = learnings.filter((l) => l.kind === 'consistentStrong');
+  const weaks = learnings.filter((l) => l.kind === 'consistentWeak');
+  const mixeds = learnings.filter((l) => l.kind === 'mixed');
+
+  let keep = null;
+  if (split) keep = { kind: 'platformReach', platform: split.reachPlatform };
+  else if (both) keep = { kind: 'platformBoth', platform: both.platform, other: both.other };
+  else if (phase) keep = { kind: 'phase', phase: phase.bestPhase, worstPhase: phase.worstPhase };
+  else if (strongs[0]) keep = { kind: 'strong', aspect: strongs[0].aspect, metricKey: strongs[0].metricKey, count: strongs[0].count, total: strongs[0].total };
+
+  let useSelectively = null;
+  if (split) useSelectively = { kind: 'platformClicks', platform: split.clickPlatform };
+  else if (both) useSelectively = { kind: 'platformOther', platform: both.other, leader: both.platform };
+  else if (phase && keep?.kind !== 'phase') useSelectively = { kind: 'phase', phase: phase.bestPhase, worstPhase: phase.worstPhase };
+
+  const improve = weaks[0] ? { kind: 'weak', aspect: weaks[0].aspect, metricKey: weaks[0].metricKey, count: weaks[0].count, total: weaks[0].total } : null;
+
+  // VALIDATE — 엇갈린 지표가 있으면 그것, 없으면 벤치마크는 있는데 패턴이 안 잡힌 지표 하나
+  let validate = null;
+  if (mixeds[0]) validate = { kind: 'mixed', aspect: mixeds[0].aspect, metricKey: mixeds[0].metricKey, count: mixeds[0].count, countBottom: mixeds[0].countBottom, total: mixeds[0].total };
+  else {
+    const covered = new Set(learnings.map((l) => l.aspect).filter(Boolean));
+    const rows = Object.values(byPlatform ?? {}).flat();
+    const candidate = ['engagement', 'click', 'reach', 'hook', 'hold', 'result'].find((aspect) => {
+      if (covered.has(aspect)) return false;
+      const keys = Object.keys(METRIC_ASPECT).filter((k) => METRIC_ASPECT[k] === aspect);
+      return rows.some((r) => keys.some((k) => r.benchmarks?.[k]?.peerScope !== 'none' && r.benchmarks?.[k]?.percentile != null));
+    });
+    if (candidate) validate = { kind: 'uncovered', aspect: candidate };
+  }
+
+  const validateAspects = [...new Set([improve?.aspect, validate?.aspect].filter(Boolean))];
+  let nextEvent = null;
+  const step = nextSteps.find((n) => n.kind === 'splitByPlatform') ?? nextSteps.find((n) => n.kind === 'leanOnPlatform') ?? nextSteps.find((n) => n.kind === 'shiftToPhase') ?? null;
+  if (step?.kind === 'splitByPlatform') nextEvent = { kind: 'split', reachPlatform: step.reachPlatform, clickPlatform: step.clickPlatform, validateAspects };
+  else if (step?.kind === 'leanOnPlatform') nextEvent = { kind: 'lean', platform: step.platform, validateAspects };
+  else if (step?.kind === 'shiftToPhase') nextEvent = { kind: 'phase', phase: step.phase, worstPhase: step.worstPhase, validateAspects };
+
+  return { keep, useSelectively, improve, validate, nextEvent };
+}
+
+/**
  * 캠페인 한 줄의 해석 — { strength, weakness, reason }. 각 항목은
  * { level, kind, ... } 또는 null(근거 없음). 표에 있는 숫자를 반복하지 않고
  * "비교군 중 어디"만 근거로 붙인다.

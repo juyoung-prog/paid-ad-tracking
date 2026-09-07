@@ -46,11 +46,11 @@ export default {
         component: `
 ## RecapPage
 
-캠페인 종료 후 결과 보고(Recap)의 이벤트 목록(\`/recap\`) — 02-ux-flow 시나리오 7,
+캠페인 종료 후 결과 보고의 이벤트 목록(\`/recap\`, 레일 이름은 **Reports** — 2026-09 개명, 내부 경로는 그대로) — 02-ux-flow 시나리오 7,
 Build Plan Phase 4. 이벤트(campaignGroup) 하나가 보고서 하나다. 최근 끝난 이벤트가
 위로 오고 행을 누르면 \`/recap/{event}\`로 간다.
 
-Reports(진행 확인)와 목적이 달라 레일의 별도 메뉴다. 보고서 상태(Draft / Final /
+Performance(진행 확인, 내부 /reports)와 목적이 달라 레일의 별도 메뉴다. 보고서 상태(Draft / Final /
 Not started)는 2단계 저장이 붙기 전까지 목 데이터에서만 Draft가 보인다.
 
 목록 계산(\`buildRecapEvents\`)은 schema.js가 하고 페이지는 자리에 놓는다. 스토어는
