@@ -28,9 +28,13 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 - **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수. 원본 이름은 hover title. 줄 전체가 드로어 버튼(onRowClick)이라 칸 안에 따로 버튼이 없고, 줄 끝 셰브론·아래 펼침도 없다(2026-09-07 — 해석은 드로어의 Campaign insights로)
 - **Spend**: 지출 + 그 아래 CPM 벤치마크
 - **Efficiency**: 사람이 고른 판정이 있으면 그것, 없으면 제안값(같은 모양, 툴팁 "suggested")을
-- **Video**: Reach · Plays · Avg 한 줄 + Hook / Hold 벤치마크
-- **Engagement**: Like · Cmt · Share 한 줄 + 참여율 벤치마크
-- **Action**: Clicks · Results · Profile 한 줄 + CTR / CPC (+ conversion goal이면 CPA)
+- **Video**: 보조 지표 Reach · Plays · Avg(라벨 → 값, 한 단 조용한 12px/500) 위에, 대표 지표 Hook / Hold(13px/600 + 벤치마크) 아래
+- **Engagement**: Like · Cmt · Share 보조 지표 + 참여율 대표 지표
+- **Action**: Clicks · Results · Profile 보조 지표 + CTR / CPC (+ conversion goal이면 CPA)
+
+모든 지표가 같은 문법 **라벨 → 값 → 비교**를 쓴다(2026-09-07 — 예전엔 보조 지표만 "Reach 163,290 · Plays 295,857" 문장이라
+메타데이터처럼 읽혔다). 위계는 글자 강도로만: 대표 값 13px/600 primary, 보조 값 12px/500 primary 72%, 라벨 11px secondary.
+보조 지표 항목은 minWidth(52/36/56)로 값 길이가 달라도 열이 흔들리지 않는다. 줄 높이 97px.
 
 ### 계산은 하지 않는다
 \`rows\`는 \`schema.js\`의 \`buildRecapRows().byPlatform[platform]\` — 순위·벤치마크·

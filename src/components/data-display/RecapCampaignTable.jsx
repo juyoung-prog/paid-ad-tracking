@@ -31,7 +31,7 @@ const COLUMN_WIDTH = {
 };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
-const CELL_SX = { verticalAlign: 'top', py: 1.25 };
+const CELL_SX = { verticalAlign: 'top', py: 1 };
 const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap' };
 /* 짝 지표(Hook | Hold, CTR | CPC) 사이 — 20px는 한 덩어리로 읽혀 30px로(2026-09-07). 세 개(CTR·CPC·CPA)가
    드는 conversion 줄은 248px 셀에 안 들어가 20px 유지 */
@@ -48,7 +48,7 @@ function MetricCell({ row, metricKey, format, lang, onBenchmarkClick }) {
   const peerLabel = stat.peerScope === 'phase' ? row.phaseName : row.goal;
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography component="span" sx={{ ...META_SX, display: 'block' }}>{metricLabel(metricKey, lang)}</Typography>
+      <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(metricKey, lang)}</Typography>
       {/* 중앙값은 툴팁에만 — 셀 폭에서 "▲ top 25% · median 28.51%"는 옆 지표와 겹친다 */}
       <BenchmarkDelta
         stat={stat}
@@ -65,22 +65,23 @@ function MetricCell({ row, metricKey, format, lang, onBenchmarkClick }) {
 }
 
 /**
- * 원본 지표 한 줄 — "Reach 151,000 · Plays 250,000". 셀 안 위계의 맨 아래(3차 정보)라 라벨(text.secondary)보다
- * 한 단 더 옅게(secondary의 78% alpha) — 값(13px/600)·순위(초록/주황)와 경쟁하지 않게. text.disabled는
- * AA 미달이라 글에 안 쓴다
+ * 보조 지표 묶음 — Reach · Plays · Avg처럼 라벨 → 값 두 줄. 대표 지표(MetricCell)와 같은 문법이되
+ * 한 단 조용하다: 라벨은 secondary 78%, 값은 12px/500 text.primary 72%(대표 값은 13px/600 primary).
+ * 예전엔 "Reach 163,290 · Plays 295,857" 한 줄 문장이라 메타데이터처럼 읽혔다(2026-09-07).
+ * 값 길이가 달라도 열이 흔들리지 않게 항목마다 minWidth를 준다(셀 폭에 맞춰 호출부가 정한다).
  */
-function RawLine({ parts }) {
+function SecondaryMetrics({ parts, minWidth }) {
   const shown = parts.filter(([, v]) => v != null);
   if (shown.length === 0) return null;
   return (
-    <Typography component="span" sx={(theme) => ({ ...META_SX, color: alpha(theme.palette.text.secondary, 0.78), display: 'block', mb: 0.75, whiteSpace: 'normal' })}>
-      {shown.map(([label, v], i) => (
-        <Box component="span" key={label} sx={{ whiteSpace: 'nowrap' }}>
-          {i > 0 && ' · '}
-          {label} <Box component="span" sx={{ fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{v}</Box>
+    <Box sx={{ display: 'flex', gap: 1.5, mb: 0.5 }}>
+      {shown.map(([label, v]) => (
+        <Box key={label} sx={{ minWidth, flexShrink: 0 }}>
+          <Typography component="span" sx={(theme) => ({ ...META_SX, lineHeight: 1.3, color: alpha(theme.palette.text.secondary, 0.78), display: 'block' })}>{label}</Typography>
+          <Typography component="span" sx={(theme) => ({ display: 'block', fontSize: 12, fontWeight: 500, lineHeight: 1.3, color: alpha(theme.palette.text.primary, 0.72), fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' })}>{v}</Typography>
         </Box>
       ))}
-    </Typography>
+    </Box>
   );
 }
 
@@ -239,7 +240,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 ) : (
                   <>
                     <TableCell sx={CELL_SX}>
-                      <RawLine parts={[
+                      <SecondaryMetrics minWidth={52} parts={[
                         [metricLabel('reach', lang), count(row.reach)],
                         [metricLabel('videoPlays', lang), count(row.videoPlays)],
                         [metricLabel('avgWatch', lang), row.avgWatchSeconds != null ? seconds(row.avgWatchSeconds) : null],
@@ -250,7 +251,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       </Box>
                     </TableCell>
                     <TableCell sx={CELL_SX}>
-                      <RawLine parts={[
+                      <SecondaryMetrics minWidth={36} parts={[
                         [metricLabel('likes', lang), count(row.likes)],
                         [metricLabel('comments', lang), count(row.comments)],
                         [metricLabel('shares', lang), count(row.shares)],
@@ -258,7 +259,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                     </TableCell>
                     <TableCell sx={CELL_SX}>
-                      <RawLine parts={[
+                      <SecondaryMetrics minWidth={56} parts={[
                         [metricLabel('clicks', lang), count(row.clicks)],
                         [metricLabel('conversions', lang), count(row.conversions)],
                         [metricLabel('profileVisits', lang), count(row.profileVisits)],
