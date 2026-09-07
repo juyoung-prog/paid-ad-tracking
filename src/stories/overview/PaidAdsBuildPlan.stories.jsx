@@ -58,7 +58,7 @@ const recapEnums = [
   { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 벤치마크 구간(band top/bottom) 경계: 백분위 70 이상 top, 30 이하 bottom. 셀 ↗↘ 색과 해석(What worked / Could improve)이 쓴다' },
-  { name: 'EFFICIENCY_BAND', value: "{ good: 0.8, bad: 1.2 } — 배지(예산 효율) = 대표 KPI ÷ 같은 비교군의 중앙값. 배지와 순위가 benchmarks[대표 KPI] 하나에서 나온다(2026-09-07). 비교군 3개 미만이면 배지 없음" },
+  { name: 'budgetEfficiency(row, goal)', value: "→ { metricKey, value } — 이 캠페인의 목표별 결과당 비용(과거·비교군·기준값 무관). 자동 Good/Fair/Weak는 없다(2026-09-07). 과거 비교(benchmarks)·집행률(pacingRatio)과 세 층으로 분리" },
 ];
 
 /** schema.js 순수 함수 — 입력/출력만 적는다. 컴포넌트는 이 결과를 props로 받을 뿐 안에서 다시 계산하지 않는다. */

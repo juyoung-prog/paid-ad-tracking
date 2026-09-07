@@ -27,7 +27,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 ### 셀 구성
 - **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름(\`phaseNameOf\`) 굵게 + 기간·일수 · 목표("Jul 6 – Aug 31 (57 days) · Awareness" — 캠페인 데이터의 goal, 드로어와 같은 원천, 없으면 기간만). 원본 이름은 hover title. 줄 전체가 드로어 버튼(onRowClick)이라 칸 안에 따로 버튼이 없고, 줄 끝 셰브론·아래 펼침도 없다(2026-09-07 — 해석은 드로어의 Campaign insights로)
 - **Spend**: 지출 + 그 아래 CPM 벤치마크
-- **Efficiency** 두 줄: 위 배지 = 예산 효율(목표별 대표 KPI ÷ 같은 비교군 중앙값, ≤80% Good / >120% Weak, 툴팁에 값·중앙값·N), 아래 "vs past" = 같은 KPI·같은 비교군 순위 — 둘이 한 benchmarks에서 나온다. 비교군 3개 미만이면 "—" + not enough data. 사람이 고른 판정이 있으면 배지는 그것을
+- **Efficiency** 두 층: 위 = 이 캠페인의 결과당 비용(목표별 KPI 라벨 + 값, 과거 무관·성과만 있으면 항상, 툴팁에 계산식), 아래 "vs past" = 같은 KPI의 과거 비교군 순위(3개 미만이면 "—" + 툴팁 Not enough comparison data). Good/Fair/Weak 자동 배지 없음
 - **Video**: 보조 지표 Reach · Plays · Avg(라벨 → 값, 한 단 조용한 12px/500) 위에, 대표 지표 Hook / Hold(13px/600 + 벤치마크) 아래
 - **Engagement**: Like · Cmt · Share 보조 지표 + 참여율 대표 지표
 - **Action**: Clicks · Results · Profile 보조 지표 + CTR / CPC (+ conversion goal이면 CPA)

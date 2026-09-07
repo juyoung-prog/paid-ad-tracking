@@ -36,7 +36,8 @@ Build Plan Phase 1의 검증 스토리. 컴포넌트 없이 \`schema.js\`의 Rec
 ### 확인 포인트
 - 비교군 사슬(2026-09-07): 같은 플랫폼 + 같은 goal + 같은 단계(다른 이벤트) → 같은 플랫폼 + 같은 goal → 3개 미만이면 \`none\`
 - Meta 줄 중 같은 goal 비교군이 3개 이상인 것만 scope \`phase\`/\`goal\`, 나머지는 \`none\`(전부 \`not enough data\`)
-- 배지(suggestedVerdict) = 예산 효율: goal별 대표 KPI(cpm/cpc/cpe/cpa) ÷ 같은 비교군의 중앙값 ≤80% good / >120% bad. 순위와 같은 benchmarks에서 나오고, 비교군 3개 미만이면 null — 억지로 만들지 않는다
+- 예산 효율(budgetEfficiency) = goal별 KPI(cpm/cpc/cpe/cpa) 값 그 자체 — 과거·비교군 무관, 자동 판정 없음. suggestedVerdict는 항상 null(사람이 고른 note.verdict만)
+- 과거 비교 = benchmarks: 비교군 3개 미만이면 순위 없음 — 억지로 만들지 않는다
 - cpe = 지출 ÷ (좋아요+댓글+공유)
 - 순위는 플랫폼 안에서 대표 지표 백분위 순
 - 머리글: 같은 단계가 겹치는 이벤트 5개 중 CPM 순위

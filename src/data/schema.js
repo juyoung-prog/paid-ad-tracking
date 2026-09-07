@@ -1549,8 +1549,8 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 예산 효율 판정(대표 KPI ÷ 비교군 중앙값, budgetEfficiency) — 사람이 verdict를 안 고르면 이것. 비교군 3개 미만이면 null
- * @property {{ verdict: string|null, metricKey: string|null, value: number|null, median: number|null, ratio: number|null, sampleSize: number, peerScope: string }} budgetEfficiency
+ * @property {null} suggestedVerdict - 자동 판정 없음(2026-09-07). 사람이 고른 판정은 note.verdict
+ * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
  * @property {RecapCampaignNote|null} note
  */
 
@@ -1781,9 +1781,10 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       thumbnailUrl: c.thumbnailUrl ?? null,
       rank: 0,
       benchmarks,
-      // 배지(제안 판정) = 대표 KPI가 비교군 중앙값 대비 얼마인가 — 아래 순위와 같은 benchmarks[대표 KPI]에서 나온다
-      budgetEfficiency: budgetEfficiency(benchmarks, c.goal),
-      suggestedVerdict: budgetEfficiency(benchmarks, c.goal).verdict,
+      // 세 층을 섞지 않는다: budgetEfficiency = 이 캠페인의 결과당 비용(과거 무관) · benchmarks = 과거 비교 · pacingRatio = 계획 대비 집행
+      budgetEfficiency: budgetEfficiency(row, c.goal),
+      // 자동 판정(Good/Fair/Weak)은 없다 — 사람이 고른 note.verdict만 남는다
+      suggestedVerdict: null,
       note: notesById[c.id] ?? null,
     };
   });
@@ -2069,26 +2070,20 @@ export function buildRecapTakeaways(byPlatform) {
 /** 계획 대비 집행률을 표에 표시하는 문턱 — +20% 이상 초과 또는 −30% 이하 미달일 때만. 그 안은 조용히 */
 export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
 
-/** 비교군 중앙값 대비 비율 → 판정. 80% 이하 good, 120% 초과 bad, 사이 mid(비용 지표라 낮을수록 좋다) */
-export const EFFICIENCY_BAND = Object.freeze({ good: 0.8, bad: 1.2 });
-
 /**
- * 예산 효율 판정 — "이 목표의 결과당 비용이 비교 가능한 과거 캠페인의 중앙값 대비 얼마인가"(2026-09-07).
- * 대표 KPI(GOAL_HEADLINE_METRICS)의 benchmarkStat에서 값·중앙값을 읽는다 — 그 stat이 쓰는 비교군(같은 플랫폼 +
- * 같은 목표 + 같은 단계 우선, 다른 이벤트, 3개 이상)이 곧 배지의 비교군이라 아래 순위("best of 12")와 한 근거에서
- * 나온다. 비교군이 3개 미만이면 판정하지 않는다(외부 업계 평균으로 대체하지 않는다). 계획 예산·집행률은 여기 안 섞는다.
- * @param {Object<string, BenchmarkStat>} benchmarks - buildRecapRows 행의 benchmarks
+ * 예산 효율 — "이 캠페인이 쓴 돈으로 목표에 맞는 결과 하나에 얼마가 들었나"(2026-09-07). **이 캠페인의 지출과 결과만**으로
+ * 계산한다: 인지 CPM · 트래픽 CPC · 참여 참여당 비용(지출 ÷ 좋아요+댓글+공유) · 전환/매장 방문 CPA. 과거 캠페인·중앙값·
+ * 업계 기준·비교군은 여기 들어오지 않는다 — 그것은 별개 층인 과거 비교(benchmarks, "best of 12")의 일이고, 계획 예산 대비
+ * 집행률(pacingRatio)은 또 다른 층이다. 그래서 비교군이 없어도 값은 항상 있다(성과 데이터가 없을 때만 null).
+ * Good/Fair/Weak 자동 판정은 없다 — 값 자체가 답이다(사람이 Edit에서 고른 판정은 note.verdict에 따로 남는다).
+ * @param {Object} row - getGoalMetricsRow() 결과(cpm/cpc/cpe/cpa 포함)
  * @param {string} goal
- * @returns {{ verdict: 'good'|'mid'|'bad'|null, metricKey: string|null, value: number|null, median: number|null, ratio: number|null, sampleSize: number, peerScope: 'phase'|'goal'|'none' }}
+ * @returns {{ metricKey: string|null, value: number|null }}
  */
-export function budgetEfficiency(benchmarks, goal) {
+export function budgetEfficiency(row, goal) {
   const metricKey = (GOAL_HEADLINE_METRICS[goal] ?? [])[0] ?? null;
-  const stat = metricKey ? benchmarks?.[metricKey] : null;
-  const none = { verdict: null, metricKey, value: stat?.value ?? null, median: null, ratio: null, sampleSize: stat?.sampleSize ?? 0, peerScope: 'none' };
-  if (!stat || stat.peerScope === 'none' || stat.median == null || stat.value == null || !(stat.median > 0)) return none;
-  const ratio = stat.value / stat.median;
-  const verdict = ratio <= EFFICIENCY_BAND.good ? VERDICT.GOOD : ratio > EFFICIENCY_BAND.bad ? VERDICT.BAD : VERDICT.MID;
-  return { verdict, metricKey, value: stat.value, median: stat.median, ratio, sampleSize: stat.sampleSize, peerScope: stat.peerScope };
+  const value = metricKey ? row?.[metricKey] : null;
+  return { metricKey, value: value != null && Number.isFinite(value) ? value : null };
 }
 
 export const METRIC_ASPECT = Object.freeze({

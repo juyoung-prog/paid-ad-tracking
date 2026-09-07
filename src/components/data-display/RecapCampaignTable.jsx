@@ -11,7 +11,6 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
-import { VerdictChip } from './VerdictChip';
 import { t, metricLabel } from '../../data/recapStrings';
 import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS } from '../../data/schema';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
@@ -113,11 +112,11 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
  * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 제안값을 보여준다. Efficiency 칸은 두 줄(2026-09-07): **배지 = 예산 효율**(목표별 대표 KPI의 결과당
- * 비용 ÷ 비교군 중앙값 — 80% 이하 Good / 120% 초과 Weak, 툴팁에 값·중앙값·N), **아래 "vs past"** = 같은 KPI를
- * 같은 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위. 둘 다 benchmarks[대표 KPI] 하나에서
- * 나오므로 "Fair인데 best of 12" 같은 어긋남이 없다. 비교군 3개 미만이면 배지 "—" + 순위 not enough data.
- * 셀의 ↗↘도 같은 비교군이다. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만 "Over 23%" 한 줄(RECAP_PACING_FLAG).
+ * 없으면 비워 둔다. Efficiency 칸은 서로 다른 두 층(2026-09-07): **위 = 예산 효율**(이 캠페인의 지출 ÷ 목표에 맞는 결과
+ * — 인지 CPM · 트래픽 CPC · 참여 참여당 비용 · 전환 CPA. 과거·비교군·기준값 무관, 성과만 있으면 항상), **아래 "vs past"** =
+ * 같은 KPI를 과거 비교군(같은 플랫폼·목표·단계 우선, 다른 이벤트, 3개 이상)과 견준 순위(없으면 "—" + 툴팁 "Not enough
+ * comparison data" — 위 값이 못 미덥다는 뜻이 아니다). Good/Fair/Weak 자동 배지는 없다. 계획 대비 집행률은 세 번째 층으로
+ * Daily budget 아래에만. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만 "Over 23%" 한 줄(RECAP_PACING_FLAG).
  *
  * 상호작용은 하나다(2026-09-07): **숫자 줄 어디를 눌러도** onRowClick — 보고서는 이걸로
  * Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다.
@@ -134,7 +133,6 @@ function SecondaryMetrics({ parts, minWidth }) {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체(#·매장·썸네일·이름·기간·예산·지표·빈 곳)가 버튼이고 Tab/Enter로도 눌린다. hover는 중립 면 140ms [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
- * @param {Object<string, string>} platformLabel - 플랫폼 값 → 표시명(배지 툴팁 문장용) [Optional, 기본값: {}]
  * @param {string|null} selectedId - 타임라인에서 찾아온 줄의 campaignId. 그 줄에 옅은 accent 배경 + 왼쪽 2px accent 선 — "내가 고른 캠페인이 이것"이라는 방향 표시 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
@@ -142,7 +140,7 @@ function SecondaryMetrics({ parts, minWidth }) {
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedId={selectedCampaignId} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedId = null, platformLabel = {}, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedId = null, label = 'Recap campaign table', sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -180,7 +178,6 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.effTitle', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effBody', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effGoals', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, fontVariantNumeric: 'tabular-nums' }}>{t('recap.table.effBands', lang)}</Typography>
                     <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effRanking', lang)}</Typography>
                   </Box>
                 )}
@@ -196,16 +193,13 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
         <TableBody>
           {rows.map((row) => {
             const hasData = row.spend != null || row.impressions != null;
-            const verdict = row.note?.verdict ?? row.suggestedVerdict ?? null;
-            // Efficiency 칸의 두 줄 — 배지와 순위가 **같은** benchmarks[대표 KPI](같은 비교군·같은 값)에서 나온다
+            /* Efficiency 칸의 두 층 — 위: 이 캠페인의 결과당 비용(과거 무관, 성과만 있으면 항상), 아래 "vs past": 같은 KPI의
+               과거 비교군 순위(3개 미만이면 "—" + 툴팁 "Not enough comparison data"). 둘은 다른 질문이라 섞지 않는다 */
             const eff = row.budgetEfficiency ?? null;
-            const kpiKey = (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
+            const kpiKey = eff?.metricKey ?? (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
             const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
-            const badgeHint = row.note?.verdict
-              ? ''
-              : eff?.verdict
-                ? `${t('recap.table.standardHint', lang, { metric: metricLabel(eff.metricKey, lang), value: kpiFormat(eff.metricKey)(eff.value), median: kpiFormat(eff.metricKey)(eff.median), n: eff.sampleSize, total: eff.sampleSize + 1, pct: Math.round(eff.ratio * 100), platform: platformLabel[row.platform] ?? row.platform, goal: t(`goal.${row.goal}`, lang) })} ${t('recap.table.suggestedNote', lang)}`
-                : hasData ? t('recap.table.noComparison', lang) : '';
+            const hasComparison = Boolean(kpiStat && kpiStat.peerScope !== 'none' && kpiStat.percentile != null);
+            const effHint = eff?.value != null ? t('recap.table.effValueHint', lang, { metric: metricLabel(eff.metricKey, lang), basis: t(`recap.table.effBasis.${eff.metricKey}`, lang) }) : '';
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedId === row.campaignId;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
@@ -295,27 +289,38 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  {/* 위: 예산 효율 배지(우리 기준값 대비 — 비교군 없어도 나온다). 툴팁에 숫자와 기준값. 사람이 고른 값이면 툴팁 없음 */}
-                  <Tooltip title={badgeHint} placement="top" enterDelay={300}>
-                    <Box component="span" sx={{ display: 'inline-block', cursor: badgeHint ? 'help' : 'default' }}>
-                      <VerdictChip verdict={verdict} isSuggested={false} lang={lang} size="sm" />
-                    </Box>
-                  </Tooltip>
-                  {/* 아래: 같은 대표 KPI의 과거 캠페인 대비 순위 — 비교군 3개 미만이면 "not enough data" */}
-                  {hasData && kpiStat && (
+                  {/* 위: 이 캠페인의 결과당 비용 — 라벨(KPI 이름) → 값(700). 성과가 있으면 과거 비교와 무관하게 항상 */}
+                  {eff?.value != null ? (
+                    <Tooltip title={effHint} placement="top" enterDelay={400}>
+                      <Box sx={{ minWidth: 0, cursor: 'help' }}>
+                        <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(eff.metricKey, lang)}</Typography>
+                        <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>{kpiFormat(eff.metricKey)(eff.value)}</Typography>
+                      </Box>
+                    </Tooltip>
+                  ) : (
+                    <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3 }}>{EMPTY}</Typography>
+                  )}
+                  {/* 아래 "vs past": 같은 KPI의 과거 비교군 순위 — 별개 층. 비교군 3개 미만이면 "—"(위 값이 못 미덥다는 뜻이 아니다) */}
+                  {hasData && kpiKey && (
                     <Box sx={{ mt: 0.75 }}>
                       <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{t('recap.table.vsPast', lang)}</Typography>
-                      <BenchmarkDelta
-                        stat={kpiStat}
-                        format={kpiFormat(kpiKey)}
-                        label={metricLabel(kpiKey, lang)}
-                        peerLabel={kpiStat.peerScope === 'phase' ? row.phaseName : row.goal}
-                        lang={lang}
-                        size="sm"
-                        hasValue={false}
-                        hasMedian={false}
-                        onClick={onBenchmarkClick && kpiStat.peerScope !== 'none' ? () => onBenchmarkClick(row.campaignId, kpiKey) : undefined}
-                      />
+                      {hasComparison ? (
+                        <BenchmarkDelta
+                          stat={kpiStat}
+                          format={kpiFormat(kpiKey)}
+                          label={metricLabel(kpiKey, lang)}
+                          peerLabel={kpiStat.peerScope === 'phase' ? row.phaseName : row.goal}
+                          lang={lang}
+                          size="sm"
+                          hasValue={false}
+                          hasMedian={false}
+                          onClick={onBenchmarkClick ? () => onBenchmarkClick(row.campaignId, kpiKey) : undefined}
+                        />
+                      ) : (
+                        <Tooltip title={t('recap.table.noComparison', lang)} placement="top" enterDelay={300}>
+                          <Typography component="span" sx={{ display: 'inline-block', fontSize: 10.5, color: 'text.disabled', lineHeight: 1.3, cursor: 'help' }}>{EMPTY}</Typography>
+                        </Tooltip>
+                      )}
                     </Box>
                   )}
                 </TableCell>
