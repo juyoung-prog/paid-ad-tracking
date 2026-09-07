@@ -54,8 +54,8 @@ const recapEnums = [
   { name: 'RECAP_STATUS', value: "{ DRAFT: 'draft', FINAL: 'final' }" },
   { name: 'VERDICT', value: "{ GOOD: 'good', MID: 'mid', BAD: 'bad' }" },
   { name: 'RECAP_LANG', value: "{ EN: 'en', KO: 'ko', ZH_HANT: 'zh-Hant' } + RECAP_DEFAULT_LANG = 'en'" },
-  { name: 'BENCHMARK_METRICS', value: "[{ key: 'cpm', lowerIsBetter: true }, { key: 'cpc', lowerIsBetter: true }, { key: 'ctr' }, { key: 'hookRate' }, { key: 'holdRate' }, { key: 'engagementRate' }] — 비율 지표만" },
-  { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm', 'hookRate'], traffic: ['ctr', 'cpc'], engagement: ['engagementRate'], conversion: ['cpa'], store_visit: ['cpa'] } — 판정 제안과 머리글 순위에 쓰는 대표 지표" },
+  { name: 'BENCHMARK_METRICS', value: "[cpm, cpc, cpa, cpe(지출 ÷ 좋아요+댓글+공유), ctr, hookRate, holdRate, engagementRate] — 비율 지표만, 비용 지표는 lowerIsBetter" },
+  { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 대표 지표 백분위 평균이 70 이상 good, 30 이하 bad, 사이 mid' },
 ];

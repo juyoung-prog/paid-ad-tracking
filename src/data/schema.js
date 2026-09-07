@@ -1270,6 +1270,9 @@ export function getGoalMetricsRow(campaign, record) {
   const clicks = record?.clicks ?? null;
   const engagements = record?.engagements ?? null;
   const conversions = record?.conversions ?? null;
+  // 참여 수 = 좋아요 + 댓글 + 공유 — cpe의 분모. 플랫폼 engagements 합계와 섞지 않는다(BENCHMARK_METRICS 주석)
+  const interactionParts = [record?.likes, record?.comments, record?.shares].map((v) => v ?? null);
+  const interactions = interactionParts.some((v) => v != null) ? interactionParts.reduce((a, b) => a + (b ?? 0), 0) : null;
 
   return {
     campaignId: campaign.id,
@@ -1286,7 +1289,7 @@ export function getGoalMetricsRow(campaign, record) {
     ctr: calcCTR(clicks, impressions),
     cpc: spend != null ? calcCPC(spend, clicks) : null,
     engagementRate: calcEngagementRate(engagements, impressions),
-    cpe: spend != null ? calcCPE(spend, engagements) : null,
+    cpe: spend != null ? calcCPE(spend, interactions) : null,
     cpa: spend != null ? calcCPA(spend, conversions) : null,
     // 아래는 goal과 무관하게 "소재가 어땠는가"를 말하는 값이라 goal별로 고르지 않고
     // 전부 그대로 전달한다. 어떤 목적의 캠페인이든 영상이 붙으면 의미가 있다.
@@ -1458,22 +1461,33 @@ export const BENCHMARK_METRICS = Object.freeze([
   { key: 'cpm', lowerIsBetter: true },
   { key: 'cpc', lowerIsBetter: true },
   { key: 'cpa', lowerIsBetter: true },
+  // cpe = 지출 ÷ (좋아요 + 댓글 + 공유). 플랫폼이 주는 engagements 합계 필드(Meta는 저장·클릭까지 섞임)는
+  // 이 계산에 쓰지 않는다 — 표의 Like·Cmt·Share와 같은 숫자에서 나와야 배지 근거와 표가 일치한다(2026-09-07)
+  { key: 'cpe', lowerIsBetter: true },
   { key: 'ctr', lowerIsBetter: false },
   { key: 'hookRate', lowerIsBetter: false },
   { key: 'holdRate', lowerIsBetter: false },
   { key: 'engagementRate', lowerIsBetter: false },
 ]);
 
-/** goal별 대표 지표 — 판정 제안과 머리글 순위에 쓴다 */
+/**
+ * goal별 대표 KPI — **하나씩**(2026-09-07). "이 목표를 돈 대비 얼마나 효율적으로 달성했나"를 말하는
+ * 결과당 비용이다: 인지 CPM · 트래픽 CPC · 참여 CPE · 전환/매장 방문 CPA. Efficiency 배지, 순위,
+ * Key takeaways의 최고/최저, 머리글 순위가 전부 이 하나를 공유해 위아래가 다른 말을 하지 않는다.
+ * Hook·Hold·CTR·참여율은 진단 지표 — 셀의 ↗↘와 캠페인 해석(What worked · Could improve)에서만 쓴다.
+ */
 export const GOAL_HEADLINE_METRICS = Object.freeze({
-  [GOAL.AWARENESS]: ['cpm', 'hookRate'],
-  [GOAL.TRAFFIC]: ['ctr', 'cpc'],
-  [GOAL.ENGAGEMENT]: ['engagementRate'],
+  [GOAL.AWARENESS]: ['cpm'],
+  [GOAL.TRAFFIC]: ['cpc'],
+  [GOAL.ENGAGEMENT]: ['cpe'],
   [GOAL.CONVERSION]: ['cpa'],
   [GOAL.STORE_VISIT]: ['cpa'],
 });
 
-/** 비교군 최소 수 — 이보다 적으면 숫자 대신 "not enough data" */
+/**
+ * 비교군 최소 수 — 이보다 적으면 벤치마크도, 판정(Good/Fair/Weak)도, 순위("best of N")도 만들지 않는다.
+ * 표본이 모자라면 "—"와 "Not enough comparison data"다. 억지로 판정을 만들지 않는다(2026-09-07 원칙).
+ */
 export const BENCHMARK_MIN_PEERS = 3;
 /** 비교 대상 시작일 — 2023년 이전 캠페인은 지표가 거의 없다(실계정 확인) */
 export const BENCHMARK_SINCE = '2024-01-01';
@@ -1639,9 +1653,13 @@ export function buildBenchmarkPeers(campaign, allCampaigns, options = {}) {
     && (c.startDate ?? '') >= since
     && (!region || accountRegionById[c.accountId] === region)
   );
-  const samePhase = base.filter((c) => phaseKey(c) === phaseKey(campaign));
-  if (samePhase.length >= BENCHMARK_MIN_PEERS) return { peers: samePhase, scope: 'phase' };
+  /* 비교군 사슬(2026-09-07): 목표가 먼저다 — 결과당 비용(CPM·CPC·CPE·CPA)은 목표가 같아야 비교가 성립한다.
+     ① 같은 플랫폼 + 같은 목표 + 같은 단계(다른 이벤트) ② 같은 플랫폼 + 같은 목표(다른 이벤트) ③ 3개 미만이면 없음.
+     같은 이벤트의 형제 캠페인은 어느 단계에도 안 들어간다(base가 이미 뺀다). 배지·셀의 ↗↘·Key takeaways가
+     전부 이 한 비교군을 공유한다 — 배지는 Weak인데 셀은 best of 5인 모순을 막는다 */
   const sameGoal = base.filter((c) => c.goal === campaign.goal);
+  const sameGoalPhase = sameGoal.filter((c) => phaseKey(c) === phaseKey(campaign));
+  if (sameGoalPhase.length >= BENCHMARK_MIN_PEERS) return { peers: sameGoalPhase, scope: 'phase' };
   if (sameGoal.length >= BENCHMARK_MIN_PEERS) return { peers: sameGoal, scope: 'goal' };
   return { peers: [], scope: 'none' };
 }
@@ -1756,6 +1774,9 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       startDate: c.startDate,
       endDate: c.endDate,
       dailyBudget: c.budgetDaily ?? null,
+      // 집행률(pacing)은 성과와 별개의 운영 상태 — 표는 계획 대비 크게 벗어날 때만 작게 보인다(RECAP_PACING_FLAG)
+      plannedBudget: effectiveBudgetPlanned(c),
+      pacingRatio: row.spend != null && effectiveBudgetPlanned(c) > 0 ? row.spend / effectiveBudgetPlanned(c) : null,
       thumbnailUrl: c.thumbnailUrl ?? null,
       rank: 0,
       benchmarks,
@@ -1794,6 +1815,10 @@ function aggregateMetric(rows, metricKey) {
     case 'hookRate': return calcHookRate(sum('hookViews'), sum('videoPlays'));
     case 'holdRate': return calcHoldRate(sum('heldViews'), sum('hookViews'));
     case 'engagementRate': return calcEngagementRate(sum('engagements'), sum('impressions'));
+    case 'cpe': {
+      const interactions = ['likes', 'comments', 'shares'].map(sum);
+      return interactions.every((v) => v == null) ? null : calcCPE(sum('spend'), interactions.reduce((a, b) => a + (b ?? 0), 0));
+    }
     default: return null;
   }
 }
@@ -2014,6 +2039,9 @@ export function buildRecapTakeaways(byPlatform) {
 // ============================================================
 
 /** 지표 → 그 지표가 말하는 것(문장의 "무엇"). 문구 키는 recapStrings의 aspect.* */
+/** 계획 대비 집행률을 표에 표시하는 문턱 — +20% 이상 초과 또는 −30% 이하 미달일 때만. 그 안은 조용히 */
+export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
+
 export const METRIC_ASPECT = Object.freeze({
   cpm: 'reach',
   cpc: 'click',
@@ -2021,8 +2049,7 @@ export const METRIC_ASPECT = Object.freeze({
   cpa: 'result',
   hookRate: 'hook',
   holdRate: 'hold',
-  engagementRate: 'engagement',
-});
+  engagementRate: 'engagement', cpe: 'engagement' });
 
 /** 근거 수준 */
 export const INSIGHT_LEVEL = Object.freeze({

@@ -17,7 +17,7 @@ import { t, metricLabel } from '../../data/recapStrings';
 import { money, percent, dateRange, EMPTY } from '../../utils/format';
 
 const fmtPercent = (v) => percent(v, { digits: 2 });
-const MONEY_KEYS = new Set(['cpm', 'cpc', 'cpa']);
+const MONEY_KEYS = new Set(['cpm', 'cpc', 'cpa', 'cpe']);
 
 /**
  * PeerCompareDialog 컴포넌트

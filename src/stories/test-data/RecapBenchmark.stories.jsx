@@ -34,10 +34,10 @@ Build Plan Phase 1의 검증 스토리. 컴포넌트 없이 \`schema.js\`의 Rec
 이 표의 숫자를 그대로 받아 그리므로, 여기 숫자가 틀리면 아래 전부가 틀린다.
 
 ### 확인 포인트
-- Meta Coming Soon / Grand Opening은 비교군 3개 이상 → scope \`phase\`, 중앙값·백분위가 있다
-- TikTok은 같은 단계 2개, 같은 goal도 2개 → scope \`none\`, 전부 \`not enough data\`
-- Now Open(store_visit)은 짝이 없어 \`none\`
-- 판정 제안: 대표 지표 백분위 평균 ≥70 good / ≤30 bad / 사이 mid, 근거 없으면 null
+- 비교군 사슬(2026-09-07): 같은 플랫폼 + 같은 goal + 같은 단계(다른 이벤트) → 같은 플랫폼 + 같은 goal → 3개 미만이면 \`none\`
+- Meta 줄 중 같은 goal 비교군이 3개 이상인 것만 scope \`phase\`/\`goal\`, 나머지는 \`none\`(전부 \`not enough data\`)
+- 판정 제안: goal별 대표 KPI 하나(cpm/cpc/cpe/cpa)의 백분위 ≥70 good / ≤30 bad / 사이 mid, 비교군 없으면 null — 억지로 만들지 않는다
+- cpe = 지출 ÷ (좋아요+댓글+공유)
 - 순위는 플랫폼 안에서 대표 지표 백분위 순
 - 머리글: 같은 단계가 겹치는 이벤트 5개 중 CPM 순위
 - localizedText: ko를 요청하면 en으로 대체하고 isFallback=true

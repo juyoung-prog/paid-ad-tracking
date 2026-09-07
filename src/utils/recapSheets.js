@@ -63,7 +63,7 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
         verdict ? `${t(`verdict.${verdict}`, lang)}${r.note?.verdict ? '' : ` (${t('verdict.suggested', lang)})`}` : '',
         r.reach, r.impressions, r.videoPlays, r.clicks, r.likes, r.comments, r.shares, r.conversions,
         ...BENCHMARK_METRICS.flatMap((m) => {
-          const isMoney = ['cpm', 'cpc', 'cpa'].includes(m.key);
+          const isMoney = ['cpm', 'cpc', 'cpa', 'cpe'].includes(m.key);
           return [isMoney ? asMoney(r[m.key]) : asPercent(r[m.key]), benchmarkText(r.benchmarks?.[m.key], isMoney, lang)];
         }),
         localizedText(r.note?.strength, lang).value, localizedText(r.note?.weakness, lang).value, localizedText(r.note?.reason, lang).value,

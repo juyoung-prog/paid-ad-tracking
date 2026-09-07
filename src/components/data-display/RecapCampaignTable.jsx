@@ -13,23 +13,24 @@ import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { VerdictChip } from './VerdictChip';
 import { t, metricLabel } from '../../data/recapStrings';
+import { RECAP_PACING_FLAG } from '../../data/schema';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
 
 const fmtPercent = (v) => percent(v, { digits: 2 });
 
 /** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다 */
 const COLUMN_WIDTH = {
-  rank: 32,
+  rank: 30,
   store: 52,
-  // 286: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07).
-  // 그만큼 순위·매장·일예산·지출·판정·참여 열을 4~8px씩 줄여 표 전체는 1296(본문 1318 안)로 유지한다
+  // 286: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07)
   campaign: 286,
   dailyBudget: 80,
   spend: 124,
   verdict: 84,
-  video: 224,
-  engagement: 168,
-  action: 246,
+  // 대표 지표 자리 + "not enough data"(≈82px)가 나란히 들어가는 폭: Video 80+24+82, Engagement 78+8+82, Action 88+24+82
+  video: 218,
+  engagement: 200,
+  action: 226,
 };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
@@ -38,8 +39,9 @@ const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteS
 /* 대표 지표 자리(slot) — 값 길이("↗ lowest of 12")와 무관하게 두 번째 지표(Hold·CPC)가 모든 줄에서 같은 x에
    오도록 첫 자리에 고정 폭을 준다. 셀 안쪽 폭: Video 192 · Action 216. 세 개(CTR·CPC·CPA)가 드는
    conversion 줄은 자리를 좁힌다 */
-const KPI_SLOT = { video: 80, action: 88, triple: 60 };
+const KPI_SLOT = { video: 80, engagement: 78, action: 88, triple: 60 };
 const KPI_GAP = 3;
+const ENGAGEMENT_GAP = 1;
 const TRIPLE_GAP = 1.5;
 /** 캠페인 목표 — 캠페인 데이터의 goal(드로어와 같은 원천). 없거나 모르는 값이면 표시하지 않는다 */
 const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 'store_visit'];
@@ -96,9 +98,12 @@ function SecondaryMetrics({ parts, minWidth }) {
  *
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 이전 보고서의 표 구성을
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
- * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·CTR·CPC·CPA)마다
+ * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 제안값(툴팁 "suggested")을 보여준다.
+ * 없으면 제안값(툴팁 "suggested")을, 비교군이 3개 미만이면 "—"(툴팁 "Not enough comparison data")를 보여준다.
+ * 판정 = 목표별 대표 KPI(GOAL_HEADLINE_METRICS) 하나의 순위, 비교군 = 같은 플랫폼·같은 목표의 다른 이벤트
+ * 캠페인(같은 단계 우선) — 셀의 ↗↘와 같은 비교군이다. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만
+ * "Over 23%" 한 줄(RECAP_PACING_FLAG).
  *
  * 상호작용은 하나다(2026-09-07): **숫자 줄 어디를 눌러도** onRowClick — 보고서는 이걸로
  * Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다.
@@ -150,7 +155,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>
               {t('recap.table.verdict', lang)}
               {/* 판정이 어디서 오는지는 툴팁 한 줄로 — 표 안에 설명문을 두지 않는다 */}
-              <Tooltip title={t('recap.table.verdictHint', lang)} arrow enterTouchDelay={0}>
+              <Tooltip title={`${t('recap.table.verdictHint', lang)} ${t('recap.table.peerHint', lang)}`} arrow enterTouchDelay={0}>
                 <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
               </Tooltip>
             </TableCell>
@@ -237,6 +242,14 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 </TableCell>
                 <TableCell align="right" sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
                   {row.dailyBudget != null ? `${money(row.dailyBudget)}/day` : EMPTY}
+                  {/* 집행률은 성과가 아니라 운영 상태 — 계획 대비 +20% 이상·−30% 이하일 때만 작게. 그 안은 조용히 */}
+                  {row.pacingRatio != null && (row.pacingRatio >= RECAP_PACING_FLAG.over || row.pacingRatio <= RECAP_PACING_FLAG.under) && (
+                    <Typography component="span" sx={{ ...META_SX, display: 'block', mt: 0.25 }}>
+                      {row.pacingRatio >= 1
+                        ? t('recap.table.over', lang, { pct: Math.round((row.pacingRatio - 1) * 100) })
+                        : t('recap.table.under', lang, { pct: Math.round((1 - row.pacingRatio) * 100) })}
+                    </Typography>
+                  )}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
                   <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.4 }}>
@@ -245,7 +258,16 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  <VerdictChip verdict={verdict} isSuggested={isSuggested} lang={lang} size="sm" />
+                  {/* 비교군 3개 미만이면 판정을 만들지 않는다 — "—"에 이유를 툴팁으로 */}
+                  {!verdict && hasData ? (
+                    <Tooltip title={t('recap.table.noComparison', lang)} placement="top" enterDelay={300}>
+                      <Box component="span" sx={{ display: 'inline-block', cursor: 'help' }}>
+                        <VerdictChip verdict={null} lang={lang} size="sm" />
+                      </Box>
+                    </Tooltip>
+                  ) : (
+                    <VerdictChip verdict={verdict} isSuggested={isSuggested} lang={lang} size="sm" />
+                  )}
                 </TableCell>
                 {!hasData ? (
                   <TableCell colSpan={3} sx={{ ...CELL_SX, color: 'text.secondary' }}>{t('recap.table.noData', lang)}</TableCell>
@@ -268,7 +290,10 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         [metricLabel('comments', lang), count(row.comments)],
                         [metricLabel('shares', lang), count(row.shares)],
                       ]} />
-                      <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                      <Box sx={{ display: 'flex', gap: ENGAGEMENT_GAP }}>
+                        <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.engagement} />
+                        <MetricCell row={row} metricKey="cpe" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                      </Box>
                     </TableCell>
                     <TableCell sx={CELL_SX}>
                       <SecondaryMetrics minWidth={56} parts={[
