@@ -1491,7 +1491,8 @@ export const GOAL_HEADLINE_METRICS = Object.freeze({
  * important: 판정을 한 단 내릴 수 있는 진단 지표(하나라도 하위면 Good → Fair)
  * secondary: 판정에는 안 쓰고 한 줄 설명("· weak hold")에만 쓴다
  * 규칙: primary 상위 → Good(important에 하위가 있으면 Fair) · primary 중간 → Fair · primary 하위 → Weak ·
- * primary 벤치마크가 하나도 없으면 판정 없음. 없는 지표는 감점하지 않는다. 설정을 바꾸려면 이 표만 고친다.
+ * primary 구간이 하나도 없으면 판정 없음. 구간은 **현재 값 vs PERFORMANCE_STANDARDS**(과거 비교군 아님).
+ * 없는 지표는 감점하지 않는다. 설정을 바꾸려면 이 표와 PERFORMANCE_STANDARDS만 고친다.
  */
 export const GOAL_PERFORMANCE_RULES = Object.freeze({
   [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], important: ['hookRate', 'holdRate'], secondary: ['engagementRate', 'ctr', 'cpc'] }),
@@ -1567,7 +1568,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
  * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 종합 성과(Performance) 자동 판정(buildPerformanceVerdict). 사람이 고른 note.verdict가 우선
- * @property {{ verdict: string|null, primaryBand: string|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }} performance - 종합 성과 판정 재료
+ * @property {{ verdict: string|null, primaryKey: string|null, primaryBand: string|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }} performance - 종합 성과 판정 재료(현재 값 vs PERFORMANCE_STANDARDS)
  * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
  * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
@@ -1802,9 +1803,9 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 세 층을 섞지 않는다: budgetEfficiency = 이 캠페인의 결과당 비용(과거 무관) · benchmarks = 과거 비교 · pacingRatio = 계획 대비 집행
       budgetEfficiency: budgetEfficiency(row, c.goal),
-      // 종합 성과(Performance) — 목표별 규칙(GOAL_PERFORMANCE_RULES)을 같은 benchmarks에 적용. 사람이 고른 note.verdict가 있으면 그것이 우선
-      performance: buildPerformanceVerdict(benchmarks, c.goal),
-      suggestedVerdict: buildPerformanceVerdict(benchmarks, c.goal).verdict,
+      // 종합 성과(Performance) — 이 캠페인의 현재 값을 기준 범위에 댄 판정(과거 비교군 무관). 사람이 고른 note.verdict가 있으면 그것이 우선
+      performance: buildPerformanceVerdict(row, c.platform, c.goal),
+      suggestedVerdict: buildPerformanceVerdict(row, c.platform, c.goal).verdict,
       // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
       kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
       note: notesById[c.id] ?? null,
@@ -2093,19 +2094,63 @@ export function buildRecapTakeaways(byPlatform) {
 export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
 
 /**
- * 종합 성과 판정 — GOAL_PERFORMANCE_RULES를 benchmarks(과거 비교군 구간)에 적용한다. 임원용 한 단어(Good/Fair/Weak) +
- * 설명 재료. 구간이 없는 지표는 무시하고, primary 구간이 하나도 없으면 판정하지 않는다(억지로 만들지 않는다).
- * 비용 효율(KPI 값)·목표치 비교·과거 순위와는 별개 층 — 이 판정은 "목표에 맞는 지표들이 비교군 대비 어디였나"만 말한다.
- * @param {Object<string, BenchmarkStat>} benchmarks
- * @param {string} goal
- * @returns {{ verdict: 'good'|'mid'|'bad'|null, primaryBand: 'top'|'mid'|'bottom'|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }}
+ * 종합 성과의 **기준 범위** — 플랫폼·지표별 good/weak 문턱(2026-09-07). 이 캠페인의 **현재 값**을 이 범위에 대는 것이라
+ * 과거 비교군이 없어도 판정이 나온다. 값은 2024-01-01 이후 우리 캠페인 전체의 사분위(상위 25% / 하위 25%)에서 출발했고
+ * (Meta n≈70, TikTok n≈30; 산출 스크립트는 커밋 메시지 참고) 제품 설정으로 여기서 손보면 된다 — 외부 업계 평균이 아니다.
+ * 비용 지표는 good ≤ / weak ≥, 비율 지표는 good ≥ / weak ≤. 없는 항목(TikTok CTR은 전부 0, CPA는 데이터 없음)은
+ * 평가에서 뺀다 — 없는 지표로 감점하지 않는다.
  */
-export function buildPerformanceVerdict(benchmarks, goal) {
+export const PERFORMANCE_STANDARDS = Object.freeze({
+  [PLATFORM.META]: Object.freeze({
+    cpm: { good: 6.3, weak: 13.2 },
+    cpc: { good: 0.48, weak: 1.02 },
+    cpe: { good: 1.11, weak: 6.03 },
+    ctr: { good: 0.0223, weak: 0.0065 },
+    hookRate: { good: 0.291, weak: 0.188 },
+    holdRate: { good: 0.142, weak: 0.070 },
+    engagementRate: { good: 0.0128, weak: 0.0014 },
+  }),
+  [PLATFORM.TIKTOK]: Object.freeze({
+    cpm: { good: 2.91, weak: 5.65 },
+    cpc: { good: 1.30, weak: 2.13 },
+    cpe: { good: 2.98, weak: 9.93 },
+    hookRate: { good: 0.097, weak: 0.040 },
+    holdRate: { good: 0.055, weak: 0.029 },
+    engagementRate: { good: 0.0023, weak: 0.0003 },
+  }),
+});
+
+/**
+ * 현재 값 하나 → 기준 범위 구간. 기준이 없거나 값이 없으면 null(평가에서 뺀다).
+ * @returns {'top'|'mid'|'bottom'|null}
+ */
+export function performanceBand(platform, metricKey, value) {
+  const std = PERFORMANCE_STANDARDS[platform]?.[metricKey];
+  if (!std || value == null || !Number.isFinite(value)) return null;
+  const lowerIsBetter = BENCHMARK_METRICS.find((m) => m.key === metricKey)?.lowerIsBetter ?? false;
+  if (lowerIsBetter) return value <= std.good ? 'top' : value >= std.weak ? 'bottom' : 'mid';
+  return value >= std.good ? 'top' : value <= std.weak ? 'bottom' : 'mid';
+}
+
+/**
+ * 종합 성과 판정 — **이 캠페인의 현재 지표**를 PERFORMANCE_STANDARDS에 대고 GOAL_PERFORMANCE_RULES로 합친다(2026-09-07).
+ * 과거 비교군(benchmarks)은 쓰지 않는다 — 그건 별개 층(vs past)이고, 비교군이 없어도 성과 데이터만 있으면 판정이 나온다.
+ * primary 상위 → Good(important 진단 하위면 Fair) · 중간 → Fair · 하위 → Weak · primary 구간이 하나도 없으면 null.
+ * 설명 재료: primary 대표 지표의 구간 + 두드러진 진단 지표 하나(하위 우선). 원인은 말하지 않는다.
+ * @param {Object} row - getGoalMetricsRow() 결과(현재 값)
+ * @param {string} platform
+ * @param {string} goal
+ * @returns {{ verdict: 'good'|'mid'|'bad'|null, primaryKey: string|null, primaryBand: 'top'|'mid'|'bottom'|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }}
+ */
+export function buildPerformanceVerdict(row, platform, goal) {
   const rule = GOAL_PERFORMANCE_RULES[goal] ?? null;
-  const band = (key) => { const s = benchmarks?.[key]; return s && s.peerScope !== 'none' && s.percentile != null ? s.band : null; };
-  if (!rule) return { verdict: null, primaryBand: null, weakDiag: null, strongDiag: null, primaryKeys: [] };
-  const primaryBands = rule.primary.map(band).filter(Boolean);
-  const primaryBand = primaryBands.length === 0 ? null : primaryBands.includes('bottom') ? 'bottom' : primaryBands.every((b) => b === 'top') ? 'top' : 'mid';
+  const band = (key) => performanceBand(platform, key, row?.[key]);
+  if (!rule) return { verdict: null, primaryKey: null, primaryBand: null, weakDiag: null, strongDiag: null, primaryKeys: [] };
+  const primaryBands = rule.primary.map((k) => [k, band(k)]).filter(([, b]) => b);
+  const bands = primaryBands.map(([, b]) => b);
+  const primaryBand = bands.length === 0 ? null : bands.includes('bottom') ? 'bottom' : bands.every((b) => b === 'top') ? 'top' : 'mid';
+  // 설명에 쓸 대표 지표: 구간이 있는 primary 중 판정을 결정한 것(하위가 있으면 그것, 아니면 첫 번째)
+  const primaryKey = (primaryBands.find(([, b]) => b === primaryBand) ?? primaryBands[0])?.[0] ?? null;
   const diag = (keys, want) => keys.find((k) => band(k) === want) ?? null;
   const weakImportant = diag(rule.important, 'bottom');
   const weakDiag = weakImportant ?? diag(rule.secondary, 'bottom');
@@ -2114,7 +2159,7 @@ export function buildPerformanceVerdict(benchmarks, goal) {
   if (primaryBand === 'top') verdict = weakImportant ? VERDICT.MID : VERDICT.GOOD;
   else if (primaryBand === 'mid') verdict = VERDICT.MID;
   else if (primaryBand === 'bottom') verdict = VERDICT.BAD;
-  return { verdict, primaryBand, weakDiag, strongDiag, primaryKeys: rule.primary };
+  return { verdict, primaryKey, primaryBand, weakDiag, strongDiag, primaryKeys: rule.primary };
 }
 
 /**

@@ -87,7 +87,7 @@ const rowForAi = (row, platformLabel) => ({
   metrics: Object.fromEntries(BENCHMARK_METRICS.map((m) => {
     const b = row.benchmarks?.[m.key];
     return [m.key, b?.peerScope === 'none' || b?.percentile == null
-      ? { value: b?.value ?? null, benchmark: 'not enough data' }
+      ? { value: b?.value ?? null, benchmark: 'no comparison' }
       : { value: b.value, median: b.median, percentile: b.percentile, peers: b.sampleSize, scope: b.peerScope }];
   })),
 });

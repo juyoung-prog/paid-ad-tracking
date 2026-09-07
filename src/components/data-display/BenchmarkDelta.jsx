@@ -37,7 +37,7 @@ const EMPHASIS = {
  *
  * 계산은 하지 않는다 — 중앙값·백분위·구간(band)은 schema.js의 benchmarkStat이
  * 정해서 넘긴다. 이 컴포넌트는 그 결과를 글자로 바꿀 뿐이다. 비교군이 부족하면
- * (peerScope 'none') 값 아래에 "not enough data"만 흐리게 적는다.
+ * (peerScope 'none') 값 아래에 "vs past —"만 흐리게 적는다 — 값 자체가 없다는 뜻이 아니라 과거 비교가 없다는 뜻(툴팁 "Not enough comparison data").
  *
  * Props:
  * @param {{ value: number|null, median: number|null, percentile: number|null, sampleSize: number, peerScope: 'phase'|'goal'|'none', band: 'top'|'mid'|'bottom'|null }} stat - schema.js benchmarkStat() 결과 [Required]
@@ -73,7 +73,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
       median: format(stat.median),
       position: positionText,
     }) + (peerLabel ? ` ${t(stat.peerScope === 'phase' ? 'benchmark.sample.phase' : 'benchmark.sample.goal', lang, { n: stat.sampleSize, phase: peerLabel, goal: peerLabel })}` : '')
-    : t('benchmark.notEnough', lang);
+    : t('recap.table.noComparison', lang);
 
   return (
     <Tooltip title={tooltip} placement="top" enterDelay={400}>
