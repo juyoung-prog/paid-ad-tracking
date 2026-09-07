@@ -98,7 +98,7 @@ const scenarios = [
     flow: [
       '레일 Reports(내부 /recap) 진입 → 이벤트 목록(최근 종료 순, Draft/Ready 상태)',
       '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), Key takeaways(임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE), 단계 타임라인(행 클릭 → 표의 그 단계 줄 펼침), 플랫폼별 캠페인 표(줄 클릭 → 캠페인 상세 드로어: 성과·페이싱·Campaign insights(What worked · Could improve · Why · Next action)·일별 지출), Learnings(다음 이벤트 플레이북: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)',
-      '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·참여당 비용·CPC)마다 벤치마크 — 같은 플랫폼·같은 목표(같은 단계 우선)의 다른 이벤트 캠페인 중앙값 대비 차이와 백분위. Efficiency 배지는 목표별 대표 KPI 하나(인지 CPM·트래픽 CPC·참여 CPE·전환 CPA)의 순위. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
+      '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·참여당 비용·CPC)마다 벤치마크 — 같은 플랫폼·같은 목표(같은 단계 우선)의 다른 이벤트 캠페인 중앙값 대비 차이와 백분위. Efficiency 칸은 두 줄 — 배지 = 목표별 대표 KPI(인지 CPM·트래픽 CPC·참여 CPE)의 결과당 비용을 우리 기준값(EFFICIENCY_STANDARD, 2024년 이후 중앙값)과 견준 예산 효율(비교군 없어도 나옴), 아래 "vs past" = 같은 KPI의 과거 비교군 순위. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
       '판정(good/mid/bad)은 백분위로 자동 제안하고 사람이 바꾼다',
       '캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언 작성 → 저장 (2단계, 로그인 필요)',
       'Export 드롭다운 — Google Sheets(표를 클립보드로 복사 후 sheets.new) 또는 PDF(브라우저 인쇄), 언어 드롭다운(en/ko/zh-Hant) — 읽기는 로그인 없이 열린다',
@@ -533,7 +533,7 @@ const entities = [
       { field: 'strength / weakness / reason', type: 'LocalizedText', format: '언어별', desc: '이전 보고서의 장점 · 아쉬운 점 · 이유', example: '—' },
       { field: 'organicViews / organicEngagements', type: 'number | null', format: '정수', desc: '계정 전체(오가닉) 조회·참여 — 광고 API에 없어 선택 입력(3단계)', example: '100250' },
     ],
-    note: 'Recap 벤치마크는 저장하지 않는 계산 전용: 비교군 = 같은 platform + 같은 goal + 같은 단계의 다른 이벤트 캠페인(3개 미만이면 같은 platform + 같은 goal, 그래도 미만이면 판정·순위 없음) · 대상은 비율 지표(CPM·CTR·CPC·CPE·CPA·Hook·Hold·참여율) · 중앙값 + 백분위 + N · 판정 = goal별 대표 KPI 하나(CPM/CPC/CPE/CPA)의 백분위 상위 30% good / 하위 30% bad · CPE = 지출 ÷ (좋아요+댓글+공유) · 2024년 이후만 · Meta와 TikTok을 섞지 않는다 · 집행률(pacing)은 성과와 분리.',
+    note: 'Recap 벤치마크는 저장하지 않는 계산 전용: 비교군 = 같은 platform + 같은 goal + 같은 단계의 다른 이벤트 캠페인(3개 미만이면 같은 platform + 같은 goal, 그래도 미만이면 판정·순위 없음) · 대상은 비율 지표(CPM·CTR·CPC·CPE·CPA·Hook·Hold·참여율) · 중앙값 + 백분위 + N · 배지 판정 = goal별 대표 KPI 하나(CPM/CPC/CPE)를 우리 기준값(EFFICIENCY_STANDARD)과 견줘 80% 이하 good / 120% 초과 bad(비교군 불필요), 과거 대비 순위는 백분위 상위 30% / 하위 30% · CPE = 지출 ÷ (좋아요+댓글+공유) · 2024년 이후만 · Meta와 TikTok을 섞지 않는다 · 집행률(pacing)은 성과와 분리.',
   },
 ];
 

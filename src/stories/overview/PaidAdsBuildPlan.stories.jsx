@@ -57,7 +57,8 @@ const recapEnums = [
   { name: 'BENCHMARK_METRICS', value: "[cpm, cpc, cpa, cpe(지출 ÷ 좋아요+댓글+공유), ctr, hookRate, holdRate, engagementRate] — 비율 지표만, 비용 지표는 lowerIsBetter" },
   { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
-  { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 대표 지표 백분위 평균이 70 이상 good, 30 이하 bad, 사이 mid' },
+  { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 과거 비교군 대비 순위(peerVerdict): 대표 KPI 백분위 70 이상 good, 30 이하 bad, 사이 mid' },
+  { name: 'EFFICIENCY_STANDARD / EFFICIENCY_BAND', value: "플랫폼·goal별 대표 KPI 기준값(2024년 이후 우리 중앙값: Meta CPM 2.68 · CPE 2.09 · CPC 0.64, TikTok CPM 3.39 · CPE 1.83 · CPC 2.13 임시) / { good: 0.8, bad: 1.2 } — 배지(예산 효율)는 이 기준 대비, 비교군 없어도 나온다(2026-09-07)" },
 ];
 
 /** schema.js 순수 함수 — 입력/출력만 적는다. 컴포넌트는 이 결과를 props로 받을 뿐 안에서 다시 계산하지 않는다. */

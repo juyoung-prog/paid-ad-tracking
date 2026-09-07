@@ -13,24 +13,28 @@ import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { VerdictChip } from './VerdictChip';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG } from '../../data/schema';
+import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS } from '../../data/schema';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
+
+/** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
+const kpiFormat = (metricKey) => (['cpm', 'cpc', 'cpa', 'cpe'].includes(metricKey) ? money : (v) => percent(v, { digits: 2 }));
 
 const fmtPercent = (v) => percent(v, { digits: 2 });
 
 /** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다 */
 const COLUMN_WIDTH = {
-  rank: 30,
-  store: 52,
-  // 286: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07)
-  campaign: 286,
+  rank: 28,
+  store: 50,
+  // 282: "Jul 10 – Aug 31 (53 days) · Engagement"(≈210px)가 썸네일(28+8) 옆 한 줄에 들어가는 폭(2026-09-07)
+  campaign: 282,
   dailyBudget: 80,
-  spend: 124,
-  verdict: 84,
-  // 대표 지표 자리 + "not enough data"(≈82px)가 나란히 들어가는 폭: Video 80+24+82, Engagement 78+8+82, Action 88+24+82
-  video: 218,
-  engagement: 200,
-  action: 226,
+  spend: 120,
+  // 118: 배지 + 아래 "vs past · ↗ lowest of 12"(≈85px) 한 줄
+  verdict: 118,
+  // 대표 지표 자리 + "↗ lowest of 12"(≈85px)가 나란히 들어가는 폭: Video 75+24+85, Engagement 73+8+85, Action 82+24+85. 합 1316 ≤ 본문 1318
+  video: 216,
+  engagement: 198,
+  action: 224,
 };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
@@ -39,7 +43,7 @@ const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteS
 /* 대표 지표 자리(slot) — 값 길이("↗ lowest of 12")와 무관하게 두 번째 지표(Hold·CPC)가 모든 줄에서 같은 x에
    오도록 첫 자리에 고정 폭을 준다. 셀 안쪽 폭: Video 192 · Action 216. 세 개(CTR·CPC·CPA)가 드는
    conversion 줄은 자리를 좁힌다 */
-const KPI_SLOT = { video: 80, engagement: 78, action: 88, triple: 60 };
+const KPI_SLOT = { video: 75, engagement: 73, action: 82, triple: 58 };
 const KPI_GAP = 3;
 const ENGAGEMENT_GAP = 1;
 const TRIPLE_GAP = 1.5;
@@ -100,10 +104,10 @@ function SecondaryMetrics({ parts, minWidth }) {
  * 따른다 — 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간) · 일예산 · 지출 ·
  * 판정 · 영상 반응 · 참여 반응 · 행동. 비율 지표(CPM·Hook·Hold·참여율·참여당 비용·CTR·CPC·CPA)마다
  * BenchmarkDelta로 "비슷한 캠페인 대비 어디쯤"이 붙고, 판정 칸은 사람이 고른 값이
- * 없으면 제안값(툴팁 "suggested")을, 비교군이 3개 미만이면 "—"(툴팁 "Not enough comparison data")를 보여준다.
- * 판정 = 목표별 대표 KPI(GOAL_HEADLINE_METRICS) 하나의 순위, 비교군 = 같은 플랫폼·같은 목표의 다른 이벤트
- * 캠페인(같은 단계 우선) — 셀의 ↗↘와 같은 비교군이다. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만
- * "Over 23%" 한 줄(RECAP_PACING_FLAG).
+ * 없으면 제안값을 보여준다. Efficiency 칸은 두 줄(2026-09-07): **배지 = 예산 효율**(목표별 대표 KPI의 결과당
+ * 비용을 우리 기준값 EFFICIENCY_STANDARD와 견줌 — 비교군 없어도 나온다, 툴팁에 값·기준값), **아래 "vs past"** =
+ * 같은 KPI를 과거 비교군(같은 플랫폼·목표, 다른 이벤트, 3개 이상)과 견준 순위(없으면 not enough data).
+ * 셀의 ↗↘도 같은 비교군이다. Daily budget 아래에는 계획 대비 ±20/30%를 벗어날 때만 "Over 23%" 한 줄(RECAP_PACING_FLAG).
  *
  * 상호작용은 하나다(2026-09-07): **숫자 줄 어디를 눌러도** onRowClick — 보고서는 이걸로
  * Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다.
@@ -168,7 +172,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
           {rows.map((row) => {
             const hasData = row.spend != null || row.impressions != null;
             const verdict = row.note?.verdict ?? row.suggestedVerdict ?? null;
-            const isSuggested = !row.note?.verdict && Boolean(row.suggestedVerdict);
+            // Efficiency 칸의 두 줄: 배지 = 우리 기준 대비 예산 효율, 아래 = 같은 대표 KPI의 과거 캠페인 대비 순위
+            const eff = row.budgetEfficiency ?? null;
+            const kpiKey = (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
+            const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
+            const badgeHint = row.note?.verdict
+              ? ''
+              : eff?.verdict
+                ? [t('recap.table.standardHint', lang, { metric: metricLabel(eff.metricKey, lang), value: kpiFormat(eff.metricKey)(eff.value), standard: kpiFormat(eff.metricKey)(eff.standard), pct: Math.round(eff.ratio * 100), platform: row.platform, goal: t(`goal.${row.goal}`, lang) }), eff.isProvisional ? t('recap.table.standardProvisional', lang) : null, t('recap.table.suggestedNote', lang)].filter(Boolean).join(' ')
+                : hasData ? t('recap.table.noStandard', lang) : '';
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedId === row.campaignId;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
@@ -258,15 +270,28 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   {hasData && <MetricCell row={row} metricKey="cpm" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  {/* 비교군 3개 미만이면 판정을 만들지 않는다 — "—"에 이유를 툴팁으로 */}
-                  {!verdict && hasData ? (
-                    <Tooltip title={t('recap.table.noComparison', lang)} placement="top" enterDelay={300}>
-                      <Box component="span" sx={{ display: 'inline-block', cursor: 'help' }}>
-                        <VerdictChip verdict={null} lang={lang} size="sm" />
-                      </Box>
-                    </Tooltip>
-                  ) : (
-                    <VerdictChip verdict={verdict} isSuggested={isSuggested} lang={lang} size="sm" />
+                  {/* 위: 예산 효율 배지(우리 기준값 대비 — 비교군 없어도 나온다). 툴팁에 숫자와 기준값. 사람이 고른 값이면 툴팁 없음 */}
+                  <Tooltip title={badgeHint} placement="top" enterDelay={300}>
+                    <Box component="span" sx={{ display: 'inline-block', cursor: badgeHint ? 'help' : 'default' }}>
+                      <VerdictChip verdict={verdict} isSuggested={false} lang={lang} size="sm" />
+                    </Box>
+                  </Tooltip>
+                  {/* 아래: 같은 대표 KPI의 과거 캠페인 대비 순위 — 비교군 3개 미만이면 "not enough data" */}
+                  {hasData && kpiStat && (
+                    <Box sx={{ mt: 0.75 }}>
+                      <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{t('recap.table.vsPast', lang)}</Typography>
+                      <BenchmarkDelta
+                        stat={kpiStat}
+                        format={kpiFormat(kpiKey)}
+                        label={metricLabel(kpiKey, lang)}
+                        peerLabel={kpiStat.peerScope === 'phase' ? row.phaseName : row.goal}
+                        lang={lang}
+                        size="sm"
+                        hasValue={false}
+                        hasMedian={false}
+                        onClick={onBenchmarkClick && kpiStat.peerScope !== 'none' ? () => onBenchmarkClick(row.campaignId, kpiKey) : undefined}
+                      />
+                    </Box>
                   )}
                 </TableCell>
                 {!hasData ? (
