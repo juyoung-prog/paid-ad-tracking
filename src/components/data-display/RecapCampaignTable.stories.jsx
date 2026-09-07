@@ -47,6 +47,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
   },
   argTypes: {
     renderDetail: { control: false, description: '(row) => ReactNode. 있으면 줄 끝에 화살표가 붙고 누르면 그 줄 아래에 펼쳐진다(한 번에 한 줄)' },
+    selectedId: { control: 'text', description: '타임라인에서 찾아온 줄의 campaignId — 옅은 accent 면 + 왼쪽 2px 선. 펼침과 별개' },
     expandedId: { control: 'text', description: '펼친 줄의 campaignId(제어형). 안 주면 표가 스스로 기억한다' },
     onExpandedChange: { action: 'expandedChange', description: '(campaignId|null) => void' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
@@ -137,6 +138,27 @@ export const WithCampaignClick = {
   args: {
     rows: byPlatform.meta,
     onRowClick: undefined,
+    renderDetail: (row) => (
+      <RecapCampaignInsightPanel
+        row={{ ...row, insight: buildCampaignInsight(row) }}
+        platformLabel={{ meta: 'Meta', tiktok: 'TikTok' }}
+        localize={(text) => localizedText(text, 'en')}
+      />
+    ),
+  },
+  render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
+};
+
+/**
+ * 타임라인에서 찾아온 줄(selectedId) — 옅은 accent 면 + 첫 칸 왼쪽 2px 선, 글자·지표 색은 그대로.
+ * 펼침(expandedId)과 별개라 둘을 같이 줘도 해석 줄에는 색이 없다.
+ */
+export const SelectedFromTimeline = {
+  args: {
+    rows: byPlatform.meta,
+    onRowClick: undefined,
+    selectedId: byPlatform.meta[1]?.campaignId,
+    expandedId: byPlatform.meta[1]?.campaignId,
     renderDetail: (row) => (
       <RecapCampaignInsightPanel
         row={{ ...row, insight: buildCampaignInsight(row) }}

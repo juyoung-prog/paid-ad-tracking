@@ -66,7 +66,7 @@ buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 
 - Key takeaways 세 칸 — 가운데 결론 줄만 읽어도 이벤트가 잡히는지
 - Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
 - Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
-- 타임라인 "Grand Opening" 행 클릭 → Meta·TikTok 표의 그 줄이 펼쳐진다
+- 타임라인 "Grand Opening" 행 클릭 → Meta·TikTok 표의 그 줄이 펼쳐지고, 스크롤 목적지 줄에 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 빈 곳을 누르면 표시만 사라지고 해석은 열려 있다
 - Learnings: 플레이북 2×2 + NEXT EVENT 한 문장
         `,
       },

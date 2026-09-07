@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -181,6 +181,23 @@ export function RecapDetailPage() {
      표마다 한 줄씩(Meta·TikTok에 같은 단계가 있으면 둘 다). 표의 화살표로 바꾼 값도 여기로 온다. */
   const [expandedByPlatform, setExpandedByPlatform] = useState({});
   const [focusedPhaseKey, setFocusedPhaseKey] = useState(null);
+  /* 타임라인에서 찾아온 캠페인 — 표의 그 줄에 선택 표시(옅은 accent 면 + 왼쪽 선). 펼침과는 별개 상태:
+     빈 곳·다른 캠페인을 누르면 표시만 사라지고 해석은 그대로 열려 있다. 시간이 지나도 저절로 안 사라진다. */
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  useEffect(() => {
+    if (!selectedCampaignId) return undefined;
+    const onDocumentClick = (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      // 선택된 줄 안(화살표·이름 포함), 타임라인(새 선택으로 바뀐다), 드로어·대화상자·메뉴 같은 포털은 "다른 곳"이 아니다
+      if (target.closest(`#recap-row-${CSS.escape(selectedCampaignId)}`)) return;
+      if (target.closest('[data-recap-timeline]')) return;
+      if (target.closest('.MuiDrawer-root, .MuiDialog-root, .MuiPopover-root, .MuiMenu-root, .MuiTooltip-popper, .MuiSnackbar-root')) return;
+      setSelectedCampaignId(null);
+    };
+    document.addEventListener('click', onDocumentClick);
+    return () => document.removeEventListener('click', onDocumentClick);
+  }, [selectedCampaignId]);
   const [isSaving, setIsSaving] = useState(false);
   const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
   const [isSignInOpen, setIsSignInOpen] = useState(false);
@@ -454,7 +471,7 @@ export function RecapDetailPage() {
         <RecapTakeaways summary={executiveSummary} platformLabel={PLATFORM_LABEL} lang={lang} />
       </Box>
 
-      <Box sx={SECTION_CARD_SX} data-print="card">
+      <Box sx={SECTION_CARD_SX} data-print="card" data-recap-timeline>
         <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />
         <PhaseTimelineChart
           phases={phases}
@@ -471,6 +488,8 @@ export function RecapDetailPage() {
             });
             setExpandedByPlatform(next);
             setFocusedPhaseKey(phase.key);
+            // 선택 표시는 스크롤 목적지 한 줄에만 — 여러 줄을 동시에 칠하지 않는다
+            setSelectedCampaignId(firstId);
             // 펼침이 그려진 다음 프레임에 첫 줄로 — 줄 위쪽이 화면 중간쯤 오게
             if (firstId) requestAnimationFrame(() => document.getElementById(`recap-row-${firstId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           }}
@@ -489,9 +508,16 @@ export function RecapDetailPage() {
             label={`${PLATFORM_LABEL[platform]} recap table`}
             /* 줄 클릭은 해석 펼침(표 기본 동작) — 보고서를 읽다가 대시보드로 튕기지 않는다 */
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
-            onCampaignClick={setDetailCampaignId}
+            /* 다른 캠페인을 건드리면(이름·썸네일·화살표) 선택 표시는 풀린다 — 이 클릭들은 stopPropagation이라
+               document 리스너에 안 닿아서 여기서 직접 처리한다. 같은 줄이면 그대로 */
+            onCampaignClick={(campaignId) => { setDetailCampaignId(campaignId); if (campaignId !== selectedCampaignId) setSelectedCampaignId(null); }}
+            selectedId={selectedCampaignId}
             expandedId={expandedByPlatform[platform] ?? null}
-            onExpandedChange={(campaignId) => setExpandedByPlatform((prev) => ({ ...prev, [platform]: campaignId }))}
+            onExpandedChange={(campaignId) => {
+              setExpandedByPlatform((prev) => ({ ...prev, [platform]: campaignId }));
+              const touched = campaignId ?? expandedByPlatform[platform];
+              if (touched && touched !== selectedCampaignId) setSelectedCampaignId(null);
+            }}
             renderDetail={(row) => (
               <RecapCampaignInsightPanel row={insightById[row.campaignId] ?? row} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />
             )}

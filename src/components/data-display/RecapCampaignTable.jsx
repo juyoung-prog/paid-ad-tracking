@@ -8,6 +8,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
@@ -125,6 +126,7 @@ function RawLine({ parts }) {
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행 전체가 Tab/Enter로 활성화된다. 보고서는 주지 않는다 — 줄 전체가 아니라 썸네일·이름(onCampaignClick)과 화살표(renderDetail)가 각각 다른 일을 한다 [Optional]
  * @param {function} onCampaignClick - 썸네일·캠페인 이름 클릭 (campaignId) => void. 있으면 둘이 버튼이 된다 — Performance와 같은 캠페인 상세 드로어를 여는 용도. 기간 글자는 눌리지 않는다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
+ * @param {string|null} selectedId - 타임라인에서 찾아온 줄의 campaignId. 그 줄(숫자 줄만, 해석 줄 제외)에 옅은 accent 배경 + 왼쪽 2px accent 선 — "내가 고른 캠페인이 이것"이라는 방향 표시. 펼침(expandedId)과는 별개 상태라 선택이 풀려도 해석은 접히지 않는다 [Optional]
  * @param {string|null} expandedId - 펼친 줄의 campaignId. 주면 제어형(타임라인 행 클릭으로 페이지가 펼치는 용도) — onExpandedChange로 바뀐 값을 돌려받는다. 안 주면 표가 스스로 기억한다 [Optional]
  * @param {function} onExpandedChange - (campaignId|null) => void. expandedId와 짝 [Optional]
  * @param {function} renderDetail - (row) => ReactNode. 있으면 줄 오른쪽 끝에 화살표가 붙고, 누르면 그 줄 바로 아래에 반환값이 펼쳐진다(한 번에 한 줄). 캠페인 해석(RecapCampaignInsightPanel)을 숫자 옆에 두는 용도 — 줄 클릭(onRowClick)과는 별개다 [Optional]
@@ -134,7 +136,7 @@ function RawLine({ parts }) {
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => navigate(`/dashboard?campaign=${id}`)} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignClick, onBenchmarkClick, renderDetail, expandedId: controlledExpandedId, onExpandedChange, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignClick, onBenchmarkClick, renderDetail, selectedId = null, expandedId: controlledExpandedId, onExpandedChange, label = 'Recap campaign table', sx }) {
   // 펼친 줄은 한 번에 하나 — 숫자 줄과 해석 줄이 번갈아 나오면 표가 아니라 목록이 된다.
   // expandedId prop이 오면 그 값을 따르고(제어형), 없으면 내부 상태.
   const [ownExpandedId, setOwnExpandedId] = useState(null);
@@ -194,6 +196,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
             const isSuggested = !row.note?.verdict && Boolean(row.suggestedVerdict);
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isExpanded = isExpandable && expandedId === row.campaignId;
+            const isSelected = selectedId === row.campaignId;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
             const detailId = `recap-detail-${row.campaignId}`;
             return [
@@ -213,19 +216,26 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onCampaignCl
                       }
                     : undefined
                 }
-                sx={{
+                aria-selected={isSelected || undefined}
+                sx={(theme) => ({
                   cursor: handleRow ? 'pointer' : 'default',
                   // 펼친 줄은 아래 경계선을 지워 해석 면과 한 덩어리로 읽히게
                   ...(isExpanded && { '& > td': { borderBottom: 0 } }),
+                  /* 타임라인에서 찾아온 줄 — 옅은 accent 면 + 첫 칸 왼쪽 2px accent 선(inset shadow라 폭·경계선이 안 바뀐다).
+                     글자·지표 색은 그대로. hover 색보다 우선하도록 &&로 특이도를 올린다 */
+                  ...(isSelected && {
+                    '&&': { backgroundColor: alpha(theme.palette.accent.main, 0.05) },
+                    '& > td:first-of-type': { boxShadow: `inset 2px 0 0 ${theme.palette.accent.main}` },
+                  }),
                   ...(handleRow && {
                     '&:focus-visible': {
                       outline: '1px solid',
                       outlineColor: 'accent.main',
                       outlineOffset: -1,
-                      boxShadow: (theme) => `inset 0 0 0 3px ${theme.palette.accent.ring}`,
+                      boxShadow: `inset 0 0 0 3px ${theme.palette.accent.ring}`,
                     },
                   }),
-                }}
+                })}
               >
                 <TableCell sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{row.rank}</TableCell>
                 {/* 매장이 여럿인 캠페인("G01, G02, …")은 56px 열을 넘쳐 옆 칸 글자와 겹쳤다 —
