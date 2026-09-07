@@ -89,13 +89,27 @@ export function RecapTakeaways({ summary, platformLabel = {}, lang = 'en', sx })
         <Box
           key={col.kind}
           sx={{
+            position: 'relative',
             minWidth: 0,
             px: 2.5,
             py: 2.25,
-            // 칸 사이는 카드가 아니라 얇은 구분선 하나 — 데스크톱은 세로선, 모바일은 가로선
-            borderLeft: { xs: 0, md: i > 0 ? '1px solid' : 0 },
+            // 칸 사이는 카드가 아니라 얇은 구분선 하나 — 모바일은 가로선(borderTop)
             borderTop: { xs: i > 0 ? '1px solid' : 0, md: 0 },
             borderColor: 'divider',
+            /* 데스크톱 세로선은 위아래 18px 띄운 1px divider — 위아래 끝까지 닿으면 표 셀처럼 읽혀서
+               세 칸이 한 요약이 아니라 세 칸짜리 표로 보였다 */
+            ...(i > 0 && {
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                left: 0,
+                top: 18,
+                bottom: 18,
+                width: '1px',
+                backgroundColor: 'divider',
+                display: { xs: 'none', md: 'block' },
+              },
+            }),
           }}
         >
           <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, mb: 1 }}>
