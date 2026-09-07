@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import { RecapCampaignTable } from './RecapCampaignTable';
-import { buildRecapRows } from '../../data/schema';
+import { RecapCampaignInsightPanel } from './RecapCampaignInsightPanel';
+import { buildRecapRows, buildCampaignInsight, localizedText } from '../../data/schema';
 import { mockRecapCampaigns, mockRecapPerformanceRecords, mockRecapCampaignNotes } from '../../data/paidAdsMockData';
 
 /* 스토리는 계산하지 않는다 — schema.js buildRecapRows()가 순위·벤치마크·판정
@@ -45,6 +46,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
     },
   },
   argTypes: {
+    renderDetail: { control: false, description: '(row) => ReactNode. 있으면 줄 끝에 화살표가 붙고 누르면 그 줄 아래에 펼쳐진다(한 번에 한 줄)' },
     rows: { control: 'object', description: 'buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순)' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
     onRowClick: { action: 'rowClicked', description: '행 클릭 핸들러 (campaignId) => void' },
@@ -103,4 +105,23 @@ export const Narrow = {
       <RecapCampaignTable {...args} />
     </Box>
   ),
+};
+
+/**
+ * 줄 끝 화살표로 캠페인 해석을 그 자리에 펼친다(renderDetail) — 숫자와 해석을 같은
+ * 줄에서 읽는다. 한 번에 한 줄만 열리고, 줄 클릭(onRowClick)과는 별개다.
+ */
+export const Expandable = {
+  args: {
+    rows: byPlatform.meta,
+    onRowClick: undefined,
+    renderDetail: (row) => (
+      <RecapCampaignInsightPanel
+        row={{ ...row, insight: buildCampaignInsight(row) }}
+        platformLabel={{ meta: 'Meta', tiktok: 'TikTok' }}
+        localize={(text) => localizedText(text, 'en')}
+      />
+    ),
+  },
+  render: (args) => <Box sx={(theme) => ({ border: '1px solid', borderColor: 'divider', borderRadius: `${theme.shape.radius.container}px` })}><RecapCampaignTable {...args} /></Box>,
 };

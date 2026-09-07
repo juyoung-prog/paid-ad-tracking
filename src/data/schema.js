@@ -2046,10 +2046,16 @@ const knownStats = (row) => Object.values(row.benchmarks ?? {}).filter((b) => b 
  * - weakness: 하위 구간(bottom/lowest)인 벤치마크 중 백분위 최저. 없으면 계획 대비
  *   20% 이상 초과 지출(observed)
  * - reason: 관측된 패턴의 해석(inferred). 패턴이 없으면 unknown
+ * - recommendation: 위 세 재료에서만 나오는 다음 실험(inferred). 관측 결과 → 다음에
+ *   확인할 것이지, 마케팅 일반론이 아니다. 근거가 없으면 null(칸을 비운다)
+ *   · keepAndTest: 장점·약점이 둘 다 있을 때 — 장점을 낸 설정은 유지, 약점 지표를 개선 대상으로
+ *   · repeat: 장점만 — 이 캠페인을 기준점으로 삼고 같은 지표가 유지되는지 확인
+ *   · improve: 약점만 — 약점 지표를 넘어야 할 기준선으로
+ *   · budget: 초과 지출만 — 예산 페이스 확인
  *
  * @param {Object} row - buildRecapRows()의 행(benchmarks 포함)
  * @param {{ plannedBudget?: number|null }} [options]
- * @returns {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object }}
+ * @returns {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object, recommendation: Object|null }}
  */
 export function buildCampaignInsight(row, options = {}) {
   const hasData = row && (row.spend != null || row.impressions != null);
@@ -2062,7 +2068,7 @@ export function buildCampaignInsight(row, options = {}) {
     return h !== 0 ? h : (dir === 'top' ? byPct(a, b) : -byPct(a, b));
   });
 
-  if (!hasData) return { hasData: false, strength: null, weakness: null, reason: { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noData' } };
+  if (!hasData) return { hasData: false, strength: null, weakness: null, reason: { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noData' }, recommendation: null };
 
   const top = rank(stats.filter((b) => b.band === 'top'), 'top');
   const bottom = rank(stats.filter((b) => b.band === 'bottom'), 'bottom');
@@ -2102,7 +2108,15 @@ export function buildCampaignInsight(row, options = {}) {
   else if ((known('cpm') || known('ctr') || known('cpc')) && top.length + bottom.length === 1) reason = { level: INSIGHT_LEVEL.INFERRED, kind: 'singleSignal', metricKey: (top[0] ?? bottom[0]).metricKey, aspect: METRIC_ASPECT[(top[0] ?? bottom[0]).metricKey], isStrong: top.length === 1 };
   else reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPattern' };
 
-  return { hasData: true, strength, weakness, reason };
+  // Recommendation — 장점·약점 재료가 있을 때만. 없으면 null이라 칸이 비고, 지어내지 않는다
+  let recommendation = null;
+  if (strength && weakness?.kind === 'ranked') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'keepAndTest', keepAspect: strength.aspect, testAspect: weakness.aspect, testMetricKey: weakness.metricKey };
+  else if (strength && weakness?.kind === 'overspend') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'keepAndBudget', keepAspect: strength.aspect, pct: weakness.pct };
+  else if (strength) recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'repeat', aspect: strength.aspect, metricKey: strength.metricKey };
+  else if (weakness?.kind === 'ranked') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'improve', aspect: weakness.aspect, metricKey: weakness.metricKey };
+  else if (weakness?.kind === 'overspend') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'budget', pct: weakness.pct };
+
+  return { hasData: true, strength, weakness, reason, recommendation };
 }
 
 /**

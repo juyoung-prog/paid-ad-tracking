@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
@@ -6,6 +8,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import { ScrollArea } from '../container/ScrollArea';
 import { BenchmarkDelta } from './BenchmarkDelta';
@@ -27,6 +30,8 @@ const COLUMN_WIDTH = {
   engagement: 176,
   action: 248,
 };
+/** 펼침 화살표 열 — renderDetail이 있을 때만 붙는다 */
+const EXPAND_WIDTH = 40;
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1.25 };
@@ -92,13 +97,19 @@ function RawLine({ parts }) {
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {function} onRowClick - 행 클릭 핸들러 (campaignId) => void. 있으면 행이 Tab/Enter로 활성화된다 [Optional]
  * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
+ * @param {function} renderDetail - (row) => ReactNode. 있으면 줄 오른쪽 끝에 화살표가 붙고, 누르면 그 줄 바로 아래에 반환값이 펼쳐진다(한 번에 한 줄). 캠페인 해석(RecapCampaignInsightPanel)을 숫자 옆에 두는 용도 — 줄 클릭(onRowClick)과는 별개다 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => navigate(`/dashboard?campaign=${id}`)} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, renderDetail, label = 'Recap campaign table', sx }) {
+  // 펼친 줄은 한 번에 하나 — 숫자 줄과 해석 줄이 번갈아 나오면 표가 아니라 목록이 된다
+  const [expandedId, setExpandedId] = useState(null);
+  const isExpandable = Boolean(renderDetail);
+  const toggle = (campaignId) => setExpandedId((current) => (current === campaignId ? null : campaignId));
+
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -107,13 +118,14 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
     );
   }
 
-  const tableWidth = Object.values(COLUMN_WIDTH).reduce((a, b) => a + b, 0);
+  const columnWidths = [...Object.values(COLUMN_WIDTH), ...(isExpandable ? [EXPAND_WIDTH] : [])];
+  const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
 
   return (
     <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.store + COLUMN_WIDTH.campaign} sx={sx}>
       <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
         <colgroup>
-          {Object.values(COLUMN_WIDTH).map((w, i) => <col key={i} style={{ width: w }} />)}
+          {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
         </colgroup>
         <TableHead>
           <TableRow>
@@ -132,6 +144,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.video', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.engagement', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.action', lang)}</TableCell>
+            {isExpandable && <TableCell sx={{ ...HEAD_SX, p: 0 }} aria-label={t('recap.table.expand', lang)} />}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -140,7 +153,9 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const verdict = row.note?.verdict ?? row.suggestedVerdict ?? null;
             const isSuggested = !row.note?.verdict && Boolean(row.suggestedVerdict);
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
-            return (
+            const isExpanded = isExpandable && expandedId === row.campaignId;
+            const detailId = `recap-detail-${row.campaignId}`;
+            return [
               <TableRow
                 key={row.campaignId}
                 hover={Boolean(onRowClick)}
@@ -158,6 +173,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 }
                 sx={{
                   cursor: onRowClick ? 'pointer' : 'default',
+                  // 펼친 줄은 아래 경계선을 지워 해석 면과 한 덩어리로 읽히게
+                  ...(isExpanded && { '& > td': { borderBottom: 0 } }),
                   ...(onRowClick && {
                     '&:focus-visible': {
                       outline: '1px solid',
@@ -227,8 +244,31 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </TableCell>
                   </>
                 )}
-              </TableRow>
-            );
+                {isExpandable && (
+                  <TableCell sx={{ ...CELL_SX, px: 0.5, textAlign: 'center' }}>
+                    <IconButton
+                      size="small"
+                      aria-label={t(isExpanded ? 'recap.table.collapse' : 'recap.table.expand', lang)}
+                      aria-expanded={isExpanded}
+                      aria-controls={isExpanded ? detailId : undefined}
+                      onClick={(event) => { event.stopPropagation(); toggle(row.campaignId); }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      sx={{ color: isExpanded ? 'accent.main' : 'text.secondary', p: 0.5, mt: -0.25 }}
+                    >
+                      <ExpandMoreIcon sx={(theme) => ({ fontSize: theme.iconSize.control, transition: theme.transitions.create('transform', { duration: theme.transitions.duration.shortest }), transform: isExpanded ? 'rotate(180deg)' : 'none' })} />
+                    </IconButton>
+                  </TableCell>
+                )}
+              </TableRow>,
+              isExpanded && (
+                /* 해석 줄 — 표의 일부다. 카드가 아니라 한 단 가라앉은 면(surface.sunken)과 경계선 하나 */
+                <TableRow key={`${row.campaignId}-detail`} id={detailId}>
+                  <TableCell colSpan={columnWidths.length} sx={{ p: 0, backgroundColor: 'surface.sunken', borderTop: '1px solid', borderColor: 'divider' }}>
+                    {renderDetail(row)}
+                  </TableCell>
+                </TableRow>
+              ),
+            ];
           })}
         </TableBody>
       </Table>

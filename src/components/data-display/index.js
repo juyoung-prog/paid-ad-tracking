@@ -10,5 +10,5 @@ export { RecapCampaignTable } from './RecapCampaignTable.jsx';
 export { RecapHeader } from './RecapHeader.jsx';
 export { RecapTakeaways } from './RecapTakeaways.jsx';
 export { RecapStatusBadge } from './RecapStatusBadge.jsx';
-export { RecapCampaignInsights } from './RecapCampaignInsights.jsx';
+export { RecapCampaignInsightPanel } from './RecapCampaignInsightPanel.jsx';
 export { RecapPatterns } from './RecapPatterns.jsx';

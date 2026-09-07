@@ -16,7 +16,7 @@ import { BackendErrorBanner } from '../../components/data-display/BackendErrorBa
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
 import { RecapTakeaways } from '../../components/data-display/RecapTakeaways';
-import { RecapCampaignInsights } from '../../components/data-display/RecapCampaignInsights';
+import { RecapCampaignInsightPanel } from '../../components/data-display/RecapCampaignInsightPanel';
 import { RecapPatterns } from '../../components/data-display/RecapPatterns';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
@@ -129,8 +129,10 @@ function LocalizedParagraph({ text, lang, sx }) {
  * RecapDetailPage
  *
  * 이벤트 하나의 결과 보고서(/recap/:event) — 02-ux-flow 시나리오 7. 머리글(순위
- * 한 줄 포함) → 요약 → 단계 타임라인 → 플랫폼별 캠페인 표(벤치마크 포함) →
- * Notes(캠페인별 판정·장점·아쉬운 점·이유) → Learnings(배운 점·다음 제언).
+ * 한 줄 포함) → 요약 → Key takeaways → 단계 타임라인 → 플랫폼별 캠페인 표(벤치마크
+ * 포함, 줄을 펼치면 그 캠페인의 What worked·What could improve·Why·Recommendation) →
+ * Learnings(배운 점·다음 제언·데이터에서 본 패턴). 캠페인별 코멘트 편집(Notes) 카드는
+ * 편집 모드에서만 나온다.
  *
  * **읽기는 누구나, 쓰기는 로그인.** Edit를 누르면 세션이 없을 때만 SignInDialog가
  * 뜬다(앱 전체 로그인 게이트는 꺼져 있다 — App.jsx). 편집은 로컬 draft에 쌓였다가
@@ -286,12 +288,13 @@ export function RecapDetailPage() {
   }, {});
   const shownRecap = isEditing && draft ? draft.recap : recap;
   const editRows = platformOrder.flatMap((p) => byPlatform[p]);
-  /* Notes는 캠페인 전부 — 사람이 쓴 글이 있으면 그것, 없으면 데이터 해석(원인은 지어내지
-     않는다). 계획 예산은 캠페인 단위 값(effectiveBudgetPlanned)으로 초과 지출 판정에만 쓴다. */
-  const insightRows = editRows.map((r) => {
+  /* 캠페인 해석은 표의 줄을 펼치면 그 자리에 — 사람이 쓴 글이 있으면 그것, 없으면 데이터
+     해석(원인은 지어내지 않는다). 계획 예산은 캠페인 단위 값(effectiveBudgetPlanned)으로
+     초과 지출 판정에만 쓴다. 편집 중에는 draft의 코멘트가 바로 반영된다. */
+  const insightById = Object.fromEntries(editRows.map((r) => {
     const campaign = eventCampaigns.find((c) => c.id === r.campaignId);
-    return { ...r, insight: buildCampaignInsight(r, { plannedBudget: campaign ? effectiveBudgetPlanned(campaign) : null }) };
-  });
+    return [r.campaignId, { ...r, insight: buildCampaignInsight(r, { plannedBudget: campaign ? effectiveBudgetPlanned(campaign) : null }) }];
+  }));
   const localize = (text) => localizedText(text, lang);
   const hasWrittenLearnings = Boolean(recap?.learnings?.length);
   const hasWrittenNextSteps = Boolean(localize(recap?.nextSteps).value);
@@ -456,16 +459,20 @@ export function RecapDetailPage() {
             label={`${PLATFORM_LABEL[platform]} recap table`}
             onRowClick={isEditing ? undefined : (campaignId) => navigate(`/dashboard?campaign=${campaignId}`)}
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
+            renderDetail={(row) => (
+              <RecapCampaignInsightPanel row={insightById[row.campaignId] ?? row} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />
+            )}
           />
         </Box>
       ))}
 
-      <Box sx={SECTION_CARD_SX} data-print="card">
-        <SectionHeader
-          title={t('recap.section.notes', lang)}
-          scope={countScope(editRows.length, 'campaign', lang)}
-        />
-        {isEditing && draft ? (
+      {/* 코멘트 편집은 편집 모드에서만 별도 카드 — 읽을 때는 표의 줄을 펼쳐서 본다 */}
+      {isEditing && draft && (
+        <Box sx={SECTION_CARD_SX} data-print="card">
+          <SectionHeader
+            title={t('recap.section.notes', lang)}
+            scope={countScope(editRows.length, 'campaign', lang)}
+          />
           <Box>
             {editRows.map((r, i) => (
               <RecapNoteEditor
@@ -481,10 +488,8 @@ export function RecapDetailPage() {
               />
             ))}
           </Box>
-        ) : (
-          <RecapCampaignInsights rows={insightRows} platformLabel={PLATFORM_LABEL} localize={localize} lang={lang} />
-        )}
-      </Box>
+        </Box>
+      )}
 
       {isEditing && draft ? (
         <Box sx={SECTION_CARD_SX} data-print="card">

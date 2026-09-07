@@ -536,7 +536,7 @@ export const mockRecapCampaignNotes = [
     verdict: 'good',
     strength: { en: 'Strongest reach efficiency and hook rate among comparable Meta Grand Opening campaigns, with the highest click volume in the event.', ko: null, 'zh-Hant': null },
     weakness: { en: 'Largest spend of the event, so its results carry the most weight in the event total — worth watching if the phase is repeated at this size.', ko: null, 'zh-Hant': null },
-    reason: { en: 'Efficient on every comparable metric. The data confirms the result but does not separate creative, targeting or timing as the driver.', ko: null, 'zh-Hant': null },
+    reason: { en: 'Efficient on every comparable metric. The data confirms the result but does not show which factor drove it.', ko: null, 'zh-Hant': null },
     organicViews: 100250,
     organicEngagements: null,
   },
