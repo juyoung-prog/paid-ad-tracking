@@ -77,9 +77,9 @@ export function RecapPatterns({ patterns, platformLabel = {}, hasWrittenLearning
           {/* 카드 안의 카드가 되지 않게 — 경계는 divider의 절반 농도, 배경·그림자 없음 */}
           {items.map((item, i) => (
             <Box key={i} sx={(theme) => ({ px: 1.5, py: 1.25, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), borderRadius: `${theme.shape.radius.control}px`, minWidth: 0 })}>
-              <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1.5 }}>
+              {/* 상태는 제목 바로 옆(카드 오른쪽 끝이 아니라) — 제목과 한 덩어리로 읽힌다. 작은 점 + 글자, 배지·배경 없음 */}
+              <Box sx={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: 1.5 }}>
                 <Typography component="h4" sx={{ fontSize: 13, fontWeight: 600, m: 0, lineHeight: 1.4, minWidth: 0 }}>{item.title}</Typography>
-                {/* 상태는 같은 줄 오른쪽 — 작은 점 + 글자, 배지·배경 없음 */}
                 <Typography component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75, fontSize: 12, fontWeight: 600, color: STATUS_COLOR[item.status], whiteSpace: 'nowrap', flexShrink: 0 }}>
                   <Box aria-hidden component="span" sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: 'currentColor' }} />
                   {item.statusText ?? t(`learn.status.${item.status}`, lang)}
@@ -90,15 +90,16 @@ export function RecapPatterns({ patterns, platformLabel = {}, hasWrittenLearning
           ))}
         </Box>
       )}
+      {/* 결정은 격자보다 한 단 크게(15px/600), 이유는 보조. 위에 얇은 선으로 격자와 나눈다 */}
       {!hasWrittenNextSteps && (
-        <Box sx={{ mt: 2 }}>
-          <Typography component="h4" sx={{ fontSize: 11, fontWeight: 500, color: 'text.secondary', m: 0, mb: 0.5 }}>{t('learn.action.title', lang)}</Typography>
+        <Box sx={{ mt: 2, pt: 1.75, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Typography component="h4" sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary', m: 0, mb: 0.75 }}>{t('learn.action.title', lang)}</Typography>
           {actions.length === 0 ? (
             <Typography variant="body2" sx={{ color: 'text.secondary' }}>{t('learn.action.empty', lang)}</Typography>
           ) : actions.map((a, i) => (
-            <Box key={i} sx={{ mb: i < actions.length - 1 ? 1 : 0 }}>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: 'text.primary', lineHeight: 1.4 }}>{a.action}</Typography>
-              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mt: 0.25 }}>{a.why}</Typography>
+            <Box key={i} sx={{ mb: i < actions.length - 1 ? 1.25 : 0 }}>
+              <Typography sx={{ fontSize: 15, fontWeight: 600, color: 'text.primary', lineHeight: 1.4 }}>{a.action}</Typography>
+              <Typography sx={{ fontSize: 12, color: 'text.secondary', lineHeight: 1.5, mt: 0.375 }}>{a.why}</Typography>
             </Box>
           ))}
         </Box>
