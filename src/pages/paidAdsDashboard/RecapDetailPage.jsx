@@ -481,7 +481,10 @@ export function RecapDetailPage() {
                   {['strength', 'weakness', 'reason'].map((key) => (
                     <Box key={key}>
                       <Typography component="span" sx={{ display: 'block', fontSize: 11, color: 'text.secondary', mb: 0.25 }}>{t(`recap.note.${key}`, lang)}</Typography>
-                      <LocalizedParagraph text={r.note[key]} lang={lang} />
+                      {/* 비어 있는 칸은 라벨만 덩그러니 두지 않고 '—'로 — 안 쓴 것과 못 불러온 것을 구분 */}
+                      {localizedText(r.note[key], lang).value
+                        ? <LocalizedParagraph text={r.note[key]} lang={lang} />
+                        : <Typography variant="body2" sx={{ color: 'text.disabled' }}>{t('verdict.none', lang)}</Typography>}
                     </Box>
                   ))}
                 </Box>
