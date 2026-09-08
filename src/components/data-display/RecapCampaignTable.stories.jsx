@@ -42,7 +42,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 
 ### 계산은 하지 않는다
 \`rows\`는 \`schema.js\`의 \`buildRecapRows().byPlatform[platform]\` — 순위·벤치마크·
-판정 제안까지 끝난 값이다. 이 컴포넌트는 자리에 놓고 \`utils/format\`으로 표기만
+Primary KPI·해석 재료(insight)까지 끝난 값이다. 이 컴포넌트는 자리에 놓고 \`utils/format\`으로 표기만
 한다. 문구는 \`recapStrings\`에서 꺼낸다.
 
 ### 폭

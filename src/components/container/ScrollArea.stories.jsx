@@ -34,6 +34,8 @@ export default {
   스크롤바 쪽을 쓴다 — 신호를 없애면 위의 함정이 그대로 돌아오므로 바꾸기만 한다.
   좌우 페이드는 두 모드 모두 그대로다
 - 그림자는 검정 알파 그라디언트라 색을 더하지 않고, 클릭도 가로채지 않는다
+- 좌우 페이드는 가벼운 단서일 뿐이다(2026-09-08 — 24px·20%짜리 띠가 마지막 열 숫자를 흐렸다):
+  \`edgeStrength='strong'\`(기본)은 20px·8%, \`'subtle'\`은 16px·5%. 오른쪽 끝에 닿으면 완전히 사라진다
 - \`startOffset\`으로 좌측 그림자 위치를 안쪽으로 밀 수 있다 — 표의 고정(sticky) 열처럼
   스크롤해도 제자리에 있는 요소가 앞을 덮고 있을 때, 그림자는 그 요소의 오른쪽 경계에
   붙어야 "여기서부터 움직인다"로 읽힌다
@@ -57,6 +59,11 @@ export default {
     maxHeight: {
       control: { type: 'number', min: 0, max: 1000 },
       description: '세로 최대 높이(px). 주면 세로 스크롤도 이 영역이 받고, 넘치면 scrollHint가 정한 신호를 띄운다',
+    },
+    edgeStrength: {
+      control: { type: 'radio' },
+      options: ['strong', 'subtle'],
+      description: "좌우 페이드의 무게 — 'strong'(기본, 20px·8%) 또는 'subtle'(16px·5%, 거의 다 들어오는 보고서 표)",
     },
     scrollHint: {
       control: { type: 'radio' },

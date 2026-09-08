@@ -64,7 +64,7 @@ localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF�
 - 머리글 순위 "Best of 5 comparable events by CPM"
 - Key takeaways 세 칸 — 가운데 결론 줄만 읽어도 이벤트가 잡히는지
 - Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
-- Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
+- 표에 등급 열은 없다 — Primary KPI(목표별 실제 값)·vs past(순위)·해석 네 열뿐. Grand Opening의 What worked/Could improve/Why는 사람이 쓴 note(툴팁 "Written by a person in Edit."), 나머지는 순위 근거 문장
 - 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
 - 줄 클릭 → 드로어(성과·페이싱·일별 지출). 해석 네 열(What worked · Could improve · Why · Next action)은 표의 오른쪽 끝에(2026-09-08)
 - Learnings 섹션 없음(2026-09-08) — 편집 모드에서만 이벤트 글(상태·요약·배운 점·제언) 폼
@@ -79,7 +79,7 @@ export const Default = {
   render: () => render(recapStore(), '/recap/G10%20Opening'),
 };
 
-/** 보고서를 아직 시작하지 않은 이벤트 — Notes는 2단계 안내, Learnings 카드는 없다 */
+/** 보고서를 아직 시작하지 않은 이벤트 — 사람이 쓴 note가 없어 해석 네 열이 전부 자동 문장 */
 export const NotStarted = {
   render: () => render(recapStore(), '/recap/BF4%20Opening'),
 };
