@@ -142,15 +142,31 @@ function SecondaryMetrics({ parts, minWidth }) {
 }
 
 /**
+ * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다(2026-09-08).
+ * 글자·숫자가 하나도 없거나(자모·기호만), 흔한 임시 표기면 자동 문장으로 넘긴다.
+ */
+const isPlaceholder = (text) => {
+  const s = String(text ?? '').trim();
+  if (!s) return true;
+  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(s)) return true;
+  // 한글 자모(ㅇㅁㄴ…)·기호·공백만 남으면 내용 없음
+  return s.replace(/[\u3131-\u318E○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
+};
+
+/**
  * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군 몇 개 중 어디였나)를 한 문장으로.
- * 근거가 있는 말만 한다: 순위·백분위·초과 지출. 원인은 관측된 관계만 적고 "the data does not show why"로 닫는다.
+ * What worked / Could improve: 순위·백분위·초과 지출처럼 비교가 성립하는 말만("CPM ranked best among 12 comparable …").
+ * Why: 지표만으로는 원인이 서지 않으므로 항상 "Not enough evidence to determine why." — 관측과 원인을 섞지 않는다.
+ * Next action: 목표 + 대표 KPI + 가장 두드러진 신호 + 개선 여지에서 캠페인마다 다르게 만든다(오프닝이 강하면 "오프닝을 다시
+ * 시험하고 …로 이어지는지", 도달이 효율적인데 참여가 약하면 "효율적인 도달이 비용을 늘리지 않고 참여를 만드는지").
  * 사람이 Edit에서 쓴 note가 있으면 호출부가 그것을 먼저 쓴다.
  */
 function insightSentence(field, item, row, platformLabel, lang) {
   if (!item) return null;
+  const goalWord = GOAL_KEYS.includes(row.goal) ? t(`goalLabel.${row.goal}`, lang).toLowerCase() : row.goal;
   const scope = (it) => (it.scope === 'phase'
     ? t('cell.scope.phase', lang, { platform: platformLabel, phase: row.phaseName })
-    : t('cell.scope.goal', lang, { platform: platformLabel, goal: GOAL_KEYS.includes(row.goal) ? t(`goalLabel.${row.goal}`, lang).toLowerCase() : row.goal }));
+    : t('cell.scope.goal', lang, { platform: platformLabel, goal: goalWord }));
   if (field === 'strength' || field === 'weakness') {
     if (item.kind === 'overspend') return t('cell.improve.overspend', lang, { pct: item.pct });
     const stat = item.stat; if (!stat) return null;
@@ -158,13 +174,22 @@ function insightSentence(field, item, row, platformLabel, lang) {
     if (field === 'strength') return stat.percentile >= 100 ? t('cell.worked.best', lang, params) : t('cell.worked.top', lang, { ...params, pct: 100 - stat.percentile });
     return stat.percentile <= 0 ? t('cell.improve.lowest', lang, params) : t('cell.improve.bottom', lang, { ...params, pct: stat.percentile });
   }
-  if (field === 'reason') {
-    const known = ['reachNotAction', 'actionNotReach', 'hookNotHold', 'holdNotHook', 'allStrong', 'allWeak'];
-    return t(`cell.why.${known.includes(item.kind) ? item.kind : 'unknown'}`, lang);
+  if (field === 'reason') return t('cell.why.unknown', lang);
+  // recommendation — 시험할 것은 약한 지표의 종류가 정한다(참여율이 약하면 참여율, 참여당 비용이 약하면 비용)
+  const testOf = (aspect, metricKey) => (aspect === 'engagement' ? t(metricKey === 'cpe' ? 'cell.test.cpe' : 'cell.test.engagementRate', lang) : aspect ? t(`cell.test.${aspect}`, lang) : '');
+  const keepOf = (aspect) => (aspect ? t(`cell.keep.${aspect}`, lang) : '');
+  const metric = item.metricKey ? metricLabel(item.metricKey, lang) : '';
+  if (item.kind === 'keepAndTest') {
+    const outcomeKey = ['hold', 'engagement', 'click', 'result'].includes(item.testAspect) ? item.testAspect : null;
+    if (item.keepAspect === 'hook' && outcomeKey) return t('cell.next.hookThen', lang, { outcome: t(`cell.outcome.${outcomeKey}`, lang) });
+    if (item.keepAspect === 'reach' && outcomeKey && outcomeKey !== 'hold') return t('cell.next.reachThen', lang, { outcome: t(`cell.outcome.${outcomeKey}`, lang) });
+    return t('cell.next.keepTest', lang, { keep: keepOf(item.keepAspect), test: testOf(item.testAspect, item.testMetricKey) });
   }
-  const aspect = (a) => (a ? t(`aspect.${a}`, lang) : '');
-  const short = (a) => (a ? t(`aspectShort.${a}`, lang) : '');
-  return t(`cell.next.${item.kind}`, lang, { keep: short(item.keepAspect), test: short(item.testAspect), aspect: aspect(item.aspect), metric: item.metricKey ? metricLabel(item.metricKey, lang) : '', pct: item.pct ?? '' });
+  if (item.kind === 'keepAndBudget') return t('cell.next.keepBudget', lang, { keep: keepOf(item.keepAspect), pct: item.pct });
+  if (item.kind === 'repeat') return t('cell.next.repeat', lang, { goal: goalWord, metric });
+  if (item.kind === 'improve') return t('cell.next.improve', lang, { test: testOf(item.aspect, item.metricKey), metric });
+  if (item.kind === 'budget') return t('cell.next.budget', lang, { pct: item.pct });
+  return null;
 }
 
 /**
@@ -288,11 +313,11 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   : t('recap.table.targetOn', lang, { target: kpiFormat(kpi.metricKey)(row.kpiTarget) });
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedIds.includes(row.campaignId);
-            /* 해석 네 칸 — 사람이 쓴 note가 우선, 없으면 재료(insight)에서 한 문장. 데이터 없으면 다음 행동만 "데이터 더 모으기" */
+            /* 해석 네 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—" */
             const insightCells = INSIGHT_COLUMNS.map((col) => {
               const written = col.noteField ? (localizedText(row.note?.[col.noteField], lang).value ?? '').trim() : '';
-              if (written) return { ...col, text: written, isWritten: true };
-              if (!hasData) return { ...col, text: col.field === 'recommendation' ? t('cell.next.collect', lang) : null, isWritten: false };
+              if (written && !isPlaceholder(written)) return { ...col, text: written, isWritten: true };
+              if (!hasData) return { ...col, text: null, isWritten: false };
               const auto = insightSentence(col.field, row.insight?.[col.field] ?? null, row, platformName, lang);
               return { ...col, text: auto ?? (col.field === 'reason' ? t('cell.why.unknown', lang) : null), isWritten: false };
             });
