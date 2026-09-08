@@ -56,8 +56,8 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
       t('recap.note.strength', lang), t('recap.note.weakness', lang), t('recap.note.reason', lang),
     ]);
     rows.forEach((r) => {
-      // 사람이 Edit에서 고른 평가만 — 자동 등급은 만들지 않는다(2026-09-08)
-      const verdict = r.note?.verdict ?? null;
+      // 종합 성과 — 사람이 Edit에서 고른 등급이 있으면 그것, 없으면 자동 등급(overall.rating)
+      const verdict = r.note?.verdict ?? r.overall?.rating ?? null;
       push([
         r.rank, r.storeCode, r.phaseName, r.name, r.startDate, r.endDate,
         asMoney(r.dailyBudget), asMoney(r.spend),

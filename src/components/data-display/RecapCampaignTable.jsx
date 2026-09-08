@@ -12,7 +12,8 @@ import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, METRIC_ASPECT } from '../../data/schema';
+import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, METRIC_ASPECT, localizedText } from '../../data/schema';
+import { VerdictChip } from './VerdictChip';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
 
 /** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
@@ -20,38 +21,27 @@ const kpiFormat = (metricKey) => (['cpm', 'cpc', 'cpa', 'cpe'].includes(metricKe
 
 const fmtPercent = (v) => percent(v, { digits: 2 });
 
-/** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다. vs target이 있을 때의 기준 폭(합 1642) */
+/**
+ * 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다(합 1640). 회장님 보고서의 정보 구조를 따른다:
+ * 순위 · 매장 · 캠페인 · 일예산 · 지출 · 종합 성과 · 영상 반응 · 참여 반응 · 강점 · 개선점 · 이유
+ */
 const COLUMN_WIDTH = {
   rank: 26,
   store: 46,
   // 250: "Jul 6 – Aug 31 (57 days) · Awareness"는 한 줄, 가장 긴 조합은 "·" 뒤에서 목표만 다음 줄로
   campaign: 250,
-  // 목표 결과: 목표 이름 + 현재 지표("CTR 0.28% · CPC $0.88 · 1,074 clicks") — 등급이 아니라 사실이라 두 줄까지
-  goalResult: 216,
   dailyBudget: 80,
   // 실제 총지출만
   spend: 100,
-  // 결과당 비용 하나: 라벨("Cost/eng") + 값("$257.94"). 124는 머리글 "Cost efficiency" + ⓘ가 옆 열을 침범하지 않는 폭
-  costEfficiency: 124,
-  // 설정된 목표치 대비 — 이 표의 캠페인 중 하나라도 목표치가 있을 때만 열이 생긴다
-  vsTarget: 74,
-  // 과거 비교군 순위("↗ best of 12") — 과거 데이터가 쓰이는 유일한 열
-  vsPast: 88,
-  // 대표 지표 자리 + "↗ lowest of 12"(≈79px)가 나란히 들어가는 폭: Video 75+24+79, Engagement 73+8+79, Action 82+24+79
+  // 등급 배지(STRONG/AVERAGE/WEAK 또는 Insufficient data) + 아래 목표 결과의 비용 KPI 한 줄("CPM $2.41") + (목표치가 있으면 vs target)
+  overall: 150,
+  // 대표 지표 자리 + "↗ lowest of 12"(≈79px)가 나란히 들어가는 폭: Video 75+24+79 · Engagement 두 개 73+8+79, 전환 셋 58+58+79+24
   video: 216,
-  engagement: 198,
-  action: 224,
-};
-/**
- * vs target 열이 숨을 때 그 74px를 나눠 갖는 열 — 글자·지표가 많은 열에만(캠페인 이름 말줄임, 목표 결과 줄바꿈,
- * 지표 옆 순위 글자). #·매장·예산·지출·비용 효율·vs past 같은 짧은 숫자 열은 늘리지 않는다. 표 전체 폭은 그대로 1642
- */
-const TARGET_REDISTRIBUTION = { campaign: 14, goalResult: 20, video: 14, engagement: 12, action: 14 };
-const columnWidthsFor = (hasTargets) => {
-  if (hasTargets) return COLUMN_WIDTH;
-  const { vsTarget: _hidden, ...rest } = COLUMN_WIDTH;
-  Object.entries(TARGET_REDISTRIBUTION).forEach(([key, extra]) => { rest[key] += extra; });
-  return rest;
+  engagement: 232,
+  // 자동 문장(12px, 두 줄까지) 또는 사람이 쓴 문장
+  strengths: 150,
+  improve: 150,
+  reason: 240,
 };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
@@ -124,47 +114,37 @@ function SecondaryMetrics({ parts, minWidth }) {
 }
 
 /**
- * 목표 결과 한 조각 — 판정이 아니라 현재 값의 표기다. 수량은 "1,074 clicks", 나머지는 "CPM $2.41".
- * 없는 값은 호출 전에 걸러진다(schema buildGoalResult) — 여기서 지어내지 않는다.
- */
-const goalResultPart = (metric, lang) => {
-  if (metric.key === 'clicks') return t('recap.table.goalResultClicks', lang, { n: count(metric.value) });
-  if (metric.key === 'conversions') return t('recap.table.goalResultResults', lang, { n: count(metric.value) });
-  const format = ['cpm', 'cpc', 'cpa', 'cpe'].includes(metric.key) ? money : fmtPercent;
-  return `${metricLabel(metric.key, lang)} ${format(metric.value)}`;
-};
-
-/**
  * RecapCampaignTable 컴포넌트
  *
- * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 열 순서는 캠페인 → 목표 결과 → 일예산 → 지출 →
- * 비용 효율 → vs target → vs past → 영상 · 참여 · 행동이다. 다섯 질문이 각각 제 열을 갖고 섞이지 않는다(2026-09-08):
- * **Goal result** "이 캠페인이 하려던 일에서 무슨 값이 나왔나" = 목표에 맞는 **현재 실측치**만(인지 Hook·Hold ·
- * 트래픽 CTR·클릭 · 참여 참여율 + Hook·Hold · 전환 결과 수 + CTR·CPC). 목표의 비용 KPI(CPM·CPC·Cost/eng·CPA)는 여기 없다 —
- * Cost efficiency 열 하나에만 둔다(같은 값이 두 열에 있었다, 2026-09-08). 공식 KPI 목표치가 없으므로
- * Good/Fair/Weak 등급도 "Efficient cost" 같은 평가어도 만들지 않는다 — 값이 답이다. 값이 없으면 그 지표를 뺀다.
- * **Cost efficiency** = 이 캠페인의 결과당 비용 하나(인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환 CPA).
- * **vs target** = 캠페인에 설정된 목표치와의 비교뿐, 없으면 "—"(다른 값으로 대신하지 않는다). 이 표의 캠페인 중 하나도
- * 목표치가 없으면 열 자체를 숨기고 그 폭을 캠페인·목표 결과·영상·참여·행동 열에 나눠 준다(표 폭은 그대로, 2026-09-08).
- * **vs past** = 다른 이벤트의 비슷한 과거 캠페인 사이 순위뿐(3개 미만이면 "—"). 과거 데이터는 이 열에서만 쓴다.
- * **Video · Engagement · Action** = 자세한 근거. 계획 대비 집행률은 Daily budget 아래 ±20/30%를 벗어날 때만(RECAP_PACING_FLAG).
+ * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 회장님이 보던 보고서의 정보 구조를 따른다(2026-09-08):
+ * 순위 · 매장 · 캠페인(28px 소재 썸네일 + 단계 이름 + 기간 · 목표) · 일예산 · 지출 · **종합 성과** · 영상 반응 · 참여 반응 ·
+ * 강점 · 개선점 · 이유. 세 층으로 읽힌다 — 1층 종합 성과(STRONG/AVERAGE/WEAK 한 단어, 5초) → 2층 무슨 일이 있었나
+ * (영상·참여 반응 숫자) → 3층 해석(강점·개선점·이유). 유료 광고 보고서라 Paid/Total 구분 라벨은 두지 않는다.
  *
- * 상호작용은 하나다(2026-09-07): **숫자 줄 어디를 눌러도** onRowClick — 보고서는 이걸로
- * Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다.
- * 줄 끝 셰브론과 줄 아래 펼침은 찾기 어려워서 뺐고, 해석은 드로어 안으로 옮겼다.
- * 벤치마크 글자(onBenchmarkClick)는 stopPropagation으로 줄 클릭에서 빠진다.
- * selectedIds는 타임라인에서 고른 단계에 속한 줄들 표시(옅은 accent 면 + 왼쪽 2px 선) — 단계가 Meta+TikTok이면 두 표에 한 줄씩.
+ * **종합 성과**는 schema.js buildOverallPerformance() — 캠페인 목표(OVERALL_RULES)가 어떤 지표를 얼마나 중요하게 볼지 정하고,
+ * 비용 + 영상 반응 + 참여 반응을 합친다. 대표 지표가 등급을 정하고 보조 지표는 한 단만 움직인다. 회사 KPI 기준값이 없으므로
+ * 고정 문턱은 없고, 각 지표는 앱의 기존 잣대(같은 플랫폼·목표의 과거 비교군 구간)로 읽되 순위 하나가 등급을 정하지 않는다.
+ * 대표 지표를 읽을 수 없으면 "Insufficient data" — 억지로 등급을 만들지 않는다. 배지 아래에는 목표 결과의 비용 KPI("CPM $2.41",
+ * 옅게)와, 캠페인에 설정된 목표치가 있을 때만 "↓ 20% vs target" 한 줄(목표치 계산·데이터는 그대로다).
+ * 사람이 Edit에서 고른 등급(note.verdict)과 쓴 문장(note.strength/weakness/reason)이 자동 값보다 우선한다.
  *
- * 계산은 하지 않는다 — rows는 schema.js buildRecapRows()가 순위·벤치마크·판정
- * 제안까지 끝낸 결과다. 이 컴포넌트는 그 값을 자리에 놓고 utils/format으로
- * 표기만 한다. 문구는 recapStrings에서 꺼낸다.
+ * **영상 반응** = Reach · Plays · Avg + Hook/Hold(비교군 화살표는 보조). **참여 반응**은 목표가 강조를 정한다 — 트래픽은
+ * Clicks + CTR/CPC, 전환은 Results + CPA/CTR/CPC, 나머지는 Like·Cmt·Share + Eng. rate/Cost/eng.
+ * **강점·개선점·이유**는 등급과 같은 근거(지표 구간)에서 자동 생성 — 중요도 순으로 상위/하위인 지표 하나둘을 문장으로.
+ * 인지 캠페인의 낮은 CTR은 개선점이 되지 않는다(supporting은 등급에 안 들어가고 문구에서도 뒤로 밀린다). 원인은 단정하지 않는다.
+ *
+ * 상호작용: **숫자 줄 어디를 눌러도** onRowClick — 캠페인 상세 드로어. 벤치마크 글자(onBenchmarkClick)는 stopPropagation.
+ * selectedIds는 타임라인에서 고른 단계의 줄 표시(옅은 accent 면 + 왼쪽 2px 선).
+ *
+ * 계산은 하지 않는다 — rows는 schema.js buildRecapRows()가 순위·벤치마크·종합 성과까지 끝낸 결과다.
+ * 이 컴포넌트는 그 값을 자리에 놓고 utils/format으로 표기만 한다. 문구는 recapStrings에서 꺼낸다.
  *
  * Props:
  * @param {Array<Object>} rows - buildRecapRows().byPlatform[platform] — 한 플랫폼의 행 배열(순위순) [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
- * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체(#·매장·썸네일·이름·기간·예산·지표·빈 곳)가 버튼이고 Tab/Enter로도 눌린다. hover는 중립 면 140ms [Optional]
- * @param {function} onBenchmarkClick - 벤치마크 줄 클릭 (campaignId, metricKey) => void. 있으면 비교군이 있는 지표의 "top 25%" 글자가 버튼이 된다 — 비교군을 나란히 보는 대화상자를 여는 용도 [Optional]
- * @param {string[]} selectedIds - 타임라인에서 고른 단계에 속한 캠페인 id들. 해당 줄에 옅은 accent 배경 + 왼쪽 2px accent 선 — "지금 고른 단계의 캠페인"이라는 방향 표시 [Optional, 기본값: []]
+ * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체가 버튼이고 Tab/Enter로도 눌린다 [Optional]
+ * @param {function} onBenchmarkClick - 벤치마크 글자 클릭 (campaignId, metricKey) => void — 비교군 대화상자 [Optional]
+ * @param {string[]} selectedIds - 타임라인에서 고른 단계에 속한 캠페인 id들 [Optional, 기본값: []]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
@@ -180,15 +160,13 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
     );
   }
 
-  // vs target 열은 이 표의 캠페인 중 하나라도 유효한 목표치가 있을 때만 — "—"로만 찬 열은 소음이라 숨기고 폭을 나눠 준다.
-  // 표시 층의 결정일 뿐 목표치 계산·데이터는 그대로다(플랫폼 표마다 따로 판단)
-  const hasTargets = rows.some((r) => r.kpiTarget > 0);
-  const widths = columnWidthsFor(hasTargets);
-  const columnWidths = Object.values(widths);
+  const columnWidths = Object.values(COLUMN_WIDTH);
   const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
+  const written = (text) => (localizedText(text, lang).value ?? '').trim();
+  const capitalize = (str) => (str ? str.charAt(0).toUpperCase() + str.slice(1) : str);
 
   return (
-    <ScrollArea label={label} startOffset={widths.rank + widths.store + widths.campaign} edgeStrength="subtle" sx={sx}>
+    <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.store + COLUMN_WIDTH.campaign} edgeStrength="subtle" sx={sx}>
       <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
         <colgroup>
           {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
@@ -198,82 +176,80 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.rank', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.store', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.campaign', lang)}</TableCell>
-            <TableCell sx={HEAD_SX}>
-              {t('recap.table.goalResult', lang)}
-              {/* 목표 결과가 무엇인지 — 등급이 아니라는 것과, 목표치·과거 비교는 따로라는 것 두 가지만 */}
-              <Tooltip
-                arrow
-                enterTouchDelay={0}
-                slotProps={{ tooltip: { sx: { maxWidth: 340 } } }}
-                title={(
-                  <Box sx={{ display: 'grid', rowGap: 0.75, py: 0.25 }}>
-                    <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.goalResultTitle', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.goalResultBody', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.goalResultBody2', lang)}</Typography>
-                  </Box>
-                )}
-              >
-                <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
-              </Tooltip>
-            </TableCell>
             <TableCell align="right" sx={HEAD_SX}>{t('recap.table.dailyBudget', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.spend', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>
-              {t('recap.table.costEfficiency', lang)}
-              {/* 툴팁은 빠른 설명만 — 정의·비교군 규칙 같은 방법론은 비교 대화상자와 문서에 */}
+              {t('recap.table.overall', lang)}
+              {/* 등급이 어디서 오는지 — 목표 가중, 고정 문턱 없음, 순위 하나가 정하지 않음, 못 읽으면 Insufficient data */}
               <Tooltip
                 arrow
                 enterTouchDelay={0}
-                slotProps={{ tooltip: { sx: { maxWidth: 340 } } }}
+                slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}
                 title={(
                   <Box sx={{ display: 'grid', rowGap: 0.75, py: 0.25 }}>
-                    <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.effTitle', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effBody', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effGoals', lang)}</Typography>
-                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.effRanking', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, fontWeight: 600, lineHeight: 1.4 }}>{t('recap.table.overallTitle', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.overallBody', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.overallBody2', lang)}</Typography>
+                    <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45, opacity: 0.9 }}>{t('recap.table.overallBody3', lang)}</Typography>
                   </Box>
                 )}
               >
                 <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
               </Tooltip>
             </TableCell>
-            {hasTargets && (
-              <Tooltip title={t('recap.table.vsTargetHint', lang)} placement="top" enterDelay={400} slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}>
-                <TableCell sx={{ ...HEAD_SX, cursor: 'help' }}>{t('recap.table.vsTarget', lang)}</TableCell>
-              </Tooltip>
-            )}
-            <Tooltip title={t('recap.table.vsPastHint', lang)} placement="top" enterDelay={400} slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}>
-              <TableCell sx={{ ...HEAD_SX, cursor: 'help' }}>{t('recap.table.vsPast', lang)}</TableCell>
-            </Tooltip>
-            <TableCell sx={HEAD_SX}>{t('recap.table.video', lang)}</TableCell>
-            <TableCell sx={HEAD_SX}>{t('recap.table.engagement', lang)}</TableCell>
-            <TableCell sx={HEAD_SX}>{t('recap.table.action', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>{t('recap.table.videoResponse', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>{t('recap.table.engagementResponse', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>{t('recap.table.strengths', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>{t('recap.table.improve', lang)}</TableCell>
+            <TableCell sx={HEAD_SX}>{t('recap.table.reason', lang)}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
           {rows.map((row) => {
             const hasData = row.spend != null || row.impressions != null;
-            /* Efficiency 칸의 두 층 — 위: 이 캠페인의 결과당 비용(과거 무관, 성과만 있으면 항상), 아래 "vs past": 같은 KPI의
-               과거 비교군 순위(3개 미만이면 "—" + 툴팁 "Not enough comparison data"). 둘은 다른 질문이라 섞지 않는다 */
-            const eff = row.budgetEfficiency ?? null;
-            const kpiKey = eff?.metricKey ?? (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
-            const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
-            const hasComparison = Boolean(kpiStat && kpiStat.peerScope !== 'none' && kpiStat.percentile != null);
-            const effHint = eff?.value != null ? t('recap.table.effValueHint', lang, { metric: metricLabel(eff.metricKey, lang), basis: t(`recap.table.effBasis.${eff.metricKey}`, lang) }) : '';
-            /* 목표 결과 — schema buildGoalResult가 고른 현재 실측치를 문자열로만 바꾼다. 등급·평가어는 만들지 않는다 */
-            const goalResult = row.goalResult ?? null;
-            const goalPrimaryText = (goalResult?.primary ?? []).map((m) => goalResultPart(m, lang)).join(' · ');
-            const goalSupportingText = (goalResult?.supporting ?? []).map((m) => goalResultPart(m, lang)).join(' · ');
-            // vs target — 캠페인에 설정된 목표치(kpiTarget)만. 없으면 "—"(Not set) — 다른 값으로 대신하지 않는다
-            const targetRatio = eff?.value != null && row.kpiTarget > 0 ? eff.value / row.kpiTarget : null;
+            const overall = row.overall ?? null;
+            const humanRating = row.note?.verdict ?? null;
+            const rating = humanRating ?? overall?.rating ?? null;
+            const isInsufficient = !rating && hasData && overall?.reason === 'insufficient';
+            const primaryLabel = (overall?.primaryKeys ?? []).map((k) => metricLabel(k, lang)).join(' + ');
+            const secondaryLabel = (overall?.secondaryKeys ?? []).map((k) => metricLabel(k, lang)).join(' · ');
+            const overallHint = humanRating ? t('recap.table.overallWritten', lang)
+              : rating ? t('recap.table.overallRule', lang, { primary: primaryLabel, secondary: secondaryLabel })
+                : isInsufficient ? t('recap.table.overallInsufficientHint', lang, { primary: primaryLabel }) : '';
+            // 배지 아래: 목표 결과의 비용 KPI 값(옅게) + 캠페인에 설정된 목표치가 있을 때만 vs target 한 줄(없으면 아무것도 — 대체값 없음)
+            const kpiKey = overall?.metricKey ?? (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
+            const kpiValue = overall?.value ?? null;
+            const targetRatio = kpiValue != null && row.kpiTarget > 0 ? kpiValue / row.kpiTarget : null;
             const targetTone = targetRatio == null ? null : targetRatio <= 0.95 ? 'success.main' : targetRatio >= 1.05 ? 'warning.main' : 'text.secondary';
             const targetText = targetRatio == null ? null
-              : targetRatio <= 0.95 ? t('recap.table.targetBetter', lang, { pct: Math.round((1 - targetRatio) * 100), target: kpiFormat(eff.metricKey)(row.kpiTarget) })
-                : targetRatio >= 1.05 ? t('recap.table.targetWorse', lang, { pct: Math.round((targetRatio - 1) * 100), target: kpiFormat(eff.metricKey)(row.kpiTarget) })
-                  : t('recap.table.targetOn', lang, { target: kpiFormat(eff.metricKey)(row.kpiTarget) });
+              : targetRatio <= 0.95 ? t('recap.table.targetBetter', lang, { pct: Math.round((1 - targetRatio) * 100), target: kpiFormat(kpiKey)(row.kpiTarget) })
+                : targetRatio >= 1.05 ? t('recap.table.targetWorse', lang, { pct: Math.round((targetRatio - 1) * 100), target: kpiFormat(kpiKey)(row.kpiTarget) })
+                  : t('recap.table.targetOn', lang, { target: kpiFormat(kpiKey)(row.kpiTarget) });
+            /* 강점·개선점·이유 — 사람이 쓴 문장이 있으면 그것, 없으면 등급과 같은 근거(지표 구간)에서 만든 문장. 원인은 단정하지 않는다 */
+            const writtenStrength = written(row.note?.strength);
+            const writtenWeakness = written(row.note?.weakness);
+            const writtenReason = written(row.note?.reason);
+            const autoStrengths = (overall?.strengths ?? []).map((k) => t(`overall.strength.${k}`, lang));
+            const autoWeaknesses = (overall?.weaknesses ?? []).map((k) => t(`overall.weak.${k}`, lang));
+            const goalWord = GOAL_KEYS.includes(row.goal) ? t(`goalLabel.${row.goal}`, lang).toLowerCase() : row.goal;
+            const strongClause = overall?.strengths?.[0] ? t(`overall.clause.strong.${overall.strengths[0]}`, lang) : null;
+            const weakClause = overall?.weaknesses?.[0] ? t(`overall.clause.weak.${overall.weaknesses[0]}`, lang) : null;
+            const autoReason = !hasData ? '' : isInsufficient && !strongClause && !weakClause ? t('overall.reason.insufficient', lang)
+              : strongClause && weakClause ? capitalize(t('overall.reason.both', lang, { strong: strongClause, weak: weakClause }))
+                : strongClause ? capitalize(t('overall.reason.strongOnly', lang, { strong: strongClause, goal: goalWord }))
+                  : weakClause ? capitalize(t('overall.reason.weakOnly', lang, { weak: weakClause, goal: goalWord }))
+                    : rating ? t('overall.reason.flat', lang, { goal: goalWord }) : t('overall.reason.insufficient', lang);
+            const isTraffic = row.goal === 'traffic';
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedIds.includes(row.campaignId);
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
+            const textCell = (text, isWritten, emptyKey) => (
+              <Tooltip title={hasData ? t(isWritten ? 'recap.table.writtenHint' : 'recap.table.autoHint', lang) : ''} placement="top" enterDelay={500}>
+                <Typography component="span" sx={{ display: 'block', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', color: text ? 'text.primary' : 'text.disabled', cursor: hasData ? 'help' : 'default' }}>
+                  {text || (hasData ? t(emptyKey, lang) : EMPTY)}
+                </Typography>
+              </Tooltip>
+            );
             return (
               <TableRow
                 key={row.campaignId}
@@ -323,12 +299,11 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   )}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  {/* [썸네일] 이름 / 기간 — 이름이 비슷한 Meta·TikTok 캠페인을 소재로 가른다. 칸 안에 따로 버튼은 없다(줄 전체가 버튼) */}
+                  {/* [썸네일] 이름 / 기간 · 목표 — 이름이 비슷한 Meta·TikTok 캠페인을 소재로 가른다. 칸 안에 따로 버튼은 없다(줄 전체가 버튼) */}
                   <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1, minWidth: 0 }}>
                     <CampaignThumbnail thumbnailUrl={row.thumbnailUrl} name={row.name} platform={row.platform} size={28} sx={(theme) => ({ borderRadius: `${theme.shape.radius.inlay}px` })} />
                     <Box sx={{ minWidth: 0 }}>
-                      {/* 이름은 한 줄 + CSS 말줄임 — 긴 이름("Instagram post: … ✨")의 이모지·점이 혼자 다음 줄로 내려가면
-                          깨져 보였다(i-26). 전체 이름은 hover 툴팁으로(단계 이름이 원본과 다르거나 길 때만) */}
+                      {/* 이름은 한 줄 + CSS 말줄임 — 긴 이름의 이모지·점이 혼자 다음 줄로 내려가면 깨져 보였다(i-26). 전체 이름은 hover 툴팁 */}
                       <Tooltip title={row.name !== row.phaseName || row.phaseName.length > 24 ? row.name : ''} placement="top" enterDelay={500}>
                         <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {row.phaseName}
@@ -340,24 +315,6 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         {GOAL_KEYS.includes(row.goal) && ` · ${t(`goalLabel.${row.goal}`, lang)}`}
                       </Typography>
                     </Box>
-                  </Box>
-                </TableCell>
-                <TableCell sx={CELL_SX}>
-                  {/* 목표 결과 — 목표 이름(작고 옅게) → 대표 지표(12px 600) → 보조 지표(옅게). 판정 배지도 평가어도 없다 */}
-                  <Box sx={{ minWidth: 0 }}>
-                    {GOAL_KEYS.includes(row.goal) && (
-                      <Typography component="span" sx={{ ...META_SX, display: 'block', lineHeight: 1.3 }}>{t(`goalLabel.${row.goal}`, lang)}</Typography>
-                    )}
-                    {goalPrimaryText ? (
-                      <Typography component="span" sx={{ display: 'block', fontSize: 12, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'normal', fontVariantNumeric: 'tabular-nums' }}>{goalPrimaryText}</Typography>
-                    ) : (
-                      <Tooltip title={t('recap.table.goalResultEmpty', lang)} placement="top" enterDelay={300}>
-                        <Typography component="span" sx={{ display: 'block', fontSize: 12, color: 'text.disabled', lineHeight: 1.4, cursor: 'help' }}>{EMPTY}</Typography>
-                      </Tooltip>
-                    )}
-                    {goalSupportingText && (
-                      <Typography component="span" sx={{ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.25 }}>{goalSupportingText}</Typography>
-                    )}
                   </Box>
                 </TableCell>
                 <TableCell align="right" sx={{ ...CELL_SX, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
@@ -375,57 +332,34 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, fontVariantNumeric: 'tabular-nums', lineHeight: 1.4 }}>
                     {money(row.spend)}
                   </Typography>
-                  {/* Spend는 실제 총지출만 — CPM·순위는 Efficiency 칸의 몫(2026-09-07, 같은 정보가 두 칸에 있었다) */}
                 </TableCell>
                 <TableCell sx={CELL_SX}>
-                  {/* 비용 효율 — 이 캠페인의 결과당 비용 하나. 라벨(KPI 이름) → 값(700). 과거·목표치와 무관해 성과만 있으면 항상 */}
-                  {eff?.value != null ? (
-                    <Tooltip title={effHint} placement="top" enterDelay={400}>
-                      <Box sx={{ minWidth: 0, cursor: 'help' }}>
-                        <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(eff.metricKey, lang)}</Typography>
-                        <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>{kpiFormat(eff.metricKey)(eff.value)}</Typography>
-                      </Box>
-                    </Tooltip>
-                  ) : (
-                    <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3 }}>{EMPTY}</Typography>
-                  )}
-                </TableCell>
-                {/* vs target 열 — 이 표에 목표치가 하나라도 있을 때만. 있는 줄은 비교(낮으면 초록, 높으면 주황, ±5% 중립), 없는 줄은 "—" */}
-                {hasTargets && (
-                  <TableCell sx={CELL_SX}>
-                    {targetText ? (
-                      <Typography component="span" sx={{ display: 'block', fontSize: 11.5, fontWeight: 500, lineHeight: 1.35, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
-                    ) : (
-                      <Tooltip title={t('recap.table.targetNotSet', lang)} placement="top" enterDelay={300}>
-                        <Typography component="span" sx={{ display: 'inline-block', fontSize: 12, color: 'text.disabled', lineHeight: 1.35, cursor: 'help' }}>{EMPTY}</Typography>
-                      </Tooltip>
-                    )}
-                  </TableCell>
-                )}
-                <TableCell sx={CELL_SX}>
-                  {/* vs past — 같은 KPI를 과거 비교군과 견준 순위. 비교군 3개 미만이면 "—"(비용 효율 값이 못 미덥다는 뜻이 아니다) */}
-                  {hasData && kpiKey && hasComparison ? (
-                    <BenchmarkDelta
-                      stat={kpiStat}
-                      format={kpiFormat(kpiKey)}
-                      label={metricLabel(kpiKey, lang)}
-                      peerLabel={kpiStat.peerScope === 'phase' ? row.phaseName : row.goal}
-                      lang={lang}
-                      size="sm"
-                      hasValue={false}
-                      hasMedian={false}
-                      onClick={onBenchmarkClick ? () => onBenchmarkClick(row.campaignId, kpiKey) : undefined}
-                    />
-                  ) : (
-                    <Tooltip title={t('recap.table.noComparison', lang)} placement="top" enterDelay={300}>
-                      <Typography component="span" sx={{ display: 'inline-block', fontSize: 12, color: 'text.disabled', lineHeight: 1.35, cursor: 'help' }}>{EMPTY}</Typography>
-                    </Tooltip>
-                  )}
+                  {/* 1층: 종합 성과 — 배지 한 단어가 지배하고, 아래 비용 KPI 값은 옅게. 규칙·근거는 툴팁 */}
+                  <Tooltip title={overallHint} placement="top" enterDelay={300} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
+                    <Box sx={{ minWidth: 0, cursor: overallHint ? 'help' : 'default' }}>
+                      {rating ? (
+                        <VerdictChip verdict={rating} lang={lang} size="sm" />
+                      ) : isInsufficient ? (
+                        <Typography component="span" sx={{ display: 'inline-block', fontSize: 10.5, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary', lineHeight: 1.4 }}>{t('recap.table.overallInsufficient', lang)}</Typography>
+                      ) : (
+                        <VerdictChip verdict={null} lang={lang} size="sm" />
+                      )}
+                      {kpiKey && kpiValue != null && (
+                        <Typography component="span" sx={{ ...META_SX, display: 'block', mt: 0.5, fontVariantNumeric: 'tabular-nums' }}>
+                          {metricLabel(kpiKey, lang)} {kpiFormat(kpiKey)(kpiValue)}
+                        </Typography>
+                      )}
+                      {targetText && (
+                        <Typography component="span" sx={{ display: 'block', fontSize: 10.5, fontWeight: 500, lineHeight: 1.35, mt: 0.25, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
+                      )}
+                    </Box>
+                  </Tooltip>
                 </TableCell>
                 {!hasData ? (
-                  <TableCell colSpan={3} sx={{ ...CELL_SX, color: 'text.secondary' }}>{t('recap.table.noData', lang)}</TableCell>
+                  <TableCell colSpan={5} sx={{ ...CELL_SX, color: 'text.secondary' }}>{t('recap.table.noData', lang)}</TableCell>
                 ) : (
                   <>
+                    {/* 2층: 영상 반응 — 보조 수량 위, 대표 Hook/Hold 아래(비교군 화살표는 보조) */}
                     <TableCell sx={CELL_SX}>
                       <SecondaryMetrics minWidth={52} parts={[
                         [metricLabel('reach', lang), count(row.reach)],
@@ -437,29 +371,53 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         <MetricCell row={row} metricKey="holdRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                       </Box>
                     </TableCell>
+                    {/* 2층: 참여 반응 — 목표가 강조를 정한다. 트래픽은 Clicks + CTR/CPC, 전환은 Results + CPA/CTR/CPC, 나머지는 Like·Cmt·Share + Eng. rate/Cost/eng */}
                     <TableCell sx={CELL_SX}>
-                      <SecondaryMetrics minWidth={36} parts={[
-                        [metricLabel('likes', lang), count(row.likes)],
-                        [metricLabel('comments', lang), count(row.comments)],
-                        [metricLabel('shares', lang), count(row.shares)],
-                      ]} />
-                      <Box sx={{ display: 'flex', gap: ENGAGEMENT_GAP }}>
-                        <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.engagement} />
-                        <MetricCell row={row} metricKey="cpe" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
-                      </Box>
+                      {isTraffic ? (
+                        <>
+                          <SecondaryMetrics minWidth={40} parts={[
+                            [metricLabel('clicks', lang), count(row.clicks)],
+                            [metricLabel('likes', lang), count(row.likes)],
+                            [metricLabel('comments', lang), count(row.comments)],
+                            [metricLabel('shares', lang), count(row.shares)],
+                          ]} />
+                          <Box sx={{ display: 'flex', gap: KPI_GAP }}>
+                            <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.action} />
+                            <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                          </Box>
+                        </>
+                      ) : isConversion ? (
+                        <>
+                          <SecondaryMetrics minWidth={40} parts={[
+                            [metricLabel('conversions', lang), count(row.conversions)],
+                            [metricLabel('clicks', lang), count(row.clicks)],
+                            [metricLabel('likes', lang), count(row.likes)],
+                            [metricLabel('comments', lang), count(row.comments)],
+                          ]} />
+                          <Box sx={{ display: 'flex', gap: TRIPLE_GAP }}>
+                            <MetricCell row={row} metricKey="cpa" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.triple} />
+                            <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.triple} />
+                            <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                          </Box>
+                        </>
+                      ) : (
+                        <>
+                          <SecondaryMetrics minWidth={36} parts={[
+                            [metricLabel('likes', lang), count(row.likes)],
+                            [metricLabel('comments', lang), count(row.comments)],
+                            [metricLabel('shares', lang), count(row.shares)],
+                          ]} />
+                          <Box sx={{ display: 'flex', gap: ENGAGEMENT_GAP }}>
+                            <MetricCell row={row} metricKey="engagementRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={KPI_SLOT.engagement} />
+                            <MetricCell row={row} metricKey="cpe" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />
+                          </Box>
+                        </>
+                      )}
                     </TableCell>
-                    <TableCell sx={CELL_SX}>
-                      <SecondaryMetrics minWidth={56} parts={[
-                        [metricLabel('clicks', lang), count(row.clicks)],
-                        [metricLabel('conversions', lang), count(row.conversions)],
-                        [metricLabel('profileVisits', lang), count(row.profileVisits)],
-                      ]} />
-                      <Box sx={{ display: 'flex', gap: isConversion ? TRIPLE_GAP : KPI_GAP }}>
-                        <MetricCell row={row} metricKey="ctr" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={isConversion ? KPI_SLOT.triple : KPI_SLOT.action} />
-                        <MetricCell row={row} metricKey="cpc" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} minWidth={isConversion ? KPI_SLOT.triple : undefined} />
-                        {isConversion && <MetricCell row={row} metricKey="cpa" format={money} lang={lang} onBenchmarkClick={onBenchmarkClick} />}
-                      </Box>
-                    </TableCell>
+                    {/* 3층: 해석 — 사람이 쓴 문장이 우선, 없으면 등급과 같은 근거에서 만든 문장(최대 두 줄) */}
+                    <TableCell sx={CELL_SX}>{textCell(writtenStrength || autoStrengths.join('\n'), Boolean(writtenStrength), 'overall.none')}</TableCell>
+                    <TableCell sx={CELL_SX}>{textCell(writtenWeakness || autoWeaknesses.join('\n'), Boolean(writtenWeakness), 'overall.noneWeak')}</TableCell>
+                    <TableCell sx={CELL_SX}>{textCell(writtenReason || autoReason, Boolean(writtenReason), 'overall.reason.flat')}</TableCell>
                   </>
                 )}
               </TableRow>

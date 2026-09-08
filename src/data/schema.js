@@ -1486,36 +1486,66 @@ export const GOAL_HEADLINE_METRICS = Object.freeze({
 });
 
 /**
- * 목표별 **목표 결과(Goal result)에 요약할 현재 지표** — 점수도 판정도 아니다(2026-09-08).
- * 공식 KPI 목표치가 없으므로 Good/Fair/Weak 등급을 만들지 않는다. 이 표는 "이 목표의 캠페인은 무엇을 보면 되나"만 정하고,
- * 값은 이 캠페인의 현재 실측치를 그대로 쓴다 — 기준값·목표치(vs target)·과거 비교(vs past)는 이 층에 들어오지 않는다.
- * primary: 목표를 바로 말하는 지표(굵게) · supporting: 곁들이는 지표(옅게, 있을 때만)
- * 목표의 비용 KPI(GOAL_HEADLINE_METRICS: 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환 CPA)는 여기 넣지 않는다 — 그건
- * Cost efficiency 열의 것이고, 두 열에 같은 값이 있으면 훑기 어렵다(2026-09-08). 목표 결과 = "무엇이 나왔나", 비용 효율 = "얼마 들었나".
+ * 종합 성과(Overall performance) 평가 규칙 — **캠페인 목표가 어떤 지표를 얼마나 중요하게 볼지** 정한다(2026-09-08).
+ * primary: 등급을 정하는 지표 · secondary: 등급을 한 단만 움직이는 지표(primary가 상위인데 secondary가 하위면 AVERAGE,
+ * primary가 하위인데 secondary가 상위면 AVERAGE) · supporting: 등급에는 안 쓰고 강점·개선점 문구에만.
+ * 인지 캠페인이 CTR·참여가 낮다고 WEAK가 되지 않고, 트래픽 캠페인은 클릭 지표가 등급을 정한다.
+ * 회사 승인 KPI 기준값이 없으므로 고정 문턱(CPM < $3 = Strong 같은 것)은 쓰지 않는다 — 각 지표는 앱에 이미 있는
+ * 검증된 잣대, 즉 같은 플랫폼·목표의 과거 비교군 구간(benchmarks.band: 백분위 70 이상 top · 30 이하 bottom, 비교군 3개 이상)으로
+ * 읽는다. 다만 순위 하나가 등급을 정하지 않는다 — 여러 지표를 목표 가중으로 합친 결과다. primary 구간이 하나도 없으면
+ * INSUFFICIENT DATA — 억지로 등급을 만들지 않는다.
  */
-export const GOAL_RESULT_METRICS = Object.freeze({
-  [GOAL.AWARENESS]: Object.freeze({ primary: ['hookRate', 'holdRate'], supporting: [] }),
-  [GOAL.TRAFFIC]: Object.freeze({ primary: ['ctr', 'clicks'], supporting: [] }),
-  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['engagementRate'], supporting: ['hookRate', 'holdRate'] }),
-  [GOAL.CONVERSION]: Object.freeze({ primary: ['conversions'], supporting: ['ctr', 'cpc'] }),
-  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['conversions'], supporting: ['ctr', 'cpc'] }),
+export const OVERALL_RULES = Object.freeze({
+  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], secondary: ['hookRate', 'holdRate'], supporting: ['engagementRate'] }),
+  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['engagementRate', 'cpe'], secondary: ['hookRate', 'holdRate'], supporting: ['cpm'] }),
+  [GOAL.TRAFFIC]: Object.freeze({ primary: ['ctr', 'cpc'], secondary: ['hookRate', 'holdRate', 'engagementRate'], supporting: ['cpm'] }),
+  [GOAL.CONVERSION]: Object.freeze({ primary: ['cpa'], secondary: ['ctr', 'cpc'], supporting: ['hookRate', 'holdRate'] }),
+  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['cpa'], secondary: ['ctr', 'cpc'], supporting: ['hookRate', 'holdRate'] }),
 });
 
+/** 여러 지표의 구간을 하나로 — 전부 top이면 top, bottom이 있고 top이 없으면 bottom, 그 외 mid. 없으면 null */
+const combineBands = (bands) => {
+  if (bands.length === 0) return null;
+  const hasTop = bands.includes('top');
+  const hasBottom = bands.includes('bottom');
+  if (hasTop && !hasBottom) return bands.every((b) => b === 'top') ? 'top' : 'mid';
+  if (hasBottom && !hasTop) return 'bottom';
+  return 'mid';
+};
+
 /**
- * 목표 결과 — "이 캠페인이 하려던 일에서 지금 실제로 어떤 값이 나왔나"(2026-09-08). 등급·점수·기준 비교가 아니라
- * 현재 실측치를 목표에 맞게 골라 담은 것이다. 값이 없는 지표는 빼고 지어내지 않는다. 네 층은 서로 독립이다:
- * 목표 결과(현재 값) · 비용 효율(결과당 현재 비용) · vs target(설정된 목표치) · vs past(과거 비교군 순위).
- * @param {Object} row - getGoalMetricsRow() 결과
+ * 종합 성과 — "전체적으로 이 캠페인은 어땠나"에 한 단어(STRONG/AVERAGE/WEAK)로 답한다(2026-09-08).
+ * 목표(OVERALL_RULES) → 중요한 지표 → 비용 + 영상 반응 + 참여 반응을 비교군 구간으로 읽어 합친다.
+ * 규칙: primary 구간이 top → STRONG(secondary가 bottom이면 AVERAGE) · mid → AVERAGE · bottom → WEAK(secondary가 top이면
+ * AVERAGE). primary 구간이 없으면 rating null + reason 'insufficient'. 성과 데이터 자체가 없으면 reason 'noData'.
+ * strengths/weaknesses는 같은 근거에서 — 중요도 순(primary → secondary → supporting)으로 top/bottom인 지표 키, 최대 2개.
+ * 사람이 Edit에서 고른 평가(note.verdict)·쓴 문장은 화면에서 이 결과보다 우선한다.
+ * @param {Object} row - getGoalMetricsRow() 결과 + benchmarks
  * @param {string} goal
- * @returns {{ goal: string|null, primary: Array<{key: string, value: number}>, supporting: Array<{key: string, value: number}> }}
+ * @returns {{ rating: 'good'|'mid'|'bad'|null, reason: 'insufficient'|'noData'|null, primaryBand: string|null, secondaryBand: string|null, strengths: string[], weaknesses: string[], primaryKeys: string[], secondaryKeys: string[], metricKey: string|null, value: number|null }}
  */
-export function buildGoalResult(row, goal) {
-  const rule = GOAL_RESULT_METRICS[goal] ?? null;
-  const pick = (keys) => keys
-    .map((key) => ({ key, value: row?.[key] ?? null }))
-    .filter((m) => m.value != null && Number.isFinite(m.value));
-  if (!rule) return { goal: goal ?? null, primary: [], supporting: [] };
-  return { goal, primary: pick(rule.primary), supporting: pick(rule.supporting) };
+export function buildOverallPerformance(row, goal) {
+  const rule = OVERALL_RULES[goal] ?? null;
+  const headline = (GOAL_HEADLINE_METRICS[goal] ?? [])[0] ?? null;
+  const value = headline != null && row?.[headline] != null && Number.isFinite(row[headline]) ? row[headline] : null;
+  const hasData = row?.spend != null || row?.impressions != null;
+  const band = (key) => {
+    const b = row?.benchmarks?.[key];
+    return b && b.peerScope !== 'none' && b.percentile != null ? b.band : null;
+  };
+  const empty = { rating: null, primaryBand: null, secondaryBand: null, strengths: [], weaknesses: [], primaryKeys: rule?.primary ?? [], secondaryKeys: rule?.secondary ?? [], metricKey: headline, value };
+  if (!hasData) return { ...empty, reason: 'noData' };
+  if (!rule) return { ...empty, reason: 'insufficient' };
+  const primaryBand = combineBands(rule.primary.map(band).filter(Boolean));
+  const secondaryBand = combineBands(rule.secondary.map(band).filter(Boolean));
+  const ordered = [...rule.primary, ...rule.secondary, ...rule.supporting];
+  const strengths = ordered.filter((k) => band(k) === 'top').slice(0, 2);
+  const weaknesses = ordered.filter((k) => band(k) === 'bottom').slice(0, 2);
+  if (!primaryBand) return { ...empty, reason: 'insufficient', secondaryBand, strengths, weaknesses };
+  let rating = VERDICT.MID;
+  if (primaryBand === 'top') rating = secondaryBand === 'bottom' ? VERDICT.MID : VERDICT.GOOD;
+  else if (primaryBand === 'bottom') rating = secondaryBand === 'top' ? VERDICT.MID : VERDICT.BAD;
+  return { ...empty, rating, reason: null, primaryBand, secondaryBand, strengths, weaknesses };
 }
 
 /**
@@ -1552,7 +1582,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {string} id - UUID v4 PK
  * @property {string} recapId - FK → EventRecap.id
  * @property {string} campaignId - FK → Campaign.id. (recapId, campaignId) unique
- * @property {'good'|'mid'|'bad'|null} verdict - 사람이 Edit에서 고른 예산 효율 평가. 자동 제안은 없다(2026-09-08) — 비워 두면 비어 있는 채로 둔다
+ * @property {'good'|'mid'|'bad'|null} verdict - 사람이 Edit에서 고른 종합 성과(Strong/Average/Weak). 있으면 자동 등급(overall.rating)보다 우선
  * @property {LocalizedText|null} strength - 장점
  * @property {LocalizedText|null} weakness - 아쉬운 점
  * @property {LocalizedText|null} reason - 이유
@@ -1583,7 +1613,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {{ goal: string|null, primary: Array<{key: string, value: number}>, supporting: Array<{key: string, value: number}> }} goalResult - 목표 결과(buildGoalResult) — 목표에 맞는 현재 실측치. 등급 아님
+ * @property {{ rating: 'good'|'mid'|'bad'|null, reason: 'insufficient'|'noData'|null, strengths: string[], weaknesses: string[], metricKey: string|null, value: number|null }} overall - 종합 성과(buildOverallPerformance) — 목표 가중 합산 등급 + 강점·개선점 지표 키
  * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
  * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
@@ -1800,8 +1830,8 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 세 층을 섞지 않는다: budgetEfficiency = 이 캠페인의 결과당 비용(과거 무관) · benchmarks = 과거 비교 · pacingRatio = 계획 대비 집행
       budgetEfficiency: budgetEfficiency(row, c.goal),
-      // 목표 결과(Goal result) — 목표에 맞는 현재 실측치만. 등급을 매기지 않는다(공식 KPI 목표치가 없다)
-      goalResult: buildGoalResult(row, c.goal),
+      // 종합 성과(Overall performance) — 목표 가중으로 비용·영상·참여 구간을 합친 STRONG/AVERAGE/WEAK + 강점·개선점 키. 사람이 고른 note가 우선
+      overall: buildOverallPerformance({ ...row, benchmarks }, c.goal),
       // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
       kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
       note: notesById[c.id] ?? null,
