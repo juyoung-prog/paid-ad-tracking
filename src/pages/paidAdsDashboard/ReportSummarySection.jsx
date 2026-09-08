@@ -485,6 +485,14 @@ const STICKY_CAMPAIGN_SX = {
   borderRight: '1px solid',
   borderRightColor: 'divider',
 };
+/* 행 hover — 고정 열은 불투명 배경이라 MUI가 tr에 칠하는 action.hover가 그 밑에 가려져 Campaign 칸만 하얗게
+   남았다(실사용 지적, 2026-09-08). 같은 색을 고정 열 배경 **위에** 한 겹 더 얹는다(불투명은 유지해야 스크롤된
+   셀이 비치지 않는다). 다른 셀과 같은 action.hover를 흰 바탕에 합성한 것이라 색이 정확히 같다. */
+const STICKY_ROW_HOVER_SX = (theme) => ({
+  '&.MuiTableRow-hover:hover > td:first-of-type': {
+    backgroundImage: `linear-gradient(${theme.palette.action.hover}, ${theme.palette.action.hover})`,
+  },
+});
 
 
 /**
@@ -2106,7 +2114,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
                   </TableHead>
                   <TableBody>
                     {visibleRows.map((r) => (
-                      <TableRow key={r.campaignId} hover onClick={() => setDetailCampaignId(r.campaignId)} sx={{ cursor: 'pointer' }}>
+                      <TableRow key={r.campaignId} hover onClick={() => setDetailCampaignId(r.campaignId)} sx={(theme) => ({ cursor: 'pointer', ...STICKY_ROW_HOVER_SX(theme) })}>
                         {/* 폭이 고정이라 아주 긴 캠페인명은 잘린다 — 전체 이름은 title로 남긴다 */}
                         <TableCell
                           title={r.name}
