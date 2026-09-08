@@ -89,10 +89,23 @@ Deno.serve(async (req) => {
   // 모든 TikTok 캠페인을 no_advertiser_id로 건너뛴다 — 수기 입력 UI를 따로 만들 필요가 없도록
   // 인가 직후 플랫폼이 알려주는 값을 그대로 저장한다.
   const advertisers = await fetchAuthorizedAdvertisers(appId, appSecret, accessToken);
-  const advertiser = advertisers[0] ?? null;
+
+  /* 이미 저장된 광고주가 인가 목록에 있으면 **그것을 유지한다**(2026-09-08). 재연결한 TikTok 로그인이 광고주를
+     여러 개 가지고 있으면 예전엔 목록의 첫 번째를 골랐는데, 그 바람에 멀쩡히 돌던 광고주(7202…937)가 다른
+     광고주(7613…569)로 바뀌어 — 잔액 166 → 0, 기존 캠페인 31개는 새 광고주 것이 아니라 성과가 다시 안 들어온다.
+     저장된 광고주가 목록에 없을 때만(권한이 정말 사라진 경우) 첫 번째로 넘어간다. */
+  const { data: existingBefore } = await admin
+    .from('ad_accounts')
+    .select('external_account_id')
+    .eq('id', accountId)
+    .maybeSingle();
+  const keptAdvertiser = existingBefore?.external_account_id
+    ? advertisers.find((a: any) => String(a.advertiser_id) === String(existingBefore.external_account_id)) ?? null
+    : null;
+  const advertiser = keptAdvertiser ?? advertisers[0] ?? null;
 
   if (advertisers.length > 1) {
-    console.warn('TikTok 광고주가 여러 개 인가됨 — 첫 번째만 사용한다', {
+    console.warn(keptAdvertiser ? 'TikTok 광고주가 여러 개 인가됨 — 저장된 광고주를 유지한다' : 'TikTok 광고주가 여러 개 인가됨 — 저장된 것이 없어 첫 번째를 쓴다', {
       used: advertiser?.advertiser_id,
       all: advertisers.map((a: any) => a.advertiser_id),
     });
