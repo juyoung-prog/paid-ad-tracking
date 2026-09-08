@@ -9,5 +9,4 @@ export { BenchmarkDelta } from './BenchmarkDelta.jsx';
 export { VerdictChip } from './VerdictChip.jsx';
 export { RecapCampaignTable } from './RecapCampaignTable.jsx';
 export { RecapHeader } from './RecapHeader.jsx';
-export { RecapTakeaways } from './RecapTakeaways.jsx';
 export { RecapStatusBadge } from './RecapStatusBadge.jsx';

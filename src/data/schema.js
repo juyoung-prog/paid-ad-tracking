@@ -1473,8 +1473,8 @@ export const BENCHMARK_METRICS = Object.freeze([
 
 /**
  * goal별 대표 KPI — **하나씩**(2026-09-07). "이 목표를 돈 대비 얼마나 효율적으로 달성했나"를 말하는
- * 결과당 비용이다: 인지 CPM · 트래픽 CPC · 참여 CPE · 전환/매장 방문 CPA. Efficiency 배지, 순위,
- * Key takeaways의 최고/최저, 머리글 순위가 전부 이 하나를 공유해 위아래가 다른 말을 하지 않는다.
+ * 결과당 비용이다: 인지 CPM · 트래픽 CPC · 참여 CPE · 전환/매장 방문 CPA. 표의 Primary KPI, 줄 순위,
+ * 머리글 순위가 전부 이 하나를 공유해 위아래가 다른 말을 하지 않는다.
  * Hook·Hold·CTR·참여율은 진단 지표 — 셀의 ↗↘와 캠페인 해석(What worked · Could improve)에서만 쓴다.
  */
 export const GOAL_HEADLINE_METRICS = Object.freeze({
@@ -1658,8 +1658,8 @@ export function buildBenchmarkPeers(campaign, allCampaigns, options = {}) {
   );
   /* 비교군 사슬(2026-09-07): 목표가 먼저다 — 결과당 비용(CPM·CPC·CPE·CPA)은 목표가 같아야 비교가 성립한다.
      ① 같은 플랫폼 + 같은 목표 + 같은 단계(다른 이벤트) ② 같은 플랫폼 + 같은 목표(다른 이벤트) ③ 3개 미만이면 없음.
-     같은 이벤트의 형제 캠페인은 어느 단계에도 안 들어간다(base가 이미 뺀다). 배지·셀의 ↗↘·Key takeaways가
-     전부 이 한 비교군을 공유한다 — 배지는 Weak인데 셀은 best of 5인 모순을 막는다 */
+     같은 이벤트의 형제 캠페인은 어느 단계에도 안 들어간다(base가 이미 뺀다). 표의 Primary KPI·셀의 ↗↘·해석 문장이
+     전부 이 한 비교군을 공유한다 — 한 줄 안에서 서로 다른 말을 하지 않는다 */
   const sameGoal = base.filter((c) => c.goal === campaign.goal);
   const sameGoalPhase = sameGoal.filter((c) => phaseKey(c) === phaseKey(campaign));
   if (sameGoalPhase.length >= BENCHMARK_MIN_PEERS) return { peers: sameGoalPhase, scope: 'phase' };
@@ -2002,70 +2002,6 @@ export function buildPeerComparison(campaign, allCampaigns, allRecords, options 
   };
 }
 
-/**
- * 핵심 요약(Key takeaways)의 **재료** — 문장은 recapStrings가 만든다. 표에 이미
- * 있는 숫자를 반복하지 않고 해석만 남긴다: 가장 좋았던 캠페인, 뒤처진 캠페인,
- * 플랫폼 차이(비교 가능한 CPM만), 다음 제언. 최대 4개.
- *
- * 근거가 없으면 만들지 않는다 — 벤치마크가 하나도 없는 이벤트는 빈 배열이다.
- *
- * @param {Object<string, Array<Object>>} byPlatform - buildRecapRows().byPlatform
- * @returns {Array<{ kind: 'best'|'weakest'|'platform'|'recommendation', campaignId?: string, platform?: string, phaseName?: string, goal?: string, metricKey?: string, metricKeys?: string[], stat?: BenchmarkStat, cheaper?: string, pricier?: string, pct?: number, weakPlatform?: string, weakPhaseName?: string }>}
- */
-export function buildRecapTakeaways(byPlatform) {
-  const rows = Object.values(byPlatform ?? {}).flat();
-  const scored = rows
-    .map((row) => ({ row, score: headlineScore(row.benchmarks, row.goal), keys: GOAL_HEADLINE_METRICS[row.goal] ?? [] }))
-    .filter((x) => x.score >= 0)
-    .sort((a, b) => b.score - a.score);
-  const items = [];
-
-  // 대표 지표 중 백분위가 가장 높은/낮은 것 — 문장에 붙일 근거 하나
-  const pickStat = (entry, isBest) => entry.keys
-    .map((k) => entry.row.benchmarks?.[k])
-    .filter((b) => b && b.percentile != null)
-    .sort((a, b) => (isBest ? b.percentile - a.percentile : a.percentile - b.percentile))[0] ?? null;
-
-  const best = scored[0] ?? null;
-  const bestStat = best ? pickStat(best, true) : null;
-  if (best && bestStat) {
-    items.push({ kind: 'best', campaignId: best.row.campaignId, platform: best.row.platform, phaseName: best.row.phaseName, goal: best.row.goal, metricKey: bestStat.metricKey, stat: bestStat });
-  }
-
-  // 뒤처진 캠페인 — 대표 지표 중 하나라도 하위 구간이어야 한다(그냥 2등을 지목하지 않는다)
-  const weakest = scored.length >= 2 ? scored[scored.length - 1] : null;
-  const weakKeys = weakest ? weakest.keys.filter((k) => weakest.row.benchmarks?.[k]?.band === 'bottom') : [];
-  const weakStat = weakest ? pickStat(weakest, false) : null;
-  if (weakest && weakKeys.length > 0 && weakStat) {
-    items.push({ kind: 'weakest', campaignId: weakest.row.campaignId, platform: weakest.row.platform, phaseName: weakest.row.phaseName, goal: weakest.row.goal, metricKeys: weakKeys, stat: weakStat });
-  }
-
-  // 플랫폼 차이 — 정의가 같은 CPM으로만, 이벤트 단위 합산(분자·분모)으로, 15% 이상 벌어질 때만
-  const platforms = Object.keys(byPlatform ?? {}).filter((p) => (byPlatform[p] ?? []).length > 0);
-  if (platforms.length >= 2) {
-    const cpmByPlatform = platforms
-      .map((p) => ({ platform: p, cpm: aggregateMetric(byPlatform[p], 'cpm') }))
-      .filter((x) => x.cpm != null && x.cpm > 0)
-      .sort((a, b) => a.cpm - b.cpm);
-    if (cpmByPlatform.length >= 2) {
-      const [cheaper, pricier] = [cpmByPlatform[0], cpmByPlatform[cpmByPlatform.length - 1]];
-      const pct = Math.round((1 - cheaper.cpm / pricier.cpm) * 100);
-      if (pct >= 15) items.push({ kind: 'platform', cheaper: cheaper.platform, pricier: pricier.platform, pct });
-    }
-  }
-
-  if (best && bestStat) {
-    const hasWeak = items.some((i) => i.kind === 'weakest');
-    items.push({
-      kind: 'recommendation',
-      platform: best.row.platform,
-      phaseName: best.row.phaseName,
-      weakPlatform: hasWeak ? weakest.row.platform : null,
-      weakPhaseName: hasWeak ? weakest.row.phaseName : null,
-    });
-  }
-  return items.slice(0, 4);
-}
 
 // ============================================================
 // Recap — 데이터 기반 캠페인 해석(Strength · Weakness · Why)과 이벤트 단위 패턴
@@ -2144,39 +2080,6 @@ export const GOAL_INSIGHT_METRICS = Object.freeze({
   [GOAL.STORE_VISIT]: Object.freeze({ primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
 });
 
-/**
- * 임원용 핵심 요약 세 칸 — buildRecapTakeaways()의 재료를 BEST RESULT / ATTENTION / NEXT MOVE로
- * 합성한다. "플랫폼 차이"는 칸을 따로 갖지 않고 NEXT MOVE의 근거로 들어간다. 계산은
- * 새로 하지 않는다 — 벤치마크·순위는 이미 takeaways 재료에 있다.
- *
- * @param {Object<string, Array<RecapCampaignRowExtra>>} byPlatform
- * @returns {{ best: Object|null, attention: Object|null, next: Object|null }}
- *   best      { platform, phaseName, metricKey, aspect, stat }
- *   attention { platform, phaseName, metricKey, aspect, stat } | null (하위 구간 캠페인 없음)
- *   next      { kind: 'platform'|'best', cheaper?, pricier?, pct?, platform?, phaseName?, weakPlatform?, weakPhaseName? } | null
- */
-export function buildRecapExecutiveSummary(byPlatform) {
-  const items = buildRecapTakeaways(byPlatform);
-  const by = (kind) => items.find((i) => i.kind === kind) ?? null;
-  const bestItem = by('best');
-  const weakItem = by('weakest');
-  const platformItem = by('platform');
-  const rec = by('recommendation');
-
-  const best = bestItem
-    ? { platform: bestItem.platform, phaseName: bestItem.phaseName, metricKey: bestItem.metricKey, aspect: METRIC_ASPECT[bestItem.metricKey], stat: bestItem.stat }
-    : null;
-  const attention = weakItem
-    ? { platform: weakItem.platform, phaseName: weakItem.phaseName, metricKey: weakItem.stat.metricKey, aspect: METRIC_ASPECT[weakItem.stat.metricKey], stat: weakItem.stat }
-    : null;
-  let next = null;
-  if (platformItem) {
-    next = { kind: 'platform', cheaper: platformItem.cheaper, pricier: platformItem.pricier, pct: platformItem.pct, weakPlatform: rec?.weakPlatform ?? null, weakPhaseName: rec?.weakPhaseName ?? null };
-  } else if (rec) {
-    next = { kind: 'best', platform: rec.platform, phaseName: rec.phaseName, weakPlatform: rec.weakPlatform, weakPhaseName: rec.weakPhaseName };
-  }
-  return { best, attention, next };
-}
 
 
 /**

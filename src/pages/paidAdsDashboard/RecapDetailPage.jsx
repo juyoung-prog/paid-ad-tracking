@@ -16,7 +16,6 @@ import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
-import { RecapTakeaways } from '../../components/data-display/RecapTakeaways';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
@@ -35,7 +34,6 @@ import {
   buildRecapRows,
   buildRecapHeadline,
   buildPeerComparison,
-  buildRecapExecutiveSummary,
   localizedText,
   campaignNameKey,
   effectiveBudgetPlanned,
@@ -131,11 +129,10 @@ function LocalizedParagraph({ text, lang, sx }) {
 /**
  * RecapDetailPage
  *
- * 이벤트 하나의 결과 보고서(/recap/:event) — 02-ux-flow 시나리오 7. 머리글(순위
- * 한 줄 포함) → 요약 → Key takeaways → 단계 타임라인 → 플랫폼별 캠페인 표(벤치마크
- * 포함, 줄을 펼치면 그 캠페인의 What worked·What could improve·Why·Recommendation) →
- * Learnings(배운 점·다음 제언·데이터에서 본 패턴). 캠페인별 코멘트 편집(Notes) 카드는
- * 편집 모드에서만 나온다.
+ * 이벤트 하나의 결과 보고서(/recap/:event) — 02-ux-flow 시나리오 7. 머리글(순위 한 줄 포함) → 요약 →
+ * 단계 타임라인 → 플랫폼별 캠페인 표(Goal · Budget / Spend · Primary KPI · Video · Engagement / Action ·
+ * What worked · Could improve). 표가 임원 요약을 겸하므로 Key takeaways 섹션은 2026-09-08에 뺐고
+ * Learnings도 앞서 뺐다 — 다른 요약 섹션으로 대체하지 않는다. 캠페인별 코멘트·이벤트 글 편집은 편집 모드에서만.
  *
  * **읽기는 누구나, 쓰기는 로그인.** Edit를 누르면 세션이 없을 때만 SignInDialog가
  * 뜬다(앱 전체 로그인 게이트는 꺼져 있다 — App.jsx). 편집은 로컬 draft에 쌓였다가
@@ -223,7 +220,6 @@ export function RecapDetailPage() {
   );
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
-  const executiveSummary = useMemo(() => buildRecapExecutiveSummary(byPlatform), [byPlatform]);
 
   const startEditing = () => {
     setDraft({
@@ -448,12 +444,6 @@ export function RecapDetailPage() {
         <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14 }} />
       )}
 
-      {/* 핵심 요약 — 표가 증거, 이 카드가 해석. KPI를 더 늘리지 않고 이 칸이 "그래서 어땠나"를 말한다. */}
-      <Box sx={SECTION_CARD_SX} data-print="card">
-        <SectionHeader title={t('recap.takeaways.title', lang)} />
-        <RecapTakeaways summary={executiveSummary} platformLabel={PLATFORM_LABEL} lang={lang} />
-      </Box>
-
       <Box sx={SECTION_CARD_SX} data-print="card" data-recap-timeline>
         <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />
         <PhaseTimelineChart
@@ -513,7 +503,7 @@ export function RecapDetailPage() {
         </Box>
       )}
 
-      {/* Learnings 읽기 섹션은 2026-09-08에 뺐다 — Key takeaways(이벤트 요약)와 표의 해석 네 열(캠페인별)이 같은 내용을 말해
+      {/* Learnings 읽기 섹션은 2026-09-08에 뺐다 — 표의 해석 열(캠페인별)이 같은 내용을 말해
           중복이었다. 편집 모드의 이벤트 글(상태·요약·배운 점·제언) 폼은 저장·시트·AI 초안이 쓰므로 남긴다 */}
       {isEditing && draft && (
         <Box sx={SECTION_CARD_SX} data-print="card">

@@ -55,7 +55,7 @@ const recapEnums = [
   { name: 'VERDICT', value: "{ GOOD: 'good', MID: 'mid', BAD: 'bad' }" },
   { name: 'RECAP_LANG', value: "{ EN: 'en', KO: 'ko', ZH_HANT: 'zh-Hant' } + RECAP_DEFAULT_LANG = 'en'" },
   { name: 'BENCHMARK_METRICS', value: "[cpm, cpc, cpa, cpe(지출 ÷ 좋아요+댓글+공유), ctr, hookRate, holdRate, engagementRate] — 비율 지표만, 비용 지표는 lowerIsBetter" },
-  { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
+  { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). 표의 Primary KPI·줄 순위·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 벤치마크 구간(band top/bottom) 경계: 백분위 70 이상 top, 30 이하 bottom. 셀 ↗↘ 색과 해석(What worked / Could improve)이 쓴다' },
   { name: 'GOAL_INSIGHT_METRICS / buildCampaignInsight(row, options)', value: "목표별 { primary, diagnostic } 후보 지표 표 + 표의 What worked · Could improve 재료(2026-09-08). 후보는 목표와 관련 있고 **표에 보이는** 지표뿐 — 인지 CPM + Hook·Hold·참여율·CTR · 트래픽 CPC·CTR + Hook·Hold · 참여 Cost/eng·참여율 + Hook·Hold · 전환 CPA + CTR·CPC·Hook·Hold. 상위 구간이면 strength, 하위면 weakness, primary가 정렬에서 앞선다(대표 KPI 약점을 진단 지표가 가리지 못하게). 후보가 없으면 null → 칸은 \"—\". 벤치마크 계산(비교군·백분위)은 건드리지 않는다" },
@@ -140,9 +140,9 @@ const recapPhases = [
   {
     phase: '7', title: '임원용 다듬기 (구현됨) — 2026-09-07', stage: '다듬기', deps: 'Phase 6',
     items: [
-      'Key takeaways → RecapTakeaways 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): schema.js buildRecapExecutiveSummary()가 기존 takeaways 재료를 합성. 라벨 → 16px 결론 → 12px 근거, 플랫폼 CPM 차이는 NEXT MOVE의 근거',
+      'Key takeaways 섹션 제거(2026-09-08) — 캠페인 표가 Goal · Budget / Spend · Primary KPI · Video · Engagement / Action · What worked · Could improve로 같은 요약을 이미 준다. RecapTakeaways와 buildRecapExecutiveSummary·buildRecapTakeaways도 함께 뺐다(다른 곳에서 안 쓴다). 다른 요약 섹션으로 대체하지 않는다',
       '캠페인 해석 → 표의 두 열(What worked · Could improve, 2026-09-08 — 드로어의 Campaign insights를 표로 옮겨 현재 지표 → 과거 맥락 → 해석을 가로로 읽는다. Reason·Next action 열과 그 생성 로직은 뺐다 — 지표만으로는 원인이 서지 않고, 사람이 쓴 이유는 Edit 폼·시트에 남는다). 한 문장씩, 순위 근거만.',
-      'Learnings 섹션 제거(2026-09-08) — Key takeaways(이벤트 요약)와 표의 해석 네 열(캠페인별)이 같은 내용이라 중복. 플레이북 계산(buildRecapPlaybook·buildRecapPatterns)과 RecapPatterns도 함께 뺐다. 편집 모드의 RecapLearningsEditor(상태·요약·배운 점·제언)는 저장·시트·AI 초안이 쓰므로 남긴다',
+      'Learnings 섹션 제거(2026-09-08) — 표의 해석 열(캠페인별)이 같은 내용이라 중복. 플레이북 계산(buildRecapPlaybook·buildRecapPatterns)과 RecapPatterns도 함께 뺐다. 편집 모드의 RecapLearningsEditor(상태·요약·배운 점·제언)는 저장·시트·AI 초안이 쓰므로 남긴다',
       '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
       '내비 이름: Reports → Performance, Recap → Reports(레일·목록 제목·"All reports"·저장 알림). 내부 경로 유지',
       'recap-draft SYSTEM 프롬프트도 같은 규칙(원인 지어내지 않기, 이벤트 범위) — 바꾼 뒤 재배포 필요',
