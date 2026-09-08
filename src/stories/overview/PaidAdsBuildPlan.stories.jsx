@@ -140,7 +140,7 @@ const recapPhases = [
     phase: '7', title: '임원용 다듬기 (구현됨) — 2026-09-07', stage: '다듬기', deps: 'Phase 6',
     items: [
       'Key takeaways → RecapTakeaways 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): schema.js buildRecapExecutiveSummary()가 기존 takeaways 재료를 합성. 라벨 → 16px 결론 → 12px 근거, 플랫폼 CPM 차이는 NEXT MOVE의 근거',
-      '캠페인 해석 → 표의 네 열(What worked · Could improve · Why · Next action, 2026-09-08 — 드로어의 Campaign insights를 표로 옮겨 현재 지표 → 과거 맥락 → 해석 → 다음 행동을 가로로 읽는다. 한때 줄 아래 펼침 → 드로어 섹션이었다). 한 문장씩, 순위 근거만. schema.js buildCampaignInsight()가 벤치마크 구간에서만 재료를 만들고 원인은 지어내지 않는다. 표의 숫자 줄 전체 클릭 = 드로어, 타임라인 행 클릭 = 그 줄로 스크롤 + 선택 표시',
+      '캠페인 해석 → 표의 세 열(What worked · Could improve · Reason, 2026-09-08 — 드로어의 Campaign insights를 표로 옮겨 현재 지표 → 과거 맥락 → 해석을 가로로 읽는다. Next action 열과 그 생성 로직은 뺐고, Reason은 사람이 쓴 것만·없으면 "—"). 한 문장씩, 순위 근거만.',
       'Learnings 섹션 제거(2026-09-08) — Key takeaways(이벤트 요약)와 표의 해석 네 열(캠페인별)이 같은 내용이라 중복. 플레이북 계산(buildRecapPlaybook·buildRecapPatterns)과 RecapPatterns도 함께 뺐다. 편집 모드의 RecapLearningsEditor(상태·요약·배운 점·제언)는 저장·시트·AI 초안이 쓰므로 남긴다',
       '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
       '내비 이름: Reports → Performance, Recap → Reports(레일·목록 제목·"All reports"·저장 알림). 내부 경로 유지',

@@ -1551,7 +1551,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
  * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관) — 표의 Primary KPI
- * @property {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object, recommendation: Object|null }} insight - buildCampaignInsight() — 표의 What worked · Could improve · Why · Next action 재료
+ * @property {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object }} insight - buildCampaignInsight() — 표의 What worked · Could improve · Reason 재료(Reason은 사람 글만 보인다)
  * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
  */
@@ -1767,7 +1767,7 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 층을 섞지 않는다: budgetEfficiency = Primary KPI(판단 없음) · kpiTarget = vs target(설정된 목표치만) · benchmarks = vs past · pacingRatio = 집행률. 종합 등급은 없다(2026-09-08 제품 결정)
       budgetEfficiency: budgetEfficiency(row, c.goal),
-      // 캠페인 해석(What worked · Could improve · Why · Next action) — 표의 네 열. 재료는 벤치마크 구간뿐, 등급이 아니다. 사람이 쓴 note가 우선
+      // 캠페인 해석(What worked · Could improve · Reason) — 표의 세 열. 재료는 벤치마크 구간뿐, 등급이 아니다. 사람이 쓴 note가 우선
       insight: buildCampaignInsight({ ...row, benchmarks }, { plannedBudget: effectiveBudgetPlanned(c) }),
       // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
       kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
@@ -2166,7 +2166,7 @@ export function buildRecapExecutiveSummary(byPlatform) {
  * - weakness: 하위 구간(bottom/lowest)인 벤치마크 중 백분위 최저. 없으면 계획 대비
  *   20% 이상 초과 지출(observed)
  * - reason: 관측된 지표 패턴(강한 CPM·약한 클릭 등)만 — 원인은 데이터로 세울 수 없어 level은 항상 unknown
- * - recommendation: 위 세 재료에서만 나오는 다음 실험(inferred). 관측 결과 → 다음에
+ * (recommendation/Next action은 2026-09-08 표에서 뺐다 — 화면에 쓰는 곳이 없어 계산도 없앴다)
  *   확인할 것이지, 마케팅 일반론이 아니다. 근거가 없으면 null(칸을 비운다)
  *   · keepAndTest: 장점·약점이 둘 다 있을 때 — 장점을 낸 설정은 유지, 약점 지표를 개선 대상으로
  *   · repeat: 장점만 — 이 캠페인을 기준점으로 삼고 같은 지표가 유지되는지 확인
@@ -2175,7 +2175,7 @@ export function buildRecapExecutiveSummary(byPlatform) {
  *
  * @param {Object} row - buildRecapRows()의 행(benchmarks 포함)
  * @param {{ plannedBudget?: number|null }} [options]
- * @returns {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object, recommendation: Object|null }}
+ * @returns {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object }}
  */
 export function buildCampaignInsight(row, options = {}) {
   const hasData = row && (row.spend != null || row.impressions != null);
@@ -2188,7 +2188,7 @@ export function buildCampaignInsight(row, options = {}) {
     return h !== 0 ? h : (dir === 'top' ? byPct(a, b) : -byPct(a, b));
   });
 
-  if (!hasData) return { hasData: false, strength: null, weakness: null, reason: { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noData' }, recommendation: null };
+  if (!hasData) return { hasData: false, strength: null, weakness: null, reason: { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noData' } };
 
   const top = rank(stats.filter((b) => b.band === 'top'), 'top');
   const bottom = rank(stats.filter((b) => b.band === 'bottom'), 'bottom');
@@ -2231,14 +2231,6 @@ export function buildCampaignInsight(row, options = {}) {
   else if ((known('cpm') || known('ctr') || known('cpc')) && top.length + bottom.length === 1) reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'singleSignal', metricKey: (top[0] ?? bottom[0]).metricKey, aspect: METRIC_ASPECT[(top[0] ?? bottom[0]).metricKey], isStrong: top.length === 1 };
   else reason = { level: INSIGHT_LEVEL.UNKNOWN, kind: 'noPattern' };
 
-  // Recommendation — 장점·약점 재료가 있을 때만. 없으면 null이라 칸이 비고, 지어내지 않는다
-  let recommendation = null;
-  if (strength && weakness?.kind === 'ranked') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'keepAndTest', keepAspect: strength.aspect, testAspect: weakness.aspect, testMetricKey: weakness.metricKey };
-  else if (strength && weakness?.kind === 'overspend') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'keepAndBudget', keepAspect: strength.aspect, pct: weakness.pct };
-  else if (strength) recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'repeat', aspect: strength.aspect, metricKey: strength.metricKey };
-  else if (weakness?.kind === 'ranked') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'improve', aspect: weakness.aspect, metricKey: weakness.metricKey };
-  else if (weakness?.kind === 'overspend') recommendation = { level: INSIGHT_LEVEL.INFERRED, kind: 'budget', pct: weakness.pct };
-
-  return { hasData: true, strength, weakness, reason, recommendation };
+  return { hasData: true, strength, weakness, reason };
 }
 
