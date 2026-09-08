@@ -128,6 +128,8 @@ const isPlaceholder = (text) => {
 
 /**
  * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군에서 상위/하위였나)를 **해석** 한 문장으로.
+ * 후보 지표는 목표가 정한다(schema GOAL_INSIGHT_METRICS) — 이 표가 그 목표에서 실제로 그리는 지표와 같은 목록이라,
+ * 오른쪽 문장의 근거를 왼쪽 칸에서 눈으로 좇을 수 있다. 목표와 무관하거나 화면에 없는 지표는 문장이 되지 않는다.
  * 지표와 순위는 왼쪽 칸이 이미 보여주므로 여기서 숫자를 되풀이하지 않는다(2026-09-08): "Early video attention stood out
  * against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거가 있을 때만 말한다.
  * 원인(Reason)은 표에서 다루지 않는다(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람이 Edit에서
@@ -157,6 +159,8 @@ function insightSentence(field, item, lang) {
  * 통합 규칙: 일예산과 지출은 한 칸(지출이 굵게) · 과거 비교는 별도 열이 아니라 그 지표 바로 아래 · 참여와 행동은 한 칸에서
  * 목표가 강조를 정한다(ENGAGEMENT_ACTION_LAYOUT) · 매장은 캠페인 칸 둘째 줄. 종합 등급·vs target·드로어 해석은 없다(제품 결정).
  * 해석 두 열은 왼쪽 숫자를 되풀이하지 않고 해석만 한다("Early video attention stood out against comparable campaigns.").
+ * 근거는 그 목표에서 이 표가 보여주는 지표뿐이고(GOAL_INSIGHT_METRICS), 대표 KPI가 약하면 그 약점이 Could improve에
+ * 먼저 온다 — 강한 진단 지표가 약점을 가리지 못한다. 근거가 없으면 억지로 만들지 않고 "—".
  * 사람이 Edit에서 쓴 note(strength/weakness)가 있으면 우선(툴팁 "Written by a person in Edit."), 자리표시자는 무시.
  *
  * 상호작용: **숫자 줄 어디를 눌러도** onRowClick — 캠페인 상세 드로어(성과·페이싱·일별 지출). 순위 글자(onBenchmarkClick)는

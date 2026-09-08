@@ -2123,6 +2123,28 @@ const OVERSPEND_RATIO = 0.2;
 const knownStats = (row) => Object.values(row.benchmarks ?? {}).filter((b) => b && b.peerScope !== 'none' && b.percentile != null);
 
 /**
+ * 해석(What worked · Could improve)에 쓸 수 있는 지표 — **캠페인 목표가 정한다**(2026-09-08).
+ * 예전에는 벤치마크 8종 전부가 경쟁해서, 참여 캠페인의 Cost/eng가 최하위인데 표에 보이지도 않는 CPM이 상위라는 이유로
+ * "Reach efficiency stood out"이 나왔다. 목표와 무관하고 근거를 눈으로 좇을 수도 없는 문장이었다.
+ *
+ * 두 가지를 동시에 만족하는 지표만 후보다:
+ * ① 목표와 관련 있다 — primary(목표의 성패를 말하는 지표) + diagnostic(강·약을 설명하는 지표)
+ * ② **표에 보인다** — 이 목록은 RecapCampaignTable이 목표별로 그리는 지표와 일치한다
+ *   (Primary KPI · Video response의 Hook·Hold · Engagement / Action의 두 자리, 전환의 CPC는 보조 줄의 값).
+ *   해석은 왼쪽 근거를 옮긴 말이어야 하므로, 화면에 없는 지표로 결론을 만들지 않는다.
+ *
+ * primary는 정렬에서 diagnostic보다 앞선다 — 대표 KPI가 약하면 그 약점이 Could improve에 먼저 오고,
+ * 강한 진단 지표가 그 약점을 가리지 못한다. 후보 중 상위/하위가 없으면 칸을 비운다(억지 결론을 만들지 않는다).
+ */
+export const GOAL_INSIGHT_METRICS = Object.freeze({
+  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], diagnostic: ['hookRate', 'holdRate', 'engagementRate', 'ctr'] }),
+  [GOAL.TRAFFIC]: Object.freeze({ primary: ['cpc', 'ctr'], diagnostic: ['hookRate', 'holdRate'] }),
+  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['cpe', 'engagementRate'], diagnostic: ['hookRate', 'holdRate'] }),
+  [GOAL.CONVERSION]: Object.freeze({ primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
+  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
+});
+
+/**
  * 임원용 핵심 요약 세 칸 — buildRecapTakeaways()의 재료를 BEST RESULT / ATTENTION / NEXT MOVE로
  * 합성한다. "플랫폼 차이"는 칸을 따로 갖지 않고 NEXT MOVE의 근거로 들어간다. 계산은
  * 새로 하지 않는다 — 벤치마크·순위는 이미 takeaways 재료에 있다.
@@ -2162,9 +2184,11 @@ export function buildRecapExecutiveSummary(byPlatform) {
  * { level, kind, ... } 또는 null(근거 없음). 표에 있는 숫자를 반복하지 않고
  * "비교군 중 어디"만 근거로 붙인다.
  *
- * - strength: 대표 지표 우선, 상위 구간(top/best)인 벤치마크 중 백분위 최고
- * - weakness: 하위 구간(bottom/lowest)인 벤치마크 중 백분위 최저. 없으면 계획 대비
- *   20% 이상 초과 지출(observed)
+ * 후보는 목표가 정한다(GOAL_INSIGHT_METRICS) — 목표와 무관하거나 표에 보이지 않는 지표는 아예 겨루지 않는다.
+ * - strength: 후보 중 상위 구간(top)인 것. primary가 먼저, 같으면 백분위 최고. 없으면 null(칸을 비운다)
+ * - weakness: 후보 중 하위 구간(bottom)인 것. primary가 먼저, 같으면 백분위 최저 —
+ *   대표 KPI가 약하면 강한 진단 지표가 그 약점을 가리지 못한다. 없으면 계획 대비 20% 이상 초과 지출(observed,
+ *   Budget / Spend 칸의 "Over N%"로 표에 보인다). 그것도 없으면 null
  * - 원인(reason)은 만들지 않는다(2026-09-08 표에서 뺐다) — 지표만으로는 원인을 세울 수 없어 level은 항상 unknown
  * (recommendation/Next action은 2026-09-08 표에서 뺐다 — 화면에 쓰는 곳이 없어 계산도 없앴다)
  *   확인할 것이지, 마케팅 일반론이 아니다. 근거가 없으면 null(칸을 비운다)
@@ -2179,12 +2203,15 @@ export function buildRecapExecutiveSummary(byPlatform) {
  */
 export function buildCampaignInsight(row, options = {}) {
   const hasData = row && (row.spend != null || row.impressions != null);
-  const stats = hasData ? knownStats(row) : [];
-  const headline = new Set(GOAL_HEADLINE_METRICS[row?.goal] ?? []);
+  // 목표가 정한 후보만 — 목표와 무관하거나 표에 없는 지표는 여기서 걸러진다(모르는 목표면 후보 없음 → 칸을 비운다)
+  const rule = GOAL_INSIGHT_METRICS[row?.goal] ?? null;
+  const eligible = new Set(rule ? [...rule.primary, ...rule.diagnostic] : []);
+  const primaryKeys = new Set(rule?.primary ?? []);
+  const stats = hasData ? knownStats(row).filter((b) => eligible.has(b.metricKey)) : [];
   const byPct = (a, b) => b.percentile - a.percentile;
-  // 대표 지표를 먼저, 그다음 나머지 — 같은 구간이면 백분위 순
+  // 대표 지표를 먼저, 그다음 진단 지표 — 같은 층이면 백분위 순
   const rank = (list, dir) => list.slice().sort((a, b) => {
-    const h = Number(headline.has(b.metricKey)) - Number(headline.has(a.metricKey));
+    const h = Number(primaryKeys.has(b.metricKey)) - Number(primaryKeys.has(a.metricKey));
     return h !== 0 ? h : (dir === 'top' ? byPct(a, b) : -byPct(a, b));
   });
 

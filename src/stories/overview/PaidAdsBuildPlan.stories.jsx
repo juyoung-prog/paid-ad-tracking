@@ -58,6 +58,7 @@ const recapEnums = [
   { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 벤치마크 구간(band top/bottom) 경계: 백분위 70 이상 top, 30 이하 bottom. 셀 ↗↘ 색과 해석(What worked / Could improve)이 쓴다' },
+  { name: 'GOAL_INSIGHT_METRICS / buildCampaignInsight(row, options)', value: "목표별 { primary, diagnostic } 후보 지표 표 + 표의 What worked · Could improve 재료(2026-09-08). 후보는 목표와 관련 있고 **표에 보이는** 지표뿐 — 인지 CPM + Hook·Hold·참여율·CTR · 트래픽 CPC·CTR + Hook·Hold · 참여 Cost/eng·참여율 + Hook·Hold · 전환 CPA + CTR·CPC·Hook·Hold. 상위 구간이면 strength, 하위면 weakness, primary가 정렬에서 앞선다(대표 KPI 약점을 진단 지표가 가리지 못하게). 후보가 없으면 null → 칸은 \"—\". 벤치마크 계산(비교군·백분위)은 건드리지 않는다" },
   { name: 'budgetEfficiency(row, goal)', value: "→ { metricKey, value } — 표의 Primary KPI — 이 캠페인의 목표별 결과당 현재 비용(판단 없음). vs target(kpiTarget)·vs past(benchmarks)·집행률(pacingRatio)과 층을 나눈다. 종합 등급은 없다(2026-09-08 제품 결정)" },
 ];
 

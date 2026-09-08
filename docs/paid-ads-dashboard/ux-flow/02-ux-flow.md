@@ -436,7 +436,7 @@ Paid Ads Dashboard
 | Primary KPI | 목표가 정하는 **실제 대표 결과**(`budgetEfficiency`): 인지 CPM · 트래픽 CPC · 참여 Cost/eng = 지출 ÷ 좋아요+댓글+공유 · 전환/매장 방문 CPA. 라벨 + 현재 값만 — Strong/Good/Efficient 같은 판단어는 붙이지 않는다(2026-09-08) |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
-| What worked · Could improve | 표의 마지막 두 열. 재료는 `buildCampaignInsight`(비교군 순위·초과 지출뿐)이고 왼쪽 숫자를 되풀이하지 않고 **해석**만 한 문장으로: "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거 없이 strong/weak라 하지 않는다. **원인(Reason)·Next action 열은 없다**(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장을 만들지 않고, 사람이 Edit에서 쓴 `note.reason`은 편집 폼과 시트 내보내기에 남는다. 사람이 쓴 `note.strength/weakness`가 우선(자리표시자는 무시). 등급은 만들지 않는다 |
+| What worked · Could improve | 표의 마지막 두 열. 후보 지표는 **캠페인 목표가 정한다**(`GOAL_INSIGHT_METRICS`, 2026-09-08): 인지 = CPM(대표) + Hook·Hold·참여율·CTR · 트래픽 = CPC·CTR(대표) + Hook·Hold · 참여 = Cost/eng·참여율(대표) + Hook·Hold · 전환/매장 방문 = CPA(대표) + CTR·CPC·Hook·Hold. 이 목록은 표가 그 목표에서 실제로 그리는 지표와 같아 **오른쪽 문장의 근거를 왼쪽 칸에서 눈으로 좇을 수 있다**(예전엔 8종 전부가 겨뤄, 참여 캠페인에서 화면에 없는 CPM으로 "Reach efficiency stood out"이 나왔다). 대표 KPI가 하위면 그 약점이 Could improve에 먼저 오고 강한 진단 지표가 가리지 못한다. 상위/하위 후보가 없으면 "—" — 억지로 긍정도 부정도 만들지 않는다. 문장은 왼쪽 숫자를 되풀이하지 않는 해석이고("Early video attention stood out against comparable campaigns.") 원인은 말하지 않는다. 사람이 Edit에서 쓴 `note.strength/weakness`가 우선(자리표시자는 무시). 등급은 만들지 않는다 |
 | 기간 | 2024년 이후 캠페인만(2023년 이전은 지표가 거의 없음). 지역 필터(같은 GA/FL만) 전환 가능 |
 | 원칙 | Meta와 TikTok을 섞지 않는다(Hook 정의가 다르다). 평균이 아니라 중앙값 — 하나 터진 캠페인이 기준을 끌어올리지 않게 |
 

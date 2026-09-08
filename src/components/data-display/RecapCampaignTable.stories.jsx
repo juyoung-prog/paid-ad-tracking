@@ -32,7 +32,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 - **Primary KPI**: 목표가 정하는 실제 대표 결과 — 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환/매장 방문 CPA. 라벨(옅게) + 값(700), **그 아래 같은 KPI의 과거 비교**("↗ best of 12", 비교군 3개 미만이면 "—"). 순위는 맥락이지 등급이 아니다. 판단어 없음
 - **Video response**: Hook / Hold(라벨 + 값 600, 아래 순위) 앞에, "Reach 163K · Plays 296K · Avg 2s"는 옅은 보조 줄
 - **Engagement / Action**: 목표가 대표 두 자리와 보조 줄을 정한다 — 인지 참여율·CTR + 클릭 수·CPC · 트래픽 CTR·CPC + 클릭 수·참여율 · 참여 참여율·Cost/eng + 좋아요·공유 · 전환 CPA·CTR + 결과 수·CPC. 원본 값은 전부 행에 남아 있다
-- **What worked · Could improve**: 12px 한 문장(1600px 창에서 240px 폭 → 두 줄), 네 줄에서 잘리고 전문은 hover. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." Reason·Next action 열은 없다(2026-09-08 — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람이 쓴 이유는 Edit 폼과 시트에 남는다). 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
+- **What worked · Could improve**: 12px 한 문장(1600px 창에서 240px 폭 → 두 줄), 네 줄에서 잘리고 전문은 hover. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 근거 지표는 **목표가 정한다**(schema \`GOAL_INSIGHT_METRICS\` — 인지 CPM + Hook·Hold·참여율·CTR · 트래픽 CPC·CTR + Hook·Hold · 참여 Cost/eng·참여율 + Hook·Hold · 전환 CPA + CTR·CPC·Hook·Hold). 이 목록은 표가 그 목표에서 실제로 그리는 지표와 같아 근거를 눈으로 좇을 수 있고, 대표 KPI가 약하면 그 약점이 Could improve에 먼저 온다. 근거가 없으면 "—"(억지 결론을 만들지 않는다). Reason·Next action 열은 없다. 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
 
 값의 무게는 지표의 **역할**이 정한다: 목표의 대표 KPI 700 > 나머지 대표 자리 600 > 보조 줄 11px 옅게.
 
