@@ -53,11 +53,11 @@ export default {
 3. **Key takeaways**(RecapTakeaways) — 임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE
 4. **단계 타임라인**(PhaseTimelineChart) — 막대 옆에 실지출. 행을 누르면 아래 표의 그 단계 줄로 스크롤하고 선택 표시만 한다(드로어는 열지 않는다)
 5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 숫자 줄 아무 데나 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel)가 이 페이지 위에 열린다: 소재·View ad·Ads Manager·Billing·예산·페이싱·일별 지출. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론·아래 펼침은 없다
-6. **Learnings** — 사람이 쓴 배운 점(있을 때) + 다음 이벤트 플레이북(RecapPatterns: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)
+6. (Learnings 섹션은 2026-09-08에 뺐다 — Key takeaways와 표의 해석 네 열이 같은 내용을 말해 중복. 편집 모드의 이벤트 글 폼은 남는다)
 
 편집 모드(Edit, 로그인)에서만 캠페인별 코멘트 카드(Notes, RecapNoteEditor)와 Learnings 편집기가 카드로 나온다.
 계산은 schema.js(buildRecapRows · buildRecapHeadline · buildRecapExecutiveSummary · buildCampaignInsight ·
-buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
+localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
 인쇄를 부르고 PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. Google Sheets는 표를 클립보드에 복사한다.
 
 ### 확인 포인트
@@ -67,7 +67,7 @@ buildRecapPatterns · localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 
 - Grand Opening 판정은 Good(사람 값), Coming Soon은 제안값(같은 모양, 툴팁 "suggested"), Now Open은 —
 - 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
 - 줄 클릭 → 드로어(성과·페이싱·일별 지출). 해석 네 열(What worked · Could improve · Why · Next action)은 표의 오른쪽 끝에(2026-09-08)
-- Learnings: 플레이북 2×2 + NEXT EVENT 한 문장
+- Learnings 섹션 없음(2026-09-08) — 편집 모드에서만 이벤트 글(상태·요약·배운 점·제언) 폼
         `,
       },
     },

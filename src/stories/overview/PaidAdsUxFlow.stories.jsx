@@ -97,7 +97,7 @@ const scenarios = [
     goal: '이벤트(예: G10 Opening)가 끝나면 보고용 문서를 대시보드 안에서 만든다. 숫자는 동기화 데이터로 자동, 사람은 판정·장점·아쉬운 점·배운 점만 쓴다. Reports는 "지금 어떻게 되고 있나"(진행 확인), Recap은 "끝났으니 무엇을 배웠나"(보고) — 목적이 달라 별도 메뉴',
     flow: [
       '레일 Reports(내부 /recap) 진입 → 이벤트 목록(최근 종료 순, Draft/Ready 상태)',
-      '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), Key takeaways(임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE), 단계 타임라인(행 클릭 → 표의 그 단계 줄 펼침), 플랫폼별 캠페인 표(오른쪽 끝 네 열 What worked · Could improve · Why · Next action; 줄 클릭 → 캠페인 상세 드로어: 성과·페이싱·일별 지출), Learnings(다음 이벤트 플레이북: KEEP · USE SELECTIVELY · IMPROVE · VALIDATE + NEXT EVENT)',
+      '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), Key takeaways(임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE), 단계 타임라인(행 클릭 → 표의 그 단계 줄 펼침), 플랫폼별 캠페인 표(오른쪽 끝 네 열 What worked · Could improve · Why · Next action; 줄 클릭 → 캠페인 상세 드로어: 성과·페이싱·일별 지출)',
       '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·참여당 비용·CPC)마다 벤치마크 — 같은 플랫폼·같은 목표(같은 단계 우선)의 다른 이벤트 캠페인 중앙값 대비 차이와 백분위. Efficiency 칸은 서로 다른 두 층 — 위 = 이 캠페인의 결과당 비용(목표별 KPI: 인지 CPM·트래픽 CPC·참여 CPE·전환 CPA, 과거 무관·항상), 아래 "vs past" = 같은 KPI의 과거 비교군 순위(3개 미만이면 "—"). 자동 Good/Fair/Weak 없음. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
       '판정(good/mid/bad)은 백분위로 자동 제안하고 사람이 바꾼다',
       '캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언 작성 → 저장 (2단계, 로그인 필요)',
@@ -228,7 +228,6 @@ const iaTree = `Paid Ads Dashboard
         ├── 단계 타임라인 (PhaseTimelineChart 재활용) — 행 클릭 → 아래 표의 그 단계 줄로 스크롤 + 선택 표시(드로어는 안 연다)
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크 ↗↘)
         │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer (Performance와 같은 CampaignDetailPanel — 소재 · View ad · Ads Manager · Billing · 예산 · 페이싱 · 일별 지출(해석 네 열 What worked · Could improve · Why · Next action은 표에, 2026-09-08)
-        ├── Learnings — 사람이 쓴 배운 점 + 다음 이벤트 플레이북(KEEP · USE SELECTIVELY · IMPROVE · VALIDATE) + NEXT EVENT
         ├── (편집 모드) 캠페인별 코멘트 카드 — 판정 · 장점 · 아쉬운 점 · 이유 (언어별) · Learnings 편집기
         └── Export — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄) · 언어 전환(en/ko/zh-Hant)`;
 
@@ -639,7 +638,6 @@ const components = [
   { name: 'SignInDialog', usage: 'Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 앱 전체 게이트는 꺼진 채 쓰기가 필요한 자리에서만' },
   { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 EN · 한국어 · 繁中' },
   { name: 'RecapTakeaways', usage: 'Key takeaways — 임원용 세 칸(BEST RESULT · ATTENTION · NEXT MOVE): 라벨 → 16px 결론 → 12px 근거', type: '신규(구현됨) — 2026-09 임원용 다듬기', note: '카테고리: data-display — 재료는 schema.js buildRecapExecutiveSummary(), 플랫폼 CPM 차이는 NEXT MOVE의 근거' },
-  { name: 'RecapPatterns', usage: 'Learnings의 다음 이벤트 플레이북 2×2(KEEP · USE SELECTIVELY · IMPROVE · VALIDATE: 상태 → 제목(행동) → 근거) + NEXT EVENT 두 문장(결정 + 검증)', type: '신규(구현됨) — 2026-09 임원용 다듬기', note: '카테고리: data-display — 재료는 buildRecapPlaybook()(패턴 재료를 행동으로), 회고 요약은 반복하지 않는다. 방법론은 카드 제목 ⓘ 툴팁' },
   { name: 'BenchmarkArrow', usage: '벤치마크 방향 기호 ↗↘ — Lucide arrow-up-right/down-right 기하의 얇은 선 svg', type: '신규(구현됨) — 2026-09', note: '카테고리: data-display — BenchmarkDelta와 RecapCampaignInsightPanel이 같이 쓴다. ▲▼ 글자 대체' },
   { name: 'RecapStatusBadge', usage: '보고서 상태 배지 — Draft / Ready / Not started', type: '신규(구현됨) — Recap 2단계', note: '카테고리: data-display — 목록과 머리글에서 같은 모양' },
   { name: 'PeerCompareDialog', usage: '벤치마크 글자를 누르면 비교군 캠페인을 나란히 보는 대화상자(열 정렬)', type: '신규(구현됨) — Recap 3단계', note: '카테고리: templates — schema.js buildPeerComparison()' },

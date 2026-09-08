@@ -6,7 +6,6 @@ import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
 import Typography from '@mui/material/Typography';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { alpha } from '@mui/material/styles';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
@@ -18,7 +17,6 @@ import { BackendErrorBanner } from '../../components/data-display/BackendErrorBa
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
 import { RecapTakeaways } from '../../components/data-display/RecapTakeaways';
-import { RecapPatterns } from '../../components/data-display/RecapPatterns';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
@@ -38,7 +36,6 @@ import {
   buildRecapHeadline,
   buildPeerComparison,
   buildRecapExecutiveSummary,
-  buildRecapPlaybook,
   localizedText,
   campaignNameKey,
   effectiveBudgetPlanned,
@@ -227,7 +224,6 @@ export function RecapDetailPage() {
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
   const executiveSummary = useMemo(() => buildRecapExecutiveSummary(byPlatform), [byPlatform]);
-  const playbook = useMemo(() => buildRecapPlaybook(byPlatform), [byPlatform]);
 
   const startEditing = () => {
     setDraft({
@@ -318,9 +314,6 @@ export function RecapDetailPage() {
   }, {});
   const shownRecap = isEditing && draft ? draft.recap : recap;
   const editRows = platformOrder.flatMap((p) => byPlatform[p]);
-  const localize = (text) => localizedText(text, lang);
-  const hasWrittenLearnings = Boolean(recap?.learnings?.length);
-  const hasWrittenNextSteps = Boolean(localize(recap?.nextSteps).value);
   const headlineTextForAi = headline
     ? `${t(headline.rank === 1 ? 'recap.headline.best' : 'recap.headline.rank', 'en', { rank: headline.rank, total: headline.total, metric: headline.metricKey })} (${headline.peerEvents.join(' > ')})`
     : null;
@@ -521,41 +514,12 @@ export function RecapDetailPage() {
         </Box>
       )}
 
-      {isEditing && draft ? (
+      {/* Learnings 읽기 섹션은 2026-09-08에 뺐다 — Key takeaways(이벤트 요약)와 표의 해석 네 열(캠페인별)이 같은 내용을 말해
+          중복이었다. 편집 모드의 이벤트 글(상태·요약·배운 점·제언) 폼은 저장·시트·AI 초안이 쓰므로 남긴다 */}
+      {isEditing && draft && (
         <Box sx={SECTION_CARD_SX} data-print="card">
           <SectionHeader title={t('recap.section.learnings', lang)} />
           <RecapLearningsEditor recap={draft.recap} onChange={updateDraftRecap} lang={lang} isDisabled={isBusy} sx={{ p: 2 }} />
-        </Box>
-      ) : (
-        <Box sx={SECTION_CARD_SX} data-print="card">
-          <SectionHeader title={t('recap.section.learnings', lang)} scope={hasWrittenLearnings ? countScope(recap.learnings.length, 'lesson', lang) : null} hint={t('learn.hint', lang)} />
-          {hasWrittenLearnings && (
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }, gap: 2, p: 2, pb: hasWrittenNextSteps ? 0 : 2 }}>
-              {recap.learnings.map((item, i) => (
-                <Box key={i} sx={(theme) => ({ p: 2, border: '1px solid', borderColor: alpha(theme.palette.divider, 0.6), borderRadius: `${theme.shape.radius.control}px` })}>
-                  <Typography component="h3" sx={{ fontSize: 13, fontWeight: 600, m: 0, mb: 0.75 }}>
-                    {i + 1}. {localizedText(item.title, lang).value}
-                  </Typography>
-                  <LocalizedParagraph text={item.body} lang={lang} />
-                </Box>
-              ))}
-            </Box>
-          )}
-          {hasWrittenNextSteps && (
-            <Box sx={{ px: 2, py: 2 }}>
-              <Typography component="h3" sx={{ fontSize: 13, fontWeight: 600, m: 0, mb: 0.5 }}>{t('recap.section.nextSteps', lang)}</Typography>
-              <LocalizedParagraph text={recap.nextSteps} lang={lang} />
-            </Box>
-          )}
-          {/* 데이터에서 본 패턴은 사람 글과 섞지 않고 그 아래 따로 — 근거 수준이 다르다 */}
-          <RecapPatterns
-            playbook={playbook}
-            platformLabel={PLATFORM_LABEL}
-            hasWrittenLearnings={hasWrittenLearnings}
-            hasWrittenNextSteps={hasWrittenNextSteps}
-            lang={lang}
-            sx={hasWrittenLearnings || hasWrittenNextSteps ? { borderTop: '1px solid', borderColor: 'divider' } : undefined}
-          />
         </Box>
       )}
 
