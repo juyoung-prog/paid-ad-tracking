@@ -96,6 +96,18 @@ export function count(value) {
  * percent(0.4237)            // '42%'
  * percent(0.4237, { digits: 1 })  // '42.4%'
  */
+/**
+ * 압축 수량 — 좁은 칸의 보조 지표용("Reach 163K · Plays 296K"). 1만 미만은 그대로(1,074), 1만 이상은 K, 100만 이상은 M.
+ * 계산이 아니라 표기다(2026-09-08).
+ */
+export function countCompact(value) {
+  if (value == null || !Number.isFinite(value)) return EMPTY;
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toFixed(abs >= 10_000_000 ? 0 : 1).replace(/\.0$/, '')}M`;
+  if (abs >= 10_000) return `${Math.round(value / 1000)}K`;
+  return count(value);
+}
+
 export function percent(ratio, { digits = 0 } = {}) {
   if (isBlank(ratio)) return EMPTY;
   return `${(Number(ratio) * 100).toFixed(digits)}%`;

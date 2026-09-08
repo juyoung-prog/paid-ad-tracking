@@ -98,7 +98,7 @@ const scenarios = [
     flow: [
       '레일 Reports(내부 /recap) 진입 → 이벤트 목록(최근 종료 순, Draft/Ready 상태)',
       '이벤트 클릭 → /recap/{event}: 머리글(이벤트·기간·매장·플랫폼·계획 예산 대비 지출), Key takeaways(임원용 세 칸: BEST RESULT · ATTENTION · NEXT MOVE), 단계 타임라인(행 클릭 → 표의 그 단계 줄 펼침), 플랫폼별 캠페인 표(오른쪽 끝 네 열 What worked · Could improve · Why · Next action; 줄 클릭 → 캠페인 상세 드로어: 성과·페이싱·일별 지출)',
-      '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·참여당 비용·CPC)마다 벤치마크 — 같은 플랫폼·같은 목표(같은 단계 우선)의 다른 이벤트 캠페인 중앙값 대비 차이와 백분위. 열은 질문 하나씩(2026-09-08): Goal(목표 한 단어) · Primary KPI(목표별 실제 값 — 인지 CPM·트래픽 CPC·참여 Cost/eng·전환 CPA, 판단어 없음) · vs target(설정된 목표치만, 없으면 열 숨김) · vs past(같은 KPI의 과거 비교군 순위, 3개 미만이면 "—") · Video/Engagement/Action response · What worked/Could improve/Why/Next action(순위 근거 문장, 사람 글 우선). 종합 등급 없음. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
+      '표의 비율 지표(CPM·CTR·Hook·Hold·참여율·참여당 비용·CPC)마다 벤치마크 — 같은 플랫폼·같은 목표(같은 단계 우선)의 다른 이벤트 캠페인 중앙값 대비 차이와 백분위. 임원용 평가 시트 한 줄(2026-09-08, 1600px 창에서 가로 스크롤 없음): 캠페인 + Goal → Budget / Spend → Primary KPI(목표별 실제 값, 그 아래 과거 비교 순위 — 맥락일 뿐) → Video response · Engagement / Action(목표별 강조) → What worked / Could improve / Why / Next action(왼쪽 숫자를 되풀이하지 않는 해석, 사람 글 우선). 종합 등급·vs target 없음. 머리글에 "역대 오프닝 중 CPM 2위" 한 줄',
       '판정(good/mid/bad)은 백분위로 자동 제안하고 사람이 바꾼다',
       '캠페인마다 장점·아쉬운 점·이유, 이벤트마다 배운 점·다음 제언 작성 → 저장 (2단계, 로그인 필요)',
       'Export 드롭다운 — Google Sheets(표를 클립보드로 복사 후 sheets.new) 또는 PDF(브라우저 인쇄), 언어 드롭다운(en/ko/zh-Hant) — 읽기는 로그인 없이 열린다',

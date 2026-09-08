@@ -45,7 +45,7 @@ const recapTypes = [
   { name: 'EventRecap', kind: '저장', fields: 'id, ownerId, eventName, status(RECAP_STATUS), summary: LocalizedText|null, learnings: Array<{ title: LocalizedText, body: LocalizedText }>, nextSteps: LocalizedText|null, createdAt, updatedAt', note: 'eventName = Campaign.campaignGroup. 이벤트당 1건' },
   { name: 'RecapCampaignNote', kind: '저장', fields: 'id, recapId, campaignId, verdict: VERDICT|null, strength / weakness / reason: LocalizedText|null, organicViews: number|null, organicEngagements: number|null', note: '캠페인당 1건. verdict가 null이면 화면은 suggestedVerdict를 점선 칩으로' },
   { name: 'BenchmarkStat', kind: '계산 전용', fields: 'metricKey, value: number|null, median: number|null, percentile: number|null(0~100, "높을수록 좋음"으로 정규화), sampleSize: number, lowerIsBetter: boolean, peerScope: "phase"|"goal"|"none"', note: 'sampleSize < BENCHMARK_MIN_PEERS면 median/percentile null, peerScope "none" → 컴포넌트는 not enough data' },
-  { name: 'RecapCampaignRow', kind: '계산 전용', fields: 'getGoalMetricsRow(...)의 모든 필드 + storeCode, phaseName, dailyBudget, rank, benchmarks: Record<metricKey, BenchmarkStat>, budgetEfficiency(Primary KPI), kpiTarget(vs target), note: RecapCampaignNote|null', note: '표 한 행. 정렬·순위까지 끝난 상태로 컴포넌트에 내려간다' },
+  { name: 'RecapCampaignRow', kind: '계산 전용', fields: 'getGoalMetricsRow(...)의 모든 필드 + storeCode, phaseName, dailyBudget, rank, benchmarks: Record<metricKey, BenchmarkStat>, budgetEfficiency(Primary KPI), kpiTarget(데이터 모델에만 — 화면 열 없음), insight, note: RecapCampaignNote|null', note: '표 한 행. 정렬·순위까지 끝난 상태로 컴포넌트에 내려간다' },
   { name: 'RecapHeadline', kind: '계산 전용', fields: '{ metricKey, rank, total, peerEvents: string[] } | null', note: '머리글 한 줄("역대 오프닝 5개 중 CPM 2위")의 재료. 문장은 recapStrings가 만든다' },
 ];
 

@@ -480,7 +480,6 @@ export function RecapDetailPage() {
             rows={byPlatform[platform]}
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
-            platformLabel={PLATFORM_LABEL[platform] ?? platform}
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
             /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·일별 지출. 해석은 표의 네 열에).
                다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
