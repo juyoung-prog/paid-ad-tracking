@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 
 /**
- * 가장자리 그림자 폭(px). 16px·알파 0.12로 시작했다가 올렸다 — 렌더는 되고
- * 있었지만 화면에서 있는지 없는지 분간이 안 돼서, 마지막 컬럼이 잘려 있는데도
- * 여전히 표가 끝난 것처럼 보였다(실화면 리뷰). 신호는 보여야 신호다.
- * 내용 위에 얹히므로 더 넓히면 숫자를 가린다 — 여기가 상한선이다.
+ * 가장자리 페이드 폭(px). 한때 24px·알파 0.2까지 올렸는데(16px·0.12가 안 보인다는 리뷰), 그 띠가 표 오른쪽을
+ * 회색으로 무겁게 덮어 마지막 열의 숫자를 흐렸다(실사용 지적, 2026-09-08). 신호는 "더 있다"는 가벼운 단서면
+ * 충분하다 — 20px·0.08의 중립 페이드로 낮춘다. 오른쪽 끝까지 스크롤하면 완전히 사라지고, 왼쪽에서 떨어지면
+ * 같은 무게로 왼쪽에도 나온다(아래 syncEdges).
  */
-const EDGE_WIDTH = 24;
+const EDGE_WIDTH = 20;
 /** 아래 그림자 높이 — 표 행(약 33px)의 3분의 1. 행을 칠하지 않고 표가 흐려지는 것으로 읽힌다 */
 const BOTTOM_EDGE_HEIGHT = 10;
 
@@ -16,8 +16,8 @@ const BOTTOM_EDGE_HEIGHT = 10;
  * "내용이 이 방향으로 이어진다"로만 읽힌다.
  */
 const EDGE_GRADIENT = {
-  start: 'linear-gradient(to right, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
-  end: 'linear-gradient(to left, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0))',
+  start: 'linear-gradient(to right, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0))',
+  end: 'linear-gradient(to left, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0))',
   /* 아래 그림자만 옅고 얕다(0.2/24px → 0.08/10px). 좌우 그림자는 세로 띠라
      가장자리 페이드로 읽히지만, 아래 그림자는 표의 **마지막 행 위에 가로로**
      깔려서 "이 행이 선택됐다"로 읽혔다(실사용 지적). 신호는 남기되 행을 칠하지
@@ -26,14 +26,13 @@ const EDGE_GRADIENT = {
   bottom: 'linear-gradient(to top, rgba(17, 24, 39, 0.08), rgba(17, 24, 39, 0))',
 };
 /**
- * edgeStrength='subtle' — 좌우 페이드를 훨씬 옅고 좁게(0.06/16px). 보고서 표(Recap)처럼
- * 화면에 거의 다 들어와서 몇 px만 넘치는 자리에서는 0.2짜리 띠가 표 오른쪽만 무겁게
- * 보인다. 신호는 남기되 표의 나머지 경계선과 같은 무게로.
+ * edgeStrength='subtle' — 좌우 페이드를 한 단 더 옅고 좁게(0.05/16px). 보고서 표(Recap)처럼
+ * 화면에 거의 다 들어와서 몇 px만 넘치는 자리. 신호는 남기되 표의 나머지 경계선과 같은 무게로.
  */
 const SUBTLE_EDGE_WIDTH = 16;
 const SUBTLE_EDGE_GRADIENT = {
-  start: 'linear-gradient(to right, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0))',
-  end: 'linear-gradient(to left, rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0))',
+  start: 'linear-gradient(to right, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0))',
+  end: 'linear-gradient(to left, rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0))',
   bottom: EDGE_GRADIENT.bottom,
 };
 
@@ -78,7 +77,7 @@ const SUBTLE_EDGE_GRADIENT = {
  * @param {string} label - 스크롤 영역의 접근성 이름. 주면 role="region" + 키보드 포커스가 붙는다(WCAG 2.1.1: 스크롤 영역은 키보드로도 조작 가능해야 함) [Optional]
  * @param {number} startOffset - 좌측 그림자를 그릴 x 위치(px). 고정 열 폭 등 [Optional, 기본값: 0]
  * @param {number|string} maxHeight - 세로 최대 높이. 주면 세로 스크롤도 이 영역이 받는다 [Optional]
- * @param {'strong'|'subtle'} edgeStrength - 좌우 페이드의 무게. 'strong'(기본)은 0.2/24px — 넘친 열이 있다는 걸 분명히 알려야 하는 운영 표. 'subtle'은 0.06/16px — 거의 다 들어오는 보고서 표(Recap)처럼 가장자리가 조용해야 하는 자리 [Optional, 기본값: 'strong']
+ * @param {'strong'|'subtle'} edgeStrength - 좌우 페이드의 무게. 'strong'(기본)은 0.08/20px — 운영 표(Performance). 'subtle'은 0.05/16px — 거의 다 들어오는 보고서 표(Recap). 둘 다 셀 내용을 가리지 않는 가벼운 단서다(2026-09-08) [Optional, 기본값: 'strong']
  * @param {'fade'|'scrollbar'} scrollHint - 세로 스크롤이 남았다는 신호를 무엇으로 줄지. 'fade'(기본)는 아래 그라데이션, 'scrollbar'는 항상 보이는 얇은 스크롤바 — 표의 마지막 행 위에 페이드가 깔려 그 행이 선택된 것처럼 읽히는 자리(CampaignDetailPanel의 Daily spend)에서 쓴다. 좌우 페이드는 두 모드 모두 그대로다 [Optional, 기본값: 'fade']
  * @param {object} sx - 추가 스타일 오버라이드 [Optional]
  *
