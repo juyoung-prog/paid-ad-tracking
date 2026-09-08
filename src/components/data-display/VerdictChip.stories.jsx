@@ -26,8 +26,8 @@ radius.control — 점선 칩은 표 안에서 시끄러워 뺐다(2026-09). 평
 쓰지 않는다. mid는 중립(text.secondary + surface.muted). 배경 틴트는 hex가 아니라
 테마 상태색에서 alpha로 만든다.
 
-표의 **Overall performance** 열이 쓴다 — 등급은 \`schema.js\`의 \`buildOverallPerformance\`(목표 가중, 과거 비교군 구간,
-고정 문턱 없음)이고 사람이 Edit에서 고른 값이 우선한다. 라벨은 STRONG / AVERAGE / WEAK(대문자·자간).
+자동 등급은 만들지 않는다(2026-09-08) — 공식 KPI 목표치가 없어 계산할 근거가 없다.
+이 칩은 **사람이 Edit에서 고른** 평가에만 쓴다. 표의 Goal result 열은 현재 실측치만 보여준다.
         `,
       },
     },

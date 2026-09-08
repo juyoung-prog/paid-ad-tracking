@@ -431,12 +431,12 @@ Paid Ads Dashboard
 | 항목 | 정의 |
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
-| 종합 성과(Overall performance) | "전체적으로 이 캠페인은 어땠나" — STRONG / AVERAGE / WEAK 한 단어(`buildOverallPerformance`). 캠페인 목표(`OVERALL_RULES`)가 어떤 지표를 얼마나 중요하게 볼지 정한다: 인지 = CPM(primary) · Hook·Hold(secondary) · 참여율(supporting), 참여 = 참여율·Cost/eng · Hook·Hold · CPM, 트래픽 = CTR·CPC · Hook·Hold·참여율 · CPM, 전환 = CPA · CTR·CPC · Hook·Hold. primary 구간이 등급을 정하고(top → STRONG · mid → AVERAGE · bottom → WEAK) secondary는 한 단만 움직인다(primary top + secondary bottom → AVERAGE, primary bottom + secondary top → AVERAGE). supporting은 등급에 안 쓰고 문구에만. **회사 KPI 기준값이 없어 고정 문턱은 없다** — 각 지표는 앱의 기존 잣대인 같은 플랫폼·목표의 과거 비교군 구간(`benchmarks.band`)으로 읽되, 순위 하나("best of 12")가 등급을 정하지 않는다. primary를 못 읽으면 INSUFFICIENT DATA. 사람이 Edit에서 고른 등급이 우선(2026-09-08) |
-| 목표치(vs target) | 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 종합 성과 배지 아래 "↓ 20% vs target $3.00" 한 줄. 없으면 아무것도 — 건강 척도·과거 평균으로 대체하지 않는다. 등급 계산에는 관여하지 않는다(표시 층만, 계산·데이터 유지) |
-| 비용 효율 | **이 캠페인만**의 결과당 비용(`budgetEfficiency`: 인지 CPM · 트래픽 CPC · 참여 Cost/eng = 지출 ÷ 좋아요+댓글+공유 · 전환 CPA). 별도 열이 아니라 종합 성과 배지 아래 옅은 한 줄("CPM $2.41")로 — 등급이 지배하고 지표는 보조(2026-09-08) |
+| 종합 등급 | **없다**(2026-09-08 제품 결정). 회사 KPI 기준값이 없고, 과거 비교로 Strong/Average/Weak를 만들지 않는다. 표의 열은 서로 다른 질문 하나씩이다: Goal(무엇을 하려 했나) · Primary KPI(실제 대표 결과) · vs target(명시된 목표를 맞췄나) · vs past(비슷한 과거와 비교하면) · Video/Engagement/Action response(설명이 되는 보조 신호) |
+| 목표치(vs target) | 캠페인에 명시적으로 설정된 목표치(`kpiTarget`)와 Primary KPI의 비교만 — "↓ 20% vs target $3.00". 없으면 "—"(툴팁 Not set) — 과거 중앙값·사분위·플랫폼 기준·추정치·고정 문턱으로 대신하지 않는다. 플랫폼 표의 캠페인 중 하나도 목표치가 없으면 열을 숨기고 폭을 나눠 준다(표시 층만) |
+| Primary KPI | 목표가 정하는 **실제 대표 결과**(`budgetEfficiency`): 인지 CPM · 트래픽 CPC · 참여 Cost/eng = 지출 ÷ 좋아요+댓글+공유 · 전환/매장 방문 CPA. 라벨 + 현재 값만 — Strong/Good/Efficient 같은 판단어는 붙이지 않는다(2026-09-08) |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
-| 강점 · 개선점 · 이유 | 등급과 같은 근거(지표 구간)에서 자동 생성(표의 세 열). 강점 = 중요도 순(primary → secondary → supporting)으로 top인 지표 최대 2개("Strong reach efficiency"), 개선점 = bottom인 지표 최대 2개("Weak watch-through") — 인지 캠페인의 낮은 CTR은 supporting이라 개선점에 오지 않는다. 이유 = 첫 강점·첫 약점을 관측된 관계로 한 문장("Reach was generated efficiently, while engagement remained limited."). 소재·메시지·타깃 같은 원인은 단정하지 않는다. 사람이 Edit에서 쓴 문장(`note.strength/weakness/reason`)이 있으면 그것이 우선 |
+| 강점 · 개선점 · 이유 | 표에는 없다. 캠페인 드로어의 Campaign insights(`buildCampaignInsight`)가 과거 비교군 순위라는 명시된 근거로만 말한다("Strongest reach in its peer group — CPM best of 12 among comparable Meta awareness campaigns"). 원인(소재·타깃·메시지)은 추정하지 않고, 근거가 없으면 "Not enough evidence". 사람이 Edit에서 쓴 문장은 시트에 남는다 |
 | 기간 | 2024년 이후 캠페인만(2023년 이전은 지표가 거의 없음). 지역 필터(같은 GA/FL만) 전환 가능 |
 | 원칙 | Meta와 TikTok을 섞지 않는다(Hook 정의가 다르다). 평균이 아니라 중앙값 — 하나 터진 캠페인이 기준을 끌어올리지 않게 |
 

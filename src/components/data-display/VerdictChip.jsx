@@ -16,13 +16,15 @@ const VERDICT_STYLE = {
 /**
  * VerdictChip 컴포넌트
  *
- * 종합 성과(STRONG / AVERAGE / WEAK) 한 칸 — 이전 보고서의 좋음/보통/아쉬움 칸이다.
- * 옅은 틴트 배경 + 같은 색 글자(600, 대문자·자간) + 아주 옅은 실선 테두리 — 점선·큰 색면은 쓰지 않는다.
- * 값은 VERDICT(good/mid/bad)이고 라벨은 recapStrings verdict.* (Strong/Average/Weak). 없으면 "—".
- * 등급 계산은 schema.js buildOverallPerformance(목표 가중 합산)이고, 사람이 Edit에서 고른 값이 우선한다.
+ * **사람이 고른** 예산 효율 평가(good / mid / bad) 한 칸. 이전 보고서의 좋음/보통/아쉬움 칸이다.
+ * 옅은 틴트 배경 + 같은 색 글자(500) + 아주 옅은 실선 테두리 — 점선은 쓰지 않는다
+ * (2026-09: 점선 칩이 표 안에서 시끄러웠다). 평가가 없으면 "—".
+ *
+ * 자동 등급은 만들지 않는다(2026-09-08) — 공식 KPI 목표치가 없어 Good/Fair/Weak를 계산할 근거가 없다.
+ * 표의 Goal result 열은 현재 실측치만 보여주고, 이 칩은 사람이 Edit에서 고른 값을 보여줄 자리에만 쓴다.
  *
  * Props:
- * @param {'good'|'mid'|'bad'|null} verdict - 등급(사람이 고른 것 또는 자동) [Required]
+ * @param {'good'|'mid'|'bad'|null} verdict - 사람이 고른 평가 [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {'sm'|'md'} size - 높이 단계. 표 셀은 sm [Optional, 기본값: 'md']
  * @param {object} sx - 추가 스타일 [Optional]
@@ -49,11 +51,8 @@ export function VerdictChip({ verdict, lang = 'en', size = 'md', sx }) {
         py: size === 'sm' ? '4px' : '5px',
         px: size === 'sm' ? '7px' : '8px',
         borderRadius: `${theme.shape.radius.control}px`,
-        fontSize: size === 'sm' ? 10.5 : 12,
-        fontWeight: 600,
-        // 임원이 세로로 훑는 한 단어(STRONG/AVERAGE/WEAK) — 대문자 + 자간, 색은 옅은 틴트 그대로
-        letterSpacing: '0.04em',
-        textTransform: 'uppercase',
+        fontSize: size === 'sm' ? 11 : 12,
+        fontWeight: 500,
         lineHeight: size === 'sm' ? '10px' : '12px',
         whiteSpace: 'nowrap',
         color: style.color,

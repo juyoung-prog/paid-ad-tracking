@@ -45,7 +45,7 @@ const recapTypes = [
   { name: 'EventRecap', kind: '저장', fields: 'id, ownerId, eventName, status(RECAP_STATUS), summary: LocalizedText|null, learnings: Array<{ title: LocalizedText, body: LocalizedText }>, nextSteps: LocalizedText|null, createdAt, updatedAt', note: 'eventName = Campaign.campaignGroup. 이벤트당 1건' },
   { name: 'RecapCampaignNote', kind: '저장', fields: 'id, recapId, campaignId, verdict: VERDICT|null, strength / weakness / reason: LocalizedText|null, organicViews: number|null, organicEngagements: number|null', note: '캠페인당 1건. verdict가 null이면 화면은 suggestedVerdict를 점선 칩으로' },
   { name: 'BenchmarkStat', kind: '계산 전용', fields: 'metricKey, value: number|null, median: number|null, percentile: number|null(0~100, "높을수록 좋음"으로 정규화), sampleSize: number, lowerIsBetter: boolean, peerScope: "phase"|"goal"|"none"', note: 'sampleSize < BENCHMARK_MIN_PEERS면 median/percentile null, peerScope "none" → 컴포넌트는 not enough data' },
-  { name: 'RecapCampaignRow', kind: '계산 전용', fields: 'getGoalMetricsRow(...)의 모든 필드 + storeCode, phaseName, dailyBudget, rank, benchmarks: Record<metricKey, BenchmarkStat>, overall: { rating, reason, strengths[], weaknesses[], metricKey, value }, budgetEfficiency, kpiTarget, note: RecapCampaignNote|null', note: '표 한 행. 정렬·순위까지 끝난 상태로 컴포넌트에 내려간다' },
+  { name: 'RecapCampaignRow', kind: '계산 전용', fields: 'getGoalMetricsRow(...)의 모든 필드 + storeCode, phaseName, dailyBudget, rank, benchmarks: Record<metricKey, BenchmarkStat>, budgetEfficiency(Primary KPI), kpiTarget(vs target), note: RecapCampaignNote|null', note: '표 한 행. 정렬·순위까지 끝난 상태로 컴포넌트에 내려간다' },
   { name: 'RecapHeadline', kind: '계산 전용', fields: '{ metricKey, rank, total, peerEvents: string[] } | null', note: '머리글 한 줄("역대 오프닝 5개 중 CPM 2위")의 재료. 문장은 recapStrings가 만든다' },
 ];
 
@@ -58,8 +58,7 @@ const recapEnums = [
   { name: 'GOAL_HEADLINE_METRICS', value: "{ awareness: ['cpm'], traffic: ['cpc'], engagement: ['cpe'], conversion: ['cpa'], store_visit: ['cpa'] } — goal별 대표 KPI 하나(2026-09-07). Efficiency 배지·순위·Key takeaways·머리글이 공유. Hook/Hold/CTR/참여율은 진단 지표" },
   { name: 'BENCHMARK_MIN_PEERS / BENCHMARK_SINCE', value: "3 / '2024-01-01' — 비교군 최소 수, 비교 대상 시작일(2023년 이전은 지표가 거의 없다)" },
   { name: 'VERDICT_PERCENTILE', value: '{ good: 70, bad: 30 } — 벤치마크 구간(band top/bottom) 경계: 백분위 70 이상 top, 30 이하 bottom. 셀 ↗↘ 색과 해석(What worked / Could improve)이 쓴다' },
-  { name: 'budgetEfficiency(row, goal)', value: "→ { metricKey, value } — 이 캠페인의 목표별 결과당 비용(과거·비교군·기준값 무관). 과거 비교(benchmarks)·목표치(kpiTarget)·집행률(pacingRatio)과 층을 나눈다" },
-  { name: 'OVERALL_RULES / buildOverallPerformance(row, goal)', value: "목표별 { primary, secondary, supporting } 지표 표 + 종합 성과 등급(STRONG/AVERAGE/WEAK = VERDICT good/mid/bad) — 표의 Overall performance 열(2026-09-08). primary 구간이 등급을 정하고 secondary는 한 단만 움직인다. 구간은 benchmarks.band(같은 플랫폼·목표의 과거 비교군, 앱의 기존 잣대)로 읽되 순위 하나가 등급을 정하지 않는다. 회사 KPI 기준값이 없어 고정 문턱 없음. primary를 못 읽으면 rating null + reason insufficient. strengths/weaknesses(중요도 순 top/bottom 지표 키)는 강점·개선점·이유 문장의 재료" },
+  { name: 'budgetEfficiency(row, goal)', value: "→ { metricKey, value } — 표의 Primary KPI — 이 캠페인의 목표별 결과당 현재 비용(판단 없음). vs target(kpiTarget)·vs past(benchmarks)·집행률(pacingRatio)과 층을 나눈다. 종합 등급은 없다(2026-09-08 제품 결정)" },
 ];
 
 /** schema.js 순수 함수 — 입력/출력만 적는다. 컴포넌트는 이 결과를 props로 받을 뿐 안에서 다시 계산하지 않는다. */
@@ -69,7 +68,7 @@ const recapFunctions = [
   { name: 'median(values)', io: 'number[] → number|null', note: '빈 배열이면 null' },
   { name: 'percentileRank(values, value, lowerIsBetter)', io: '→ number|null (0~100)', note: '"높을수록 좋음"으로 정규화 — CPM·CPC는 뒤집는다. 동점은 절반으로 센다' },
   { name: 'benchmarkStat(metricKey, value, peerRows)', io: '→ BenchmarkStat', note: 'peerRows는 getGoalMetricsRow 결과 배열. null 값은 표본에서 뺀다' },
-  { name: 'buildRecapRows(eventName, campaigns, records, options)', io: '→ { byPlatform: Record<platform, RecapCampaignRow[]>, peerEvents: string[] }', note: '이벤트 캠페인마다 getGoalMetricsRow → benchmarks → overall → 플랫폼별로 대표 지표 백분위 순 정렬 후 rank 부여. notesById를 주면 note를 붙인다' },
+  { name: 'buildRecapRows(eventName, campaigns, records, options)', io: '→ { byPlatform: Record<platform, RecapCampaignRow[]>, peerEvents: string[] }', note: '이벤트 캠페인마다 getGoalMetricsRow → benchmarks → budgetEfficiency → 플랫폼별로 대표 지표 백분위 순 정렬 후 rank 부여. notesById를 주면 note를 붙인다' },
   { name: 'buildRecapHeadline(eventName, rows, allCampaigns, records)', io: '→ RecapHeadline|null', note: '같은 단계 구성의 다른 이벤트들과 이벤트 단위 대표 지표(지출 가중)를 비교해 순위. 이벤트가 3개 미만이면 null' },
   { name: 'localizedText(text, lang)', io: 'LocalizedText|null, RECAP_LANG → { value: string, isFallback: boolean }', note: '요청 언어가 비면 en. 컴포넌트는 이 결과만 받는다(언어 판단을 컴포넌트가 하지 않는다)' },
   { name: 'recapStrings (src/data/recapStrings.js, 별도 파일)', io: 't(key, lang, params) → string', note: '화면 문구 표 { key: { en, ko, "zh-Hant" } }. 1단계는 en만 채우고 나머지는 빈 값(→ en 대체). 문장 조립("Top 25% of 12 similar campaigns")은 여기서만' },
@@ -97,7 +96,7 @@ const recapPhases = [
     phase: '2', title: '원자 컴포넌트 (Tier 0, 구현됨)', stage: '1단계', deps: 'Phase 1의 BenchmarkStat 타입',
     items: [
       'BenchmarkDelta — data-display. props: stat(BenchmarkStat), formattedValue(string), label(string), size("sm"|"md"). 중앙값 대비 화살표·백분위·N, sampleSize 부족이면 not enough data. KpiBar delta와 같은 화살표·톤 문법',
-      'VerdictChip — data-display. props: verdict(VERDICT|null), lang. good=success / mid=중립 / bad=warning 옅은 틴트 + 옅은 실선 테두리. 표의 Overall performance 열(STRONG/AVERAGE/WEAK, 대문자) — 자동 등급은 buildOverallPerformance, 사람이 고른 note.verdict가 우선(2026-09-08)',
+      'VerdictChip — data-display. props: verdict(VERDICT|null), lang. good=success / mid=중립 / bad=warning 옅은 틴트 + 옅은 실선 테두리. 자동 등급을 없앤 뒤(2026-09-08 제품 결정) 표·편집기에서는 쓰지 않는다 — 사람이 고른 평가를 보여줄 자리가 생기면 다시 쓴다',
     ],
   },
   {
@@ -122,7 +121,7 @@ const recapPhases = [
     items: [
       '마이그레이션 2개 — event_recaps, recap_campaign_notes: owner_id 기본값 auth.uid(), anon read 정책(00000000000019 방식), owner write. LocalizedText는 jsonb',
       'usePaidAdsStore — recaps/notes 읽기 + upsert 함수. 저장 실패는 BackendErrorBanner 문법 그대로',
-      'RecapNoteEditor — templates. props: note(RecapCampaignNote|null), campaignLabel, lang, onChange, isDisabled. 종합 성과 등급(Strong/Average/Weak)은 사람이 고르면 자동 등급보다 우선(자동 제안 UI는 없음). 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
+      'RecapNoteEditor — templates. props: note(RecapCampaignNote|null), campaignLabel, lang, onChange, isDisabled. 평가는 사람이 고르는 것만(자동 제안 없음, 2026-09-08). 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
       'RecapLearningsEditor — templates. props: learnings, nextSteps, lang, onChange. 카드 추가·삭제·순서',
       '로그인 게이트 — Recap 편집 버튼에서만 켠다(읽기는 그대로 공개). 지금 꺼둔 LoginPage 재사용',
     ],

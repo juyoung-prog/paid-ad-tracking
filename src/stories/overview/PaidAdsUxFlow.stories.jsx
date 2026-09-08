@@ -632,7 +632,7 @@ const components = [
   { name: 'RecapHeader', usage: 'Recap 머리글 — 이벤트·상태 칩·기간·매장·플랫폼, KpiBar, 순위 한 줄', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar를 안에서 재활용. headline이 null이면 순위 줄 생략' },
   { name: 'PhaseTimelineChart (Recap)', usage: '이벤트 단계 타임라인 — 행 클릭 → 아래 표의 그 단계 줄로 스크롤 + 선택 표시(페이지 이동·드로어 없음)', type: '재활용', note: 'pages/paidAdsDashboard/PhaseTimelineChart.jsx — onPhaseClick + emphasizedKey' },
   { name: 'BenchmarkDelta', usage: '지표 값 + 중앙값 대비 차이 · 백분위 · N. not enough data 상태 포함', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — KpiBar delta와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대)' },
-  { name: 'VerdictChip', usage: 'good / mid / bad 종합 성과 표시(STRONG/AVERAGE/WEAK, 대문자) — 옅은 틴트 + 같은 색 글자 + 옅은 실선 테두리. 표의 Overall performance 열', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
+  { name: 'VerdictChip', usage: 'good / mid / bad 평가 표시(Good/Fair/Weak) — 옅은 틴트 + 같은 색 글자 + 옅은 실선 테두리. 자동 등급을 없앤 뒤(2026-09-08) 표·편집기에서는 쓰지 않는다', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
   { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — 고정 열 폭 + ScrollArea, 비율 지표마다 BenchmarkDelta' },
   { name: 'RecapNoteEditor', usage: '캠페인 한 줄의 판정 + 장점·아쉬운 점·이유 + 오가닉 선택 입력', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — lang 칸 하나만 편집, 저장은 페이지' },
   { name: 'RecapLearningsEditor', usage: '이벤트 단위 글 — 상태·요약·배운 점 카드·다음 제언', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 캠페인 단위와 저장 대상이 달라 RecapNoteEditor에서 분리' },

@@ -19,18 +19,20 @@ export default {
         component: `
 ## RecapCampaignTable
 
-Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Plan Phase 3). 회장님이 보던 보고서의
-정보 구조 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · **종합 성과** · 영상 반응 · 참여 반응 · 강점 · 개선점 · 이유 — 를
-따르되, 스프레드시트 스타일이 아니라 지금의 시각 체계(흰 바탕, 옅은 경계선, 절제된 상태색)로 그린다(2026-09-08).
-세 층으로 읽힌다: 1층 종합 성과 한 단어(5초) → 2층 무슨 일이 있었나(영상·참여 숫자) → 3층 해석(강점·개선점·이유).
+Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Plan Phase 3). 열은 서로 다른 질문 하나씩이고
+**종합 등급은 없다**(2026-09-08 제품 결정 — 회사 KPI 기준값이 없고, 과거 비교로 등급을 만들지 않는다):
+순위 · 매장 · 캠페인 · **Goal** · 일예산 · 지출 · **Primary KPI** · **vs target** · **vs past** · 영상 반응 · 참여 반응 · 행동 반응.
 
 ### 셀 구성
-- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름 굵게 + 기간·일수 · 목표. 원본 이름은 hover. 줄 전체가 드로어 버튼
+- **Campaign**: 28px 소재 썸네일(CampaignThumbnail, 없으면 이니셜) + 단계 이름 굵게(한 줄 말줄임, 원본 이름은 hover) + 기간·일수. 줄 전체가 드로어 버튼
+- **Goal**: 캠페인 데이터의 목표 한 단어(Awareness · Traffic · Engagement · Conversion · Store visit). 등급도 해석도 과거 비교도 없다
 - **Spend**: 실제 총지출만
-- **Overall performance**: STRONG / AVERAGE / WEAK 배지(VerdictChip, 대문자·옅은 틴트) — schema \`buildOverallPerformance\`: 캠페인 목표(\`OVERALL_RULES\`)가 어떤 지표를 얼마나 중요하게 볼지 정하고 비용 + 영상 반응 + 참여 반응을 합친다. 대표 지표가 등급을 정하고 보조 지표는 한 단만 움직인다. 회사 KPI 기준값이 없어 고정 문턱은 없고, 각 지표는 앱의 기존 잣대(같은 플랫폼·목표의 과거 비교군 구간)로 읽되 순위 하나가 등급을 정하지 않는다. 대표 지표를 못 읽으면 "INSUFFICIENT DATA". 배지 아래 목표 결과의 비용 KPI("CPM $2.41", 옅게), 캠페인 목표치가 있을 때만 "↓ 20% vs target" 한 줄. 사람이 Edit에서 고른 등급이 우선. 툴팁에 규칙
-- **Video response**: Reach · Plays · Avg(라벨 → 값, 12px/400) 위에 Hook / Hold(13px/600 + 비교군 화살표는 보조) 아래
-- **Engagement response**: 목표가 강조를 정한다 — 트래픽은 Clicks·Like·Cmt·Share + CTR / CPC, 전환은 Results·Clicks·Like·Cmt + CPA / CTR / CPC, 나머지는 Like·Cmt·Share + Eng. rate / Cost/eng
-- **Strengths · Areas to improve · Reason**: 사람이 Edit에서 쓴 문장이 우선, 없으면 등급과 같은 근거(지표 구간)에서 자동 생성 — 중요도 순으로 상위/하위인 지표 하나둘("Strong reach efficiency" / "Weak watch-through"), 이유는 관측된 관계만("Reach was generated efficiently, while engagement remained limited."). 원인(소재·메시지·타깃)은 단정하지 않는다. 인지 캠페인의 낮은 CTR은 개선점이 되지 않는다
+- **Primary KPI**: 목표가 정하는 실제 대표 결과 — 인지 CPM · 트래픽 CPC · 참여 Cost/eng(지출 ÷ 좋아요+댓글+공유) · 전환/매장 방문 CPA. 라벨(옅게) + 현재 값(700). Strong/Good/Efficient 같은 판단어는 붙이지 않는다. 툴팁에 계산식만
+- **vs target**: 캠페인에 명시적으로 설정된 목표치(kpiTarget)와의 비교만 — "↓ 20% vs target $3.00", 없으면 "—"(툴팁 Not set). 과거 중앙값·사분위·플랫폼 기준·고정 문턱으로 대신하지 않는다. 이 표의 캠페인 중 하나도 목표치가 없으면 열을 숨기고 그 74px를 캠페인·영상·참여·행동에 나눠 준다
+- **vs past**: Primary KPI를 같은 플랫폼·목표의 과거 비교군(다른 이벤트, 3개 이상)과 견준 순위("↗ best of 12" · "top 9%" · "mid" · "↘ lowest of 4"), 부족하면 "—". 과거 데이터가 쓰이는 유일한 전용 열이며 **맥락일 뿐 등급이 아니다**
+- **Video response**: Reach · Plays · Avg(라벨 → 값, 12px/400) 위에 Hook / Hold(13px/600) 아래. 지표 옆 화살표는 "비교군 4개 중 최고" 같은 명시된 과거 맥락
+- **Engagement response**: Like · Cmt · Share + Eng. rate / Cost/eng
+- **Action response**: Clicks · Results · Profile + CTR / CPC (+ conversion goal이면 CPA)
 
 모든 지표가 같은 문법 **라벨 → 값 → 비교**를 쓴다. 위계는 글자 무게로만, 무게는 지표의 **역할**이 정한다: 목표의 대표 KPI 700 >
 진단 지표(Hook·Hold·Eng. rate·CTR) 600 > 그 밖의 수량·비용 지표 400. 라벨은 11px secondary, 순위 글자는 그대로.
@@ -60,7 +62,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 /**
  * Meta — 비교군이 충분한 쪽. 확인 포인트:
  * - 순위가 대표 지표 백분위 순인가(Grand Opening 1위)
- * - 종합 성과: Grand Opening은 사람이 고른 등급(note.verdict)이 우선, 나머지는 자동. Now Open(store_visit)은 비교군이 없어 INSUFFICIENT DATA
+ * - Primary KPI는 목표별로 다르다(인지 CPM · 트래픽 CPC · 매장 방문 CPA). Now Open(store_visit)은 비교군이 없어 vs past가 "—"
  * - Now Open(store_visit)은 비교군이 없어 전 지표 "not enough data"이고 Action 칸에 CPA가 추가로 보이는가
  * - Spend 아래 CPM이 "best of 5"처럼 양 끝 표현을 쓰는가
  */
@@ -82,25 +84,19 @@ export const NoPerformanceData = {
         ...byPlatform.meta[1],
         rank: 2,
         spend: null, impressions: null, reach: null, clicks: null, videoPlays: null,
-        note: null, overall: { rating: null, reason: 'noData', strengths: [], weaknesses: [], primaryKeys: ['cpm'], secondaryKeys: ['hookRate', 'holdRate'], metricKey: 'cpm', value: null },
+        note: null, budgetEfficiency: { metricKey: 'cpm', value: null },
       },
     ],
   },
 };
 
-/** 캠페인에 목표치가 설정돼 있으면 종합 성과 배지 아래 "↓ 20% vs target $3.83" 한 줄이 붙는다(첫 줄만). 목표치 계산은 그대로다 */
+/** 캠페인에 목표치가 설정돼 있으면 vs target 열이 나타난다 — 첫 줄은 "↓ 20% vs target $3.83", 나머지는 "—". 목표치 계산은 그대로다 */
 export const WithTarget = {
   args: {
     rows: byPlatform.meta.map((r, i) => (i === 0 ? { ...r, kpiTarget: r.budgetEfficiency?.value != null ? Math.round(r.budgetEfficiency.value * 1.25 * 100) / 100 : null } : r)),
   },
 };
 
-/** 사람이 Edit에서 고른 등급·쓴 문장이 자동 값보다 우선한다 — 첫 줄은 사람이 쓴 것(툴팁 "Written by a person in Edit.") */
-export const WithWrittenNotes = {
-  args: {
-    rows: byPlatform.meta.map((r, i) => (i === 0 ? { ...r, note: { ...(r.note ?? {}), verdict: 'mid', strength: { en: 'Store staff reported walk-ins during the teaser week' }, weakness: { en: 'Sale message ran two days late' }, reason: { en: 'Written by the store manager after the event.' } } } : r)),
-  },
-};
 
 /** onRowClick — 숫자 줄 전체가 버튼(보고서에서는 캠페인 상세 드로어). hover는 중립 면 140ms, 벤치마크 글자는 줄 클릭에서 빠진다. Tab으로 행에 포커스, Enter로 눌린다 */
 export const Clickable = {
