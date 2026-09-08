@@ -1883,7 +1883,9 @@ export function localizedText(text, lang = RECAP_DEFAULT_LANG) {
  * @param {Campaign[]} campaigns
  * @param {PerformanceRecord[]} records
  * @param {EventRecap[]} [eventRecaps=[]]
- * @returns {Array<{ eventName: string, startDate: string, endDate: string, campaignCount: number, spend: number|null, platforms: string[], stores: string[], status: 'draft'|'final'|null }>}
+ * 이벤트의 **연도(year)** = 이벤트 시작일의 연도 — 목록의 연도 필터 기준(2026-09-08). 기간이 해를 넘겨도 한 해에만
+ * 속한다(시작한 해). 보고서 레코드(EventRecap)에는 날짜 필드가 없어 캠페인 기간에서 뽑는 것이 단일 원천이다.
+ * @returns {Array<{ eventName: string, startDate: string, endDate: string, year: number, campaignCount: number, spend: number|null, platforms: string[], stores: string[], status: 'draft'|'final'|null }>}
  */
 export function buildRecapEvents(campaigns, records, eventRecaps = []) {
   const byEvent = new Map();
@@ -1898,10 +1900,12 @@ export function buildRecapEvents(campaigns, records, eventRecaps = []) {
   return [...byEvent.entries()]
     .map(([key, { eventName, campaigns: list }]) => {
       const spends = list.map((c) => latestRecordFor(c.id, records)?.spend).filter((v) => v != null);
+      const startDate = list.reduce((min, c) => (c.startDate < min ? c.startDate : min), list[0].startDate);
       return {
         eventName,
-        startDate: list.reduce((min, c) => (c.startDate < min ? c.startDate : min), list[0].startDate),
+        startDate,
         endDate: list.reduce((max, c) => (c.endDate > max ? c.endDate : max), list[0].endDate),
+        year: Number(String(startDate).slice(0, 4)),
         campaignCount: list.length,
         spend: spends.length > 0 ? spends.reduce((a, b) => a + b, 0) : null,
         // 플랫폼 순서는 데이터 순서가 아니라 PLATFORM 선언 순서 — 동기화 순서에 따라 "TikTok + Meta"로 흔들리지 않게
@@ -1911,6 +1915,29 @@ export function buildRecapEvents(campaigns, records, eventRecaps = []) {
       };
     })
     .sort((a, b) => (a.endDate < b.endDate ? 1 : a.endDate > b.endDate ? -1 : 0));
+}
+
+/**
+ * 보고서 목록의 연도 선택지 — 실제로 이벤트가 있는 연도만, 최신이 앞(2026-09-08). 빈 연도는 만들지 않는다.
+ * @param {Array<{ year: number }>} events - buildRecapEvents() 결과
+ * @returns {number[]}
+ */
+export function recapEventYears(events) {
+  return [...new Set((events ?? []).map((e) => e.year).filter((y) => Number.isFinite(y)))].sort((a, b) => b - a);
+}
+
+/**
+ * 목록에 보일 연도 결정 — URL의 연도가 선택지에 있으면 그것, 아니면 올해, 올해도 없으면 가장 최근 연도. 선택지가 없으면 null.
+ * @param {number[]} years - recapEventYears() 결과(최신순)
+ * @param {string|number|null} requested - URL ?year= 값
+ * @param {number} [currentYear]
+ * @returns {number|null}
+ */
+export function resolveRecapYear(years, requested, currentYear = new Date().getFullYear()) {
+  if (!years || years.length === 0) return null;
+  const wanted = Number(requested);
+  if (Number.isFinite(wanted) && years.includes(wanted)) return wanted;
+  return years.includes(currentYear) ? currentYear : years[0];
 }
 
 /**

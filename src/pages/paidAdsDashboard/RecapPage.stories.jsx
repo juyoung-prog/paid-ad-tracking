@@ -53,6 +53,9 @@ Build Plan Phase 4. 이벤트(campaignGroup) 하나가 보고서 하나다. 최�
 Performance(진행 확인, 내부 /reports)와 목적이 달라 레일의 별도 메뉴다. 보고서 상태(Draft / Final /
 Not started)는 2단계 저장이 붙기 전까지 목 데이터에서만 Draft가 보인다.
 
+머리글 오른쪽에 **연도 필터**(\`YearSelect\`)가 언어 선택 앞에 있다(2026-09-08) — 이벤트가 실제로 있는 연도만
+최신순, 기본은 올해(없으면 가장 최근 연도), \`?year=\`로 유지. 이벤트의 연도는 시작일의 연도 하나다.
+
 목록 계산(\`buildRecapEvents\`)은 schema.js가 하고 페이지는 자리에 놓는다. 스토어는
 PaidAdsStoreProvider로 mock을 주입한다 — Recap 목 데이터(\`mockRecapCampaigns\`)는
 Dashboard 스토리의 목록과 섞지 않는다.

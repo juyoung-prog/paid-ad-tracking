@@ -6,3 +6,4 @@ export { LocalizedDateField } from './LocalizedDateField.jsx';
 export { DateRangeField } from './DateRangeField.jsx';
 export { LanguageSwitch } from './LanguageSwitch.jsx';
 export { ExportMenu } from './ExportMenu.jsx';
+export { YearSelect } from './YearSelect.jsx';
