@@ -20,7 +20,7 @@ const kpiFormat = (metricKey) => (['cpm', 'cpc', 'cpa', 'cpe'].includes(metricKe
 
 const fmtPercent = (v) => percent(v, { digits: 2 });
 
-/** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다 */
+/** 열 폭 — 보고서는 한 화면에 다 보이는 게 목표라 글자 열을 좁게 잡는다. vs target이 있을 때의 기준 폭(합 1642) */
 const COLUMN_WIDTH = {
   rank: 26,
   store: 46,
@@ -33,7 +33,7 @@ const COLUMN_WIDTH = {
   spend: 100,
   // 결과당 비용 하나: 라벨("Cost/eng") + 값("$257.94"). 124는 머리글 "Cost efficiency" + ⓘ가 옆 열을 침범하지 않는 폭
   costEfficiency: 124,
-  // 설정된 목표치 대비. 목표치가 없으면 "—"
+  // 설정된 목표치 대비 — 이 표의 캠페인 중 하나라도 목표치가 있을 때만 열이 생긴다
   vsTarget: 74,
   // 과거 비교군 순위("↗ best of 12") — 과거 데이터가 쓰이는 유일한 열
   vsPast: 88,
@@ -42,7 +42,17 @@ const COLUMN_WIDTH = {
   engagement: 198,
   action: 224,
 };
-
+/**
+ * vs target 열이 숨을 때 그 74px를 나눠 갖는 열 — 글자·지표가 많은 열에만(캠페인 이름 말줄임, 목표 결과 줄바꿈,
+ * 지표 옆 순위 글자). #·매장·예산·지출·비용 효율·vs past 같은 짧은 숫자 열은 늘리지 않는다. 표 전체 폭은 그대로 1642
+ */
+const TARGET_REDISTRIBUTION = { campaign: 14, goalResult: 20, video: 14, engagement: 12, action: 14 };
+const columnWidthsFor = (hasTargets) => {
+  if (hasTargets) return COLUMN_WIDTH;
+  const { vsTarget: _hidden, ...rest } = COLUMN_WIDTH;
+  Object.entries(TARGET_REDISTRIBUTION).forEach(([key, extra]) => { rest[key] += extra; });
+  return rest;
+};
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1 };
@@ -133,7 +143,8 @@ const goalResultPart = (metric, lang) => {
  * 트래픽 CTR·CPC·클릭 · 참여 Cost/eng·참여율 + Hook·Hold · 전환 결과 수·CPA + CTR·CPC). 공식 KPI 목표치가 없으므로
  * Good/Fair/Weak 등급도 "Efficient cost" 같은 평가어도 만들지 않는다 — 값이 답이다. 값이 없으면 그 지표를 뺀다.
  * **Cost efficiency** = 이 캠페인의 결과당 비용 하나(인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환 CPA).
- * **vs target** = 캠페인에 설정된 목표치와의 비교뿐, 없으면 "—"(다른 값으로 대신하지 않는다).
+ * **vs target** = 캠페인에 설정된 목표치와의 비교뿐, 없으면 "—"(다른 값으로 대신하지 않는다). 이 표의 캠페인 중 하나도
+ * 목표치가 없으면 열 자체를 숨기고 그 폭을 캠페인·목표 결과·영상·참여·행동 열에 나눠 준다(표 폭은 그대로, 2026-09-08).
  * **vs past** = 다른 이벤트의 비슷한 과거 캠페인 사이 순위뿐(3개 미만이면 "—"). 과거 데이터는 이 열에서만 쓴다.
  * **Video · Engagement · Action** = 자세한 근거. 계획 대비 집행률은 Daily budget 아래 ±20/30%를 벗어날 때만(RECAP_PACING_FLAG).
  *
@@ -168,11 +179,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
     );
   }
 
-  const columnWidths = Object.values(COLUMN_WIDTH);
+  // vs target 열은 이 표의 캠페인 중 하나라도 유효한 목표치가 있을 때만 — "—"로만 찬 열은 소음이라 숨기고 폭을 나눠 준다.
+  // 표시 층의 결정일 뿐 목표치 계산·데이터는 그대로다(플랫폼 표마다 따로 판단)
+  const hasTargets = rows.some((r) => r.kpiTarget > 0);
+  const widths = columnWidthsFor(hasTargets);
+  const columnWidths = Object.values(widths);
   const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
 
   return (
-    <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.store + COLUMN_WIDTH.campaign} edgeStrength="subtle" sx={sx}>
+    <ScrollArea label={label} startOffset={widths.rank + widths.store + widths.campaign} edgeStrength="subtle" sx={sx}>
       <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
         <colgroup>
           {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
@@ -221,9 +236,11 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 <InfoOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline, color: 'text.disabled', verticalAlign: 'middle', ml: 0.5, cursor: 'help' })} />
               </Tooltip>
             </TableCell>
-            <Tooltip title={t('recap.table.vsTargetHint', lang)} placement="top" enterDelay={400} slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}>
-              <TableCell sx={{ ...HEAD_SX, cursor: 'help' }}>{t('recap.table.vsTarget', lang)}</TableCell>
-            </Tooltip>
+            {hasTargets && (
+              <Tooltip title={t('recap.table.vsTargetHint', lang)} placement="top" enterDelay={400} slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}>
+                <TableCell sx={{ ...HEAD_SX, cursor: 'help' }}>{t('recap.table.vsTarget', lang)}</TableCell>
+              </Tooltip>
+            )}
             <Tooltip title={t('recap.table.vsPastHint', lang)} placement="top" enterDelay={400} slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}>
               <TableCell sx={{ ...HEAD_SX, cursor: 'help' }}>{t('recap.table.vsPast', lang)}</TableCell>
             </Tooltip>
@@ -372,16 +389,18 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3 }}>{EMPTY}</Typography>
                   )}
                 </TableCell>
-                <TableCell sx={CELL_SX}>
-                  {/* vs target — 설정된 목표치가 있을 때만. 비용 지표라 낮으면 초록, 높으면 주황, ±5%는 중립 */}
-                  {targetText ? (
-                    <Typography component="span" sx={{ display: 'block', fontSize: 11.5, fontWeight: 500, lineHeight: 1.35, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
-                  ) : (
-                    <Tooltip title={t('recap.table.targetNotSet', lang)} placement="top" enterDelay={300}>
-                      <Typography component="span" sx={{ display: 'inline-block', fontSize: 12, color: 'text.disabled', lineHeight: 1.35, cursor: 'help' }}>{EMPTY}</Typography>
-                    </Tooltip>
-                  )}
-                </TableCell>
+                {/* vs target 열 — 이 표에 목표치가 하나라도 있을 때만. 있는 줄은 비교(낮으면 초록, 높으면 주황, ±5% 중립), 없는 줄은 "—" */}
+                {hasTargets && (
+                  <TableCell sx={CELL_SX}>
+                    {targetText ? (
+                      <Typography component="span" sx={{ display: 'block', fontSize: 11.5, fontWeight: 500, lineHeight: 1.35, color: targetTone, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal' }}>{targetText}</Typography>
+                    ) : (
+                      <Tooltip title={t('recap.table.targetNotSet', lang)} placement="top" enterDelay={300}>
+                        <Typography component="span" sx={{ display: 'inline-block', fontSize: 12, color: 'text.disabled', lineHeight: 1.35, cursor: 'help' }}>{EMPTY}</Typography>
+                      </Tooltip>
+                    )}
+                  </TableCell>
+                )}
                 <TableCell sx={CELL_SX}>
                   {/* vs past — 같은 KPI를 과거 비교군과 견준 순위. 비교군 3개 미만이면 "—"(비용 효율 값이 못 미덥다는 뜻이 아니다) */}
                   {hasData && kpiKey && hasComparison ? (

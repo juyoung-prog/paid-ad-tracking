@@ -432,7 +432,7 @@ Paid Ads Dashboard
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
 | 목표 결과(Goal result) | "이 캠페인이 하려던 일에서 무슨 값이 나왔나" — 목표별로 정한 **현재 실측치**만 보여준다(`GOAL_RESULT_METRICS` / `buildGoalResult`): 인지 CPM + Hook·Hold · 트래픽 CTR·CPC·클릭 수 · 참여 Cost/eng·참여율 + Hook·Hold · 전환/매장 방문 결과 수·CPA + CTR·CPC. **등급(Good/Fair/Weak)도 점수도 "Efficient cost" 같은 평가어도 만들지 않는다**(2026-09-08) — 공식 KPI 목표치가 없어 판단의 근거가 없고, 값 자체가 답이다. 없는 지표는 빼고 지어내지 않는다. 목표치(vs target)·과거 데이터(vs past)는 각자 열에서만 |
-| 목표치(vs target) | "계획한 목표를 맞췄나" — 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 결과당 비용과 견줘 "↓ 20% vs target $3.00". 없으면 "vs target —"(툴팁 Not set) — 건강 척도·과거 평균으로 대체하지 않는다. 목표치는 Performance 판정에 관여하지 않는다 |
+| 목표치(vs target) | "계획한 목표를 맞췄나" — 캠페인에 설정된 목표치(`kpiTarget`)가 있을 때만 결과당 비용과 견줘 "↓ 20% vs target $3.00". 없는 줄은 "—"(툴팁 Not set) — 건강 척도·과거 평균으로 대체하지 않는다. **플랫폼 표의 캠페인 중 하나도 목표치가 없으면 열 자체를 숨기고** 그 폭을 캠페인·목표 결과·영상·참여·행동 열에 나눠 준다(표 폭 그대로, 표시 층만 — 계산·데이터는 유지, 2026-09-08) |
 | 비용 효율 | **이 캠페인만**의 결과당 비용 — 목표별 KPI(인지 CPM · 트래픽 CPC · 참여 참여당 비용 = 지출 ÷ 좋아요+댓글+공유 · 전환 CPA). 과거·비교군·기준값을 쓰지 않으므로 성과만 있으면 항상 값이 있고, Good/Fair/Weak 자동 판정은 없다(`budgetEfficiency`). 표의 Efficiency 칸은 위 = 이 값, 아래 "vs past" = 같은 KPI의 과거 비교군 순위(별개 층, 3개 미만이면 "—" + "Not enough comparison data"). 계획 대비 집행률(pacing)은 세 번째 층 |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |

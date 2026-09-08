@@ -2182,7 +2182,9 @@ export function buildRecapPlaybook(byPlatform) {
   const stepSplit = nextSteps.find((n) => n.kind === 'splitByPlatform') ?? null;
   const stepLean = nextSteps.find((n) => n.kind === 'leanOnPlatform') ?? null;
   const split = find('platformSplit') ?? (stepSplit && { reachPlatform: stepSplit.reachPlatform, clickPlatform: stepSplit.clickPlatform });
-  const both = find('platformBoth') ?? (stepLean && { platform: stepLean.platform, other: null });
+  // nextSteps 경로에는 상대 플랫폼이 없어 표의 플랫폼 키에서 찾는다(둘 중 나머지 하나)
+  const otherOf = (platform) => Object.keys(byPlatform ?? {}).find((p) => p !== platform) ?? null;
+  const both = find('platformBoth') ?? (stepLean && { platform: stepLean.platform, other: otherOf(stepLean.platform) });
   const phase = find('phaseClicks');
   const strongs = learnings.filter((l) => l.kind === 'consistentStrong');
   const weaks = learnings.filter((l) => l.kind === 'consistentWeak');
@@ -2219,7 +2221,7 @@ export function buildRecapPlaybook(byPlatform) {
   let nextEvent = null;
   const step = nextSteps.find((n) => n.kind === 'splitByPlatform') ?? nextSteps.find((n) => n.kind === 'leanOnPlatform') ?? nextSteps.find((n) => n.kind === 'shiftToPhase') ?? null;
   if (step?.kind === 'splitByPlatform') nextEvent = { kind: 'split', reachPlatform: step.reachPlatform, clickPlatform: step.clickPlatform, validateAspects };
-  else if (step?.kind === 'leanOnPlatform') nextEvent = { kind: 'lean', platform: step.platform, validateAspects };
+  else if (step?.kind === 'leanOnPlatform') nextEvent = { kind: 'lean', platform: step.platform, other: otherOf(step.platform), validateAspects };
   else if (step?.kind === 'shiftToPhase') nextEvent = { kind: 'phase', phase: step.phase, worstPhase: step.worstPhase, validateAspects };
 
   return { keep, useSelectively, improve, validate, nextEvent };

@@ -19,12 +19,14 @@ function cardFor(slot, item, platformLabel, lang) {
   const params = {
     platform: platform(item.platform), other: platform(item.other), leader: platform(item.leader),
     phase: item.phase, worstPhase: item.worstPhase, aspect, aspectLower: aspect.toLowerCase(),
+    aspectTitle: item.aspect ? t(`play.aspectTitle.${item.aspect}`, lang) : '',
     metric: item.metricKey ? metricLabel(item.metricKey, lang) : '', count: item.count, countBottom: item.countBottom, total: item.total,
   };
   const prefix = { keep: 'play.keep', useSelectively: 'play.use', improve: 'play.improve', validate: 'play.validate' }[slot];
   return { title: t(`${prefix}.${item.kind}`, lang, params), why: t(`${prefix}.${item.kind}.why`, lang, params) };
 }
 
+/** NEXT EVENT 두 문장 — 결정(primary: 배분 방향) + 검증(secondary: 집행 중 볼 지표). 재료의 kind가 문장을 고른다 */
 function nextEventFor(item, platformLabel, lang) {
   if (!item) return null;
   const platform = (p) => platformLabel[p] ?? p;
@@ -32,8 +34,9 @@ function nextEventFor(item, platformLabel, lang) {
   const aspects = (item.validateAspects ?? []).map((a) => t(`learn.aspect.${a}`, lang).toLowerCase());
   const and = t('play.next.and', lang);
   const list = aspects.length === 0 ? '' : aspects.length === 1 ? `${and}${aspects[0]}` : `, ${aspects.slice(0, -1).join(', ')}${and}${aspects[aspects.length - 1]}`;
-  const primary = t(`play.next.${item.kind}`, lang, { reachPlatform: platform(item.reachPlatform), clickPlatform: platform(item.clickPlatform), platform: platform(item.platform), phase: item.phase, worstPhase: item.worstPhase, aspects: t('play.next.validateJoin', lang, { aspects: list }) });
-  return { primary, secondary: null };
+  const kind = item.kind === 'lean' && !item.other ? 'leanSolo' : item.kind;
+  const primary = t(`play.next.${kind}`, lang, { reachPlatform: platform(item.reachPlatform), clickPlatform: platform(item.clickPlatform), platform: platform(item.platform), other: platform(item.other), phase: item.phase, worstPhase: item.worstPhase });
+  return { primary, secondary: t('play.next.validate', lang, { aspects: list }) };
 }
 
 /**
@@ -41,8 +44,10 @@ function nextEventFor(item, platformLabel, lang) {
  *
  * Learnings 카드 안의 **다음 이벤트 플레이북** — "다음 비슷한 이벤트에서 무엇을 반복하고
  * 무엇을 바꿀까"에만 답한다. 2×2 칸: KEEP(초록 점) · USE SELECTIVELY(파랑 점) · IMPROVE
- * (주황 점) · VALIDATE(회색 점), 칸마다 상태 → 제목 → 근거 한 줄. 아래 NEXT EVENT 줄은
- * 한 문장 — "이번 결과를 출발 가설로, 집행 중 CPM·CTR·(개선·검증 지표) 검증".
+ * (주황 점) · VALIDATE(회색 점), 칸마다 상태 → 제목(행동: "Meta for reach") → 근거 한 줄("Lower CPM in
+ * this event"). 아래 NEXT EVENT 줄은 두 문장 — 결정(15px/600: "Start with Meta-heavy reach allocation and use
+ * TikTok selectively where clicks matter.") + 검증(12px 옅게: "Validate CPM, CTR, … as campaigns run before
+ * shifting more budget."). 큰 콜아웃 카드로 만들지 않는다(2026-09-08).
  *
  * 회고 요약("Reach efficiency was consistently strong")은 Key takeaways·표가 이미 말하므로
  * 여기서 반복하지 않는다. 재료는 schema.js buildRecapPlaybook() — 같은 방향 캠페인 2개
@@ -86,7 +91,7 @@ export function RecapPatterns({ playbook, platformLabel = {}, hasWrittenLearning
           ))}
         </Box>
       )}
-      {/* NEXT EVENT — 격자와 얇은 선으로 나눈 마지막 줄. 결정 15px/600, 검증 12px 보조 */}
+      {/* NEXT EVENT — 격자와 얇은 선으로 나눈 마지막 줄. 결정 15px/600(섹션 제목 다음으로 가장 무겁다), 검증 12px 옅게 */}
       {!hasWrittenNextSteps && (
         <Box sx={{ mt: 2, pt: 1.75, borderTop: '1px solid', borderColor: 'divider' }}>
           <Typography component="h4" sx={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'text.secondary', m: 0, mb: 0.75 }}>{t('play.next.title', lang)}</Typography>
