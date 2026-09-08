@@ -139,8 +139,9 @@ const goalResultPart = (metric, lang) => {
  *
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 열 순서는 캠페인 → 목표 결과 → 일예산 → 지출 →
  * 비용 효율 → vs target → vs past → 영상 · 참여 · 행동이다. 다섯 질문이 각각 제 열을 갖고 섞이지 않는다(2026-09-08):
- * **Goal result** "이 캠페인이 하려던 일에서 무슨 값이 나왔나" = 목표에 맞는 **현재 실측치**만(인지 CPM + Hook·Hold ·
- * 트래픽 CTR·CPC·클릭 · 참여 Cost/eng·참여율 + Hook·Hold · 전환 결과 수·CPA + CTR·CPC). 공식 KPI 목표치가 없으므로
+ * **Goal result** "이 캠페인이 하려던 일에서 무슨 값이 나왔나" = 목표에 맞는 **현재 실측치**만(인지 Hook·Hold ·
+ * 트래픽 CTR·클릭 · 참여 참여율 + Hook·Hold · 전환 결과 수 + CTR·CPC). 목표의 비용 KPI(CPM·CPC·Cost/eng·CPA)는 여기 없다 —
+ * Cost efficiency 열 하나에만 둔다(같은 값이 두 열에 있었다, 2026-09-08). 공식 KPI 목표치가 없으므로
  * Good/Fair/Weak 등급도 "Efficient cost" 같은 평가어도 만들지 않는다 — 값이 답이다. 값이 없으면 그 지표를 뺀다.
  * **Cost efficiency** = 이 캠페인의 결과당 비용 하나(인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환 CPA).
  * **vs target** = 캠페인에 설정된 목표치와의 비교뿐, 없으면 "—"(다른 값으로 대신하지 않는다). 이 표의 캠페인 중 하나도

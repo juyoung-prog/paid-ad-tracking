@@ -1490,13 +1490,15 @@ export const GOAL_HEADLINE_METRICS = Object.freeze({
  * 공식 KPI 목표치가 없으므로 Good/Fair/Weak 등급을 만들지 않는다. 이 표는 "이 목표의 캠페인은 무엇을 보면 되나"만 정하고,
  * 값은 이 캠페인의 현재 실측치를 그대로 쓴다 — 기준값·목표치(vs target)·과거 비교(vs past)는 이 층에 들어오지 않는다.
  * primary: 목표를 바로 말하는 지표(굵게) · supporting: 곁들이는 지표(옅게, 있을 때만)
+ * 목표의 비용 KPI(GOAL_HEADLINE_METRICS: 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환 CPA)는 여기 넣지 않는다 — 그건
+ * Cost efficiency 열의 것이고, 두 열에 같은 값이 있으면 훑기 어렵다(2026-09-08). 목표 결과 = "무엇이 나왔나", 비용 효율 = "얼마 들었나".
  */
 export const GOAL_RESULT_METRICS = Object.freeze({
-  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], supporting: ['hookRate', 'holdRate'] }),
-  [GOAL.TRAFFIC]: Object.freeze({ primary: ['ctr', 'cpc', 'clicks'], supporting: [] }),
-  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['cpe', 'engagementRate'], supporting: ['hookRate', 'holdRate'] }),
-  [GOAL.CONVERSION]: Object.freeze({ primary: ['conversions', 'cpa'], supporting: ['ctr', 'cpc'] }),
-  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['conversions', 'cpa'], supporting: ['ctr', 'cpc'] }),
+  [GOAL.AWARENESS]: Object.freeze({ primary: ['hookRate', 'holdRate'], supporting: [] }),
+  [GOAL.TRAFFIC]: Object.freeze({ primary: ['ctr', 'clicks'], supporting: [] }),
+  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['engagementRate'], supporting: ['hookRate', 'holdRate'] }),
+  [GOAL.CONVERSION]: Object.freeze({ primary: ['conversions'], supporting: ['ctr', 'cpc'] }),
+  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['conversions'], supporting: ['ctr', 'cpc'] }),
 });
 
 /**
