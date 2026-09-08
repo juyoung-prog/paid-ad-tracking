@@ -21,7 +21,7 @@ const fmtPercent = (v) => percent(v, { digits: 2 });
 
 /**
  * 열 폭 — 임원용 평가 시트(2026-09-08): 한 캠페인을 왼쪽에서 오른쪽으로 읽으면 "무엇 → 얼마 → 결과 → 주변 반응 →
- * 해석 → 이유"가 한 화면에 든다. 합 1470 = 1600px 창(내용 폭 ≈1478)에 가로 스크롤 없이 들어가는 폭.
+ * 해석"이 한 화면에 든다. 합 1470 = 1600px 창(내용 폭 ≈1478)에 가로 스크롤 없이 들어가는 폭.
  * 표는 width:100%라 더 넓은 창에서는 남는 폭이 열들에 비례 배분되고(글 열이 함께 넓어진다), 더 좁은 창(1440 이하)은
  * ScrollArea가 가로 스크롤을 준다 — 글자를 줄여 억지로 맞추지 않는다.
  * 통합: 일예산 + 지출 → Budget / Spend · vs past → Primary KPI 아래 · 참여 + 행동 → Engagement / Action · 매장 → 캠페인 둘째 줄.
@@ -37,21 +37,19 @@ const COLUMN_WIDTH = {
   // 라벨 · 값(700) · 아래 과거 비교 "↗ lowest of 12"(≈78px)
   primaryKpi: 108,
   // Hook / Hold 두 자리(각 라벨+값, 아래 순위) + 옅은 보조 줄 "Reach 163K · Plays 296K · Avg 2s"
-  video: 196,
+  video: 226,
   // 목표별 대표 두 자리(순위 포함) + 옅은 보조 줄("248 clicks · CPC $4.51")
-  engagementAction: 202,
-  // 해석 세 열 — 12px 한두 문장(1600px 창에서 27자/줄 → 두세 줄), 네 줄에서 잘리고 전문은 hover. Next action 열은 뺐다(2026-09-08)
-  worked: 200,
-  improve: 200,
-  // Reason은 사람이 쓴 글만 보여 대개 "—" — 나머지 두 열에 폭을 더 준다
-  reason: 140,
+  engagementAction: 232,
+  // 해석 두 열 — 12px 한 문장(1600px 창에서 약 38자/줄 → 두 줄), 네 줄에서 잘리고 전문은 hover.
+  // Reason·Next action 열은 뺐다(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람 글은 Edit·시트에 남는다
+  worked: 240,
+  improve: 240,
 };
 
-/** 해석 열(What worked · Could improve · Reason) — 순서·문구 키·사람이 쓴 note 필드가 한 줄에 */
+/** 해석 열(What worked · Could improve) — 순서·문구 키·사람이 쓴 note 필드가 한 줄에 */
 const INSIGHT_COLUMNS = [
   { key: 'worked', field: 'strength', noteField: 'strength' },
   { key: 'improve', field: 'weakness', noteField: 'weakness' },
-  { key: 'reason', field: 'reason', noteField: 'reason' },
 ];
 /** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
 const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
@@ -132,8 +130,8 @@ const isPlaceholder = (text) => {
  * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군에서 상위/하위였나)를 **해석** 한 문장으로.
  * 지표와 순위는 왼쪽 칸이 이미 보여주므로 여기서 숫자를 되풀이하지 않는다(2026-09-08): "Early video attention stood out
  * against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거가 있을 때만 말한다.
- * Reason: 지표만으로는 원인이 서지 않으므로 자동 문장은 없다 — 사람이 Edit에서 쓴 것만 보이고, 없으면 "—"
- * ("Not enough evidence…"를 줄마다 반복하면 소음이라 뺐다). 사람이 쓴 note가 있으면 호출부가 그것을 먼저 쓴다.
+ * 원인(Reason)은 표에서 다루지 않는다(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람이 Edit에서
+ * 쓴 이유는 편집 폼과 시트 내보내기에 남는다. 사람이 쓴 note가 있으면 호출부가 그것을 먼저 쓴다.
  */
 function insightSentence(field, item, lang) {
   if (!item) return null;
@@ -153,14 +151,13 @@ function insightSentence(field, item, lang) {
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표 — **임원용 평가 시트**(2026-09-08). 한 줄을 왼쪽에서 오른쪽으로
  * 읽으면 결정에 필요한 이야기가 가로 스크롤 없이 끝난다(1600px 이상 창):
  * 무엇인가(캠페인 + Goal) → 얼마 썼나(Budget / Spend) → 주 결과는(Primary KPI + 그 아래 과거 비교) → 주변 반응은
- * (Video response · Engagement / Action) → 그래서(What worked · Could improve) → 이유는(Reason). 표는 여기서 끝난다 —
- * Next action 열은 뺐다(2026-09-08, Reason이 마지막).
+ * (Video response · Engagement / Action) → 그래서(What worked · Could improve). 표는 여기서 끝난다 —
+ * Reason·Next action 열은 뺐다(2026-09-08, Could improve가 마지막).
  *
  * 통합 규칙: 일예산과 지출은 한 칸(지출이 굵게) · 과거 비교는 별도 열이 아니라 그 지표 바로 아래 · 참여와 행동은 한 칸에서
  * 목표가 강조를 정한다(ENGAGEMENT_ACTION_LAYOUT) · 매장은 캠페인 칸 둘째 줄. 종합 등급·vs target·드로어 해석은 없다(제품 결정).
- * 해석 세 열은 왼쪽 숫자를 되풀이하지 않고 해석만 한다("Early video attention stood out against comparable campaigns.").
- * Reason은 근거 있는 원인이 있을 때만 — 지표만으로는 원인이 서지 않으므로 자동 문장 없이 사람이 쓴 것만, 없으면 "—".
- * 사람이 Edit에서 쓴 note(strength/weakness/reason)가 있으면 우선(툴팁 "Written by a person in Edit."), 자리표시자는 무시.
+ * 해석 두 열은 왼쪽 숫자를 되풀이하지 않고 해석만 한다("Early video attention stood out against comparable campaigns.").
+ * 사람이 Edit에서 쓴 note(strength/weakness)가 있으면 우선(툴팁 "Written by a person in Edit."), 자리표시자는 무시.
  *
  * 상호작용: **숫자 줄 어디를 눌러도** onRowClick — 캠페인 상세 드로어(성과·페이싱·일별 지출). 순위 글자(onBenchmarkClick)는
  * stopPropagation. selectedIds는 타임라인에서 고른 단계의 줄 표시(옅은 accent 면 + 왼쪽 2px 선).
@@ -225,7 +222,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             </TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.videoResponse', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.engagementAction', lang)}</TableCell>
-            {/* 해석 세 열 — 첫 열 왼쪽에 옅은 구분선. 근거 수준은 머리글 툴팁 한 줄로만 */}
+            {/* 해석 두 열 — 첫 열 왼쪽에 옅은 구분선. 근거 수준은 머리글 툴팁 한 줄로만 */}
             {INSIGHT_COLUMNS.map((col, i) => (
               <Tooltip key={col.key} title={t('insight.autoHint', lang)} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
                 <TableCell sx={{ ...HEAD_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), cursor: 'help' }}>{t(`insight.field.${col.field}`, lang)}</TableCell>
@@ -255,7 +252,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
               row.videoPlays != null ? `${metricLabel('videoPlays', lang)} ${countCompact(row.videoPlays)}` : null,
               row.avgWatchSeconds != null ? t('recap.table.avgWatch', lang, { s: seconds(row.avgWatchSeconds) }) : null,
             ].filter(Boolean).join(' · ');
-            /* 해석 세 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장(Reason은 자동 없음). 데이터·근거가 없으면 "—" */
+            /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—" */
             const insightCells = INSIGHT_COLUMNS.map((col) => {
               const written = col.noteField ? (localizedText(row.note?.[col.noteField], lang).value ?? '').trim() : '';
               if (written && !isPlaceholder(written)) return { ...col, text: written, isWritten: true };
@@ -403,7 +400,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </TableCell>
                   </>
                 )}
-                {/* 해석 세 칸 — 상자 없이 문장만. 네 줄 넘으면 잘리고 전문은 hover. 비어 있으면 "—" */}
+                {/* 해석 두 칸 — 상자 없이 문장만. 네 줄 넘으면 잘리고 전문은 hover. 비어 있으면 "—" */}
                 {insightCells.map((cell, i) => (
                   <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}) }}>
                     {cell.text ? (

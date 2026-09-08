@@ -163,7 +163,6 @@ export const RECAP_STRINGS = Object.freeze({
   'aspect.engagement': { en: 'engagement', ko: '참여', 'zh-Hant': '互動' },
   'insight.field.strength': { en: 'What worked', ko: '잘된 것', 'zh-Hant': '做得好的' },
   'insight.field.weakness': { en: 'Could improve', ko: '개선할 것', 'zh-Hant': '可改進的' },
-  'insight.field.reason': { en: 'Reason', ko: '이유', 'zh-Hant': '原因' },
   'cell.worked.reach': { en: 'Reach efficiency stood out against comparable campaigns.', ko: '도달 효율이 비교 캠페인 대비 두드러졌습니다.', 'zh-Hant': '觸及效率相較可比廣告表現突出。' },
   'cell.worked.hook': { en: 'Early video attention stood out against comparable campaigns.', ko: '영상 초반 주목이 비교 캠페인 대비 두드러졌습니다.', 'zh-Hant': '影片前段注意力相較可比廣告表現突出。' },
   'cell.worked.hold': { en: 'Watch-through stood out against comparable campaigns.', ko: '끝까지 시청이 비교 캠페인 대비 두드러졌습니다.', 'zh-Hant': '完整觀看相較可比廣告表現突出。' },

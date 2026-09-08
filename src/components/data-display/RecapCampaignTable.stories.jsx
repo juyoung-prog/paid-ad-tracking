@@ -22,7 +22,7 @@ export default {
 Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Plan Phase 3) — **임원용 평가 시트**(2026-09-08).
 한 줄을 왼쪽에서 오른쪽으로 읽으면 결정에 필요한 이야기가 가로 스크롤 없이 끝난다(1600px 이상 창, 열 폭 합 1458):
 무엇인가(캠페인 + Goal) → 얼마 썼나(Budget / Spend) → 주 결과는(Primary KPI + 그 아래 과거 비교) → 주변 반응은
-(Video response · Engagement / Action) → 그래서(What worked · Could improve) → 이유는(Reason). 표는 여기서 끝난다.
+(Video response · Engagement / Action) → 그래서(What worked · Could improve). 표는 여기서 끝난다.
 종합 등급·vs target·드로어 해석은 없다(제품 결정). 좁은 창(1440 이하)은 글자를 줄이지 않고 가로 스크롤한다.
 
 ### 셀 구성
@@ -32,7 +32,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 - **Primary KPI**: 목표가 정하는 실제 대표 결과 — 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환/매장 방문 CPA. 라벨(옅게) + 값(700), **그 아래 같은 KPI의 과거 비교**("↗ best of 12", 비교군 3개 미만이면 "—"). 순위는 맥락이지 등급이 아니다. 판단어 없음
 - **Video response**: Hook / Hold(라벨 + 값 600, 아래 순위) 앞에, "Reach 163K · Plays 296K · Avg 2s"는 옅은 보조 줄
 - **Engagement / Action**: 목표가 대표 두 자리와 보조 줄을 정한다 — 인지 참여율·CTR + 클릭 수·CPC · 트래픽 CTR·CPC + 클릭 수·참여율 · 참여 참여율·Cost/eng + 좋아요·공유 · 전환 CPA·CTR + 결과 수·CPC. 원본 값은 전부 행에 남아 있다
-- **What worked · Could improve · Reason**: 12px 한두 문장(1600px 창에서 두세 줄), 네 줄에서 잘리고 전문은 hover. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." Reason은 근거 있는 원인이 있을 때만 — 지표만으로는 원인이 서지 않으므로 자동 문장 없이 사람이 Edit에서 쓴 것만 보이고 없으면 "—"(2026-09-08, "Not enough evidence…" 반복은 소음이라 뺐다). Next action 열은 없다. 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
+- **What worked · Could improve**: 12px 한 문장(1600px 창에서 240px 폭 → 두 줄), 네 줄에서 잘리고 전문은 hover. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." Reason·Next action 열은 없다(2026-09-08 — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람이 쓴 이유는 Edit 폼과 시트에 남는다). 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
 
 값의 무게는 지표의 **역할**이 정한다: 목표의 대표 KPI 700 > 나머지 대표 자리 600 > 보조 줄 11px 옅게.
 
@@ -62,7 +62,7 @@ Primary KPI·해석 재료(insight)까지 끝난 값이다. 이 컴포넌트는 
  * Meta — 비교군이 충분한 쪽. 확인 포인트:
  * - 순위가 대표 지표 백분위 순인가(Grand Opening 1위)
  * - Primary KPI는 목표별로 다르다(인지 CPM · 트래픽 CPC · 매장 방문 CPA). Now Open(store_visit)은 비교군이 없어 KPI 아래 순위 줄이 "—"
- * - 해석 세 열: Grand Opening은 사람이 쓴 note가 우선(툴팁 "Written by a person in Edit."), 나머지는 순위 근거 해석. Reason은 사람 글이 없으면 "—"
+ * - 해석 두 열: Grand Opening은 사람이 쓴 note가 우선(툴팁 "Written by a person in Edit."), 나머지는 순위 근거 해석. 근거가 없으면 "—"
  * - Now Open(store_visit)은 비교군이 없어 전 지표 "not enough data"이고 Action 칸에 CPA가 추가로 보이는가
  * - Spend 아래 CPM이 "best of 5"처럼 양 끝 표현을 쓰는가
  */

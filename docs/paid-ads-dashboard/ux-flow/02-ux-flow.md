@@ -431,12 +431,12 @@ Paid Ads Dashboard
 | 항목 | 정의 |
 |---|---|
 | 비교군 | 같은 `platform` + 같은 `goal` + 같은 단계 이름(buildPhaseTimeline이 캠페인명에서 뽑는 "Grand Opening" 등)의 **다른 이벤트** 캠페인. 3개 미만이면 같은 platform + 같은 goal(다른 이벤트)로, 그래도 3개 미만이면 벤치마크·순위를 만들지 않는다(`not enough data`). 목표가 먼저인 이유: 결과당 비용은 목표가 같아야 비교가 성립한다(2026-09-07) |
-| 종합 등급 | **없다**(2026-09-08 제품 결정). 회사 KPI 기준값이 없고, 과거 비교로 Strong/Average/Weak를 만들지 않는다. 표는 임원용 평가 시트 한 줄로 읽힌다: 캠페인 + Goal(무엇) → Budget / Spend(얼마) → Primary KPI + 그 아래 과거 비교(주 결과) → Video response · Engagement / Action(주변 반응) → What worked · Could improve(그래서) → Reason(이유). 표는 여기서 끝난다. 1600px 이상 창에서 가로 스크롤 없이 한 화면(열 폭 합 1458) |
+| 종합 등급 | **없다**(2026-09-08 제품 결정). 회사 KPI 기준값이 없고, 과거 비교로 Strong/Average/Weak를 만들지 않는다. 표는 임원용 평가 시트 한 줄로 읽힌다: 캠페인 + Goal(무엇) → Budget / Spend(얼마) → Primary KPI + 그 아래 과거 비교(주 결과) → Video response · Engagement / Action(주변 반응) → What worked · Could improve(그래서). 표는 여기서 끝난다. 1600px 이상 창에서 가로 스크롤 없이 한 화면(열 폭 합 1458) |
 | 목표치(vs target) | 표에서 뺐다(2026-09-08 제품 결정). 캠페인 목표치(`kpiTarget`) 필드와 계산은 데이터 모델에 남아 있지만 화면에 열은 없다 |
 | Primary KPI | 목표가 정하는 **실제 대표 결과**(`budgetEfficiency`): 인지 CPM · 트래픽 CPC · 참여 Cost/eng = 지출 ÷ 좋아요+댓글+공유 · 전환/매장 방문 CPA. 라벨 + 현재 값만 — Strong/Good/Efficient 같은 판단어는 붙이지 않는다(2026-09-08) |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
-| What worked · Could improve · Reason | 표의 마지막 세 열. 재료는 `buildCampaignInsight`(비교군 순위·초과 지출뿐)이고 왼쪽 숫자를 되풀이하지 않고 **해석**만 한 문장으로: "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거 없이 strong/weak라 하지 않는다. Reason은 근거 있는 원인이 있을 때만 — 지표만으로는 원인이 서지 않으므로 자동 문장은 없고 사람이 Edit에서 쓴 `note.reason`만 보이며 없으면 "—"(2026-09-08). Next action 열은 없다. 사람이 쓴 `note.strength/weakness`가 우선(자리표시자는 무시). 등급은 만들지 않는다 |
+| What worked · Could improve | 표의 마지막 두 열. 재료는 `buildCampaignInsight`(비교군 순위·초과 지출뿐)이고 왼쪽 숫자를 되풀이하지 않고 **해석**만 한 문장으로: "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거 없이 strong/weak라 하지 않는다. **원인(Reason)·Next action 열은 없다**(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장을 만들지 않고, 사람이 Edit에서 쓴 `note.reason`은 편집 폼과 시트 내보내기에 남는다. 사람이 쓴 `note.strength/weakness`가 우선(자리표시자는 무시). 등급은 만들지 않는다 |
 | 기간 | 2024년 이후 캠페인만(2023년 이전은 지표가 거의 없음). 지역 필터(같은 GA/FL만) 전환 가능 |
 | 원칙 | Meta와 TikTok을 섞지 않는다(Hook 정의가 다르다). 평균이 아니라 중앙값 — 하나 터진 캠페인이 기준을 끌어올리지 않게 |
 
