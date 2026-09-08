@@ -74,7 +74,6 @@ const rowForAi = (row, platformLabel) => ({
   goal: row.goal,
   period: `${row.startDate} – ${row.endDate}`,
   rank: row.rank,
-  suggestedVerdict: row.suggestedVerdict,
   spend: row.spend,
   reach: row.reach,
   impressions: row.impressions,
@@ -519,7 +518,6 @@ export function RecapDetailPage() {
                 key={r.campaignId}
                 note={draft.notesById[r.campaignId]}
                 campaignLabel={`${r.phaseName} · ${PLATFORM_LABEL[r.platform] ?? r.platform}`}
-                suggestedVerdict={r.suggestedVerdict}
                 hint={t('recap.edit.insightHint', lang)}
                 onChange={(patch) => updateDraftNote(r.campaignId, patch)}
                 lang={lang}

@@ -1,10 +1,8 @@
 import Box from '@mui/material/Box';
-import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import { VerdictChip } from '../data-display/VerdictChip';
 import { t } from '../../data/recapStrings';
 
 const VERDICTS = ['good', 'mid', 'bad'];
@@ -17,10 +15,9 @@ function withLang(text, lang, value) {
 /**
  * RecapNoteEditor 컴포넌트
  *
- * Recap 표의 캠페인 한 줄에 대한 사람의 판단 — 판정(good/mid/bad), 장점·아쉬운
- * 점·이유, 그리고 선택 입력인 오가닉 조회·참여. 벤치마크가 제안한 판정이 있으면
- * "Use suggestion" 버튼으로 받아들일 수 있고, 아무것도 고르지 않으면 화면은
- * 제안값을 칩(툴팁 "suggested")으로 계속 보여준다(판정 null = "아직 사람이 안 정함").
+ * Recap 표의 캠페인 한 줄에 대한 사람의 판단 — 평가(good/mid/bad), 장점·아쉬운
+ * 점·이유, 그리고 선택 입력인 오가닉 조회·참여. 자동 제안은 없다(2026-09-08) — 공식 KPI
+ * 목표치가 없어 등급을 계산할 근거가 없다. 비워 두면 비어 있는 채로 둔다("아직 사람이 안 정함").
  *
  * 언어별 칸(LocalizedText) 중 `lang` 하나만 편집한다 — 3단계에서 언어 탭이 이
  * prop을 바꾼다. 저장은 하지 않는다(onChange로 patch만 올린다). 문구는 recapStrings.
@@ -28,7 +25,6 @@ function withLang(text, lang, value) {
  * Props:
  * @param {{ verdict: 'good'|'mid'|'bad'|null, strength: object|null, weakness: object|null, reason: object|null, organicViews: number|null, organicEngagements: number|null }|null} note - 편집 중인 코멘트. null이면 빈 폼 [Required]
  * @param {string} campaignLabel - 이 줄이 어느 캠페인인지(단계 이름 + 플랫폼) [Required]
- * @param {'good'|'mid'|'bad'|null} suggestedVerdict - 벤치마크가 제안한 판정 [Optional]
  * @param {function} onChange - (patch) => void. 바뀐 필드만 담은 부분 객체 [Required]
  * @param {string} lang - 편집할 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {boolean} isDisabled - 저장 중 등 잠금 [Optional, 기본값: false]
@@ -36,9 +32,9 @@ function withLang(text, lang, value) {
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <RecapNoteEditor note={draft.notes[row.campaignId]} campaignLabel="Grand Opening · Meta" suggestedVerdict={row.suggestedVerdict} onChange={(patch) => updateNote(row.campaignId, patch)} />
+ * <RecapNoteEditor note={draft.notes[row.campaignId]} campaignLabel="Grand Opening · Meta" onChange={(patch) => updateNote(row.campaignId, patch)} />
  */
-export function RecapNoteEditor({ note, campaignLabel, suggestedVerdict = null, onChange, lang = 'en', isDisabled = false, hint, sx }) {
+export function RecapNoteEditor({ note, campaignLabel, onChange, lang = 'en', isDisabled = false, hint, sx }) {
   const verdict = note?.verdict ?? null;
 
   return (
@@ -59,18 +55,6 @@ export function RecapNoteEditor({ note, campaignLabel, suggestedVerdict = null, 
             <ToggleButton key={v} value={v} sx={{ px: 1.25 }}>{t(`verdict.${v}`, lang)}</ToggleButton>
           ))}
         </ToggleButtonGroup>
-        {suggestedVerdict ? (
-          <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
-            <VerdictChip verdict={suggestedVerdict} isSuggested lang={lang} size="sm" />
-            {verdict !== suggestedVerdict && (
-              <Button size="small" variant="text" disabled={isDisabled} onClick={() => onChange({ verdict: suggestedVerdict })} sx={{ minWidth: 0 }}>
-                {t('recap.edit.useSuggestion', lang)}
-              </Button>
-            )}
-          </Box>
-        ) : (
-          <Typography component="span" sx={{ fontSize: 12, color: 'text.disabled' }}>{t('recap.edit.noSuggestion', lang)}</Typography>
-        )}
       </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>

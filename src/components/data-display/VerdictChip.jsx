@@ -1,5 +1,4 @@
 import Box from '@mui/material/Box';
-import Tooltip from '@mui/material/Tooltip';
 import { alpha } from '@mui/material/styles';
 import { t } from '../../data/recapStrings';
 
@@ -17,24 +16,23 @@ const VERDICT_STYLE = {
 /**
  * VerdictChip 컴포넌트
  *
- * 예산 효율 판정(good / mid / bad) 한 칸. 이전 보고서의 좋음/보통/아쉬움 칸이다.
+ * **사람이 고른** 예산 효율 평가(good / mid / bad) 한 칸. 이전 보고서의 좋음/보통/아쉬움 칸이다.
  * 옅은 틴트 배경 + 같은 색 글자(500) + 아주 옅은 실선 테두리 — 점선은 쓰지 않는다
- * (2026-09: 점선 칩이 표 안에서 시끄러웠다). 벤치마크가 **제안한** 판정(isSuggested)은
- * 모양은 같고 툴팁("suggested")으로만 구분한다. 판정이 없으면 "—".
+ * (2026-09: 점선 칩이 표 안에서 시끄러웠다). 평가가 없으면 "—".
  *
- * 판정을 고르는 계산(백분위 → good/mid/bad)은 schema.js suggestVerdict가 한다.
+ * 자동 등급은 만들지 않는다(2026-09-08) — 공식 KPI 목표치가 없어 Good/Fair/Weak를 계산할 근거가 없다.
+ * 표의 Goal result 열은 현재 실측치만 보여주고, 이 칩은 사람이 Edit에서 고른 값을 보여줄 자리에만 쓴다.
  *
  * Props:
- * @param {'good'|'mid'|'bad'|null} verdict - 판정 [Required]
- * @param {boolean} isSuggested - 벤치마크가 제안한 값이면 true(툴팁 "suggested") [Optional, 기본값: false]
+ * @param {'good'|'mid'|'bad'|null} verdict - 사람이 고른 평가 [Required]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
  * @param {'sm'|'md'} size - 높이 단계. 표 셀은 sm [Optional, 기본값: 'md']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <VerdictChip verdict={row.note?.verdict ?? row.suggestedVerdict} isSuggested={!row.note?.verdict} size="sm" />
+ * <VerdictChip verdict={row.note?.verdict} size="sm" />
  */
-export function VerdictChip({ verdict, isSuggested = false, lang = 'en', size = 'md', sx }) {
+export function VerdictChip({ verdict, lang = 'en', size = 'md', sx }) {
   if (!verdict) {
     return (
       <Box component="span" sx={{ color: 'text.disabled', fontSize: size === 'sm' ? 12 : 13, ...sx }}>
@@ -67,5 +65,5 @@ export function VerdictChip({ verdict, isSuggested = false, lang = 'en', size = 
       {t(`verdict.${verdict}`, lang)}
     </Box>
   );
-  return isSuggested ? <Tooltip title={t('verdict.suggested', lang)} placement="top">{chip}</Tooltip> : chip;
+  return chip;
 }

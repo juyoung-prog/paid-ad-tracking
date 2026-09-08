@@ -37,7 +37,7 @@ Build Plan Phase 1의 검증 스토리. 컴포넌트 없이 \`schema.js\`의 Rec
 - 비교군 사슬(2026-09-07): 같은 플랫폼 + 같은 goal + 같은 단계(다른 이벤트) → 같은 플랫폼 + 같은 goal → 3개 미만이면 \`none\`
 - Meta 줄 중 같은 goal 비교군이 3개 이상인 것만 scope \`phase\`/\`goal\`, 나머지는 \`none\`(전부 \`not enough data\`)
 - 비용 효율(budgetEfficiency) = goal별 KPI(cpm/cpc/cpe/cpa) 값 그 자체 — 과거·비교군 무관
-- 종합 성과(performance / suggestedVerdict) = 이 캠페인의 현재 값을 건강 척도(METRIC_HEALTH_SCALE)에 읽은 구간을 GOAL_PERFORMANCE_RULES로 합침: primary 상위 → Good(important 진단 하위면 Fair) · 중간 → Fair · 하위 → Weak · 눈금 없는 목표(CPA 계열)는 null(reason noScale), 값 부족은 null(reason noData). 캠페인 목표치(vs target)·과거 캠페인 데이터(vs past)는 관여하지 않는다. 사람이 고른 note.verdict가 우선
+- 목표 결과(goalResult) = GOAL_RESULT_METRICS가 고른 현재 실측치만(buildGoalResult) — 등급·점수·기준 비교가 없다(2026-09-08). 값이 없는 지표는 빠진다. 평가(note.verdict)는 사람이 Edit에서 고를 때만 생긴다
 - 과거 비교 = benchmarks: 비교군 3개 미만이면 순위 없음 — 억지로 만들지 않는다
 - cpe = 지출 ÷ (좋아요+댓글+공유)
 - 순위는 플랫폼 안에서 대표 지표 백분위 순
@@ -97,7 +97,7 @@ function BenchmarkTable() {
                     <TableCell>Goal</TableCell>
                     <TableCell>Spend</TableCell>
                     {BENCHMARK_METRICS.map((m) => <TableCell key={m.key}>{metricLabel(m.key)}</TableCell>)}
-                    <TableCell>Suggested</TableCell>
+                    <TableCell>Goal result</TableCell>
                     <TableCell>Note verdict</TableCell>
                   </TableRow>
                 </TableHead>
@@ -119,7 +119,7 @@ function BenchmarkTable() {
                           </TableCell>
                         );
                       })}
-                      <TableCell>{r.suggestedVerdict ?? 'null'}</TableCell>
+                      <TableCell>{(r.goalResult?.primary ?? []).map((m) => m.key).join(', ') || 'null'}</TableCell>
                       <TableCell>{r.note?.verdict ?? (r.note ? 'null' : '(no note)')}</TableCell>
                     </TableRow>
                   ))}

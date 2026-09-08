@@ -32,7 +32,6 @@ LocalizedText의 \`lang\` 칸 하나만 편집한다. 3단계의 언어 탭이 �
   argTypes: {
     note: { control: 'object', description: '편집 중인 코멘트(RecapCampaignNote) 또는 null' },
     campaignLabel: { control: 'text', description: '단계 이름 + 플랫폼' },
-    suggestedVerdict: { control: 'select', options: ['good', 'mid', 'bad', null], description: '벤치마크 제안 판정' },
     onChange: { action: 'changed', description: '(patch) => void' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '편집 언어' },
     isDisabled: { control: 'boolean', description: '저장 중 잠금' },
@@ -50,25 +49,19 @@ function Interactive(props) {
   );
 }
 
-/** 저장된 코멘트 편집 — 사람이 이미 good을 골랐고 제안도 good이라 "Use suggestion"이 숨는다 */
+/** 저장된 코멘트 편집 — 평가는 사람이 고른 값만 남는다(자동 제안 없음, 2026-09-08) */
 export const Default = {
-  args: { note: mockRecapCampaignNotes[0], campaignLabel: 'Grand Opening · Meta', suggestedVerdict: 'good' },
+  args: { note: mockRecapCampaignNotes[0], campaignLabel: 'Grand Opening · Meta' },
   render: (args) => <Interactive {...args} />,
 };
 
-/** 빈 코멘트 + 제안 mid — 제안값 칩과 "Use suggestion" 버튼 */
-export const EmptyWithSuggestion = {
-  args: { note: null, campaignLabel: 'Coming Soon · Meta', suggestedVerdict: 'mid' },
-  render: (args) => <Interactive {...args} />,
-};
-
-/** 비교군이 없어 제안이 없는 캠페인 */
-export const NoSuggestion = {
-  args: { note: null, campaignLabel: 'Now Open · Meta', suggestedVerdict: null },
+/** 빈 코멘트 — 아무것도 고르지 않은 상태 */
+export const Empty = {
+  args: { note: null, campaignLabel: 'Coming Soon · Meta' },
   render: (args) => <Interactive {...args} />,
 };
 
 /** 저장 중 잠금 */
 export const Disabled = {
-  args: { note: mockRecapCampaignNotes[0], campaignLabel: 'Grand Opening · Meta', suggestedVerdict: 'good', isDisabled: true },
+  args: { note: mockRecapCampaignNotes[0], campaignLabel: 'Grand Opening · Meta', isDisabled: true },
 };

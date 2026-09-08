@@ -1486,30 +1486,44 @@ export const GOAL_HEADLINE_METRICS = Object.freeze({
 });
 
 /**
- * 목표별 **종합 성과(Performance) 평가 규칙** — 가중치 점수가 아니라 구간(band) 규칙이다(2026-09-07).
- * primary: 목표를 말하는 지표(여럿이면 하나라도 하위면 하위, 전부 상위면 상위, 아니면 중간)
- * important: 판정을 한 단 내릴 수 있는 진단 지표(하나라도 하위면 Good → Fair)
- * secondary: 판정에는 안 쓰고 한 줄 설명("· weak hold")에만 쓴다
- * 규칙: primary 상위 → Good(important에 하위가 있으면 Fair) · primary 중간 → Fair · primary 하위 → Weak ·
- * primary 구간이 하나도 없으면 판정 없음. 구간은 **현재 값을 건강 척도(METRIC_HEALTH_SCALE)에 읽은 것** — 캠페인 목표치
- * (vs target)도 과거 캠페인 데이터(vs past)도 쓰지 않는다. 없는 지표는 감점하지 않는다. 바꾸려면 이 표와 METRIC_HEALTH_SCALE만 고친다.
+ * 목표별 **목표 결과(Goal result)에 요약할 현재 지표** — 점수도 판정도 아니다(2026-09-08).
+ * 공식 KPI 목표치가 없으므로 Good/Fair/Weak 등급을 만들지 않는다. 이 표는 "이 목표의 캠페인은 무엇을 보면 되나"만 정하고,
+ * 값은 이 캠페인의 현재 실측치를 그대로 쓴다 — 기준값·목표치(vs target)·과거 비교(vs past)는 이 층에 들어오지 않는다.
+ * primary: 목표를 바로 말하는 지표(굵게) · supporting: 곁들이는 지표(옅게, 있을 때만)
  */
-export const GOAL_PERFORMANCE_RULES = Object.freeze({
-  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], important: ['hookRate', 'holdRate'], secondary: ['engagementRate', 'ctr', 'cpc'] }),
-  [GOAL.TRAFFIC]: Object.freeze({ primary: ['cpc', 'ctr'], important: [], secondary: ['hookRate', 'holdRate', 'engagementRate'] }),
-  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['cpe', 'engagementRate'], important: [], secondary: ['hookRate', 'holdRate', 'ctr', 'cpc'] }),
-  [GOAL.CONVERSION]: Object.freeze({ primary: ['cpa'], important: [], secondary: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
-  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['cpa'], important: [], secondary: ['ctr', 'cpc', 'hookRate', 'holdRate'] }),
+export const GOAL_RESULT_METRICS = Object.freeze({
+  [GOAL.AWARENESS]: Object.freeze({ primary: ['cpm'], supporting: ['hookRate', 'holdRate'] }),
+  [GOAL.TRAFFIC]: Object.freeze({ primary: ['ctr', 'cpc', 'clicks'], supporting: [] }),
+  [GOAL.ENGAGEMENT]: Object.freeze({ primary: ['cpe', 'engagementRate'], supporting: ['hookRate', 'holdRate'] }),
+  [GOAL.CONVERSION]: Object.freeze({ primary: ['conversions', 'cpa'], supporting: ['ctr', 'cpc'] }),
+  [GOAL.STORE_VISIT]: Object.freeze({ primary: ['conversions', 'cpa'], supporting: ['ctr', 'cpc'] }),
 });
 
 /**
- * 비교군 최소 수 — 이보다 적으면 벤치마크도, 판정(Good/Fair/Weak)도, 순위("best of N")도 만들지 않는다.
+ * 목표 결과 — "이 캠페인이 하려던 일에서 지금 실제로 어떤 값이 나왔나"(2026-09-08). 등급·점수·기준 비교가 아니라
+ * 현재 실측치를 목표에 맞게 골라 담은 것이다. 값이 없는 지표는 빼고 지어내지 않는다. 네 층은 서로 독립이다:
+ * 목표 결과(현재 값) · 비용 효율(결과당 현재 비용) · vs target(설정된 목표치) · vs past(과거 비교군 순위).
+ * @param {Object} row - getGoalMetricsRow() 결과
+ * @param {string} goal
+ * @returns {{ goal: string|null, primary: Array<{key: string, value: number}>, supporting: Array<{key: string, value: number}> }}
+ */
+export function buildGoalResult(row, goal) {
+  const rule = GOAL_RESULT_METRICS[goal] ?? null;
+  const pick = (keys) => keys
+    .map((key) => ({ key, value: row?.[key] ?? null }))
+    .filter((m) => m.value != null && Number.isFinite(m.value));
+  if (!rule) return { goal: goal ?? null, primary: [], supporting: [] };
+  return { goal, primary: pick(rule.primary), supporting: pick(rule.supporting) };
+}
+
+/**
+ * 비교군 최소 수 — 이보다 적으면 벤치마크도 순위("best of N")도 만들지 않는다.
  * 표본이 모자라면 "—"와 "Not enough comparison data"다. 억지로 판정을 만들지 않는다(2026-09-07 원칙).
  */
 export const BENCHMARK_MIN_PEERS = 3;
 /** 비교 대상 시작일 — 2023년 이전 캠페인은 지표가 거의 없다(실계정 확인) */
 export const BENCHMARK_SINCE = '2024-01-01';
-/** 판정 제안 경계 — 대표 지표 백분위 평균이 good 이상이면 good, bad 이하면 bad */
+/** 과거 비교(vs past) 구간 경계 — 백분위가 good 이상이면 top, bad 이하면 bottom. 종합 등급을 만드는 데는 쓰지 않는다 */
 export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
 
 /**
@@ -1536,7 +1550,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {string} id - UUID v4 PK
  * @property {string} recapId - FK → EventRecap.id
  * @property {string} campaignId - FK → Campaign.id. (recapId, campaignId) unique
- * @property {'good'|'mid'|'bad'|null} verdict - 예산 효율 판정. null이면 화면은 suggestedVerdict를 점선 칩으로 보여준다
+ * @property {'good'|'mid'|'bad'|null} verdict - 사람이 Edit에서 고른 예산 효율 평가. 자동 제안은 없다(2026-09-08) — 비워 두면 비어 있는 채로 둔다
  * @property {LocalizedText|null} strength - 장점
  * @property {LocalizedText|null} weakness - 아쉬운 점
  * @property {LocalizedText|null} reason - 이유
@@ -1567,8 +1581,7 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {'good'|'mid'|'bad'|null} suggestedVerdict - 종합 성과(Performance) 자동 판정(buildPerformanceVerdict). 사람이 고른 note.verdict가 우선
- * @property {{ verdict: string|null, primaryKey: string|null, primaryBand: string|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }} performance - 종합 성과 판정 재료(현재 값을 건강 척도 METRIC_HEALTH_SCALE에 읽은 것, 목표치·과거 데이터 무관)
+ * @property {{ goal: string|null, primary: Array<{key: string, value: number}>, supporting: Array<{key: string, value: number}> }} goalResult - 목표 결과(buildGoalResult) — 목표에 맞는 현재 실측치. 등급 아님
  * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
  * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
@@ -1713,7 +1726,7 @@ export function benchmarkStat(metricKey, value, peerRows, peerScope = 'none') {
 }
 
 /**
- * 백분위 → 구간. 판정(suggestVerdict)과 같은 경계를 쓴다 — 표의 셀 색과 판정 칩이
+ * 백분위 → 구간(vs past 전용). 경계는 VERDICT_PERCENTILE — 표의 셀 색과 판정 칩이
  * 서로 다른 말을 하지 않게.
  * @param {number|null} percentile
  * @returns {'top'|'mid'|'bottom'|null}
@@ -1723,24 +1736,6 @@ export function percentileBand(percentile) {
   if (percentile >= VERDICT_PERCENTILE.good) return 'top';
   if (percentile <= VERDICT_PERCENTILE.bad) return 'bottom';
   return 'mid';
-}
-
-/**
- * goal별 대표 지표의 백분위 평균으로 판정을 제안한다. 대표 지표가 전부
- * not enough data면 null — 근거 없는 판정은 만들지 않는다.
- *
- * @param {Object<string, BenchmarkStat>} benchmarks
- * @param {string} goal
- * @returns {'good'|'mid'|'bad'|null}
- */
-export function suggestVerdict(benchmarks, goal) {
-  const keys = GOAL_HEADLINE_METRICS[goal] ?? [];
-  const pcts = keys.map((k) => benchmarks?.[k]?.percentile).filter((p) => p != null);
-  if (pcts.length === 0) return null;
-  const avg = pcts.reduce((a, b) => a + b, 0) / pcts.length;
-  if (avg >= VERDICT_PERCENTILE.good) return VERDICT.GOOD;
-  if (avg <= VERDICT_PERCENTILE.bad) return VERDICT.BAD;
-  return VERDICT.MID;
 }
 
 /** 캠페인 하나의 성과 레코드 — 여러 개면 recordedAt이 늦은 것(없으면 마지막) */
@@ -1803,9 +1798,8 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 세 층을 섞지 않는다: budgetEfficiency = 이 캠페인의 결과당 비용(과거 무관) · benchmarks = 과거 비교 · pacingRatio = 계획 대비 집행
       budgetEfficiency: budgetEfficiency(row, c.goal),
-      // 종합 성과(Performance) — 이 캠페인의 현재 값을 건강 척도에 읽은 판정. 목표치(vs target)·과거 데이터(vs past)와 무관. 사람이 고른 note.verdict가 우선
-      performance: buildPerformanceVerdict(row, c.platform, c.goal),
-      suggestedVerdict: buildPerformanceVerdict(row, c.platform, c.goal).verdict,
+      // 목표 결과(Goal result) — 목표에 맞는 현재 실측치만. 등급을 매기지 않는다(공식 KPI 목표치가 없다)
+      goalResult: buildGoalResult(row, c.goal),
       // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
       kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
       note: notesById[c.id] ?? null,
@@ -2094,88 +2088,11 @@ export function buildRecapTakeaways(byPlatform) {
 export const RECAP_PACING_FLAG = Object.freeze({ over: 1.2, under: 0.7 });
 
 /**
- * 종합 성과가 현재 값을 읽는 **건강 척도**(METRIC_HEALTH_SCALE) — "이 플랫폼에서 이 지표가 이 값이면 건강한가"를 정하는
- * 고정 눈금(2026-09-07). 플랫폼·지표별 healthy/poor 두 눈금만 있고, 판정은 이 캠페인의 **현재 값**을 눈금에 읽는 것뿐이다.
- * 이 표는 캠페인 목표치(kpiTarget, vs target의 것)도 아니고 과거 캠페인의 분포·중앙값·백분위·순위(vs past의 것)도 아니다 —
- * 목표치나 과거 데이터가 없어도 성과 값만 있으면 판정이 나온다. 비용 지표는 healthy ≤ / poor ≥, 비율 지표는 healthy ≥ / poor ≤.
- * 눈금이 없는 지표(TikTok CTR, CPA)는 평가에서 뺀다 — 없는 지표로 감점하지 않는다. 눈금을 바꾸려면 이 표만 고친다.
- */
-export const METRIC_HEALTH_SCALE = Object.freeze({
-  [PLATFORM.META]: Object.freeze({
-    cpm: { healthy: 6, poor: 13 },
-    cpc: { healthy: 0.5, poor: 1 },
-    cpe: { healthy: 1.1, poor: 6 },
-    ctr: { healthy: 0.022, poor: 0.0065 },
-    hookRate: { healthy: 0.29, poor: 0.19 },
-    holdRate: { healthy: 0.14, poor: 0.07 },
-    engagementRate: { healthy: 0.013, poor: 0.0014 },
-  }),
-  [PLATFORM.TIKTOK]: Object.freeze({
-    cpm: { healthy: 3, poor: 5.5 },
-    cpc: { healthy: 1.3, poor: 2.1 },
-    cpe: { healthy: 3, poor: 10 },
-    hookRate: { healthy: 0.1, poor: 0.04 },
-    holdRate: { healthy: 0.055, poor: 0.03 },
-    engagementRate: { healthy: 0.0023, poor: 0.0003 },
-  }),
-});
-
-/**
- * 현재 값 하나 → 건강 구간. 눈금이나 값이 없으면 null(평가에서 뺀다). 목표치·과거 데이터는 받지 않는다.
- * @returns {'top'|'mid'|'bottom'|null}
- */
-export function performanceBand(platform, metricKey, value) {
-  if (value == null || !Number.isFinite(value)) return null;
-  const scale = METRIC_HEALTH_SCALE[platform]?.[metricKey];
-  if (!scale) return null;
-  const lowerIsBetter = BENCHMARK_METRICS.find((m) => m.key === metricKey)?.lowerIsBetter ?? false;
-  if (lowerIsBetter) return value <= scale.healthy ? 'top' : value >= scale.poor ? 'bottom' : 'mid';
-  return value >= scale.healthy ? 'top' : value <= scale.poor ? 'bottom' : 'mid';
-}
-
-/**
- * 종합 성과 판정 — "이 캠페인이 지금 얼마나 잘 되고 있나". **이 캠페인의 현재 지표**를 건강 척도(METRIC_HEALTH_SCALE)에 읽고
- * GOAL_PERFORMANCE_RULES로 합친다(2026-09-07). 네 개념은 서로 섞이지 않는다: Performance(현재 건강) · Cost efficiency(결과당
- * 현재 비용) · vs target(캠페인에 설정된 목표치) · vs past(과거 비교군 순위). 여기에는 목표치도 과거 데이터도 들어오지 않아
- * 둘 다 없어도 성과 값만 있으면 판정이 나온다. 판정이 null이면 reason: 'noData'(현재 지표 부족) | 'noScale'(이 목표의 대표
- * 지표에 눈금 없음 — CPA 계열).
- * primary 상위 → Good(important 진단 하위면 Fair) · 중간 → Fair · 하위 → Weak · primary 구간이 하나도 없으면 null.
- * 설명 재료: primary 대표 지표의 구간 + 두드러진 진단 지표 하나(하위 우선). 원인은 말하지 않는다.
- * @param {Object} row - getGoalMetricsRow() 결과(현재 값)
- * @param {string} platform
- * @param {string} goal
- * @returns {{ verdict: 'good'|'mid'|'bad'|null, reason: 'noData'|'noScale'|null, primaryKey: string|null, primaryBand: 'top'|'mid'|'bottom'|null, weakDiag: string|null, strongDiag: string|null, primaryKeys: string[] }}
- */
-export function buildPerformanceVerdict(row, platform, goal) {
-  const rule = GOAL_PERFORMANCE_RULES[goal] ?? null;
-  const band = (key) => performanceBand(platform, key, row?.[key]);
-  if (!rule) return { verdict: null, reason: 'noScale', primaryKey: null, primaryBand: null, weakDiag: null, strongDiag: null, primaryKeys: [] };
-  const primaryBands = rule.primary.map((k) => [k, band(k)]).filter(([, b]) => b);
-  // 판정 없음의 이유: 대표 지표 값이 있는데 눈금이 없으면 noScale(CPA 계열), 값 자체가 없으면 noData
-  const hasPrimaryValue = rule.primary.some((k) => row?.[k] != null && Number.isFinite(row[k]));
-  const hasScale = rule.primary.some((k) => METRIC_HEALTH_SCALE[platform]?.[k]);
-  const reason = primaryBands.length ? null : hasPrimaryValue && !hasScale ? 'noScale' : 'noData';
-  const bands = primaryBands.map(([, b]) => b);
-  const primaryBand = bands.length === 0 ? null : bands.includes('bottom') ? 'bottom' : bands.every((b) => b === 'top') ? 'top' : 'mid';
-  // 설명에 쓸 대표 지표: 구간이 있는 primary 중 판정을 결정한 것(하위가 있으면 그것, 아니면 첫 번째)
-  const primaryKey = (primaryBands.find(([, b]) => b === primaryBand) ?? primaryBands[0])?.[0] ?? null;
-  const diag = (keys, want) => keys.find((k) => band(k) === want) ?? null;
-  const weakImportant = diag(rule.important, 'bottom');
-  const weakDiag = weakImportant ?? diag(rule.secondary, 'bottom');
-  const strongDiag = diag(rule.important, 'top') ?? diag(rule.secondary, 'top');
-  let verdict = null;
-  if (primaryBand === 'top') verdict = weakImportant ? VERDICT.MID : VERDICT.GOOD;
-  else if (primaryBand === 'mid') verdict = VERDICT.MID;
-  else if (primaryBand === 'bottom') verdict = VERDICT.BAD;
-  return { verdict, reason, primaryKey, primaryBand, weakDiag, strongDiag, primaryKeys: rule.primary };
-}
-
-/**
  * 예산 효율 — "이 캠페인이 쓴 돈으로 목표에 맞는 결과 하나에 얼마가 들었나"(2026-09-07). **이 캠페인의 지출과 결과만**으로
  * 계산한다: 인지 CPM · 트래픽 CPC · 참여 참여당 비용(지출 ÷ 좋아요+댓글+공유) · 전환/매장 방문 CPA. 과거 캠페인·중앙값·
  * 업계 기준·비교군은 여기 들어오지 않는다 — 그것은 별개 층인 과거 비교(benchmarks, "best of 12")의 일이고, 계획 예산 대비
  * 집행률(pacingRatio)은 또 다른 층이다. 그래서 비교군이 없어도 값은 항상 있다(성과 데이터가 없을 때만 null).
- * Good/Fair/Weak 자동 판정은 없다 — 값 자체가 답이다(사람이 Edit에서 고른 판정은 note.verdict에 따로 남는다).
+ * Good/Fair/Weak 자동 판정은 없다 — 값 자체가 답이다(사람이 Edit에서 고른 평가는 note.verdict에 따로 남는다).
  * @param {Object} row - getGoalMetricsRow() 결과(cpm/cpc/cpe/cpa 포함)
  * @param {string} goal
  * @returns {{ metricKey: string|null, value: number|null }}

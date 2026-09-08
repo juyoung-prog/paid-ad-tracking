@@ -49,18 +49,19 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
     push([t('recap.section.campaigns', lang, { platform: platformLabel[platform] ?? platform })]);
     push([
       t('recap.table.rank', lang), t('recap.table.store', lang), t('recap.table.campaign', lang), 'Campaign name', 'Start', 'End',
-      t('recap.table.dailyBudget', lang), t('recap.table.spend', lang), t('recap.table.performance', lang),
+      t('recap.table.dailyBudget', lang), t('recap.table.spend', lang), t('recap.edit.verdict', lang),
       metricLabel('reach', lang), metricLabel('impressions', lang), metricLabel('videoPlays', lang), metricLabel('clicks', lang),
       metricLabel('likes', lang), metricLabel('comments', lang), metricLabel('shares', lang), metricLabel('conversions', lang),
       ...BENCHMARK_METRICS.flatMap((m) => [metricLabel(m.key, lang), `${metricLabel(m.key, lang)} vs peers`]),
       t('recap.note.strength', lang), t('recap.note.weakness', lang), t('recap.note.reason', lang),
     ]);
     rows.forEach((r) => {
-      const verdict = r.note?.verdict ?? r.suggestedVerdict ?? null;
+      // 사람이 Edit에서 고른 평가만 — 자동 등급은 만들지 않는다(2026-09-08)
+      const verdict = r.note?.verdict ?? null;
       push([
         r.rank, r.storeCode, r.phaseName, r.name, r.startDate, r.endDate,
         asMoney(r.dailyBudget), asMoney(r.spend),
-        verdict ? `${t(`verdict.${verdict}`, lang)}${r.note?.verdict ? '' : ` (${t('verdict.suggested', lang)})`}` : '',
+        verdict ? t(`verdict.${verdict}`, lang) : '',
         r.reach, r.impressions, r.videoPlays, r.clicks, r.likes, r.comments, r.shares, r.conversions,
         ...BENCHMARK_METRICS.flatMap((m) => {
           const isMoney = ['cpm', 'cpc', 'cpa', 'cpe'].includes(m.key);
