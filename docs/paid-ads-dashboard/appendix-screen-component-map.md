@@ -71,7 +71,6 @@
 | **RecapHeader** | 신규(구현됨) | 머리글 — 이벤트·상태 배지·기간·매장·플랫폼, KpiBar, 순위 한 줄 |
 | **RecapTakeaways** | 신규(구현됨, 2026-09) | 임원용 핵심 요약 세 칸 — BEST RESULT · ATTENTION · NEXT MOVE(라벨 → 결론 → 근거 한 줄). 재료는 buildRecapExecutiveSummary() |
 | **RecapStatusBadge** | 신규(구현됨, 2026-09) | Not started / Draft / Ready 배지 — 목록 Report 열과 머리글 공용 |
-| **RecapCampaignInsightPanel** | 신규(구현됨, 2026-09) | 캠페인 상세 드로어의 Campaign insights 섹션(2×2) — What worked·Could improve·Why·Next action, 라벨 → 짧은 결론 → 한 줄 근거(↗↘). 근거 수준은 툴팁, Why는 항상 "Insufficient evidence" |
 | **RecapPatterns** | 신규(구현됨, 2026-09) | Learnings의 다음 이벤트 플레이북 — KEEP · USE SELECTIVELY · IMPROVE · VALIDATE 2×2 + NEXT EVENT. 재료는 buildRecapPlaybook() |
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인(썸네일) · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. 숫자 줄 전체 클릭 → 캠페인 상세 드로어, selectedId로 타임라인 선택 표시. PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |

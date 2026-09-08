@@ -7,7 +7,7 @@ import Box from '@mui/material/Box';
  * (stroke 1.5, 둥근 끝, fill 없음). 글자 ▲▼는 면으로 채운 삼각형이라 주식 시세판처럼
  * 무거웠다. 시간 추세(trending)가 아니라 **상대 위치**라 대각 화살표다. 색은
  * currentColor — 옆 글자와 같은 톤(success/warning)을 따른다. BenchmarkDelta(표 셀)와
- * RecapCampaignInsightPanel(펼친 해석 줄)이 같은 기호를 쓴다.
+ * RecapCampaignTable 해석 열(펼친 해석 줄)이 같은 기호를 쓴다.
  *
  * Props:
  * @param {'up'|'down'} direction - up = 비교군보다 낫다, down = 못하다(값의 높낮이가 아니다) [Required]

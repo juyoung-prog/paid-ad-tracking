@@ -72,7 +72,7 @@ function Row({ label, value }) {
  * @param {Date} today - 페이싱 계산 기준일 [Optional, 기본값: new Date()]
  * @param {function} onClose - 닫기 핸들러 [Required]
  * @param {function} onEdit - "Edit on Dashboard" 핸들러 (campaignId) => void [Optional]
- * @param {node} insights - "Campaign insights" 섹션 본문(보고서가 RecapCampaignInsightPanel layout="grid"를 넘긴다). 없으면 섹션째 안 그린다 — Performance처럼 해석 재료가 없는 자리에서는 조용하다 [Optional]
+ * (Campaign insights 섹션은 2026-09-08 보고서 표의 네 열로 옮겨 갔다 — 드로어는 성과·페이싱·일별 지출만 맡는다가 없는 자리에서는 조용하다 [Optional]
  *
  * Example usage:
  * {selected && <CampaignDetailPanel campaign={selected} performance={perf} onClose={close} onEdit={goEdit} />}
@@ -87,7 +87,6 @@ export function CampaignDetailPanel({
   today = new Date(),
   onClose,
   onEdit,
-  insights,
 }) {
   if (!campaign) return null;
 
@@ -253,16 +252,6 @@ export function CampaignDetailPanel({
           />
         )}
 
-        {/* 캠페인 해석 — 보고서에서만 넘어온다(재료: schema.js buildCampaignInsight). 예산 페이싱 뒤,
-            일별 지출 앞: "무슨 일이 있었나 → 예산은 어땠나 → 그래서 무엇을 배웠나 → 근거 표" 순서.
-            표 아래 펼침(셰브론)을 없애고 여기로 옮겼다(2026-09-07) — 줄을 누르면 다 나온다 */}
-        {insights && (
-          <Box sx={{ mb: 3 }}>
-            {/* 상자 없이 — Daily spend와 같은 제목 위계, 여백과 옅은 선만으로 나눈다(드로어 안의 카드가 되지 않게) */}
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>Campaign insights</Typography>
-            {insights}
-          </Box>
-        )}
 
         {/* 이 캠페인만의 일별 지출 — Reports의 Daily spend 표는 필터에 걸린
             캠페인들의 **합**이라, 같은 플랫폼에서 기간이 겹치는 캠페인이 있으면

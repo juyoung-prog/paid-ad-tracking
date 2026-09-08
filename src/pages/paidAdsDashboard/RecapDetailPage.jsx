@@ -18,7 +18,6 @@ import { BackendErrorBanner } from '../../components/data-display/BackendErrorBa
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
 import { RecapTakeaways } from '../../components/data-display/RecapTakeaways';
-import { RecapCampaignInsightPanel } from '../../components/data-display/RecapCampaignInsightPanel';
 import { RecapPatterns } from '../../components/data-display/RecapPatterns';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
@@ -39,7 +38,6 @@ import {
   buildRecapHeadline,
   buildPeerComparison,
   buildRecapExecutiveSummary,
-  buildCampaignInsight,
   buildRecapPlaybook,
   localizedText,
   campaignNameKey,
@@ -320,13 +318,6 @@ export function RecapDetailPage() {
   }, {});
   const shownRecap = isEditing && draft ? draft.recap : recap;
   const editRows = platformOrder.flatMap((p) => byPlatform[p]);
-  /* 캠페인 해석은 캠페인 상세 드로어의 "Campaign insights"에 — 사람이 쓴 글이 있으면 그것, 없으면 데이터
-     해석(원인은 지어내지 않는다). 계획 예산은 캠페인 단위 값(effectiveBudgetPlanned)으로
-     초과 지출 판정에만 쓴다. 편집 중에는 draft의 코멘트가 바로 반영된다. */
-  const insightById = Object.fromEntries(editRows.map((r) => {
-    const campaign = eventCampaigns.find((c) => c.id === r.campaignId);
-    return [r.campaignId, { ...r, insight: buildCampaignInsight(r, { plannedBudget: campaign ? effectiveBudgetPlanned(campaign) : null }) }];
-  }));
   const localize = (text) => localizedText(text, lang);
   const hasWrittenLearnings = Boolean(recap?.learnings?.length);
   const hasWrittenNextSteps = Boolean(localize(recap?.nextSteps).value);
@@ -496,8 +487,9 @@ export function RecapDetailPage() {
             rows={byPlatform[platform]}
             lang={lang}
             label={`${PLATFORM_LABEL[platform]} recap table`}
+            platformLabel={PLATFORM_LABEL[platform] ?? platform}
             onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
-            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출).
+            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·일별 지출. 해석은 표의 네 열에).
                다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
             onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (!phaseSelection?.ids.includes(campaignId)) setPhaseSelection(null); }}
             selectedIds={phaseSelection?.ids ?? []}
@@ -582,10 +574,6 @@ export function RecapDetailPage() {
             today={today}
             onClose={() => setDetailCampaignId(null)}
             onEdit={(id) => navigate(`/dashboard?campaign=${id}`)}
-            /* 캠페인 해석은 이 페이지의 재료(벤치마크 구간)로만 만든다 — Performance에는 없다 */
-            insights={insightById[detailCampaign.id] ? (
-              <RecapCampaignInsightPanel row={insightById[detailCampaign.id]} localize={localize} lang={lang} layout="grid" />
-            ) : undefined}
           />
         );
       })()}

@@ -12,7 +12,7 @@ import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, METRIC_ASPECT } from '../../data/schema';
+import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, METRIC_ASPECT, localizedText } from '../../data/schema';
 import { money, count, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
 
 /** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
@@ -44,11 +44,27 @@ const COLUMN_WIDTH = {
   video: 224,
   engagement: 206,
   action: 232,
+  // 해석 네 열(2026-09-08) — 한 문장씩, 12px 네 줄까지. 지표 열보다 조금 넓다. 넘치면 잘리고 전문은 hover
+  worked: 200,
+  improve: 200,
+  why: 220,
+  next: 240,
 };
 /**
  * vs target 열이 숨을 때 그 74px를 나눠 갖는 열 — 글자·지표가 많은 열에만. 짧은 숫자 열은 늘리지 않는다. 표 전체 폭은 그대로
  */
 const TARGET_REDISTRIBUTION = { campaign: 14, video: 20, engagement: 20, action: 20 };
+/** 해석 열은 표기 문제라 상수로 — 순서·문구 키·사람이 쓴 note 필드가 한 줄에 */
+const INSIGHT_COLUMNS = [
+  { key: 'worked', field: 'strength', noteField: 'strength' },
+  { key: 'improve', field: 'weakness', noteField: 'weakness' },
+  { key: 'why', field: 'reason', noteField: 'reason' },
+  { key: 'next', field: 'recommendation', noteField: null },
+];
+/** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
+const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
+/** 수치 열과 해석 열 사이 — 옅은 세로 구분선 하나(머리글·본문 같은 자리) */
+const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider' };
 const columnWidthsFor = (hasTargets) => {
   if (hasTargets) return COLUMN_WIDTH;
   const { vsTarget: _hidden, ...rest } = COLUMN_WIDTH;
@@ -126,6 +142,32 @@ function SecondaryMetrics({ parts, minWidth }) {
 }
 
 /**
+ * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군 몇 개 중 어디였나)를 한 문장으로.
+ * 근거가 있는 말만 한다: 순위·백분위·초과 지출. 원인은 관측된 관계만 적고 "the data does not show why"로 닫는다.
+ * 사람이 Edit에서 쓴 note가 있으면 호출부가 그것을 먼저 쓴다.
+ */
+function insightSentence(field, item, row, platformLabel, lang) {
+  if (!item) return null;
+  const scope = (it) => (it.scope === 'phase'
+    ? t('cell.scope.phase', lang, { platform: platformLabel, phase: row.phaseName })
+    : t('cell.scope.goal', lang, { platform: platformLabel, goal: GOAL_KEYS.includes(row.goal) ? t(`goalLabel.${row.goal}`, lang).toLowerCase() : row.goal }));
+  if (field === 'strength' || field === 'weakness') {
+    if (item.kind === 'overspend') return t('cell.improve.overspend', lang, { pct: item.pct });
+    const stat = item.stat; if (!stat) return null;
+    const params = { metric: metricLabel(item.metricKey, lang), n: stat.sampleSize + 1, scope: scope(item) };
+    if (field === 'strength') return stat.percentile >= 100 ? t('cell.worked.best', lang, params) : t('cell.worked.top', lang, { ...params, pct: 100 - stat.percentile });
+    return stat.percentile <= 0 ? t('cell.improve.lowest', lang, params) : t('cell.improve.bottom', lang, { ...params, pct: stat.percentile });
+  }
+  if (field === 'reason') {
+    const known = ['reachNotAction', 'actionNotReach', 'hookNotHold', 'holdNotHook', 'allStrong', 'allWeak'];
+    return t(`cell.why.${known.includes(item.kind) ? item.kind : 'unknown'}`, lang);
+  }
+  const aspect = (a) => (a ? t(`aspect.${a}`, lang) : '');
+  const short = (a) => (a ? t(`aspectShort.${a}`, lang) : '');
+  return t(`cell.next.${item.kind}`, lang, { keep: short(item.keepAspect), test: short(item.testAspect), aspect: aspect(item.aspect), metric: item.metricKey ? metricLabel(item.metricKey, lang) : '', pct: item.pct ?? '' });
+}
+
+/**
  * RecapCampaignTable 컴포넌트
  *
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표. 열은 서로 다른 질문 하나씩이고 **종합 등급은 없다**
@@ -134,8 +176,11 @@ function SecondaryMetrics({ parts, minWidth }) {
  * **Primary KPI**(목표별 실제 대표 결과 — 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환/매장 방문 CPA. 라벨 + 현재 값, 판단어 없음) ·
  * **vs target**(캠페인에 설정된 목표치와의 비교만, 없으면 "—". 이 표에 목표치가 하나도 없으면 열을 숨기고 폭을 나눠 준다) ·
  * **vs past**(같은 플랫폼·목표의 과거 비교군 사이 Primary KPI 순위, 3개 미만이면 "—". 맥락일 뿐 등급이 아니다) ·
- * **Video / Engagement / Action response**(진단 근거 — 지표마다 과거 비교 화살표는 명시된 과거 맥락으로만).
- * 사람이 Edit에서 고른 평가·문장은 시트와 드로어의 몫이고 이 표는 숫자만 보여준다.
+ * **Video / Engagement / Action response**(진단 근거 — 지표마다 과거 비교 화살표는 명시된 과거 맥락으로만) ·
+ * **What worked · Could improve · Why · Next action**(해석 네 열, 2026-09-08 — 드로어의 Campaign insights를 표로 옮겼다.
+ * 현재 지표 → 과거 맥락 → 해석 → 다음 행동을 가로로 한 번에 읽는다). 재료는 schema buildCampaignInsight(비교군 순위·초과
+ * 지출뿐)이고 문장은 insightSentence가 한 줄로 만든다. 순위 없이 "strong/weak"라 하지 않고, 원인은 데이터가 말하는 관계만
+ * 적는다. 사람이 Edit에서 쓴 note(strength/weakness/reason)가 있으면 그것이 우선(툴팁 "Written by a person in Edit."). 등급은 없다.
  *
  * 상호작용: **숫자 줄 어디를 눌러도** onRowClick — 캠페인 상세 드로어. 벤치마크 글자(onBenchmarkClick)는 stopPropagation.
  * selectedIds는 타임라인에서 고른 단계의 줄 표시(옅은 accent 면 + 왼쪽 2px 선).
@@ -150,12 +195,13 @@ function SecondaryMetrics({ parts, minWidth }) {
  * @param {function} onBenchmarkClick - 벤치마크 글자 클릭 (campaignId, metricKey) => void — 비교군 대화상자 [Optional]
  * @param {string[]} selectedIds - 타임라인에서 고른 단계에 속한 캠페인 id들 [Optional, 기본값: []]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
+ * @param {string} platformLabel - 해석 문장에 쓰는 플랫폼 표시명("Meta") [Optional, 기본값: rows[0].platform]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
- * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedIds={phaseSelection?.ids ?? []} />
+ * <RecapCampaignTable rows={byPlatform.meta} platformLabel="Meta" onRowClick={(id) => setDetailCampaignId(id)} selectedIds={phaseSelection?.ids ?? []} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', platformLabel, sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -167,6 +213,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
   // vs target 열은 이 표의 캠페인 중 하나라도 유효한 목표치가 있을 때만 — "—"로만 찬 열은 소음이라 숨긴다(표시 층만, 계산·데이터는 그대로)
   const hasTargets = rows.some((r) => r.kpiTarget > 0);
   const widths = columnWidthsFor(hasTargets);
+  const platformName = platformLabel ?? rows[0]?.platform ?? '';
   const columnWidths = Object.values(widths);
   const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
 
@@ -214,6 +261,12 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.videoResponse', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.engagementResponse', lang)}</TableCell>
             <TableCell sx={HEAD_SX}>{t('recap.table.actionResponse', lang)}</TableCell>
+            {/* 해석 네 열 — 첫 열 왼쪽에 옅은 구분선. 근거 수준은 머리글 툴팁 한 줄로만 */}
+            {INSIGHT_COLUMNS.map((col, i) => (
+              <Tooltip key={col.key} title={t('insight.autoHint', lang)} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
+                <TableCell sx={{ ...HEAD_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), cursor: 'help' }}>{t(`insight.field.${col.field}`, lang)}</TableCell>
+              </Tooltip>
+            ))}
           </TableRow>
         </TableHead>
         <TableBody>
@@ -235,6 +288,14 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   : t('recap.table.targetOn', lang, { target: kpiFormat(kpi.metricKey)(row.kpiTarget) });
             const isConversion = row.goal === 'conversion' || row.goal === 'store_visit';
             const isSelected = selectedIds.includes(row.campaignId);
+            /* 해석 네 칸 — 사람이 쓴 note가 우선, 없으면 재료(insight)에서 한 문장. 데이터 없으면 다음 행동만 "데이터 더 모으기" */
+            const insightCells = INSIGHT_COLUMNS.map((col) => {
+              const written = col.noteField ? (localizedText(row.note?.[col.noteField], lang).value ?? '').trim() : '';
+              if (written) return { ...col, text: written, isWritten: true };
+              if (!hasData) return { ...col, text: col.field === 'recommendation' ? t('cell.next.collect', lang) : null, isWritten: false };
+              const auto = insightSentence(col.field, row.insight?.[col.field] ?? null, row, platformName, lang);
+              return { ...col, text: auto ?? (col.field === 'reason' ? t('cell.why.unknown', lang) : null), isWritten: false };
+            });
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
             return (
               <TableRow
@@ -407,6 +468,18 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </TableCell>
                   </>
                 )}
+                {/* 해석 네 칸 — 상자 없이 문장만. 네 줄 넘으면 잘리고 전문은 hover. 비어 있으면 "—" */}
+                {insightCells.map((cell, i) => (
+                  <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}) }}>
+                    {cell.text ? (
+                      <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}>
+                        <Typography component="span" sx={{ ...INSIGHT_TEXT_SX, color: 'text.primary', cursor: 'help' }}>{cell.text}</Typography>
+                      </Tooltip>
+                    ) : (
+                      <Typography component="span" sx={{ fontSize: 12, color: 'text.disabled', lineHeight: 1.45 }}>{EMPTY}</Typography>
+                    )}
+                  </TableCell>
+                ))}
               </TableRow>
             );
           })}

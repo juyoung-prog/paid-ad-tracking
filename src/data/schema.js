@@ -1550,7 +1550,8 @@ export const VERDICT_PERCENTILE = Object.freeze({ good: 70, bad: 30 });
  * @property {number|null} dailyBudget
  * @property {number} rank - 같은 플랫폼 안에서 1부터
  * @property {Object<string, BenchmarkStat>} benchmarks - BENCHMARK_METRICS key → BenchmarkStat
- * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관)
+ * @property {{ metricKey: string|null, value: number|null }} budgetEfficiency - 이 캠페인의 목표별 결과당 비용(과거·비교군 무관) — 표의 Primary KPI
+ * @property {{ hasData: boolean, strength: Object|null, weakness: Object|null, reason: Object, recommendation: Object|null }} insight - buildCampaignInsight() — 표의 What worked · Could improve · Why · Next action 재료
  * @property {number|null} kpiTarget - 캠페인에 설정된 목표치(같은 KPI). 없으면 null — 지어내지 않는다
  * @property {RecapCampaignNote|null} note
  */
@@ -1766,6 +1767,8 @@ export function buildRecapRows(eventName, allCampaigns, allRecords, options = {}
       benchmarks,
       // 층을 섞지 않는다: budgetEfficiency = Primary KPI(판단 없음) · kpiTarget = vs target(설정된 목표치만) · benchmarks = vs past · pacingRatio = 집행률. 종합 등급은 없다(2026-09-08 제품 결정)
       budgetEfficiency: budgetEfficiency(row, c.goal),
+      // 캠페인 해석(What worked · Could improve · Why · Next action) — 표의 네 열. 재료는 벤치마크 구간뿐, 등급이 아니다. 사람이 쓴 note가 우선
+      insight: buildCampaignInsight({ ...row, benchmarks }, { plannedBudget: effectiveBudgetPlanned(c) }),
       // 목표치(vs target) — 캠페인에 설정된 값만. 없으면 null이고 화면은 비운다(과거 평균으로 대체하지 않는다)
       kpiTarget: c.kpiTarget && c.kpiTarget.metricKey === budgetEfficiency(row, c.goal).metricKey && c.kpiTarget.value > 0 ? c.kpiTarget.value : null,
       note: notesById[c.id] ?? null,

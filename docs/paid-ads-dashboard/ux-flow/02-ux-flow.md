@@ -216,7 +216,7 @@ Paid Ads Dashboard
         ├── 머리글 — 이벤트 · 기간 · 매장 · 플랫폼 · 계획 예산 대비 지출 · 역대 순위 한 줄
         ├── 단계 타임라인 (PhaseTimelineChart 재활용)
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
-        │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer(Performance와 같은 CampaignDetailPanel) — 성과 · 예산 페이싱 · Campaign insights(What worked · Could improve · Why · Next action, 사람 글 우선, 없으면 데이터 해석) · 일별 지출. 타임라인 행 클릭은 그 줄로 스크롤 + 선택 표시만
+        │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer(Performance와 같은 CampaignDetailPanel) — 성과 · 예산 페이싱 · 일별 지출(해석 네 열은 표에, 2026-09-08). 타임라인 행 클릭은 그 줄로 스크롤 + 선택 표시만
         ├── 배운 점 · 다음 제언 (2단계, 언어별)
         └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)
 ```
@@ -436,7 +436,7 @@ Paid Ads Dashboard
 | Primary KPI | 목표가 정하는 **실제 대표 결과**(`budgetEfficiency`): 인지 CPM · 트래픽 CPC · 참여 Cost/eng = 지출 ÷ 좋아요+댓글+공유 · 전환/매장 방문 CPA. 라벨 + 현재 값만 — Strong/Good/Efficient 같은 판단어는 붙이지 않는다(2026-09-08) |
 | 대상 지표 | CPM · CTR · CPC · Hook Rate · Hold Rate · Engagement Rate — 비율만. Reach·조회수 같은 절대값은 예산·기간에 묶여 비교 불가 |
 | 통계 | 중앙값(median) + 이번 캠페인의 백분위(낮을수록 좋은 CPM·CPC는 뒤집어 계산) + 비교군 수 N |
-| 강점 · 개선점 · 이유 | 표에는 없다. 캠페인 드로어의 Campaign insights(`buildCampaignInsight`)가 과거 비교군 순위라는 명시된 근거로만 말한다("Strongest reach in its peer group — CPM best of 12 among comparable Meta awareness campaigns"). 원인(소재·타깃·메시지)은 추정하지 않고, 근거가 없으면 "Not enough evidence". 사람이 Edit에서 쓴 문장은 시트에 남는다 |
+| What worked · Could improve · Why · Next action | 표의 마지막 네 열(2026-09-08, 드로어의 Campaign insights를 옮김). 재료는 `buildCampaignInsight`(비교군 순위·초과 지출뿐)이고 한 문장씩: "CPM ranked best among 12 comparable Meta awareness campaigns." / "Hold was in the bottom 26% of comparable Meta awareness campaigns." 순위 근거 없이 strong/weak라 하지 않는다. Why는 관측된 관계만 적고 원인(소재·타깃·메시지·오퍼)은 단정하지 않으며 근거가 없으면 "Not enough evidence to determine why." Next action은 관측에 붙는 구체적 한 걸음("Repeat the campaign format and confirm whether CPM holds."). 사람이 Edit에서 쓴 `note.strength/weakness/reason`이 우선. 등급은 만들지 않는다 |
 | 기간 | 2024년 이후 캠페인만(2023년 이전은 지표가 거의 없음). 지역 필터(같은 GA/FL만) 전환 가능 |
 | 원칙 | Meta와 TikTok을 섞지 않는다(Hook 정의가 다르다). 평균이 아니라 중앙값 — 하나 터진 캠페인이 기준을 끌어올리지 않게 |
 

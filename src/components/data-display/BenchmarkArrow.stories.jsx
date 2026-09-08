@@ -21,7 +21,7 @@ export default {
 ↘ = 못하다. 값의 높낮이가 아니다 — CPM처럼 낮을수록 좋은 지표는 값이 낮아도 ↗.
 색은 currentColor라 옆 글자의 톤(success / warning)을 그대로 따른다.
 
-BenchmarkDelta(표 셀)와 RecapCampaignInsightPanel(펼친 해석 줄)이 같은 컴포넌트를 쓴다 —
+BenchmarkDelta(표 셀)와 RecapCampaignTable 해석 열(펼친 해석 줄)이 같은 컴포넌트를 쓴다 —
 표와 해석이 같은 기호 언어를 갖게.
         `,
       },

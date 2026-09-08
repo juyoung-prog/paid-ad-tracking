@@ -3,9 +3,7 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import { CampaignDetailPanel } from './CampaignDetailPanel';
 import { PLATFORM, GOAL, TARGET_SCOPE } from '../../data/schema';
-import { spreadDailyOverCampaign, mockRecapCampaigns, mockRecapPerformanceRecords } from '../../data/paidAdsMockData';
-import { buildRecapRows, buildCampaignInsight, localizedText } from '../../data/schema';
-import { RecapCampaignInsightPanel } from '../data-display/RecapCampaignInsightPanel';
+import { spreadDailyOverCampaign } from '../../data/paidAdsMockData';
 
 const TODAY = new Date('2026-08-07');
 
@@ -127,7 +125,7 @@ Billing & payments → Payment activity를 또 찾아 들어가야 했다. 인�
    표의 Total이 위 Spend 줄(632.98)과 정확히 같아야 정상이다. */
 const DAILY_ROWS = spreadDailyOverCampaign(CAMPAIGN, PERFORMANCE, '2026-08-07');
 
-function Harness({ campaign, performance, dailyRows, adsManagerHref, billingHref, insights }) {
+function Harness({ campaign, performance, dailyRows, adsManagerHref, billingHref }) {
   const [isOpen, setIsOpen] = useState(true);
   return (
     <Box sx={{ minWidth: 320 }}>
@@ -139,7 +137,6 @@ function Harness({ campaign, performance, dailyRows, adsManagerHref, billingHref
           campaign={campaign}
           performance={performance}
           dailyRows={dailyRows}
-          insights={insights}
           accountLabel="TikTok Unified"
           adsManagerHref={adsManagerHref}
           billingHref={billingHref}
@@ -230,18 +227,3 @@ export const MetaCampaign = {
   ),
 };
 
-/**
- * 보고서에서 연 드로어 — 예산 페이싱 뒤, 일별 지출 앞에 **Campaign insights** 섹션
- * (RecapCampaignInsightPanel layout="grid": What worked · Could improve · Why · Next action).
- * 재료는 schema.js buildCampaignInsight()이고 Performance에서 열면 이 섹션이 없다(insights 미전달).
- */
-export const WithInsights = {
-  render: () => {
-    const { byPlatform } = buildRecapRows('G10 Opening', mockRecapCampaigns, mockRecapPerformanceRecords);
-    const row = (byPlatform.meta ?? [])[1] ?? (byPlatform.meta ?? [])[0];
-    const insights = row ? (
-      <RecapCampaignInsightPanel row={{ ...row, insight: buildCampaignInsight(row) }} localize={(text) => localizedText(text, 'en')} layout="grid" />
-    ) : null;
-    return <Harness campaign={CAMPAIGN} performance={PERFORMANCE} dailyRows={DAILY_ROWS} insights={insights} />;
-  },
-};
