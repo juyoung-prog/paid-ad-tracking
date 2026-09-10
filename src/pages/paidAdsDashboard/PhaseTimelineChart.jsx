@@ -4,52 +4,8 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 
 import { toLocalISODate } from './paidAdsPageUtils';
-import { phaseNameOf } from '../../data/schema';
+import { phaseDisplayName } from '../../components/data-display/recapRowView';
 import { moneyWhole, dateMed, rangeDays } from '../../utils/format';
-
-/**
- * 이름 앞의 타입 접두사를 떼는 패턴 — `Instagram post: <캡션>`의 `Instagram post`.
- *
- * 이 계정 이름의 절반 이상(170건 중 98건)이 `타입: 내용` 꼴이다. 게시물 부스팅을
- * 캠페인으로 만들 때 Meta가 캡션 앞부분을 잘라 이름으로 쓰기 때문인데, 그래서
- * 이름 안에 이모지·줄바꿈·말줄임표가 그대로 들어온다.
- *
- * 이걸 데이터에서 걷어내려던 두 안(타임라인에서 제외 / 겹치는 phase에 흡수)은
- * 실측으로 폐기했다 — 부스팅 게시물이 전체 지출의 24.1%($24,747)를 차지해서
- * 빼면 차트 합계가 헤더 KPI와 어긋나고, "다른 phase에 완전히 포함"되는 건 93건
- * 중 1건뿐이라 흡수 규칙은 성립하지 않는다. 문제는 이것들이 **거기 있는 것**이
- * 아니라 계획 캠페인과 **똑같아 보이는 것**이었다. 그래서 표시 계층에서 굵기만
- * 나눈다 — 정보는 하나도 안 지우고, Meta가 준 이름도 그대로 둔다(DB에서 고치면
- * Ads Manager에서 같은 캠페인을 못 찾는다).
- *
- * 접두사를 24자로 제한하는 이유: 콜론이 타입 구분이 아니라 문장 부호로 쓰인
- * 이름("Come see us at the mall: this weekend")에서 절반이 굵어지는 걸 막는다.
- * 실데이터의 최장 접두사는 14자('Instagram post')다.
- *
- * 뒷부분을 `.` 대신 `[\s\S]`로 받는 이유: 캡션에 줄바꿈이 그대로 들어온 이름이
- * 19건 있는데, `.`은 개행을 못 먹어서 그 19건만 조용히 분리에 실패했다(실측으로
- * 발견). 접두사 쪽은 반대로 개행을 막는다 — 개행을 넘어간 덩어리는 타입 이름일
- * 수 없다.
- */
-const NAME_PREFIX_PATTERN = /^([^:\n]{1,24}):\s*([\s\S]+)$/;
-
-/**
- * 이름을 `타입 접두사`와 `나머지`로 나눈다. 접두사가 없으면 이름 전체를 접두사로
- * 돌려준다 — 호출부가 "접두사는 굵게"만 지키면 두 경우가 같은 코드로 처리된다.
- *
- * @param {string} name - 캠페인 이름
- * @returns {{prefix: string, rest: string}}
- */
-function splitNamePrefix(name) {
-  const match = (name ?? '').match(NAME_PREFIX_PATTERN);
-  return match ? { prefix: match[1], rest: match[2] } : { prefix: name ?? '', rest: '' };
-}
-
-/* 표시용 이름(`G10_Coming Soon_0617~0707` → `Coming Soon`)은 schema.js의
-   phaseNameOf가 정한다 — Recap 벤치마크의 "같은 단계끼리" 판정과 같은 규칙이어야
-   화면에 같은 이름으로 보이는 두 캠페인이 벤치마크에서 다른 단계로 갈리지 않는다.
-   한때 이 파일이 자기 정규식을 들고 있었다(Build Plan Phase 1에서 올림). */
-const displayName = phaseNameOf;
 
 /**
  * phase 막대 옆에 붙이는 예산 문자열. 일일 예산과 총 예산을 둘 다 말한다 —
@@ -364,8 +320,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
              로만 남긴다 — 한때 둘째 줄 끝에도 붙였는데, 잘려서 "G10_Coming Soon_…"
              까지만 보이는 조각은 정보가 아니라 소음이었다. 모든 행이 같은 규칙:
              첫 줄 표시 이름, 둘째 줄 기간·일수. */
-          const { rest } = splitNamePrefix(p.name);
-          const primaryName = displayName(rest || p.name);
+          const primaryName = phaseDisplayName(p.name);
           const details = [formatPhaseBudget(p), barSuffix?.(p)].filter(Boolean).join(' · ');
           const isLast = index === phases.length - 1;
           const metaSx = { fontSize: 11, lineHeight: 1.6, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' };

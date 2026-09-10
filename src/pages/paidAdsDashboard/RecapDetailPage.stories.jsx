@@ -64,7 +64,7 @@ localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Google Sheets�
 
 Export의 PDF는 브라우저 인쇄를 부른다 — 인쇄는 **화면을 줄인 것이 아니다**(2026-09-10). 용지는 \`@page\`가
 Letter **세로**로 고정하고, 화면 블록은 통째로 빠지며(data-print="hide") 그 자리에 인쇄 전용 문서
-(RecapPrintSheet)가 나온다: 촘촘한 머리글 → 단계별 한 줄 요약 표 → 플랫폼 제목 아래 세로로 쌓인 캠페인 블록
+(RecapPrintSheet)가 나온다: 촘촘한 머리글 → 타임라인 그래프(세로 폭에 맞춘 Gantt — 표로 바꾸지 않는다) → 플랫폼 제목 아래 세로로 쌓인 캠페인 블록
 (break-inside: avoid). 웹 레이아웃은 한 픽셀도 바뀌지 않는다.
 
 ### 확인 포인트
@@ -75,6 +75,7 @@ Letter **세로**로 고정하고, 화면 블록은 통째로 빠지며(data-pri
 - 줄 클릭 → 드로어(성과·페이싱·일별 지출). 편집 모드에서는 줄 클릭이 꺼지고 해석 두 칸이 입력 칸이 된다 — 값은 사람이 쓴 글만, 자동 문장은 빈 칸 hover 툴팁("Generated note")과 "Add custom note…" 안내로만 보인다
 - Learnings 섹션 없음 — 읽기·편집 모두. 표 다음에 빈 자리가 남지 않는다
 - 인쇄 미리보기(브라우저 인쇄 대화상자)는 세로 한 장짜리 문서다 — 사이드바·언어 선택·Edit·Export·⋯ 버튼·입력 칸이 없고, 가로 표 대신 캠페인 블록이 세로로 쌓인다
+- 인쇄 1쪽: 머리글 → Timeline(막대 그래프, 겹침이 보인다) → Meta campaigns 시작
         `,
       },
     },

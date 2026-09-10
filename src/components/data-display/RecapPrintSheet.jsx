@@ -2,7 +2,8 @@ import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import { t, metricLabel, benchmarkPositionText } from '../../data/recapStrings';
 import { localizedText } from '../../data/schema';
-import { money, moneyWhole, dateRange, dateRangeWithDays, rangeDays, EMPTY } from '../../utils/format';
+import { money, moneyWhole, dateRange, dateRangeWithDays, EMPTY } from '../../utils/format';
+import { RecapPrintTimeline } from './RecapPrintTimeline';
 import {
   INSIGHT_COLUMNS,
   engagementLayout,
@@ -19,8 +20,9 @@ import {
 
 /**
  * 인쇄본은 화면을 줄인 것이 아니다 — Letter **세로** 한 장의 흐름에 맞춰 다시 짠 문서다.
- * 그래서 화면 폭에 기대는 것(가로로 아홉 열인 표, 가로 막대 타임라인)은 인쇄에서 쓰지 않고
- * 같은 값을 세로로 읽는 형태(요약 표 + 캠페인 블록)로 바꾼다. 화면 레이아웃은 건드리지 않는다.
+ * 그래서 화면 폭에 기대는 것(가로로 아홉 열인 캠페인 표)은 세로로 쌓인 블록으로 바꾼다.
+ * 다만 타임라인은 **그림 그대로 남긴다**(2026-09-10) — 겹침과 기간은 표가 답하지 못하는 질문이고,
+ * 좁아진 폭은 치수를 다시 잡아 해결한다(RecapPrintTimeline). 화면 레이아웃은 건드리지 않는다.
  *
  * 글자 크기는 px가 아니라 pt다 — 이 컴포넌트는 종이에서만 그려지고, 본문 9pt/보조 8pt가
  * 종이에서 읽히는 최소선이다. 색은 흑백 출력에서 살아남게 text.primary·text.secondary·divider만
@@ -38,10 +40,6 @@ const ROOT_SX = {
     lineHeight: 1.45,
   },
 };
-
-const CELL_SX = { textAlign: 'left', verticalAlign: 'top', py: '3pt', pr: '8pt', fontWeight: 400 };
-const HEAD_CELL_SX = { ...CELL_SX, fontSize: PT.meta, fontWeight: 600, color: 'text.secondary', borderBottom: '0.5pt solid', borderColor: 'divider', whiteSpace: 'nowrap' };
-const BODY_CELL_SX = { ...CELL_SX, fontSize: PT.body, borderBottom: '0.5pt solid', borderColor: 'divider' };
 
 /** 캠페인 한 장 — 페이지 경계에서 쪼개지지 않는다(브리프 요구) */
 const BLOCK_SX = {
@@ -185,40 +183,12 @@ export function RecapPrintSheet({
         <Typography component="p" sx={{ ...VALUE_SX, mb: '10pt', breakInside: 'avoid' }}>{summaryText}</Typography>
       )}
 
-      {/* 타임라인 — 종이에서는 주 단위 격자 대신 단계별 한 줄 요약이 읽힌다 */}
+      {/* 타임라인 — 표가 아니라 화면과 같은 **그림**이다(2026-09-10). 겹침·기간은 막대의 위치와 길이만 답한다.
+          치수만 세로 종이용으로 다시 잡는다(왼쪽 40% / 축 60%, 눈금은 1·15일과 양 끝) */}
       {phases.length > 0 && (
-        <Box component="section" sx={{ mb: '12pt' }}>
-          <Typography component="h2" sx={{ fontSize: PT.section, fontWeight: 700, mb: '4pt' }}>{t('recap.section.timeline', lang)}</Typography>
-          <Box component="table" sx={{ width: '100%', borderCollapse: 'collapse' }}>
-            <Box component="thead">
-              <Box component="tr">
-                <Box component="th" sx={HEAD_CELL_SX}>{t('recap.table.campaign', lang)}</Box>
-                <Box component="th" sx={HEAD_CELL_SX}>{t('recap.print.platform', lang)}</Box>
-                <Box component="th" sx={HEAD_CELL_SX}>{t('recap.print.dates', lang)}</Box>
-                <Box component="th" sx={HEAD_CELL_SX}>{t('recap.print.duration', lang)}</Box>
-                <Box component="th" sx={{ ...HEAD_CELL_SX, pr: 0 }}>{t('recap.table.budgetSpend', lang)}</Box>
-              </Box>
-            </Box>
-            <Box component="tbody">
-              {phases.map((phase) => {
-                const spent = phaseSpend[phase.key];
-                return (
-                  <Box component="tr" key={phase.key} sx={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}>
-                    <Box component="td" sx={{ ...BODY_CELL_SX, fontWeight: 600 }}>{phase.name}</Box>
-                    <Box component="td" sx={{ ...BODY_CELL_SX, color: 'text.secondary', whiteSpace: 'nowrap' }}>{phase.platformLabel || EMPTY}</Box>
-                    <Box component="td" sx={{ ...BODY_CELL_SX, whiteSpace: 'nowrap' }}>{dateRange(phase.startDate, phase.endDate)}</Box>
-                    <Box component="td" sx={{ ...BODY_CELL_SX, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{rangeDays(phase.startDate, phase.endDate)}</Box>
-                    <Box component="td" sx={{ ...BODY_CELL_SX, pr: 0, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
-                      {[
-                        phase.totalBudget ? t('recap.table.planned', lang, { amount: moneyWhole(phase.totalBudget) }) : null,
-                        spent != null ? t('recap.table.spent', lang, { amount: money(spent) }) : null,
-                      ].filter(Boolean).join(' · ') || EMPTY}
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-          </Box>
+        <Box component="section" sx={{ mb: '12pt', breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+          <Typography component="h2" sx={{ fontSize: PT.section, fontWeight: 700, mb: '4pt', breakAfter: 'avoid', pageBreakAfter: 'avoid' }}>{t('recap.section.timeline', lang)}</Typography>
+          <RecapPrintTimeline phases={phases} phaseSpend={phaseSpend} lang={lang} />
         </Box>
       )}
 

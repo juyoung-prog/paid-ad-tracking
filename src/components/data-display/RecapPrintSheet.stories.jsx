@@ -60,7 +60,7 @@ Event Recap의 **인쇄 전용 문서**(Letter 세로). 인쇄본은 화면을 �
 
 ### 구성
 - **머리글**: 이벤트 이름 + 상태, "Jun 17 – Aug 31 · G10 · Meta + TikTok", "9 campaigns · $6,068.77 spent of $6,728 planned", 순위 한 줄. 화면의 KPI 카드는 종이에서 자리만 먹어 쓰지 않는다
-- **Timeline**: 주 단위 격자 대신 단계별 한 줄 — Campaign · Platform · Date range · Duration · Budget / Spend
+- **Timeline**: 화면과 같은 **막대 그래프**(RecapPrintTimeline) — 표로 바꾸지 않는다. 겹침·기간은 막대의 위치와 길이만 답한다. 좁아진 폭은 치수를 다시 잡아 해결한다(왼쪽 40% 정보 / 축 60%, 눈금은 각 달 1·15일과 기간 양 끝)
 - **플랫폼 제목**(Meta campaigns / TikTok campaigns) 아래 **캠페인 블록**이 세로로 쌓인다. 한 블록은 이름·순위·목표·기간 다음에 Budget / Spend · Primary KPI · Video response · Engagement / Action · What worked · Could improve를 라벨-값 목록으로 놓는다
 - 블록은 \`break-inside: avoid\` — 페이지 경계에서 쪼개지지 않는다(실측 블록 높이 100–217px, Letter 내용 높이 965px)
 

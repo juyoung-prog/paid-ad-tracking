@@ -1,5 +1,5 @@
 import { t, metricLabel } from '../../data/recapStrings';
-import { GOAL_HEADLINE_METRICS } from '../../data/schema';
+import { GOAL_HEADLINE_METRICS, phaseNameOf } from '../../data/schema';
 import { money, count, countCompact, percent, seconds } from '../../utils/format';
 
 /**
@@ -125,4 +125,26 @@ export function videoSecondaryText(row, lang) {
 export function storeTextOf(row) {
   const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
   return { stores, storeText: stores.length > 1 ? `${stores[0]} +${stores.length - 1}` : stores[0] ?? null };
+}
+
+/**
+ * 이름 앞의 타입 접두사를 떼는 패턴 — `Instagram post: <캡션>`의 `Instagram post`.
+ *
+ * 이 계정 이름의 절반 이상이 `타입: 내용` 꼴이다(게시물 부스팅을 캠페인으로 만들 때 Meta가 캡션
+ * 앞부분을 잘라 이름으로 쓴다). 접두사를 24자로 제한하는 이유는 콜론이 문장 부호로 쓰인 이름
+ * ("Come see us at the mall: this weekend")에서 절반이 잘리는 걸 막기 위해서다(실데이터 최장 접두사 14자).
+ * 뒷부분을 `[\s\S]`로 받는 이유는 캡션에 줄바꿈이 그대로 들어온 이름이 있기 때문이다.
+ */
+const NAME_PREFIX_PATTERN = /^([^:\n]{1,24}):\s*([\s\S]+)$/;
+
+/**
+ * 타임라인에 적는 **부르는 이름** — `G10_Coming Soon_0617~0707` → `Coming Soon`,
+ * `Instagram post: COMING SOON …` → `COMING SOON …`. 화면 타임라인(PhaseTimelineChart)과
+ * 인쇄 타임라인이 같은 규칙을 써야 같은 캠페인이 두 곳에서 다른 이름으로 보이지 않는다.
+ * 코드·기간을 벗기는 규칙 자체는 schema.js phaseNameOf(벤치마크의 "같은 단계" 판정과 같은 규칙)다.
+ */
+export function phaseDisplayName(name) {
+  const match = (name ?? '').match(NAME_PREFIX_PATTERN);
+  const rest = match ? match[2] : '';
+  return phaseNameOf(rest || name || '');
 }

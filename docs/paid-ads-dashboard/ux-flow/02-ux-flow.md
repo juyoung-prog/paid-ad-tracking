@@ -487,7 +487,7 @@ Paid Ads Dashboard
 | RecapNoteEditor (신규 — Recap 2단계) | 캠페인 한 줄의 판정(good/mid/bad, 제안값 "Use suggestion") + 장점·아쉬운 점·이유 + 오가닉 조회·참여 선택 입력 | 신규(구현됨) | 카테고리: templates — LocalizedText의 `lang` 칸 하나만 편집, 저장은 페이지(onChange patch) |
 | SignInDialog (신규 — Recap 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 | 신규(구현됨) | 카테고리: templates — LoginPage와 같은 로직. 앱 전체 게이트는 꺼진 채 "쓰기가 필요한 자리"에서만 연다 |
 | LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규(구현됨) | 카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 각 언어의 자기 이름(EN · 한국어 · 繁中) |
-| RecapPrintSheet (신규 — Recap) | 인쇄 전용 **세로**(Letter portrait) 문서 — 머리글 + 단계별 요약 표 + 세로로 쌓인 캠페인 블록 | 신규(구현됨, 2026-09-10) | 카테고리: data-display. 인쇄본은 화면을 축소한 것이 아니라 종이 흐름에 맞춰 다시 짠 문서다. 목표별 지표 구성·해석 문장은 화면 표와 같은 모듈(`recapRowView`) |
+| RecapPrintSheet (신규 — Recap) | 인쇄 전용 **세로**(Letter portrait) 문서 — 머리글 + 타임라인 그래프(RecapPrintTimeline) + 세로로 쌓인 캠페인 블록 | 신규(구현됨, 2026-09-10) | 카테고리: data-display. 인쇄본은 화면을 축소한 것이 아니라 종이 흐름에 맞춰 다시 짠 문서다. 목표별 지표 구성·해석 문장은 화면 표와 같은 모듈(`recapRowView`) |
 | Print stylesheet (Recap) | 인쇄/PDF — `@page` Letter 세로 + 화면 블록 통째 숨김 | 신규(구현됨) | 컴포넌트가 아니라 `@page` + `@media print` 규칙. PaidAdsShell의 GlobalStyles + `data-print` 속성 |
 
 > CampaignTable(2줄 리스트, 아바타 없음)과 KpiBar(라벨-위-숫자 배치)는 이후 라운드에서 Influencer Tracking Dashboard 실측 기준으로 갱신됨 — 위 표는 초기 이식 시점 기준이라 세부 배치는 각 컴포넌트 자체 주석/`components.md`가 최신 기준이다.
