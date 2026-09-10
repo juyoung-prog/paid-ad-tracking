@@ -100,7 +100,7 @@ const hasNoteContent = (note) =>
 /** 카드 제목 행 — Dashboard 목록 카드·Reports SectionHeader와 같은 자리(px 2, 아래 1px 선) */
 function SectionHeader({ title, scope, hint }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', '@media print': { px: '4pt', pt: '5pt', pb: '4pt', gap: '8pt' } }}>
+    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 2, px: 2, pt: 2, pb: 1.5, borderBottom: '1px solid', borderColor: 'divider', '@media print': { px: '3pt', pt: '4pt', pb: '3pt', gap: '8pt' } }}>
       <Typography variant="title" component="h2" sx={{ minWidth: 0, color: 'text.primary', '@media print': { fontSize: '10pt' } }}>
         {title}
         {/* 방법론 설명은 본문이 아니라 제목 옆 ⓘ 툴팁에 — 결과와 경쟁하지 않게 */}
@@ -452,14 +452,14 @@ export function RecapDetailPage() {
         status={shownRecap?.status ?? null}
         lang={lang}
         actions={actions}
-        sx={{ mb: 3, '@media print': { mb: '10pt' } }}
+        sx={{ mb: 3, '@media print': { mb: '8pt' } }}
       />
 
       {!isEditing && recap?.summary && (
         <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14, '@media print': { mb: '10pt', maxWidth: 'none', fontSize: '8pt' } }} />
       )}
 
-      <Box sx={[SECTION_CARD_SX, { '@media print': { mb: '10pt' } }]} data-print="card" data-recap-timeline>
+      <Box sx={[SECTION_CARD_SX, { '@media print': { mb: '8pt' } }]} data-print="card" data-recap-timeline>
         <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />
         <PhaseTimelineChart
           phases={phases}
@@ -478,7 +478,7 @@ export function RecapDetailPage() {
       {platformOrder.map((platform) => (
         /* 타임라인 카드와 달리 캠페인 표는 한 페이지에 다 들어가지 않는다 — 카드째 "쪼개지 말라"고 하면
            빈 페이지가 생기고 뒤가 잘린다. 카드는 흐르게 두고, 갈라지면 안 되는 단위(캠페인 한 줄)는 표가 지킨다 */
-        <Box key={platform} sx={[SECTION_CARD_SX, { '@media print': { mb: '10pt', breakInside: 'auto', pageBreakInside: 'auto' } }]} data-print="card-flow">
+        <Box key={platform} sx={[SECTION_CARD_SX, { '@media print': { mb: '8pt', breakInside: 'auto', pageBreakInside: 'auto' } }]} data-print="card-flow">
           <SectionHeader
             title={t('recap.section.campaigns', lang, { platform: PLATFORM_LABEL[platform] })}
             scope={countScope(byPlatform[platform].length, 'campaign', lang)}

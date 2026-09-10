@@ -32,8 +32,9 @@ const PRINT_STYLES = {
   /* Letter 세로 고정 — 보고서는 세로로 읽고 세로로 철한다. 가로로 눕혀 아홉 열짜리 표를 그대로
      밀어 넣지 않는다(그러면 글자가 6pt까지 줄어든다). 여백은 여기 한 곳에서만 준다 —
      화면 거터를 함께 두면 종이 여백이 두 번 붙는다(Recap 페이지가 인쇄에서 p:0으로 푼다).
+     위아래는 10mm — 좌우(12mm)보다 좁게 둬서 한 쪽에 한 섹션이 더 들어간다(Recap의 Meta 다섯 줄이 1쪽에).
      브라우저가 찍는 머리글·꼬리글(날짜·URL)은 CSS로 끌 수 없다 — 인쇄 대화상자에서 끈다. */
-  '@page': { size: 'letter portrait', margin: '12mm' },
+  '@page': { size: 'letter portrait', margin: '10mm 12mm' },
   '@media print': {
     'html, body': { height: 'auto', overflow: 'visible', backgroundColor: '#fff' },
     '[data-print="hide"]': { display: 'none !important' },

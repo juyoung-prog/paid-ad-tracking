@@ -129,7 +129,7 @@ export function KpiBar({ items, sx }) {
                 sx={{
                   whiteSpace: 'nowrap',
                   color: item.isAlert ? 'error.main' : 'text.primary',
-                  '@media print': { fontSize: '12pt' },
+                  '@media print': { fontSize: '11pt' },
                 }}
               >
                 {item.value}

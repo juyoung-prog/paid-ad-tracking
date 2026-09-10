@@ -296,7 +296,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
     fontSize: 12,
     color: 'text.secondary',
     alignSelf: 'end',
-    '@media print': { px: '4pt', pt: '4pt', pb: '3pt', fontSize: '7pt' },
+    '@media print': { px: '4pt', pt: '3pt', pb: '2pt', fontSize: '7pt' },
   };
 
   return (
@@ -317,7 +317,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
           {/* 실지출(barSuffix)이 붙는 Performance 탭에서만 "Spend"를 말한다 —
               Plan 탭은 이 열에 계획 예산뿐이라 헤더가 없는 값을 약속하면 안 된다. */}
           <Typography component="div" sx={headCellSx}>{barSuffix ? 'Platform / Budget / Spend' : 'Platform / Budget'}</Typography>
-          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider', '@media print': { height: '30pt' } }}>
+          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider', '@media print': { height: '24pt' } }}>
             {months.map((mo) => (mo.showLabel || mo.showLabelPrint) && (
               <Typography
                 key={mo.key}
@@ -466,7 +466,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               {/* 이름 — 첫 줄은 세미볼드 표시 이름, 둘째 줄은 기간·일수. 모든 행이
                   같은 두 줄이라 훑을 때 리듬이 안 깨진다. 원본 전체 이름은 이 칸의
                   title(hover)로 남는다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '4pt' } }}>
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '3pt' } }}>
                 {/* 긴 이름은 말줄임 — 열 폭은 고정이라 타임라인을 잠식하지 않는다.
                     전체 원본 이름은 hover 툴팁(CampaignTable 행과 같은 문법). */}
                 <Tooltip title={p.name} enterDelay={400} placement="top-start">
@@ -485,7 +485,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               {/* 플랫폼 · 계획 예산 · (Performance 탭) 실지출 — 막대 안에 있던
                   숫자가 전부 여기로 왔다. 막대 폭과 무관하게 항상 온전히 읽히고,
                   "planned"/"spent"가 계획과 실적을 가른다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '4pt' } }}>
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '3pt' } }}>
                 <Typography component="div" sx={{ fontSize: 13, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { fontSize: '7.5pt', lineHeight: 1.3 } }}>
                   {p.platformLabel || '—'}
                 </Typography>
@@ -495,7 +495,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               </Box>
 
               {/* 막대 — 얇은 트랙 + 양 끝 원. 라벨은 막대 밖(아래). */}
-              <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider', '@media print': { minHeight: '32pt' } }}>
+              <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider', '@media print': { minHeight: '22pt' } }}>
                 <TimelineGrid ticks={ticks} printTicks={printTicks} monthStarts={monthStarts} pct={pct} />
                 <Box
                   className={BAR_CLASS}
