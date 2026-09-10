@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -221,7 +221,15 @@ export function RecapDetailPage() {
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
 
+  /* Edit을 누르면 편집 칸이 화면 아래(타임라인·표 뒤)에 있어 사용자가 직접 찾아 내려가야 했다 —
+     "어디서 고치나"를 바로 답하도록 편집 모드가 그려진 뒤 Notes 카드로 부드럽게 스크롤한다(2026-09-10).
+     플래그는 **사람이 Edit을 누른 경우에만** 켠다(startEditing은 Edit 버튼과 로그인 후 이어가기에서만 불린다) —
+     첫 로드·새로고침·언어 변경·타이핑·저장·취소에서는 화면이 움직이지 않는다. */
+  const notesRef = useRef(null);
+  const shouldScrollToNotes = useRef(false);
+
   const startEditing = () => {
+    shouldScrollToNotes.current = true;
     setDraft({
       recap: recap
         ? { ...recap, learnings: (recap.learnings ?? []).map((l) => ({ ...l })) }
@@ -230,6 +238,17 @@ export function RecapDetailPage() {
     });
     setIsEditing(true);
   };
+
+  /* setDraft와 setIsEditing이 같은 이벤트에서 배치되므로, isEditing이 true가 된 렌더에는 Notes 카드가 이미 DOM에 있다.
+     그래서 픽셀 위치를 계산하지 않고 그 요소로 스크롤한다 — 위 여백은 카드의 scrollMarginTop이 맡는다. */
+  useEffect(() => {
+    if (!isEditing || !shouldScrollToNotes.current) return;
+    shouldScrollToNotes.current = false;
+    const el = notesRef.current;
+    if (!el) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }, [isEditing]);
 
   const handleEditClick = () => {
     if (!session) { setIsSignInOpen(true); return; }
@@ -481,7 +500,9 @@ export function RecapDetailPage() {
 
       {/* 코멘트 편집은 편집 모드에서만 별도 카드 — 읽을 때는 표의 줄을 펼쳐서 본다 */}
       {isEditing && draft && (
-        <Box sx={SECTION_CARD_SX} data-print="card">
+        /* scrollMarginTop — Edit 직후 스크롤에서 제목이 화면 맨 위에 딱 붙지 않게. 섹션 사이 간격(24px)과 같은 값이라
+           "의도한 자리"로 읽힌다. 이 페이지에는 sticky 툴바가 없어 그 높이는 더하지 않는다 */
+        <Box ref={notesRef} sx={{ ...SECTION_CARD_SX, scrollMarginTop: '24px' }} data-print="card" data-recap-notes>
           <SectionHeader
             title={t('recap.section.notes', lang)}
             scope={countScope(editRows.length, 'campaign', lang)}
