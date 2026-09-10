@@ -56,8 +56,9 @@ export default {
 6. (Learnings 섹션도 2026-09-08에 뺐다 — 표의 해석 열과 중복. 편집 모드의 이벤트 글 폼은 남는다)
 
 편집 모드(Edit, 로그인)는 화면을 옮기지 않는다(2026-09-10) — **표의 What worked · Could improve 칸이 그 자리에서
-입력 칸이 되어** 지표를 보면서 해석을 쓴다. 아래 Notes 카드에는 화면에 안 나오는 값(평가·이유·오가닉 조회/참여)만
-남고, 이벤트 글(상태·요약·배운 점·제언) 편집기가 함께 나온다. AI draft·Translate는 빈 칸에만 초안을 채운다.
+입력 칸이 되어** 지표를 보면서 해석을 쓴다. 표 아래 "Notes — N campaigns" 카드는 2026-09-10에 없앴다 —
+화면에 안 나오는 값(이유·오가닉 조회/참여)은 캠페인 칸의 ⋯ 버튼이 여는 작은 팝오버로 옮겼고, 평가(Good/Fair/Weak)
+편집은 뺐다(저장된 값·시트 열은 유지). 이벤트 글(상태·요약·배운 점·제언) 편집기는 그대로 나온다. AI draft·Translate는 빈 칸에만 초안을 채운다.
 계산은 schema.js(buildRecapRows · buildRecapHeadline · buildCampaignInsight ·
 localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
 인쇄를 부르고 PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. Google Sheets는 표를 클립보드에 복사한다.

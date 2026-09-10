@@ -200,13 +200,14 @@ function insightSentence(field, item, lang) {
  * @param {boolean} isEditing - true면 What worked · Could improve 칸이 인라인 편집 칸이 된다(지표를 보면서 해석을 쓰도록) [Optional, 기본값: false]
  * @param {function} onNoteChange - (campaignId, field, value) => void. field는 'strength' | 'weakness', value는 사람이 쓴 원문 [Optional]
  * @param {boolean} isDisabled - 저장 중 등 입력 잠금 [Optional, 기본값: false]
+ * @param {function} renderRowExtra - (row) => node. 캠페인 칸 오른쪽 끝에 놓을 작은 것(편집 모드의 수기 입력 버튼). 열을 늘리지 않는다 [Optional]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedIds={phaseSelection?.ids ?? []} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', isEditing = false, onNoteChange, isDisabled = false, sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', isEditing = false, onNoteChange, isDisabled = false, renderRowExtra, sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -350,6 +351,10 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         {[storeText, dateRangeWithDays(row.startDate, row.endDate)].filter(Boolean).join(' · ')}
                       </Typography>
                     </Box>
+                    {/* 행별 부가 입력(이유·오가닉) 버튼 — 편집 모드에서만, 이름 줄 오른쪽 끝에. 열도 줄 높이도 늘리지 않는다 */}
+                    {renderRowExtra && (
+                      <Box sx={{ ml: 'auto', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>{renderRowExtra(row)}</Box>
+                    )}
                   </Box>
                 </TableCell>
                 <TableCell sx={CELL_SX}>

@@ -1,27 +1,23 @@
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { t } from '../../data/recapStrings';
 import { withLang } from '../../data/schema';
 
-const VERDICTS = ['good', 'mid', 'bad'];
-
 /**
  * RecapNoteEditor 컴포넌트
  *
- * Recap 표의 캠페인 한 줄에 딸린 **부가 입력** — 평가(good/mid/bad), 이유, 오가닉 조회·참여.
- * What worked(장점)·Could improve(아쉬운 점)는 2026-09-10부터 **표 안에서 직접** 고친다 —
- * 지표를 보면서 해석을 쓰도록. 같은 데이터를 두 곳에서 고치지 않게 여기서는 뺐다.
- * 평가·이유는 화면에 나오지 않고 시트 내보내기에만 남는 값이라 이 폼이 유일한 입력 자리다.
- * 자동 제안은 없다(2026-09-08). 비워 두면 비어 있는 채로 둔다.
+ * Recap 캠페인 한 줄의 **수기 입력** — 이유(Reason), 오가닉 조회·참여. 표의 캠페인 칸에 있는 작은 버튼으로 여는
+ * 팝오버 안에 들어간다(2026-09-10) — 한 캠페인의 편집 자리는 그 줄 하나다.
+ * What worked(장점)·Could improve(아쉬운 점)는 표 안에서 직접 고치므로 여기 없다(같은 값을 두 곳에서 고치지 않는다).
+ * 평가(Good/Fair/Weak) 토글도 뺐다 — 등급은 제품에서 없앤 개념이고, 저장된 값과 시트 열은 그대로 남는다.
+ * 여기 값들은 화면에 나오지 않는다: 이유는 시트 내보내기와 AI 초안이 쓰고, 오가닉은 아직 읽는 곳이 없다(수기 보관용).
  *
  * 언어별 칸(LocalizedText) 중 `lang` 하나만 편집한다 — 3단계에서 언어 탭이 이
  * prop을 바꾼다. 저장은 하지 않는다(onChange로 patch만 올린다). 문구는 recapStrings.
  *
  * Props:
- * @param {{ verdict: 'good'|'mid'|'bad'|null, reason: object|null, organicViews: number|null, organicEngagements: number|null }|null} note - 편집 중인 코멘트(장점·아쉬운 점은 표에서 고친다). null이면 빈 폼 [Required]
+ * @param {{ reason: object|null, organicViews: number|null, organicEngagements: number|null }|null} note - 편집 중인 코멘트(장점·아쉬운 점은 표에서, 평가는 더 이상 편집하지 않는다). null이면 빈 폼 [Required]
  * @param {string} campaignLabel - 이 줄이 어느 캠페인인지(단계 이름 + 플랫폼) [Required]
  * @param {function} onChange - (patch) => void. 바뀐 필드만 담은 부분 객체 [Required]
  * @param {string} lang - 편집할 언어(RECAP_LANG) [Optional, 기본값: 'en']
@@ -33,27 +29,9 @@ const VERDICTS = ['good', 'mid', 'bad'];
  * <RecapNoteEditor note={draft.notes[row.campaignId]} campaignLabel="Grand Opening · Meta" onChange={(patch) => updateNote(row.campaignId, patch)} />
  */
 export function RecapNoteEditor({ note, campaignLabel, onChange, lang = 'en', isDisabled = false, hint, sx }) {
-  const verdict = note?.verdict ?? null;
-
   return (
     <Box sx={sx}>
       <Typography component="h3" sx={{ fontSize: 13, fontWeight: 600, m: 0, mb: 1.25 }}>{campaignLabel}</Typography>
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap', mb: 1.5 }}>
-        <Typography component="span" sx={{ fontSize: 12, color: 'text.secondary', minWidth: 72 }}>{t('recap.edit.verdict', lang)}</Typography>
-        <ToggleButtonGroup
-          exclusive
-          size="small"
-          value={verdict}
-          onChange={(_, next) => onChange({ verdict: next })}
-          disabled={isDisabled}
-          aria-label={t('recap.edit.verdict', lang)}
-        >
-          {VERDICTS.map((v) => (
-            <ToggleButton key={v} value={v} sx={{ px: 1.25 }}>{t(`verdict.${v}`, lang)}</ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-      </Box>
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1fr)' }, gap: 1.5, maxWidth: 560 }}>
         {['reason'].map((key) => (

@@ -55,6 +55,7 @@ Primary KPI·해석 재료(insight)까지 끝난 값이다. 이 컴포넌트는 
     isEditing: { control: 'boolean', description: 'true면 What worked · Could improve가 인라인 편집 칸이 된다' },
     onNoteChange: { action: 'noteChanged', description: '(campaignId, field, value) => void — field는 strength | weakness' },
     isDisabled: { control: 'boolean', description: '저장 중 등 입력 잠금' },
+    renderRowExtra: { control: false, description: '(row) => node — 캠페인 칸 오른쪽 끝의 작은 것(편집 모드의 수기 입력 ⋯ 버튼). 열을 늘리지 않는다' },
     lang: { control: 'select', options: ['en', 'ko', 'zh-Hant'], description: '문구 언어' },
     onRowClick: { action: 'rowClicked', description: '숫자 줄 전체 클릭 (campaignId) => void — 보고서는 이걸로 캠페인 상세 드로어(성과·페이싱·캠페인 해석·일별 지출)를 연다. 벤치마크 글자는 예외' },
     label: { control: 'text', description: '스크롤 영역 접근성 이름' },
