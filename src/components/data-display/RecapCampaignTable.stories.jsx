@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import { useState } from 'react';
 import { RecapCampaignTable } from './RecapCampaignTable';
 import { buildRecapRows } from '../../data/schema';
 import { mockRecapCampaigns, mockRecapPerformanceRecords, mockRecapCampaignNotes } from '../../data/paidAdsMockData';
@@ -32,7 +33,7 @@ Recap(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표(Build Pl
 - **Primary KPI**: 목표가 정하는 실제 대표 결과 — 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환/매장 방문 CPA. 라벨(옅게) + 값(700), **그 아래 같은 KPI의 과거 비교**("↗ best of 12", 비교군 3개 미만이면 "—"). 순위는 맥락이지 등급이 아니다. 판단어 없음
 - **Video response**: Hook / Hold(라벨 + 값 600, 아래 순위) 앞에, "Reach 163K · Plays 296K · Avg 2s"는 옅은 보조 줄
 - **Engagement / Action**: 목표가 대표 두 자리와 보조 줄을 정한다 — 인지 참여율·CTR + 클릭 수·CPC · 트래픽 CTR·CPC + 클릭 수·참여율 · 참여 참여율·Cost/eng + 좋아요·공유 · 전환 CPA·CTR + 결과 수·CPC. 원본 값은 전부 행에 남아 있다
-- **What worked · Could improve**: 12px 한 문장(1600px 창에서 240px 폭 → 두 줄), 네 줄에서 잘리고 전문은 hover. **편집 모드(\`isEditing\`)에서는 이 두 칸이 그 자리에서 입력 칸이 된다**(2026-09-10 — 지표를 보면서 해석을 쓰도록. 예전엔 아래 Notes 섹션으로 내려가야 했다): 본문과 같은 12px, 두 줄로 시작해 여섯 줄까지, 값은 사람이 쓴 원문만 넣고 자동 문장은 placeholder로 깔아 "비우면 이게 남는다"를 보인다. 편집 중에는 줄 클릭(드로어)이 꺼진다. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 근거 지표는 **목표가 정한다**(schema \`GOAL_INSIGHT_METRICS\` — 인지 CPM + Hook·Hold·참여율·CTR · 트래픽 CPC·CTR + Hook·Hold · 참여 Cost/eng·참여율 + Hook·Hold · 전환 CPA + CTR·CPC·Hook·Hold). 이 목록은 표가 그 목표에서 실제로 그리는 지표와 같아 근거를 눈으로 좇을 수 있고, 대표 KPI가 약하면 그 약점이 Could improve에 먼저 온다. 근거가 없으면 "—"(억지 결론을 만들지 않는다). Reason·Next action 열은 없다. 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
+- **What worked · Could improve**: 12px 한 문장(1600px 창에서 240px 폭 → 두 줄), 네 줄에서 잘리고 전문은 hover. **편집 모드(\`isEditing\`)에서는 이 두 칸이 그 자리에서 입력 칸이 된다**(2026-09-10 — 지표를 보면서 해석을 쓰도록. 예전엔 아래 Notes 섹션으로 내려가야 했다): 본문과 같은 12px, 두 줄로 시작해 여섯 줄까지, 값은 **사람이 쓴 원문만** 들어간다 — 자동 문장은 값도 placeholder도 아니다(2026-09-10: placeholder에 자동 문장을 깔았더니 이미 저장된 글처럼 읽혔다). placeholder는 "Override generated note…"(자동 문장이 있을 때)·"Add custom note…"(없을 때) 안내뿐이고, 자동 문장은 **빈 칸에 hover·focus할 때 툴팁**("Generated note")으로 본다. 사람이 쓰기 시작하면 툴팁은 꺼진다. 테두리는 기본 divider · hover 한 단 진하게 · focus accent 1px. 편집 중에는 줄 클릭(드로어)이 꺼진다. 왼쪽 숫자를 되풀이하지 않고 **해석**만 한다 — "Early video attention stood out against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 근거 지표는 **목표가 정한다**(schema \`GOAL_INSIGHT_METRICS\` — 인지 CPM + Hook·Hold·참여율·CTR · 트래픽 CPC·CTR + Hook·Hold · 참여 Cost/eng·참여율 + Hook·Hold · 전환 CPA + CTR·CPC·Hook·Hold). 이 목록은 표가 그 목표에서 실제로 그리는 지표와 같아 근거를 눈으로 좇을 수 있고, 대표 KPI가 약하면 그 약점이 Could improve에 먼저 온다. 근거가 없으면 "—"(억지 결론을 만들지 않는다). Reason·Next action 열은 없다. 사람이 쓴 note 우선(자리표시자 무시). 첫 열 왼쪽에 옅은 구분선
 
 값의 무게는 지표의 **역할**이 정한다: 목표의 대표 KPI 700 > 나머지 대표 자리 600 > 보조 줄 11px 옅게.
 
@@ -95,9 +96,28 @@ export const NoPerformanceData = {
 
 
 
-/** 편집 모드 — What worked · Could improve가 표 안에서 바로 고쳐진다. 사람이 쓴 값이 없으면 칸은 비고 자동 문장이 placeholder로 깔린다 */
+/**
+ * 편집 모드 — What worked · Could improve를 표 안에서 바로 고친다.
+ * 첫 줄은 **사람이 쓴 값**이 있어 칸에 그 글이 들어가고, 나머지는 비어 있어 "Override generated note…" 안내만 보인다.
+ * 자동 문장은 값도 placeholder도 아니다 — 빈 칸에 마우스를 올리거나 포커스하면 툴팁("Generated note")으로 보인다.
+ */
 export const Editing = {
-  args: { rows: byPlatform.meta, isEditing: true },
+  args: { isEditing: true },
+  render: (args) => {
+    // 스토리에서도 실제처럼 입력이 남아야 지우기·되돌아오기를 확인할 수 있다 — 페이지의 draft.notesById와 같은 모양
+    const [notesById, setNotesById] = useState(() => Object.fromEntries(mockRecapCampaignNotes.map((n) => [n.campaignId, n])));
+    const rows = buildRecapRows('G10 Opening', mockRecapCampaigns, mockRecapPerformanceRecords, { notesById }).byPlatform.meta;
+    return (
+      <RecapCampaignTable
+        {...args}
+        rows={rows}
+        onNoteChange={(campaignId, field, value) => setNotesById((prev) => ({
+          ...prev,
+          [campaignId]: { ...(prev[campaignId] ?? { campaignId }), [field]: { ko: null, 'zh-Hant': null, ...(prev[campaignId]?.[field] ?? {}), en: value } },
+        }))}
+      />
+    );
+  },
 };
 
 /** onRowClick — 숫자 줄 전체가 버튼(보고서에서는 캠페인 상세 드로어). hover는 중립 면 140ms, 벤치마크 글자는 줄 클릭에서 빠진다. Tab으로 행에 포커스, Enter로 눌린다 */

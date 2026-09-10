@@ -55,14 +55,26 @@ const INSIGHT_COLUMNS = [
 /** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
 const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
 /**
- * 인라인 편집 칸 — 표가 폼처럼 보이지 않게 본문과 같은 12px, 얕은 패딩, 옅은 테두리. 두 줄부터 시작해 여섯 줄까지 늘어난다.
- * 비워 두면 자동 문장이 그대로 남는다는 뜻이라, 자동 문장을 placeholder로 깔아 그 사실이 보이게 한다(2026-09-10).
+ * 인라인 편집 칸 — 표가 폼처럼 보이지 않게 본문과 같은 12px, 얕은 패딩, 옅은 테두리. 두 줄부터 시작해 여섯 줄까지.
+ * 칸의 **값은 사람이 쓴 글만**이고 자동 문장은 값도 placeholder도 아니다(2026-09-10) — 자동 문장을 placeholder로
+ * 깔았더니 이미 저장된 글처럼 읽혔다. placeholder는 "비면 자동 문장이 남는다"를 말하는 짧은 안내뿐이고,
+ * 자동 문장 자체는 hover·focus 툴팁에서 본다.
+ * 상태: 기본 divider · hover 한 단 진하게 · focus는 accent 1px(굵은 파란 테두리를 쓰지 않는다).
  */
-const INSIGHT_INPUT_SX = {
-  '& .MuiOutlinedInput-root': { p: 0.75, fontSize: 12, lineHeight: 1.45, alignItems: 'flex-start' },
+const insightInputSx = (theme) => ({
+  '& .MuiOutlinedInput-root': {
+    p: 0.75,
+    fontSize: 12,
+    lineHeight: 1.45,
+    alignItems: 'flex-start',
+    backgroundColor: theme.palette.background.paper,
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.divider },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(theme.palette.text.primary, 0.28) },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 1, borderColor: theme.palette.accent.main },
+  },
   '& .MuiOutlinedInput-input': { p: 0 },
-  '& .MuiOutlinedInput-input::placeholder': { opacity: 0.7, fontStyle: 'italic' },
-};
+  '& .MuiOutlinedInput-input::placeholder': { opacity: 0.65, fontStyle: 'italic' },
+});
 /** 수치 열과 해석 열 사이 — 옅은 세로 구분선 하나(머리글·본문 같은 자리) */
 const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider' };
 
@@ -425,21 +437,34 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 {insightCells.map((cell, i) => (
                   <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}) }}>
                     {isEditing ? (
-                      <TextField
-                        value={cell.raw}
-                        onChange={(e) => onNoteChange?.(row.campaignId, cell.noteField, e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder={cell.auto ?? ''}
-                        title={cell.auto ?? ''}
-                        aria-label={`${t(`insight.field.${cell.field}`, lang)} — ${row.phaseName}`}
-                        multiline
-                        minRows={2}
-                        maxRows={6}
-                        size="small"
-                        fullWidth
-                        disabled={isDisabled}
-                        sx={INSIGHT_INPUT_SX}
-                      />
+                      /* 자동 문장은 칸이 비어 있을 때만, 그것도 툴팁으로 — 값으로도 placeholder로도 넣지 않는다.
+                         사람이 쓴 글이 있으면 툴팁도 끈다(그 순간 자동 문장은 쓰이지 않으므로) */
+                      <Tooltip
+                        title={!cell.raw.trim() && cell.auto ? (
+                          <Box sx={{ display: 'grid', rowGap: 0.25, py: 0.25 }}>
+                            <Typography component="span" sx={{ fontSize: 11, fontWeight: 600, opacity: 0.8 }}>{t('recap.edit.generatedNote', lang)}</Typography>
+                            <Typography component="span" sx={{ fontSize: 12, lineHeight: 1.45 }}>{cell.auto}</Typography>
+                          </Box>
+                        ) : ''}
+                        placement="top"
+                        enterDelay={300}
+                        slotProps={{ tooltip: { sx: { maxWidth: 300 } } }}
+                      >
+                        <TextField
+                          value={cell.raw}
+                          onChange={(e) => onNoteChange?.(row.campaignId, cell.noteField, e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder={t(cell.auto ? 'recap.edit.overridePlaceholder' : 'recap.edit.addNotePlaceholder', lang)}
+                          aria-label={`${t(`insight.field.${cell.field}`, lang)} — ${row.phaseName}`}
+                          multiline
+                          minRows={2}
+                          maxRows={6}
+                          size="small"
+                          fullWidth
+                          disabled={isDisabled}
+                          sx={insightInputSx}
+                        />
+                      </Tooltip>
                     ) : cell.text ? (
                       <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}>
                         <Typography component="span" sx={{ ...INSIGHT_TEXT_SX, color: 'text.primary', cursor: 'help' }}>{cell.text}</Typography>
