@@ -80,7 +80,8 @@
 | **ExportMenu** | 신규(구현됨, 3단계) | Export 드롭다운 — Google Sheets · PDF(인쇄) |
 | **PeerCompareDialog** | 신규(구현됨) | 벤치마크 글자를 누르면 비교군 캠페인을 나란히 — 열 정렬 |
 | recap-draft (Edge Function) | 신규(구현됨, 3단계) | Claude로 빈 코멘트·배운 점 초안과 ko/zh-Hant 번역. 로그인 세션만 호출 가능, 결과는 에디터의 빈 칸에만 채운다 |
-| Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles, data-print 속성) | `@media print` — 레일·툴바 숨김, 카드 분리 방지 |
+| **RecapPrintSheet** | 신규(구현됨, 2026-09-10) | 인쇄 전용 세로 문서 — 촘촘한 머리글 + 단계별 요약 표 + 플랫폼 제목 아래 세로로 쌓인 캠페인 블록(`break-inside: avoid`). 화면에서는 display:none, `@media print`에서만 나온다 |
+| Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles, data-print 속성) | `@page { size: letter portrait; margin: 12mm }` + `@media print` — 화면 블록 통째 숨김(data-print="hide"), 스크롤 컨테이너 해제. Recap은 화면을 줄이지 않고 RecapPrintSheet로 갈아 끼운다 |
 
 ## 전역 (모든 화면 공통)
 

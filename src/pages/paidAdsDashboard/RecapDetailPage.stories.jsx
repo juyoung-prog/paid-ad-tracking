@@ -60,8 +60,12 @@ export default {
 화면에 안 나오는 값(이유·오가닉 조회/참여)은 캠페인 칸의 ⋯ 버튼이 여는 작은 팝오버로 옮겼고, 평가(Good/Fair/Weak)
 편집은 뺐다(저장된 값·시트 열은 유지). 이벤트 글(상태·요약·배운 점·제언) 편집기도 2026-09-10에 없앴다 — 보고서 상태는 머리글 배지가 보여주고, 저장된 값과 시트 내보내기는 그대로다. AI draft·Translate는 빈 칸에만 초안을 채운다.
 계산은 schema.js(buildRecapRows · buildRecapHeadline · buildCampaignInsight ·
-localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
-인쇄를 부르고 PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. Google Sheets는 표를 클립보드에 복사한다.
+localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Google Sheets는 표를 클립보드에 복사한다.
+
+Export의 PDF는 브라우저 인쇄를 부른다 — 인쇄는 **화면을 줄인 것이 아니다**(2026-09-10). 용지는 \`@page\`가
+Letter **세로**로 고정하고, 화면 블록은 통째로 빠지며(data-print="hide") 그 자리에 인쇄 전용 문서
+(RecapPrintSheet)가 나온다: 촘촘한 머리글 → 단계별 한 줄 요약 표 → 플랫폼 제목 아래 세로로 쌓인 캠페인 블록
+(break-inside: avoid). 웹 레이아웃은 한 픽셀도 바뀌지 않는다.
 
 ### 확인 포인트
 - 머리글 순위 "Best of 5 comparable events by CPM"
@@ -70,6 +74,7 @@ localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF�
 - 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
 - 줄 클릭 → 드로어(성과·페이싱·일별 지출). 편집 모드에서는 줄 클릭이 꺼지고 해석 두 칸이 입력 칸이 된다 — 값은 사람이 쓴 글만, 자동 문장은 빈 칸 hover 툴팁("Generated note")과 "Add custom note…" 안내로만 보인다
 - Learnings 섹션 없음 — 읽기·편집 모두. 표 다음에 빈 자리가 남지 않는다
+- 인쇄 미리보기(브라우저 인쇄 대화상자)는 세로 한 장짜리 문서다 — 사이드바·언어 선택·Edit·Export·⋯ 버튼·입력 칸이 없고, 가로 표 대신 캠페인 블록이 세로로 쌓인다
         `,
       },
     },

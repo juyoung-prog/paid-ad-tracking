@@ -1,0 +1,128 @@
+import { t, metricLabel } from '../../data/recapStrings';
+import { GOAL_HEADLINE_METRICS } from '../../data/schema';
+import { money, count, countCompact, percent, seconds } from '../../utils/format';
+
+/**
+ * Recap 캠페인 한 줄의 **표기 규칙** — 화면 표(RecapCampaignTable)와 인쇄본
+ * (RecapPrintSheet)이 같은 규칙을 본다. 두 곳이 각자 규칙을 갖고 있으면 목표별
+ * 지표 구성이나 해석 문장이 조용히 갈라진다(웹에서 본 문장과 PDF의 문장이 달라진다).
+ *
+ * 계산은 여기서도 하지 않는다 — 순위·벤치마크·해석 재료는 schema.js buildRecapRows()가
+ * 이미 끝냈고, 이 모듈은 그 값을 "어느 자리에 어떤 문구로 놓을지"만 정한다.
+ */
+
+/** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
+export const kpiFormat = (metricKey) => (['cpm', 'cpc', 'cpa', 'cpe'].includes(metricKey) ? money : (v) => percent(v, { digits: 2 }));
+export const fmtPercent = (v) => percent(v, { digits: 2 });
+
+/** 캠페인 목표 — 캠페인 데이터의 goal(드로어와 같은 원천). 없거나 모르는 값이면 표시하지 않는다 */
+export const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 'store_visit'];
+/** 목표 표시명. 모르는 값이면 null — 호출부가 "—"를 놓는다 */
+export const goalText = (goal, lang) => (GOAL_KEYS.includes(goal) ? t(`goalLabel.${goal}`, lang) : null);
+
+/**
+ * 목표별 Engagement / Action 구성 — 대표 두 지표(순위 포함)와 옅은 보조 줄. 목표가 강조를 정한다(2026-09-08):
+ * 인지 = 참여율·CTR + 클릭 수·CPC · 트래픽 = CTR·CPC + 클릭 수·참여율 · 참여 = 참여율·Cost/eng + 좋아요·공유 ·
+ * 전환/매장 방문 = CPA·CTR + 결과 수·CPC. 모든 원본 값은 행(row)에 그대로 있다.
+ */
+export const ENGAGEMENT_ACTION_LAYOUT = {
+  awareness: { primary: ['engagementRate', 'ctr'], secondary: ['clicks', 'cpc'] },
+  traffic: { primary: ['ctr', 'cpc'], secondary: ['clicks', 'engagementRate'] },
+  engagement: { primary: ['engagementRate', 'cpe'], secondary: ['likes', 'shares'] },
+  conversion: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+  store_visit: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+};
+export const engagementLayout = (goal) => ENGAGEMENT_ACTION_LAYOUT[goal] ?? ENGAGEMENT_ACTION_LAYOUT.awareness;
+
+const COUNT_KEYS = { clicks: 'recap.table.countClicks', likes: 'recap.table.countLikes', shares: 'recap.table.countShares', conversions: 'recap.table.countResults' };
+
+/** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 나머지 대표 자리(600) */
+export const emphasisOf = (row, metricKey) => ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey ? 'primary' : 'diagnostic');
+
+/** 성과 데이터가 하나라도 있는 줄인가 — 없으면 지표 칸 대신 "No performance data" */
+export const hasRowData = (row) => row.spend != null || row.impressions != null;
+
+/** 해석 열(What worked · Could improve) — 순서·문구 키·사람이 쓴 note 필드가 한 줄에 */
+export const INSIGHT_COLUMNS = [
+  { key: 'worked', field: 'strength', noteField: 'strength' },
+  { key: 'improve', field: 'weakness', noteField: 'weakness' },
+];
+
+/**
+ * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다(2026-09-08).
+ * 글자·숫자가 하나도 없거나(자모·기호만), 흔한 임시 표기면 자동 문장으로 넘긴다.
+ */
+export const isPlaceholder = (text) => {
+  const s = String(text ?? '').trim();
+  if (!s) return true;
+  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(s)) return true;
+  // 한글 자모(ㅇㅁㄴ…)·기호·공백만 남으면 내용 없음
+  return s.replace(/[ㄱ-ㆎ○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
+};
+
+/**
+ * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군에서 상위/하위였나)를 **해석** 한 문장으로.
+ * 후보 지표는 목표가 정한다(schema GOAL_INSIGHT_METRICS) — 표가 그 목표에서 실제로 그리는 지표와 같은 목록이라,
+ * 오른쪽 문장의 근거를 왼쪽 칸에서 눈으로 좇을 수 있다. 목표와 무관하거나 화면에 없는 지표는 문장이 되지 않는다.
+ * 지표와 순위는 왼쪽 칸이 이미 보여주므로 여기서 숫자를 되풀이하지 않는다(2026-09-08).
+ * 원인(Reason)은 표에서 다루지 않는다 — 사람이 Edit에서 쓴 이유는 편집 폼과 시트 내보내기에 남는다.
+ */
+export function insightSentence(field, item, lang) {
+  if (!item) return null;
+  // 지표 종류가 문구를 고른다 — 같은 "참여"라도 참여율은 반응, 참여당 비용은 효율
+  const aspectKey = (aspect, metricKey) => (metricKey === 'cpe' ? 'cpe' : metricKey === 'cpc' ? 'cpc' : aspect);
+  if (field === 'strength') return item.kind === 'ranked' && item.stat ? t(`cell.worked.${aspectKey(item.aspect, item.metricKey)}`, lang) : null;
+  if (field === 'weakness') {
+    if (item.kind === 'overspend') return t('cell.improve.overspend', lang, { pct: item.pct });
+    return item.kind === 'ranked' && item.stat ? t(`cell.improve.${aspectKey(item.aspect, item.metricKey)}`, lang) : null;
+  }
+  return null;
+}
+
+/**
+ * 해석 두 칸의 최종 내용 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료에서 한 문장, 그것도 없으면 null.
+ * raw는 편집 칸에 그대로 넣을 원문(자리표시자 포함)이고, auto는 자동 문장(툴팁용)이다.
+ */
+export function insightCellsOf(row, lang) {
+  const hasData = hasRowData(row);
+  return INSIGHT_COLUMNS.map((col) => {
+    const raw = col.noteField ? (row.note?.[col.noteField]?.[lang] ?? '') : '';
+    const written = raw.trim();
+    const auto = hasData ? insightSentence(col.field, row.insight?.[col.field] ?? null, lang) : null;
+    if (written && !isPlaceholder(written)) return { ...col, raw, text: written, auto, isWritten: true };
+    return { ...col, raw, text: auto, auto, isWritten: false };
+  });
+}
+
+/** 대표 KPI 한 자리 — 값(schema budgetEfficiency)과 같은 지표의 과거 비교 재료 */
+export function primaryKpiOf(row) {
+  const kpi = row.budgetEfficiency ?? null;
+  const metricKey = kpi?.metricKey ?? (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
+  const stat = metricKey ? row.benchmarks?.[metricKey] ?? null : null;
+  return { kpi, metricKey, stat, hasComparison: Boolean(stat && stat.peerScope !== 'none' && stat.percentile != null) };
+}
+
+/** 보조 줄 — 수량은 "248 clicks", 비용·비율은 "CPC $4.51". 값이 없는 것은 뺀다 */
+export function secondaryText(row, keys, lang) {
+  return keys.map((key) => {
+    const v = row[key];
+    if (v == null) return null;
+    if (COUNT_KEYS[key]) return t(COUNT_KEYS[key], lang, { n: count(v) });
+    return `${metricLabel(key, lang)} ${kpiFormat(key)(v)}`;
+  }).filter(Boolean).join(' · ');
+}
+
+/** 영상 칸의 보조 줄 — "Reach 163K · Plays 296K · Avg 2s" */
+export function videoSecondaryText(row, lang) {
+  return [
+    row.reach != null ? `${metricLabel('reach', lang)} ${countCompact(row.reach)}` : null,
+    row.videoPlays != null ? `${metricLabel('videoPlays', lang)} ${countCompact(row.videoPlays)}` : null,
+    row.avgWatchSeconds != null ? t('recap.table.avgWatch', lang, { s: seconds(row.avgWatchSeconds) }) : null,
+  ].filter(Boolean).join(' · ');
+}
+
+/** 매장 표기 — 여러 곳이면 "G10 +2"(전체 목록은 title로) */
+export function storeTextOf(row) {
+  const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
+  return { stores, storeText: stores.length > 1 ? `${stores[0]} +${stores.length - 1}` : stores[0] ?? null };
+}

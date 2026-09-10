@@ -19,6 +19,7 @@ import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
+import { RecapPrintSheet } from '../../components/data-display/RecapPrintSheet';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
 import { LanguageSwitch } from '../../components/input/LanguageSwitch';
@@ -434,11 +435,89 @@ export function RecapDetailPage() {
   );
 
   return (
-    <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X }}>
-      <Box sx={{ mb: 2 }}>{backLink}</Box>
-      {error && <BackendErrorBanner error={error} onRetry={refresh} sx={{ mb: 2 }} />}
+    /* 인쇄에서는 페이지 여백을 @page가 갖는다 — 화면 거터를 그대로 두면 종이 여백이 두 번 붙는다 */
+    <PageContainer maxWidth={false} sx={{ py: 3, px: PAGE_GUTTER_X, '@media print': { p: 0 } }}>
+      {/* 화면용 블록 전부 — display:contents라 웹 레이아웃에는 아무 영향이 없고, 인쇄에서만 통째로 빠진다 */}
+      <Box data-print="hide" sx={{ display: 'contents' }}>
+        <Box sx={{ mb: 2 }}>{backLink}</Box>
+        {error && <BackendErrorBanner error={error} onRetry={refresh} sx={{ mb: 2 }} />}
 
-      <RecapHeader
+        <RecapHeader
+          eventName={eventName}
+          startDate={startDate}
+          endDate={endDate}
+          campaignCount={eventCampaigns.length}
+          spend={spend}
+          plannedBudget={plannedBudget}
+          stores={stores}
+          platforms={platforms}
+          headline={headline}
+          status={shownRecap?.status ?? null}
+          lang={lang}
+          actions={actions}
+          sx={{ mb: 3 }}
+        />
+
+        {!isEditing && recap?.summary && (
+          <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14 }} />
+        )}
+
+        <Box sx={SECTION_CARD_SX} data-print="card" data-recap-timeline>
+          <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />
+          <PhaseTimelineChart
+            phases={phases}
+            today={today}
+            emphasizedKey={phaseSelection?.key ?? undefined}
+            barSuffix={(phase) => (spendByPhaseKey[phase.key] != null ? `${money(spendByPhaseKey[phase.key])} spent` : null)}
+            onPhaseClick={(phase) => {
+              // 단계에 속한 캠페인 전부(플랫폼마다 한 줄) — Meta를 기본으로 두지 않는다. 스크롤만 첫 줄로
+              const ids = platformOrder.map((p) => byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key)?.campaignId).filter(Boolean);
+              setPhaseSelection(ids.length ? { key: phase.key, ids } : null);
+              if (ids[0]) requestAnimationFrame(() => document.getElementById(`recap-row-${ids[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+            }}
+          />
+        </Box>
+
+        {platformOrder.map((platform) => (
+          <Box key={platform} sx={SECTION_CARD_SX} data-print="card">
+            <SectionHeader
+              title={t('recap.section.campaigns', lang, { platform: PLATFORM_LABEL[platform] })}
+              scope={countScope(byPlatform[platform].length, 'campaign', lang)}
+            />
+            <RecapCampaignTable
+              rows={byPlatform[platform]}
+              lang={lang}
+              label={`${PLATFORM_LABEL[platform]} recap table`}
+              onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
+              /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·일별 지출. 해석은 표의 네 열에).
+                 다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
+              onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (!phaseSelection?.ids.includes(campaignId)) setPhaseSelection(null); }}
+              selectedIds={phaseSelection?.ids ?? []}
+              /* 해석 두 칸을 표 안에서 바로 고친다 — 지표를 보면서 쓰도록(2026-09-10). 상태는 draft.notesById 하나뿐이라
+                 AI 초안·번역이 채우는 값과 같은 곳을 본다 */
+              isEditing={isEditing && Boolean(draft)}
+              onNoteChange={updateDraftNoteText}
+              isDisabled={isBusy}
+              renderRowExtra={isEditing && draft ? (row) => (
+                <Tooltip title={t('recap.edit.secondaryFields', lang)} placement="top">
+                  <IconButton
+                    size="small"
+                    disabled={isBusy}
+                    aria-label={`${t('recap.edit.secondaryFields', lang)} — ${row.phaseName}`}
+                    onClick={(e) => setNoteAnchor({ el: e.currentTarget, campaignId: row.campaignId, label: `${row.phaseName} · ${PLATFORM_LABEL[row.platform] ?? row.platform}` })}
+                    sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
+                  >
+                    <MoreHorizOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />
+                  </IconButton>
+                </Tooltip>
+              ) : undefined}
+            />
+          </Box>
+        ))}
+      </Box>
+
+      {/* 인쇄 전용 세로 문서 — 화면 컴포넌트를 축소하지 않고 같은 값을 종이 흐름에 맞춰 다시 배치한다 */}
+      <RecapPrintSheet
         eventName={eventName}
         startDate={startDate}
         endDate={endDate}
@@ -449,67 +528,12 @@ export function RecapDetailPage() {
         platforms={platforms}
         headline={headline}
         status={shownRecap?.status ?? null}
+        summary={shownRecap?.summary ?? null}
+        phases={phases}
+        phaseSpend={spendByPhaseKey}
+        sections={platformOrder.map((platform) => ({ platform, label: PLATFORM_LABEL[platform], rows: byPlatform[platform] }))}
         lang={lang}
-        actions={actions}
-        sx={{ mb: 3 }}
       />
-
-      {!isEditing && recap?.summary && (
-        <LocalizedParagraph text={recap.summary} lang={lang} sx={{ mb: 3, maxWidth: 880, fontSize: 14 }} />
-      )}
-
-      <Box sx={SECTION_CARD_SX} data-print="card" data-recap-timeline>
-        <SectionHeader title={t('recap.section.timeline', lang)} scope={countScope(phases.length, 'phase', lang)} />
-        <PhaseTimelineChart
-          phases={phases}
-          today={today}
-          emphasizedKey={phaseSelection?.key ?? undefined}
-          barSuffix={(phase) => (spendByPhaseKey[phase.key] != null ? `${money(spendByPhaseKey[phase.key])} spent` : null)}
-          onPhaseClick={(phase) => {
-            // 단계에 속한 캠페인 전부(플랫폼마다 한 줄) — Meta를 기본으로 두지 않는다. 스크롤만 첫 줄로
-            const ids = platformOrder.map((p) => byPlatform[p].find((r) => campaignNameKey(r.name) === phase.key)?.campaignId).filter(Boolean);
-            setPhaseSelection(ids.length ? { key: phase.key, ids } : null);
-            if (ids[0]) requestAnimationFrame(() => document.getElementById(`recap-row-${ids[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-          }}
-        />
-      </Box>
-
-      {platformOrder.map((platform) => (
-        <Box key={platform} sx={SECTION_CARD_SX} data-print="card">
-          <SectionHeader
-            title={t('recap.section.campaigns', lang, { platform: PLATFORM_LABEL[platform] })}
-            scope={countScope(byPlatform[platform].length, 'campaign', lang)}
-          />
-          <RecapCampaignTable
-            rows={byPlatform[platform]}
-            lang={lang}
-            label={`${PLATFORM_LABEL[platform]} recap table`}
-            onBenchmarkClick={(campaignId, metricKey) => setCompareTarget({ campaignId, metricKey })}
-            /* 숫자 줄 전체 클릭 → Performance와 같은 캠페인 상세 드로어(성과·페이싱·일별 지출. 해석은 표의 네 열에).
-               다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
-            onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (!phaseSelection?.ids.includes(campaignId)) setPhaseSelection(null); }}
-            selectedIds={phaseSelection?.ids ?? []}
-            /* 해석 두 칸을 표 안에서 바로 고친다 — 지표를 보면서 쓰도록(2026-09-10). 상태는 draft.notesById 하나뿐이라
-               AI 초안·번역이 채우는 값과 같은 곳을 본다 */
-            isEditing={isEditing && Boolean(draft)}
-            onNoteChange={updateDraftNoteText}
-            isDisabled={isBusy}
-            renderRowExtra={isEditing && draft ? (row) => (
-              <Tooltip title={t('recap.edit.secondaryFields', lang)} placement="top">
-                <IconButton
-                  size="small"
-                  disabled={isBusy}
-                  aria-label={`${t('recap.edit.secondaryFields', lang)} — ${row.phaseName}`}
-                  onClick={(e) => setNoteAnchor({ el: e.currentTarget, campaignId: row.campaignId, label: `${row.phaseName} · ${PLATFORM_LABEL[row.platform] ?? row.platform}` })}
-                  sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
-                >
-                  <MoreHorizOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />
-                </IconButton>
-              </Tooltip>
-            ) : undefined}
-          />
-        </Box>
-      ))}
 
       {/* 수기 입력 팝오버 — 이유·오가닉만. 값은 draft.notesById 하나를 그대로 쓰고 저장은 Save가 한다 */}
       {noteAnchor && draft && (

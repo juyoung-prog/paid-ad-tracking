@@ -13,12 +13,23 @@ import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS } from '../../data/schema';
-import { money, count, countCompact, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
-
-/** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
-const kpiFormat = (metricKey) => (['cpm', 'cpc', 'cpa', 'cpe'].includes(metricKey) ? money : (v) => percent(v, { digits: 2 }));
-const fmtPercent = (v) => percent(v, { digits: 2 });
+import { RECAP_PACING_FLAG } from '../../data/schema';
+import { money, dateRangeWithDays, EMPTY } from '../../utils/format';
+/* 목표별 지표 구성·해석 문장·표기 규칙은 인쇄본(RecapPrintSheet)과 한 곳에서 나눠 쓴다 — 두 벌이면 조용히 갈라진다 */
+import {
+  INSIGHT_COLUMNS,
+  emphasisOf,
+  engagementLayout,
+  fmtPercent,
+  goalText,
+  hasRowData,
+  insightCellsOf,
+  kpiFormat,
+  primaryKpiOf,
+  secondaryText,
+  storeTextOf,
+  videoSecondaryText,
+} from './recapRowView';
 
 /**
  * 열 폭 — 임원용 평가 시트(2026-09-08): 한 캠페인을 왼쪽에서 오른쪽으로 읽으면 "무엇 → 얼마 → 결과 → 주변 반응 →
@@ -47,11 +58,6 @@ const COLUMN_WIDTH = {
   improve: 240,
 };
 
-/** 해석 열(What worked · Could improve) — 순서·문구 키·사람이 쓴 note 필드가 한 줄에 */
-const INSIGHT_COLUMNS = [
-  { key: 'worked', field: 'strength', noteField: 'strength' },
-  { key: 'improve', field: 'weakness', noteField: 'weakness' },
-];
 /** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
 const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
 /**
@@ -81,27 +87,6 @@ const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider'
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
 const CELL_SX = { verticalAlign: 'top', py: 1 };
 const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap' };
-/** 캠페인 목표 — 캠페인 데이터의 goal(드로어와 같은 원천). 없거나 모르는 값이면 표시하지 않는다 */
-const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 'store_visit'];
-
-/**
- * 목표별 Engagement / Action 칸 구성 — 대표 두 지표(순위 포함)와 옅은 보조 줄. 목표가 강조를 정한다(2026-09-08):
- * 인지 = 참여율·CTR + 클릭 수·CPC · 트래픽 = CTR·CPC + 클릭 수·참여율 · 참여 = 참여율·Cost/eng + 좋아요·공유 ·
- * 전환/매장 방문 = CPA·CTR + 결과 수·CPC. 모든 원본 값은 행(row)에 그대로 있다.
- */
-const ENGAGEMENT_ACTION_LAYOUT = {
-  awareness: { primary: ['engagementRate', 'ctr'], secondary: ['clicks', 'cpc'] },
-  traffic: { primary: ['ctr', 'cpc'], secondary: ['clicks', 'engagementRate'] },
-  engagement: { primary: ['engagementRate', 'cpe'], secondary: ['likes', 'shares'] },
-  conversion: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
-  store_visit: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
-};
-const DEFAULT_LAYOUT = ENGAGEMENT_ACTION_LAYOUT.awareness;
-const COUNT_KEYS = { clicks: 'recap.table.countClicks', likes: 'recap.table.countLikes', shares: 'recap.table.countShares', conversions: 'recap.table.countResults' };
-
-/** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 나머지 대표 자리(600) */
-const emphasisOf = (row, metricKey) => ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey ? 'primary' : 'diagnostic');
-
 /**
  * 대표 지표 한 자리 — "Hook 23.11%" 한 줄(라벨 옅게 + 값 600) 아래 과거 비교 한 줄("↗ best of 12", 없으면 생략).
  * 순위는 맥락이지 등급이 아니다. 값이 없으면 "—".
@@ -134,39 +119,6 @@ function KpiSlot({ row, metricKey, format, lang, onBenchmarkClick }) {
       )}
     </Box>
   );
-}
-
-/**
- * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다(2026-09-08).
- * 글자·숫자가 하나도 없거나(자모·기호만), 흔한 임시 표기면 자동 문장으로 넘긴다.
- */
-const isPlaceholder = (text) => {
-  const s = String(text ?? '').trim();
-  if (!s) return true;
-  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(s)) return true;
-  // 한글 자모(ㅇㅁㄴ…)·기호·공백만 남으면 내용 없음
-  return s.replace(/[ㄱ-ㆎ○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
-};
-
-/**
- * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군에서 상위/하위였나)를 **해석** 한 문장으로.
- * 후보 지표는 목표가 정한다(schema GOAL_INSIGHT_METRICS) — 이 표가 그 목표에서 실제로 그리는 지표와 같은 목록이라,
- * 오른쪽 문장의 근거를 왼쪽 칸에서 눈으로 좇을 수 있다. 목표와 무관하거나 화면에 없는 지표는 문장이 되지 않는다.
- * 지표와 순위는 왼쪽 칸이 이미 보여주므로 여기서 숫자를 되풀이하지 않는다(2026-09-08): "Early video attention stood out
- * against comparable campaigns." / "Engagement efficiency was the clearest opportunity." 순위 근거가 있을 때만 말한다.
- * 원인(Reason)은 표에서 다루지 않는다(2026-09-08) — 지표만으로는 원인이 서지 않아 자동 문장이 없었고, 사람이 Edit에서
- * 쓴 이유는 편집 폼과 시트 내보내기에 남는다. 사람이 쓴 note가 있으면 호출부가 그것을 먼저 쓴다.
- */
-function insightSentence(field, item, lang) {
-  if (!item) return null;
-  // 지표 종류가 문구를 고른다 — 같은 "참여"라도 참여율은 반응, 참여당 비용은 효율
-  const aspectKey = (aspect, metricKey) => (metricKey === 'cpe' ? 'cpe' : metricKey === 'cpc' ? 'cpc' : aspect);
-  if (field === 'strength') return item.kind === 'ranked' && item.stat ? t(`cell.worked.${aspectKey(item.aspect, item.metricKey)}`, lang) : null;
-  if (field === 'weakness') {
-    if (item.kind === 'overspend') return t('cell.improve.overspend', lang, { pct: item.pct });
-    return item.kind === 'ranked' && item.stat ? t(`cell.improve.${aspectKey(item.aspect, item.metricKey)}`, lang) : null;
-  }
-  return null;
 }
 
 /**
@@ -262,41 +214,21 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
         </TableHead>
         <TableBody>
           {rows.map((row) => {
-            const hasData = row.spend != null || row.impressions != null;
+            const hasData = hasRowData(row);
             /* Primary KPI — 목표별 결과당 현재 비용(schema budgetEfficiency). 판단하지 않는다. 아래에 같은 KPI의 과거 비교 */
-            const kpi = row.budgetEfficiency ?? null;
-            const kpiKey = kpi?.metricKey ?? (GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] ?? null;
+            const { kpi, metricKey: kpiKey, stat: kpiStat, hasComparison } = primaryKpiOf(row);
             const kpiHint = kpi?.value != null ? t('recap.table.primaryKpiValueHint', lang, { metric: metricLabel(kpi.metricKey, lang), basis: t(`recap.table.primaryKpiBasis.${kpi.metricKey}`, lang) }) : '';
-            const kpiStat = kpiKey ? row.benchmarks?.[kpiKey] ?? null : null;
-            const hasComparison = Boolean(kpiStat && kpiStat.peerScope !== 'none' && kpiStat.percentile != null);
-            const layout = ENGAGEMENT_ACTION_LAYOUT[row.goal] ?? DEFAULT_LAYOUT;
-            /* 보조 줄 — 수량은 "248 clicks", 비용·비율은 "CPC $4.51". 값이 없는 것은 뺀다 */
-            const secondaryText = (keys) => keys.map((key) => {
-              const v = row[key];
-              if (v == null) return null;
-              if (COUNT_KEYS[key]) return t(COUNT_KEYS[key], lang, { n: count(v) });
-              return `${metricLabel(key, lang)} ${kpiFormat(key)(v)}`;
-            }).filter(Boolean).join(' · ');
-            const videoSecondary = [
-              row.reach != null ? `${metricLabel('reach', lang)} ${countCompact(row.reach)}` : null,
-              row.videoPlays != null ? `${metricLabel('videoPlays', lang)} ${countCompact(row.videoPlays)}` : null,
-              row.avgWatchSeconds != null ? t('recap.table.avgWatch', lang, { s: seconds(row.avgWatchSeconds) }) : null,
-            ].filter(Boolean).join(' · ');
+            const layout = engagementLayout(row.goal);
+            const engagementSecondary = secondaryText(row, layout.secondary, lang);
+            const videoSecondary = videoSecondaryText(row, lang);
             /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
                편집 중에는 사람이 쓴 **원문 그대로**(자리표시자도)를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
                자동 문장은 placeholder로 깔아 "비우면 이게 남는다"를 보인다 — 자동 문장을 값으로 채워 넣지 않는다 */
-            const insightCells = INSIGHT_COLUMNS.map((col) => {
-              const raw = col.noteField ? (row.note?.[col.noteField]?.[lang] ?? '') : '';
-              const written = raw.trim();
-              const auto = hasData ? insightSentence(col.field, row.insight?.[col.field] ?? null, lang) : null;
-              if (written && !isPlaceholder(written)) return { ...col, raw, text: written, auto, isWritten: true };
-              return { ...col, raw, text: auto, auto, isWritten: false };
-            });
+            const insightCells = insightCellsOf(row, lang);
             const isSelected = selectedIds.includes(row.campaignId);
             // 편집 중에는 줄 클릭(드로어)을 끈다 — 편집 칸을 누를 때마다 드로어가 열리면 글을 쓸 수 없다
             const handleRowClick = isEditing ? undefined : onRowClick;
-            const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
-            const storeText = stores.length > 1 ? `${stores[0]} +${stores.length - 1}` : stores[0] ?? null;
+            const { stores, storeText } = storeTextOf(row);
             return (
               <TableRow
                 key={row.campaignId}
@@ -359,8 +291,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 </TableCell>
                 <TableCell sx={CELL_SX}>
                   {/* Goal — 캠페인 데이터의 목표 그대로. 등급도 해석도 없다 */}
-                  <Typography component="span" sx={{ display: 'block', fontSize: 12, lineHeight: 1.4, color: GOAL_KEYS.includes(row.goal) ? 'text.primary' : 'text.disabled' }}>
-                    {GOAL_KEYS.includes(row.goal) ? t(`goalLabel.${row.goal}`, lang) : EMPTY}
+                  <Typography component="span" sx={{ display: 'block', fontSize: 12, lineHeight: 1.4, color: goalText(row.goal, lang) ? 'text.primary' : 'text.disabled' }}>
+                    {goalText(row.goal, lang) ?? EMPTY}
                   </Typography>
                 </TableCell>
                 <TableCell sx={CELL_SX}>
@@ -432,8 +364,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                           <KpiSlot key={key} row={row} metricKey={key} format={kpiFormat(key)} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         ))}
                       </Box>
-                      {secondaryText(layout.secondary) && (
-                        <Typography component="span" sx={(theme) => ({ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5, color: alpha(theme.palette.text.secondary, 0.85), fontVariantNumeric: 'tabular-nums' })}>{secondaryText(layout.secondary)}</Typography>
+                      {engagementSecondary && (
+                        <Typography component="span" sx={(theme) => ({ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5, color: alpha(theme.palette.text.secondary, 0.85), fontVariantNumeric: 'tabular-nums' })}>{engagementSecondary}</Typography>
                       )}
                     </TableCell>
                   </>
