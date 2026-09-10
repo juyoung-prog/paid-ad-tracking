@@ -62,10 +62,11 @@ export default {
 계산은 schema.js(buildRecapRows · buildRecapHeadline · buildCampaignInsight ·
 localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Google Sheets는 표를 클립보드에 복사한다.
 
-Export의 PDF는 브라우저 인쇄를 부른다 — 인쇄는 **화면을 줄인 것이 아니다**(2026-09-10). 용지는 \`@page\`가
-Letter **세로**로 고정하고, 화면 블록은 통째로 빠지며(data-print="hide") 그 자리에 인쇄 전용 문서
-(RecapPrintSheet)가 나온다: 촘촘한 머리글 → 타임라인 그래프(세로 폭에 맞춘 Gantt — 표로 바꾸지 않는다) → 플랫폼 제목 아래 세로로 쌓인 캠페인 블록
-(break-inside: avoid). 웹 레이아웃은 한 픽셀도 바뀌지 않는다.
+Export의 PDF는 브라우저 인쇄를 부른다 — 그리고 인쇄본은 **이 화면 그대로**다(2026-09-10 단일화).
+인쇄 전용 보고서 컴포넌트는 없다: 같은 RecapHeader · PhaseTimelineChart · RecapCampaignTable이
+\`@media print\`에서 종이 치수로 갈아입는다(Letter 세로 726px, 글자는 화면 위계 그대로 pt로 한 단씩,
+표의 해석 두 열은 같은 캠페인의 둘째 줄로 접힘, 타임라인은 눈금만 성글게). 한때 인쇄용 보고서를 따로
+그렸는데 같은 보고서가 두 벌이 되어 갈라질 구조라 지웠다 — 인쇄는 매체이지 다른 제품이 아니다.
 
 ### 확인 포인트
 - 머리글 순위 "Best of 5 comparable events by CPM"
@@ -74,8 +75,8 @@ Letter **세로**로 고정하고, 화면 블록은 통째로 빠지며(data-pri
 - 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
 - 줄 클릭 → 드로어(성과·페이싱·일별 지출). 편집 모드에서는 줄 클릭이 꺼지고 해석 두 칸이 입력 칸이 된다 — 값은 사람이 쓴 글만, 자동 문장은 빈 칸 hover 툴팁("Generated note")과 "Add custom note…" 안내로만 보인다
 - Learnings 섹션 없음 — 읽기·편집 모두. 표 다음에 빈 자리가 남지 않는다
-- 인쇄 미리보기(브라우저 인쇄 대화상자)는 세로 한 장짜리 문서다 — 사이드바·언어 선택·Edit·Export·⋯ 버튼·입력 칸이 없고, 가로 표 대신 캠페인 블록이 세로로 쌓인다
-- 인쇄 1쪽: 머리글 → Timeline(막대 그래프, 겹침이 보인다) → Meta campaigns 시작
+- 인쇄 미리보기(Letter 세로)에는 사이드바·언어 선택·Edit·Export·⋯ 버튼·입력 칸이 없고, **화면과 같은 표·같은 타임라인**이 종이 폭으로 좁혀져 나온다. 1쪽: 머리글 → Timeline(막대 그래프) → Meta campaigns
+- 같은 캠페인이 화면과 인쇄에서 **같은 값**을 말하는가(지표 아홉 칸 + What worked / Could improve)
         `,
       },
     },

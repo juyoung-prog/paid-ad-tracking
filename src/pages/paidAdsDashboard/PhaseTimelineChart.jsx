@@ -85,20 +85,43 @@ function edgeAwareShift(pct) {
  * 말줄임(전체는 title).
  */
 const GRID_TEMPLATE = '320px 300px minmax(360px, 1fr)';
+/**
+ * 인쇄(Letter 세로, 내용 폭 ≈726px)의 열 비율 — 정보 40% : 축 60%. 화면과 **같은 세 열**이고 순서·내용도 같다;
+ * 종이가 좁아 폭만 비율로 다시 잡는다. 화면 차트를 scale()로 줄이지 않는 이유는 글자가 6pt 아래로 내려가기 때문이다.
+ */
+const PRINT_GRID_TEMPLATE = '23% 17% 60%';
+/** 화면·인쇄 공통 격자 정의 — 머리글 행과 본문 행이 같은 것을 쓴다 */
+const GRID_SX = { display: 'grid', gridTemplateColumns: GRID_TEMPLATE, '@media print': { gridTemplateColumns: PRINT_GRID_TEMPLATE } };
+/**
+ * 인쇄 눈금 — 종이의 축은 약 436px이라 주 단위(열한 개)는 라벨이 붙는다. 후보는 각 달의 **1일·15일**과 기간 양 끝이고,
+ * 앞 눈금과 이 간격(축 폭의 %)보다 가까우면 버린다. 12% ≈ 52px — 7pt "Aug 15"(≈28px)에 숨 쉴 틈을 더한 값.
+ * 막대 위치는 눈금과 무관하게 **실제 날짜**를 쓴다(같은 pct 계산).
+ */
+const PRINT_MIN_TICK_GAP_PCT = 12;
+/** 인쇄에서 월 라벨을 적을 최소 구간(8pt "Jun 2026" ≈ 46px) */
+const PRINT_MIN_MONTH_LABEL_PCT = 11;
 
 /**
  * 타임라인 격자 — 주 눈금은 거의 안 보이는 선, 월 경계만 divider 단계.
  * 헤더가 아니라 **각 행 안에** 그린다. 행마다 그리면 "한 행의 배경"으로 읽혀
  * 막대와 같은 층에 놓이고, 행 경계선과도 자연스럽게 끊긴다.
  */
-function TimelineGrid({ ticks, monthStarts, pct }) {
+function TimelineGrid({ ticks, printTicks, monthStarts, pct }) {
   return (
     <>
       {ticks.map((day) => (
         <Box
           key={`t-${day}`}
           aria-hidden
-          sx={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(day)}%`, borderLeft: '1px solid', borderColor: 'chart.grid' }}
+          sx={{ position: 'absolute', top: 0, bottom: 0, left: `${pct(day)}%`, borderLeft: '1px solid', borderColor: 'chart.grid', '@media print': { display: 'none' } }}
+        />
+      ))}
+      {/* 인쇄용 눈금선 — 같은 축, 같은 계산. 종이에서 라벨이 붙지 않을 만큼만 남긴 것 */}
+      {printTicks.map((day) => (
+        <Box
+          key={`pt-${day}`}
+          aria-hidden
+          sx={{ display: 'none', '@media print': { display: 'block', position: 'absolute', top: 0, bottom: 0, left: `${pct(day)}%`, borderLeft: '0.5pt solid', borderColor: 'chart.grid' } }}
         />
       ))}
       {monthStarts.map((day) => (
@@ -209,6 +232,31 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
   if (endDay - ticks[ticks.length - 1] >= step * 0.85) ticks.push(endDay);
   else ticks[ticks.length - 1] = endDay;
 
+  /* 인쇄 눈금 — 화면과 같은 축(pct) 위에서 후보만 달리 고른다: 각 달의 1일·15일 + 기간 양 끝 중
+     앞 눈금과 PRINT_MIN_TICK_GAP_PCT 이상 떨어진 것. 종이 축이 좁아 주 단위 라벨이 붙기 때문이다. */
+  const printTicks = [];
+  {
+    const candidates = new Set([startDay, endDay]);
+    const first = new Date(startDay * MS_PER_DAY);
+    let y = first.getUTCFullYear();
+    let m = first.getUTCMonth();
+    while (Date.UTC(y, m, 1) / MS_PER_DAY <= endDay) {
+      [1, 15].forEach((d) => {
+        const day = Math.round(Date.UTC(y, m, d) / MS_PER_DAY);
+        if (day > startDay && day < endDay) candidates.add(day);
+      });
+      m += 1;
+      if (m === 12) { m = 0; y += 1; }
+    }
+    [...candidates].sort((a, b) => a - b).forEach((day) => {
+      if (day === endDay) return;
+      if (printTicks.length === 0 || pct(day) - pct(printTicks[printTicks.length - 1]) >= PRINT_MIN_TICK_GAP_PCT) printTicks.push(day);
+    });
+    // 마지막 눈금이 끝과 너무 가까우면 그것을 버린다 — 끝 날짜가 먼저다
+    if (printTicks.length > 0 && pct(endDay) - pct(printTicks[printTicks.length - 1]) < PRINT_MIN_TICK_GAP_PCT) printTicks.pop();
+    printTicks.push(endDay);
+  }
+
   /* 월 구간 — 라벨은 각 달의 시작(첫 달은 타임라인 시작)에, 경계선은 1일에.
      첫 달의 1일은 축 밖이라 선을 긋지 않는다. 너무 좁은 구간은 라벨을 건너뛴다. */
   const months = [];
@@ -227,6 +275,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
         labelDay,
         boundaryDay: monthStartDay > startDay ? monthStartDay : null,
         showLabel: widthPct >= MIN_MONTH_LABEL_PCT,
+        // 종이에서는 라벨이 더 크게 먹으므로 기준이 한 단 높다(같은 규칙, 다른 치수)
+        showLabelPrint: widthPct >= PRINT_MIN_MONTH_LABEL_PCT,
       });
       m += 1;
       if (m === 12) { m = 0; y += 1; }
@@ -246,17 +296,17 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
     fontSize: 12,
     color: 'text.secondary',
     alignSelf: 'end',
+    '@media print': { px: '4pt', pt: '4pt', pb: '3pt', fontSize: '7pt' },
   };
 
   return (
     /* 좁은 화면에서는 표처럼 가로 스크롤 — 열을 접거나 막대를 숨기지 않는다 */
-    <Box sx={{ overflowX: 'auto', ...sx }}>
-      <Box sx={{ minWidth: 740 }}>
+    <Box sx={{ overflowX: 'auto', '@media print': { overflow: 'visible' }, ...sx }}>
+      <Box sx={{ minWidth: 740, '@media print': { minWidth: 0 } }}>
         {/* 헤더 행 — 열 이름 둘 + 축(월 라벨 / 주 눈금) */}
         <Box
           sx={{
-            display: 'grid',
-            gridTemplateColumns: GRID_TEMPLATE,
+            ...GRID_SX,
             // 헤더와 첫 행 사이 숨 쉴 틈(5px) — 열 이름이 첫 행 글자에 붙어 보였다
             pb: 0.625,
             borderBottom: '1px solid',
@@ -267,8 +317,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
           {/* 실지출(barSuffix)이 붙는 Performance 탭에서만 "Spend"를 말한다 —
               Plan 탭은 이 열에 계획 예산뿐이라 헤더가 없는 값을 약속하면 안 된다. */}
           <Typography component="div" sx={headCellSx}>{barSuffix ? 'Platform / Budget / Spend' : 'Platform / Budget'}</Typography>
-          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider' }}>
-            {months.map((mo) => mo.showLabel && (
+          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider', '@media print': { height: '30pt' } }}>
+            {months.map((mo) => (mo.showLabel || mo.showLabelPrint) && (
               <Typography
                 key={mo.key}
                 component="div"
@@ -282,6 +332,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
                   fontWeight: 600,
                   color: 'text.primary',
                   whiteSpace: 'nowrap',
+                  ...(mo.showLabel ? {} : { display: 'none' }),
+                  '@media print': { top: '2pt', pl: '3pt', fontSize: '8pt', display: mo.showLabelPrint ? 'block' : 'none' },
                 }}
               >
                 {mo.label}
@@ -300,6 +352,29 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
                   color: 'text.secondary',
                   whiteSpace: 'nowrap',
                   fontVariantNumeric: 'tabular-nums',
+                  '@media print': { display: 'none' },
+                }}
+              >
+                {dateMed(isoOf(day))}
+              </Typography>
+            ))}
+            {printTicks.map((day) => (
+              <Typography
+                key={`p-${day}`}
+                component="div"
+                sx={{
+                  display: 'none',
+                  '@media print': {
+                    display: 'block',
+                    position: 'absolute',
+                    bottom: '3pt',
+                    left: `${pct(day)}%`,
+                    transform: edgeAwareShift(pct(day)),
+                    fontSize: '7pt',
+                    color: 'text.secondary',
+                    whiteSpace: 'nowrap',
+                    fontVariantNumeric: 'tabular-nums',
+                  },
                 }}
               >
                 {dateMed(isoOf(day))}
@@ -323,7 +398,17 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
           const primaryName = phaseDisplayName(p.name);
           const details = [formatPhaseBudget(p), barSuffix?.(p)].filter(Boolean).join(' · ');
           const isLast = index === phases.length - 1;
-          const metaSx = { fontSize: 11, lineHeight: 1.6, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontVariantNumeric: 'tabular-nums' };
+          /* 인쇄에서는 폭이 좁아 예산 줄을 말줄임 대신 접는다 — 종이에서는 "…"가 정보를 영영 지운다 */
+          const metaSx = {
+            fontSize: 11,
+            lineHeight: 1.6,
+            color: 'text.secondary',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            fontVariantNumeric: 'tabular-nums',
+            '@media print': { fontSize: '7pt', lineHeight: 1.35, whiteSpace: 'normal', overflow: 'visible' },
+          };
           const dateLabelSx = {
             position: 'absolute',
             top: `calc(50% + ${DOT_SIZE / 2 + 3}px)`,
@@ -332,6 +417,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
             color: 'text.secondary',
             whiteSpace: 'nowrap',
             fontVariantNumeric: 'tabular-nums',
+            '@media print': { fontSize: '7pt' },
           };
           return (
             <Box
@@ -354,8 +440,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
                  phase)는 과녁이 몇 px밖에 안 된다. 왼쪽 두 열이 평문이라
                  스크린리더는 이름·기간을 그대로 읽는다(막대 쪽은 aria-hidden). */
               sx={(theme) => ({
-                display: 'grid',
-                gridTemplateColumns: GRID_TEMPLATE,
+                ...GRID_SX,
                 borderBottom: isLast ? 0 : '1px solid',
                 borderColor: 'divider',
                 cursor: onPhaseClick ? 'pointer' : 'default',
@@ -381,13 +466,13 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               {/* 이름 — 첫 줄은 세미볼드 표시 이름, 둘째 줄은 기간·일수. 모든 행이
                   같은 두 줄이라 훑을 때 리듬이 안 깨진다. 원본 전체 이름은 이 칸의
                   title(hover)로 남는다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '4pt' } }}>
                 {/* 긴 이름은 말줄임 — 열 폭은 고정이라 타임라인을 잠식하지 않는다.
                     전체 원본 이름은 hover 툴팁(CampaignTable 행과 같은 문법). */}
                 <Tooltip title={p.name} enterDelay={400} placement="top-start">
                   <Typography
                     component="div"
-                    sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                    sx={{ fontSize: 13, fontWeight: 600, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { fontSize: '8.5pt', lineHeight: 1.3 } }}
                   >
                     {primaryName}
                   </Typography>
@@ -400,8 +485,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               {/* 플랫폼 · 계획 예산 · (Performance 탭) 실지출 — 막대 안에 있던
                   숫자가 전부 여기로 왔다. 막대 폭과 무관하게 항상 온전히 읽히고,
                   "planned"/"spent"가 계획과 실적을 가른다. */}
-              <Box sx={{ px: 2, py: 1.5, minWidth: 0 }}>
-                <Typography component="div" sx={{ fontSize: 13, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <Box sx={{ px: 2, py: 1.5, minWidth: 0, '@media print': { px: '4pt', py: '4pt' } }}>
+                <Typography component="div" sx={{ fontSize: 13, lineHeight: 1.5, color: 'text.primary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { fontSize: '7.5pt', lineHeight: 1.3 } }}>
                   {p.platformLabel || '—'}
                 </Typography>
                 <Typography component="div" title={details || undefined} sx={metaSx}>
@@ -410,8 +495,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
               </Box>
 
               {/* 막대 — 얇은 트랙 + 양 끝 원. 라벨은 막대 밖(아래). */}
-              <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider' }}>
-                <TimelineGrid ticks={ticks} monthStarts={monthStarts} pct={pct} />
+              <Box aria-hidden sx={{ position: 'relative', minHeight: 64, borderLeft: '1px solid', borderColor: 'divider', '@media print': { minHeight: '32pt' } }}>
+                <TimelineGrid ticks={ticks} printTicks={printTicks} monthStarts={monthStarts} pct={pct} />
                 <Box
                   className={BAR_CLASS}
                   sx={{
@@ -423,6 +508,16 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
                     transform: `translateY(-${BAR_HEIGHT * 1.5}px)`,
                     borderRadius: `${BAR_HEIGHT / 2}px`,
                     backgroundColor: barColor,
+                    /* 종이에서는 강조 파랑이 회색으로 뭉개져 뜻을 잃으므로 막대는 전부 중립 회색이다.
+                       그리고 **면이 아니라 선으로** 그린다 — 브라우저 인쇄의 "배경 그래픽"은 기본이 꺼짐이라
+                       배경색 막대는 통째로 사라진다(막대가 이 차트의 데이터다). 테두리는 항상 인쇄된다. */
+                    '@media print': {
+                      backgroundColor: 'transparent',
+                      height: 0,
+                      borderTop: `${BAR_HEIGHT - 2}px solid`,
+                      borderColor: 'chart.bar',
+                      borderRadius: 0,
+                    },
                   }}
                 />
                 {[startPct, endPct].map((x, i) => (
@@ -441,6 +536,8 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
                       border: '2px solid',
                       borderColor: barColor,
                       boxSizing: 'border-box',
+                      // 끝점도 선으로만 — 흰 채움은 배경 그래픽이 꺼지면 안 그려지지만 테두리 원은 남는다
+                      '@media print': { width: DOT_SIZE - 2, height: DOT_SIZE - 2, border: '1.5px solid', borderColor: 'chart.bar', backgroundColor: 'transparent' },
                     }}
                   />
                 ))}

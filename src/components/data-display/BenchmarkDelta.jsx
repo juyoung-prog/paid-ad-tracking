@@ -15,8 +15,8 @@ const BAND_STYLE = {
    13px/600이다 — 표에서 12px/500이면 옆의 원본 지표(Reach·Plays)와 무게가 같아져
    "무엇이 판단 근거인가"가 안 보였다(경영진용 보고서 리뷰, 2026-09). */
 const SIZE = {
-  md: { value: 14, valueWeight: 600, caption: 11 },
-  sm: { value: 13, valueWeight: 600, caption: 10.5 },
+  md: { value: 14, valueWeight: 600, caption: 11, printValue: '8.5pt', printCaption: '7pt' },
+  sm: { value: 13, valueWeight: 600, caption: 10.5, printValue: '7.5pt', printCaption: '6.5pt' },
 };
 /* 값의 무게는 지표의 역할이 정한다(2026-09-07): 목표의 대표 KPI가 가장 강하고, 진단 지표(Hook·Hold·CTR·참여율)는
    세미볼드, 나머지 비용 지표(대표가 아닌 CPM·CPC·CPE)는 보조라 보통 굵기. 순위 글자는 그대로 */
@@ -79,7 +79,7 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
     <Tooltip title={tooltip} placement="top" enterDelay={400}>
       <Box sx={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', minWidth: 0, ...sx }}>
         {hasValue && (
-          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: valueStyle.weight, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: valueStyle.color }}>
+          <Typography component="span" sx={{ fontSize: sizes.value, fontWeight: valueStyle.weight, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: valueStyle.color, '@media print': { fontSize: sizes.printValue } }}>
             {value}
           </Typography>
         )}
@@ -91,6 +91,8 @@ export function BenchmarkDelta({ stat, format, label = '', peerLabel = '', lang 
             display: 'inline-flex',
             alignItems: 'center',
             fontSize: sizes.caption,
+            // 인쇄에서도 같은 문장, 크기만 종이 단위로(같은 컴포넌트가 두 매체를 그린다)
+            '@media print': { fontSize: sizes.printCaption },
             lineHeight: 1.3,
             // 비교 글자는 값보다 한 단 아래 — 굵게 하지 않는다(값이 먼저 읽혀야 한다)
             fontWeight: isKnown ? 500 : 400,

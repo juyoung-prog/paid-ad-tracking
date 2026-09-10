@@ -43,7 +43,8 @@ export function KpiBar({ items, sx }) {
     // gap:4(32px)·alignItems:'flex-start'는 실제 Influencer Tracking
     // Dashboard(live, /beautymaster)를 Playwright로 열어 getComputedStyle로
     // 잰 값이다 — 일반 항목 사이 간격이 정확히 32px, 정렬은 flex-start였다.
-    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 4, overflowX: 'auto', ...sx }}>
+    /* 인쇄 — 같은 바를 종이 폭에 맞게 조인다(항목·순서·값은 그대로, 치수만 pt로) */
+    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 4, overflowX: 'auto', '@media print': { gap: '14pt', overflow: 'visible' }, ...sx }}>
       {items.map((item, index) => (
         <Fragment key={item.label}>
           {/* 구분선은 **모든 항목 사이**에 자동으로 긋는다 — 레퍼런스가 네 KPI
@@ -52,7 +53,7 @@ export function KpiBar({ items, sx }) {
               레퍼런스에 있는 선이 우리 화면에만 없었다. 높이는 라벨+숫자
               블록을 덮는 40px. */}
           {index > 0 && (
-            <Box sx={{ width: '1px', height: 40, alignSelf: 'center', backgroundColor: 'divider' }} />
+            <Box sx={{ width: '1px', height: 40, alignSelf: 'center', backgroundColor: 'divider', '@media print': { height: '22pt' } }} />
           )}
           <Box
             onClick={item.onClick}
@@ -108,6 +109,7 @@ export function KpiBar({ items, sx }) {
                 fontWeight: 400,
                 whiteSpace: 'nowrap',
                 color: item.isAlert ? 'error.main' : 'text.secondary',
+                '@media print': { fontSize: '7pt' },
               }}
             >
               {item.label}
@@ -127,6 +129,7 @@ export function KpiBar({ items, sx }) {
                 sx={{
                   whiteSpace: 'nowrap',
                   color: item.isAlert ? 'error.main' : 'text.primary',
+                  '@media print': { fontSize: '12pt' },
                 }}
               >
                 {item.value}
@@ -135,7 +138,7 @@ export function KpiBar({ items, sx }) {
                 <Typography
                   variant="caption"
                   component="span"
-                  sx={{ whiteSpace: 'nowrap', color: 'text.secondary' }}
+                  sx={{ whiteSpace: 'nowrap', color: 'text.secondary', '@media print': { fontSize: '7pt' } }}
                 >
                   {item.sub}
                 </Typography>

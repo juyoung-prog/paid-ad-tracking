@@ -3,9 +3,11 @@ import { GOAL_HEADLINE_METRICS, phaseNameOf } from '../../data/schema';
 import { money, count, countCompact, percent, seconds } from '../../utils/format';
 
 /**
- * Recap 캠페인 한 줄의 **표기 규칙** — 화면 표(RecapCampaignTable)와 인쇄본
- * (RecapPrintSheet)이 같은 규칙을 본다. 두 곳이 각자 규칙을 갖고 있으면 목표별
- * 지표 구성이나 해석 문장이 조용히 갈라진다(웹에서 본 문장과 PDF의 문장이 달라진다).
+ * Recap 캠페인 한 줄의 **표기 규칙** — 목표별 지표 구성, 해석 문장, 부르는 이름이 한 곳에 있다.
+ * 보고서 화면(RecapCampaignTable)과 타임라인(PhaseTimelineChart)이 이것을 쓰고, **인쇄도 같은
+ * 컴포넌트가 그대로 인쇄되므로** 규칙은 한 벌뿐이다. 한때 인쇄 전용 보고서 컴포넌트를 따로 뒀는데
+ * (2026-09-10) 같은 보고서가 두 벌이 되어 시간이 지나면 갈라질 구조라 지웠다 — 인쇄는 매체이지
+ * 다른 제품이 아니다.
  *
  * 계산은 여기서도 하지 않는다 — 순위·벤치마크·해석 재료는 schema.js buildRecapRows()가
  * 이미 끝냈고, 이 모듈은 그 값을 "어느 자리에 어떤 문구로 놓을지"만 정한다.

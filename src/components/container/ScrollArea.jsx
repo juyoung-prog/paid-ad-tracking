@@ -133,6 +133,8 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, scroll
     background: gradient[side],
     opacity: edges[side] ? 1 : 0,
     pointerEvents: 'none',
+    // 종이에는 스크롤이 없다 — 더 볼 게 있다는 신호도 없어야 한다
+    '@media print': { display: 'none' },
     transition: theme.transitions.create('opacity', {
       duration: theme.transitions.duration.shortest,
     }),
@@ -149,6 +151,8 @@ export function ScrollArea({ children, label, startOffset = 0, maxHeight, scroll
         tabIndex={label ? 0 : undefined}
         sx={(theme) => ({
           overflowX: 'auto',
+          /* 인쇄에서는 스크롤 상자가 아니라 그냥 흐르는 내용이다 — 잘라내면 안 보이는 열이 생긴다 */
+          '@media print': { overflow: 'visible', maxHeight: 'none' },
           maxHeight,
           overflowY: maxHeight ? 'auto' : undefined,
           /* scrollHint='scrollbar' — 아래 페이드 대신 **항상 보이는 얇은 스크롤바**로

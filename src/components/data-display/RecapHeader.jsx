@@ -73,25 +73,26 @@ export function RecapHeader({
       <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 2 }}>
         <Box sx={{ minWidth: 0 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-            <Typography variant="display" component="h1" sx={{ minWidth: 0 }}>
+            <Typography variant="display" component="h1" sx={{ minWidth: 0, '@media print': { fontSize: '15pt' } }}>
               {eventName}
             </Typography>
             <RecapStatusBadge status={status} lang={lang} />
           </Box>
-          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, '@media print': { fontSize: '7.5pt' } }}>
             {metaLine}
           </Typography>
         </Box>
         {actions && <Box sx={{ flexShrink: 0 }}>{actions}</Box>}
       </Box>
 
-      <KpiBar items={kpis} sx={{ mt: 2.5 }} />
+      {/* 인쇄에서도 같은 KpiBar다 — 종이라고 다른 요약을 만들지 않는다. 간격만 조인다 */}
+      <KpiBar items={kpis} sx={{ mt: 2.5, '@media print': { mt: '6pt' } }} />
 
       {headlineText && (
-        <Typography component="p" sx={{ mt: 2, fontSize: 14, fontWeight: 600, color: 'text.primary' }}>
+        <Typography component="p" sx={{ mt: 2, fontSize: 14, fontWeight: 600, color: 'text.primary', '@media print': { mt: '5pt', fontSize: '8.5pt' } }}>
           {headlineText}
           {headline.peerEvents?.length > 0 && (
-            <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', ml: 1 }}>
+            <Box component="span" sx={{ fontWeight: 400, color: 'text.secondary', ml: 1, '@media print': { fontSize: '7.5pt' } }}>
               {headline.peerEvents.join(' · ')}
             </Box>
           )}

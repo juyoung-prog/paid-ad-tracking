@@ -78,7 +78,6 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.table.actionResponse': { en: 'Action response', ko: '행동 반응', 'zh-Hant': '行動反應' },
   'recap.table.budgetSpend': { en: 'Budget / Spend', ko: '예산 / 지출', 'zh-Hant': '預算 / 花費' },
   'recap.table.spent': { en: '{amount} spent', ko: '{amount} 지출', 'zh-Hant': '已花費 {amount}' },
-  'recap.table.planned': { en: '{amount} planned', ko: '{amount} 계획', 'zh-Hant': '預算 {amount}' },
   'recap.table.perDay': { en: '{amount}/day', ko: '{amount}/일', 'zh-Hant': '{amount}/天' },
   'recap.table.videoResponse': { en: 'Video response', ko: '영상 반응', 'zh-Hant': '影片反應' },
   'recap.table.engagementAction': { en: 'Engagement / Action', ko: '참여 / 행동', 'zh-Hant': '互動 / 行動' },
@@ -94,8 +93,6 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.table.over': { en: 'Over {pct}%', ko: '{pct}% 초과', 'zh-Hant': '超出 {pct}%' },
   'recap.table.under': { en: 'Under {pct}%', ko: '{pct}% 미달', 'zh-Hant': '不足 {pct}%' },
   'recap.table.noData': { en: 'No performance data', ko: '성과 데이터 없음', 'zh-Hant': '無成效資料' },
-  /* 인쇄(세로 PDF) 전용 — 머리글 한 줄의 캠페인 수 */
-  'recap.print.campaignCount': { en: '{n} campaigns', ko: '캠페인 {n}개', 'zh-Hant': '{n} 支廣告' },
   'recap.table.empty': { en: 'No campaigns on this platform.', ko: '이 플랫폼에는 캠페인이 없습니다.', 'zh-Hant': '此平台沒有廣告。' },
 
   // 지표 이름

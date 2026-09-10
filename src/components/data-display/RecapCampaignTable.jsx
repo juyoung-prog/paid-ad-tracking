@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import Box from '@mui/material/Box';
 import Table from '@mui/material/Table';
 import TableBody from '@mui/material/TableBody';
@@ -15,7 +16,7 @@ import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
 import { RECAP_PACING_FLAG } from '../../data/schema';
 import { money, dateRangeWithDays, EMPTY } from '../../utils/format';
-/* 목표별 지표 구성·해석 문장·표기 규칙은 인쇄본(RecapPrintSheet)과 한 곳에서 나눠 쓴다 — 두 벌이면 조용히 갈라진다 */
+/* 목표별 지표 구성·해석 문장·표기 규칙은 공용 모듈에 있다 — 이 표가 화면과 인쇄를 모두 그리므로 규칙도 한 벌이다 */
 import {
   INSIGHT_COLUMNS,
   emphasisOf,
@@ -58,8 +59,26 @@ const COLUMN_WIDTH = {
   improve: 240,
 };
 
-/** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
-const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
+/**
+ * 인쇄 글자 크기 — 화면의 px 위계를 그대로 pt로 한 단계씩 내린 값(13 → 8pt · 12 → 7.5pt · 11 → 6.5pt).
+ * 인쇄는 같은 표를 좁은 종이에 옮긴 것이라 **위계는 그대로 두고 치수만** 줄인다.
+ */
+const printFont = (size) => ({ '@media print': { fontSize: size } });
+/** 인쇄에서만 사라지는 것 — 썸네일·편집 버튼처럼 종이에서 할 일이 없는 것 */
+const PRINT_HIDE = { '@media print': { display: 'none' } };
+
+/** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음. 인쇄에서는 줄 자르기를 풀어 전문을 찍는다 */
+const INSIGHT_TEXT_SX = {
+  display: '-webkit-box',
+  WebkitLineClamp: 4,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  fontSize: 12,
+  lineHeight: 1.45,
+  whiteSpace: 'normal',
+  overflowWrap: 'anywhere',
+  '@media print': { display: 'block', WebkitLineClamp: 'unset', overflow: 'visible', fontSize: '7.5pt', lineHeight: 1.35 },
+};
 /**
  * 인라인 편집 칸 — 표가 폼처럼 보이지 않게 본문과 같은 12px, 얕은 패딩, 옅은 테두리. 두 줄부터 시작해 여섯 줄까지.
  * 칸의 **값은 사람이 쓴 글만**이고 자동 문장은 값도 placeholder도 아니다(2026-09-10) — 자동 문장을 placeholder로
@@ -84,9 +103,18 @@ const insightInputSx = (theme) => ({
 /** 수치 열과 해석 열 사이 — 옅은 세로 구분선 하나(머리글·본문 같은 자리) */
 const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider' };
 
-const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom' };
-const CELL_SX = { verticalAlign: 'top', py: 1 };
-const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap' };
+const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom', '@media print': { fontSize: '6.5pt', px: '4pt', py: '2pt' } };
+const CELL_SX = { verticalAlign: 'top', py: 1, '@media print': { px: '4pt', py: '3pt' } };
+const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap', '@media print': { fontSize: '6.5pt', lineHeight: 1.3 } };
+
+/**
+ * 인쇄 열 폭(합 726px = Letter 세로의 내용 폭). 같은 표를 좁은 종이에 옮기는 것이라 **열 순서와 뜻은 그대로**이고
+ * 폭만 다시 잡는다. 해석 두 열은 이 폭에서 문장이 설 자리가 없어(96px → 한 줄에 14자) 같은 캠페인의 **둘째 줄**로
+ * 접힌다(PRINT_INSIGHT_SPAN) — 열을 지우는 게 아니라 줄바꿈이다.
+ */
+const PRINT_COLUMN_WIDTH = [16, 148, 62, 82, 82, 168, 168, 0, 0];
+/** 접힌 해석 줄의 칸 나눔 — 캠페인~KPI(4칸) / 영상·참여(2칸)로 갈라 좌우가 반반이 된다 */
+const PRINT_INSIGHT_SPAN = [4, 2];
 /**
  * 대표 지표 한 자리 — "Hook 23.11%" 한 줄(라벨 옅게 + 값 600) 아래 과거 비교 한 줄("↗ best of 12", 없으면 생략).
  * 순위는 맥락이지 등급이 아니다. 값이 없으면 "—".
@@ -100,7 +128,7 @@ function KpiSlot({ row, metricKey, format, lang, onBenchmarkClick }) {
     <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
       <Typography component="span" sx={{ display: 'block', whiteSpace: 'normal', lineHeight: 1.35 }}>
         <Box component="span" sx={{ ...META_SX, whiteSpace: 'normal' }}>{metricLabel(metricKey, lang)}</Box>{' '}
-        <Box component="span" sx={{ fontSize: 13, fontWeight: emphasisOf(row, metricKey) === 'primary' ? 700 : 600, fontVariantNumeric: 'tabular-nums', color: value == null ? 'text.disabled' : 'text.primary' }}>
+        <Box component="span" sx={{ fontSize: 13, fontWeight: emphasisOf(row, metricKey) === 'primary' ? 700 : 600, fontVariantNumeric: 'tabular-nums', color: value == null ? 'text.disabled' : 'text.primary', ...printFont('7.5pt') }}>
           {value == null ? EMPTY : format(value)}
         </Box>
       </Typography>
@@ -170,10 +198,23 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
 
   const columnWidths = Object.values(COLUMN_WIDTH);
   const tableWidth = columnWidths.reduce((a, b) => a + b, 0);
+  /* 인쇄용 열 폭은 colgroup을 CSS로 덮어써서 준다 — 같은 표(같은 DOM)가 매체만 바꿔 입는 것이라
+     인쇄용 표를 따로 만들지 않는다. 폭이 종이에 맞으므로 최소 폭(가로 스크롤) 규칙도 함께 푼다. */
+  /* col의 폭은 인라인 style이라 CSS가 이기려면 !important가 필요하다 — 화면 폭은 인라인이 그대로 쓰고,
+     인쇄에서만 종이 폭으로 덮는다(같은 colgroup, 같은 표) */
+  const printColSx = Object.fromEntries(PRINT_COLUMN_WIDTH.map((w, i) => [`& col:nth-of-type(${i + 1})`, { width: `${w}px !important` }]));
 
   return (
     <ScrollArea label={label} startOffset={COLUMN_WIDTH.rank + COLUMN_WIDTH.campaign} edgeStrength="subtle" sx={sx}>
-      <Table size="small" sx={{ tableLayout: 'fixed', width: '100%', minWidth: tableWidth }}>
+      <Table
+        size="small"
+        sx={{
+          tableLayout: 'fixed',
+          width: '100%',
+          minWidth: tableWidth,
+          '@media print': { minWidth: 0, ...printColSx },
+        }}
+      >
         <colgroup>
           {columnWidths.map((w, i) => <col key={i} style={{ width: w }} />)}
         </colgroup>
@@ -207,7 +248,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             {/* 해석 두 열 — 첫 열 왼쪽에 옅은 구분선. 근거 수준은 머리글 툴팁 한 줄로만 */}
             {INSIGHT_COLUMNS.map((col, i) => (
               <Tooltip key={col.key} title={isEditing ? `${t('insight.autoHint', lang)} ${t('recap.edit.insightHint', lang)}` : t('insight.autoHint', lang)} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
-                <TableCell sx={{ ...HEAD_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), cursor: 'help' }}>{t(`insight.field.${col.field}`, lang)}</TableCell>
+                <TableCell sx={{ ...HEAD_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), cursor: 'help', ...PRINT_HIDE }}>{t(`insight.field.${col.field}`, lang)}</TableCell>
               </Tooltip>
             ))}
           </TableRow>
@@ -229,9 +270,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             // 편집 중에는 줄 클릭(드로어)을 끈다 — 편집 칸을 누를 때마다 드로어가 열리면 글을 쓸 수 없다
             const handleRowClick = isEditing ? undefined : onRowClick;
             const { stores, storeText } = storeTextOf(row);
+            /* 해석 칸 하나 — 화면은 열, 인쇄는 접힌 둘째 줄. 값(cell.text)은 한 번만 계산해 둘이 같은 것을 쓴다 */
+            const insightBody = (cell) => (cell.text ? (
+              <Typography component="span" sx={{ ...INSIGHT_TEXT_SX, color: 'text.primary' }}>{cell.text}</Typography>
+            ) : (
+              <Typography component="span" sx={{ fontSize: 12, color: 'text.disabled', lineHeight: 1.45, ...printFont('7.5pt') }}>{EMPTY}</Typography>
+            ));
             return (
+              <Fragment key={row.campaignId}>
               <TableRow
-                key={row.campaignId}
                 id={`recap-row-${row.campaignId}`}
                 hover={Boolean(handleRowClick)}
                 tabIndex={handleRowClick ? 0 : undefined}
@@ -249,6 +296,15 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 aria-selected={isSelected || undefined}
                 sx={(theme) => ({
                   cursor: handleRowClick ? 'pointer' : 'default',
+                  /* 한 캠페인은 두 줄(지표 줄 + 접힌 해석 줄)이다 — 페이지 경계에서 갈라지지 않게 붙여 두고,
+                     둘 사이 경계선을 지워 한 덩어리로 읽히게 한다(경계선은 해석 줄 아래에만 남는다) */
+                  '@media print': {
+                    breakInside: 'avoid',
+                    pageBreakInside: 'avoid',
+                    breakAfter: 'avoid',
+                    pageBreakAfter: 'avoid',
+                    '& > td': { borderBottom: 0 },
+                  },
                   // 줄 hover는 MUI action.hover(중립) — 140ms로 부드럽게. 지표·순위 색은 그대로
                   transition: theme.transitions.create('background-color', { duration: 140 }),
                   /* 타임라인에서 찾아온 줄 — 옅은 accent 면 + 첫 칸 왼쪽 2px accent 선(inset shadow라 폭·경계선이 안 바뀐다).
@@ -275,7 +331,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     <Box sx={{ minWidth: 0 }}>
                       {/* 이름은 한 줄 + CSS 말줄임 — 긴 이름의 이모지·점이 혼자 다음 줄로 내려가면 깨져 보였다(i-26). 전체 이름은 hover 툴팁 */}
                       <Tooltip title={row.name !== row.phaseName || row.phaseName.length > 20 ? row.name : ''} placement="top" enterDelay={500}>
-                        <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', ...printFont('8pt') }}>
                           {row.phaseName}
                         </Typography>
                       </Tooltip>
@@ -285,13 +341,13 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     </Box>
                     {/* 행별 부가 입력(이유·오가닉) 버튼 — 편집 모드에서만, 이름 줄 오른쪽 끝에. 열도 줄 높이도 늘리지 않는다 */}
                     {renderRowExtra && (
-                      <Box sx={{ ml: 'auto', flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>{renderRowExtra(row)}</Box>
+                      <Box sx={{ ml: 'auto', flexShrink: 0, ...PRINT_HIDE }} onClick={(e) => e.stopPropagation()}>{renderRowExtra(row)}</Box>
                     )}
                   </Box>
                 </TableCell>
                 <TableCell sx={CELL_SX}>
                   {/* Goal — 캠페인 데이터의 목표 그대로. 등급도 해석도 없다 */}
-                  <Typography component="span" sx={{ display: 'block', fontSize: 12, lineHeight: 1.4, color: goalText(row.goal, lang) ? 'text.primary' : 'text.disabled' }}>
+                  <Typography component="span" sx={{ display: 'block', fontSize: 12, lineHeight: 1.4, color: goalText(row.goal, lang) ? 'text.primary' : 'text.disabled', ...printFont('7pt') }}>
                     {goalText(row.goal, lang) ?? EMPTY}
                   </Typography>
                 </TableCell>
@@ -300,7 +356,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <Typography component="span" sx={{ ...META_SX, display: 'block', fontVariantNumeric: 'tabular-nums' }}>
                     {row.dailyBudget != null ? t('recap.table.perDay', lang, { amount: money(row.dailyBudget) }) : EMPTY}
                   </Typography>
-                  <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal', color: row.spend == null ? 'text.disabled' : 'text.primary' }}>
+                  <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 600, lineHeight: 1.4, fontVariantNumeric: 'tabular-nums', whiteSpace: 'normal', color: row.spend == null ? 'text.disabled' : 'text.primary', ...printFont('7.5pt') }}>
                     {row.spend != null ? t('recap.table.spent', lang, { amount: money(row.spend) }) : EMPTY}
                   </Typography>
                   {row.pacingRatio != null && (row.pacingRatio >= RECAP_PACING_FLAG.over || row.pacingRatio <= RECAP_PACING_FLAG.under) && (
@@ -318,7 +374,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       <Tooltip title={kpiHint} placement="top" enterDelay={400}>
                         <Box sx={{ cursor: 'help' }}>
                           <Typography component="span" sx={{ ...META_SX, lineHeight: 1.3, display: 'block' }}>{metricLabel(kpi.metricKey, lang)}</Typography>
-                          <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary' }}>{kpiFormat(kpi.metricKey)(kpi.value)}</Typography>
+                          <Typography component="span" sx={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.3, fontVariantNumeric: 'tabular-nums', color: 'text.primary', ...printFont('8pt') }}>{kpiFormat(kpi.metricKey)(kpi.value)}</Typography>
                         </Box>
                       </Tooltip>
                       {hasComparison ? (
@@ -335,12 +391,12 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         />
                       ) : (
                         <Tooltip title={t('recap.table.noComparison', lang)} placement="top" enterDelay={300}>
-                          <Typography component="span" sx={{ display: 'inline-block', fontSize: 10.5, color: 'text.disabled', lineHeight: 1.35, cursor: 'help' }}>{EMPTY}</Typography>
+                          <Typography component="span" sx={{ display: 'inline-block', fontSize: 10.5, color: 'text.disabled', lineHeight: 1.35, cursor: 'help', ...printFont('6.5pt') }}>{EMPTY}</Typography>
                         </Tooltip>
                       )}
                     </Box>
                   ) : (
-                    <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3 }}>{EMPTY}</Typography>
+                    <Typography component="span" sx={{ display: 'block', fontSize: 13, color: 'text.disabled', lineHeight: 1.3, ...printFont('7.5pt') }}>{EMPTY}</Typography>
                   )}
                 </TableCell>
                 {!hasData ? (
@@ -372,7 +428,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 )}
                 {/* 해석 두 칸 — 상자 없이 문장만. 네 줄 넘으면 잘리고 전문은 hover. 비어 있으면 "—" */}
                 {insightCells.map((cell, i) => (
-                  <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}) }}>
+                  <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), ...PRINT_HIDE }}>
                     {isEditing ? (
                       /* 자동 문장은 칸이 비어 있을 때만, 그것도 툴팁으로 — 값으로도 placeholder로도 넣지 않는다.
                          사람이 쓴 글이 있으면 툴팁도 끈다(그 순간 자동 문장은 쓰이지 않으므로) */
@@ -404,14 +460,25 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                       </Tooltip>
                     ) : cell.text ? (
                       <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}>
-                        <Typography component="span" sx={{ ...INSIGHT_TEXT_SX, color: 'text.primary', cursor: 'help' }}>{cell.text}</Typography>
+                        <Box component="span" sx={{ cursor: 'help' }}>{insightBody(cell)}</Box>
                       </Tooltip>
-                    ) : (
-                      <Typography component="span" sx={{ fontSize: 12, color: 'text.disabled', lineHeight: 1.45 }}>{EMPTY}</Typography>
-                    )}
+                    ) : insightBody(cell)}
                   </TableCell>
                 ))}
               </TableRow>
+
+              {/* 접힌 해석 줄 — 인쇄에서만. 같은 표의 같은 캠페인이 이어지는 둘째 줄이고, 값은 위 줄과 같은
+                  insightCells에서 온다(문장을 다시 만들지 않는다). 편집 중에도 여기는 읽기 문장을 찍는다 */}
+              <TableRow sx={{ display: 'none', '@media print': { display: 'table-row', breakInside: 'avoid', pageBreakInside: 'avoid' } }}>
+                <TableCell sx={{ ...CELL_SX, borderTop: 0 }} />
+                {insightCells.map((cell, i) => (
+                  <TableCell key={cell.key} colSpan={PRINT_INSIGHT_SPAN[i]} sx={{ ...CELL_SX, ...(i === 1 ? INSIGHT_DIVIDER_SX : {}), pt: 0 }}>
+                    <Typography component="span" sx={{ ...META_SX, display: 'block', fontWeight: 600 }}>{t(`insight.field.${cell.field}`, lang)}</Typography>
+                    {insightBody(cell)}
+                  </TableCell>
+                ))}
+              </TableRow>
+              </Fragment>
             );
           })}
         </TableBody>
