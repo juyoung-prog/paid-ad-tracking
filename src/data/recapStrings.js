@@ -132,7 +132,6 @@ export const RECAP_STRINGS = Object.freeze({
   // 캠페인 해석(Notes 자동 생성) — 근거 수준 표시 + 지표가 말하는 것(aspect)
   'insight.autoHint': { en: 'Generated from this campaign\'s metrics and comparable past campaigns. Nothing here is a claim about creative, targeting or messaging — the data does not contain that.', ko: '이 캠페인의 지표와 비교 가능한 과거 캠페인에서 만든 문장입니다. 소재·타겟·메시지에 대한 주장은 없습니다 — 데이터에 그 정보가 없습니다.', 'zh-Hant': '由此廣告的指標與可比過往廣告產生。此處不涉及素材、受眾或訊息的判斷——資料中沒有這些資訊。' },
   'recap.edit.insightHint': { en: 'Leave a field empty to keep the data-based note that the page shows; anything you write here replaces it.', ko: '칸을 비워 두면 화면에 데이터 기반 해석이 그대로 보입니다. 여기에 쓴 글이 그것을 대체합니다.', 'zh-Hant': '欄位留空時，頁面會顯示以資料為基礎的解讀；在此撰寫的內容會取代它。' },
-  'recap.edit.overridePlaceholder': { en: 'Override generated note…', ko: '자동 문장 대신 쓰기…', 'zh-Hant': '覆寫自動產生的說明…' },
   'recap.edit.addNotePlaceholder': { en: 'Add custom note…', ko: '직접 쓰기…', 'zh-Hant': '自行撰寫…' },
   'recap.edit.generatedNote': { en: 'Generated note', ko: '자동 생성된 문장', 'zh-Hant': '自動產生的說明' },
   'insight.field.strength': { en: 'What worked', ko: '잘된 것', 'zh-Hant': '做得好的' },

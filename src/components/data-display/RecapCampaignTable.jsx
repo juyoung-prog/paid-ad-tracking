@@ -57,8 +57,8 @@ const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxO
 /**
  * 인라인 편집 칸 — 표가 폼처럼 보이지 않게 본문과 같은 12px, 얕은 패딩, 옅은 테두리. 두 줄부터 시작해 여섯 줄까지.
  * 칸의 **값은 사람이 쓴 글만**이고 자동 문장은 값도 placeholder도 아니다(2026-09-10) — 자동 문장을 placeholder로
- * 깔았더니 이미 저장된 글처럼 읽혔다. placeholder는 "비면 자동 문장이 남는다"를 말하는 짧은 안내뿐이고,
- * 자동 문장 자체는 hover·focus 툴팁에서 본다.
+ * 깔았더니 이미 저장된 글처럼 읽혔다. placeholder는 "Add custom note…" 안내뿐이고(구현 용어처럼 읽히던
+ * "Override generated note…"에서 바꿨다, 2026-09-10), 자동 문장 자체는 hover·focus 툴팁에서 본다.
  * 상태: 기본 divider · hover 한 단 진하게 · focus는 accent 1px(굵은 파란 테두리를 쓰지 않는다).
  */
 const insightInputSx = (theme) => ({
@@ -454,7 +454,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                           value={cell.raw}
                           onChange={(e) => onNoteChange?.(row.campaignId, cell.noteField, e.target.value)}
                           onClick={(e) => e.stopPropagation()}
-                          placeholder={t(cell.auto ? 'recap.edit.overridePlaceholder' : 'recap.edit.addNotePlaceholder', lang)}
+                          placeholder={t('recap.edit.addNotePlaceholder', lang)}
                           aria-label={`${t(`insight.field.${cell.field}`, lang)} — ${row.phaseName}`}
                           multiline
                           minRows={2}
