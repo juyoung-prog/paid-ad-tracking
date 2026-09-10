@@ -15,7 +15,7 @@ export const RECAP_STRINGS = Object.freeze({
   // 페이지·머리글
   'recap.title': { en: 'Reports', ko: '보고서', 'zh-Hant': '報告' },
   'recap.list.subtitle': { en: 'Post-campaign reports by event. Numbers come from synced data; judgments and lessons are written here.', ko: '이벤트별 캠페인 결과 보고서입니다. 숫자는 동기화 데이터에서 자동으로 오고, 판단과 배운 점은 여기서 씁니다.', 'zh-Hant': '依活動整理的行銷成效報告。數字來自同步資料，判斷與心得在此撰寫。' },
-  'recap.list.empty': { en: 'No events yet. Tag campaigns with an Event on the Dashboard to see them here.', ko: '아직 이벤트가 없습니다. Dashboard에서 캠페인에 Event를 태그하면 여기에 나타납니다.', 'zh-Hant': '尚無活動。請在 Dashboard 為廣告加上 Event 標籤後即會顯示於此。' },
+  'recap.list.empty': { en: 'No events yet. Tag campaigns with an Event on the Campaigns page to see them here.', ko: '아직 이벤트가 없습니다. Campaigns에서 캠페인에 Event를 태그하면 여기에 나타납니다.', 'zh-Hant': '尚無活動。請在 Campaigns 為廣告加上 Event 標籤後即會顯示於此。' },
   'recap.list.year': { en: 'Year', ko: '연도', 'zh-Hant': '年度' },
   'recap.list.column.event': { en: 'Event', ko: '이벤트', 'zh-Hant': '活動' },
   'recap.list.column.period': { en: 'Period', ko: '기간', 'zh-Hant': '期間' },

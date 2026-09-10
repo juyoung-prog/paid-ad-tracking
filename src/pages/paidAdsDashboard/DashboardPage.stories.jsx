@@ -13,7 +13,8 @@ export default {
         component: `
 ## DashboardPage
 
-메인 현황 대시보드(\`/dashboard\`). 실제 앱에서는 usePaidAdsStore가 Supabase를
+레일에서는 **Campaigns**(2026-09-10, 예전 이름 Dashboard — 캠페인 색인이라는 역할을 이름이 말하게 했다.
+경로 \`/dashboard\`와 컴포넌트 이름은 그대로). 메인 현황 화면(\`/dashboard\`). 실제 앱에서는 usePaidAdsStore가 Supabase를
 읽지만, 스토리북에는 백엔드도 로그인 세션도 없으므로 PaidAdsStoreProvider로
 mock 스토어를 주입해 렌더한다. 알림은 저장된 값이 아니라 schema.js의
 generateAlerts()로 매번 다시 계산된다. 타이틀+네비는 PaidAdsShell(글로벌 셸)이

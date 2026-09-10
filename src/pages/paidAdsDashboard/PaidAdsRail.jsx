@@ -22,8 +22,11 @@ import logoUrl from '../../assets/beautymaster-logo.png';
  * Settings는 여기 넣지 않는다(아래 UTILITY_ITEMS 참고).
  */
 const NAV_ITEMS = [
-  { to: '/dashboard', label: 'Dashboard', icon: <SpaceDashboardOutlinedIcon /> },
-  /* 이름 체계(2026-09): Dashboard(지금 무슨 일이) → Performance(광고가 어떻게 되고 있나, /reports)
+  /* Campaigns(2026-09-10, 예전 이름 Dashboard) — 이 화면은 캠페인 색인이다: 상태·예산 페이싱·기간을 훑고
+     캠페인 상세로 들어간다. "Dashboard"는 앱 이름(Paid Ads Dashboard)과도 겹쳤다. 경로(/dashboard)는 그대로 —
+     이름 때문에 링크를 깨지 않는다. 아이콘도 그대로. */
+  { to: '/dashboard', label: 'Campaigns', icon: <SpaceDashboardOutlinedIcon /> },
+  /* 이름 체계(2026-09): Campaigns(지금 무슨 일이) → Performance(광고가 어떻게 되고 있나, /reports)
      → Reports(무슨 일이 있었고 무엇을 배웠나 — 이벤트 종료 후 보고서, /recap) → Stores.
      내부 경로는 그대로다 — /reports를 바꾸면 기존 링크가 다른 화면을 가리키게 된다. */
   { to: '/reports', label: 'Performance', icon: <QueryStatsOutlinedIcon /> },

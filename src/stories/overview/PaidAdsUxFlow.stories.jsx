@@ -231,7 +231,7 @@ const iaTree = `Paid Ads Dashboard
         └── Export — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄) · 언어 전환(en/ko/zh-Hant)`;
 
 const pageList = [
-  { page: 'Dashboard', path: '/dashboard', data: 'Campaign(R), PerformanceRecord(R, 집계), Store(R, 필터), AdAccount(R, 필터) — Alert는 저장 없이 재계산' },
+  { page: 'Campaigns (레일 이름 — 내부 /dashboard, 예전 Dashboard)', path: '/dashboard', data: 'Campaign(R), PerformanceRecord(R, 집계), Store(R, 필터), AdAccount(R, 필터) — Alert는 저장 없이 재계산' },
   { page: 'Campaign Register', path: '/dashboard?new=1', data: 'Campaign(W, insert), Store(R), AdAccount(R)' },
   { page: 'Campaign Detail Drawer', path: '/dashboard?campaign={id}', data: 'Campaign(R/W, update), PerformanceRecord(R/W, insert)' },
   { page: 'Stores', path: '/stores', data: 'Store(R/W, insert·update)' },

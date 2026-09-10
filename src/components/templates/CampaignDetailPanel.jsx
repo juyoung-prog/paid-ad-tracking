@@ -71,7 +71,7 @@ function Row({ label, value }) {
  * @param {string} billingHref - 이 캠페인이 속한 계정의 청구 내역(Meta: Billing & payments → Payment activity)으로 가는 링크. adsManagerHref와 같은 이유로 호출부(billingUrl)가 계산해 넘긴다 [Optional]
  * @param {Date} today - 페이싱 계산 기준일 [Optional, 기본값: new Date()]
  * @param {function} onClose - 닫기 핸들러 [Required]
- * @param {function} onEdit - "Edit on Dashboard" 핸들러 (campaignId) => void [Optional]
+ * @param {function} onEdit - "Edit in Campaigns" 핸들러(레일의 Campaigns 화면 = /dashboard, 2026-09-10에 Dashboard에서 개명) (campaignId) => void [Optional]
  * (Campaign insights 섹션은 2026-09-08 보고서 표의 네 열로 옮겨 갔다 — 드로어는 성과·페이싱·일별 지출만 맡는다가 없는 자리에서는 조용하다 [Optional]
  *
  * Example usage:
@@ -213,7 +213,7 @@ export function CampaignDetailPanel({
               onClick={() => onEdit(campaign.id)}
               sx={{ boxShadow: 'none' }}
             >
-              Edit on Dashboard
+              Edit in Campaigns
             </Button>
           )}
         </Box>

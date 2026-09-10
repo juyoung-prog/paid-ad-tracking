@@ -189,7 +189,7 @@ CPM $2.94\`), 컬럼별 중앙값은 ⓘ 툴팁이 갖는다. 대표 지표는 �
 확인하려고 페이지를 떠나면 맥락이 날아간다 — 필터는 URL에 있어 살아남지만
 **스크롤 위치와 페이지 번호는 안 살아난다**(Traffic 8페이지 중 7페이지에서 보고
 돌아오면 1페이지). 이제 CampaignDetailPanel이 그 자리에서 열리고, 고칠 게 있을
-때만 \`Edit on Dashboard\`로 간다.
+때만 \`Edit in Campaigns\`(레일의 Campaigns = /dashboard)로 간다.
 
 ### 전 컬럼을 보여준다 — 가로 스크롤은 결함이 아니다
 한동안 Reach·Plays·Comments·Shares·Follows·Visits를 표에서 빼고 상세 패널에만

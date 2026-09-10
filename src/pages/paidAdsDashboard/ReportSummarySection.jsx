@@ -731,7 +731,7 @@ function PlanList({ plans, campaigns, performanceRecords, eventOptions, onSave, 
                         수도 있다. 목록에 상시 표시해서 "실제 $0"이 "안 썼다"가
                         아니라 "안 붙었다"임을 구분한다. */}
                     {c.campaignCount === 0 && (
-                      <Tooltip title={`No campaigns are tagged with the Event "${plan.name}". Tag them on the Dashboard, or rename this plan to match.`}>
+                      <Tooltip title={`No campaigns are tagged with the Event "${plan.name}". Tag them on the Campaigns page, or rename this plan to match.`}>
                         <Box
                           component="span"
                           sx={{
