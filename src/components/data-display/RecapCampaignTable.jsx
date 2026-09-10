@@ -103,7 +103,7 @@ const insightInputSx = (theme) => ({
 const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider' };
 
 const HEAD_SX = { fontWeight: 600, whiteSpace: 'nowrap', verticalAlign: 'bottom', '@media print': { fontSize: '6.5pt', px: '3pt', py: '2pt', whiteSpace: 'normal', lineHeight: 1.25 } };
-const CELL_SX = { verticalAlign: 'top', py: 1, '@media print': { px: '3pt', py: '2pt' } };
+const CELL_SX = { verticalAlign: 'top', py: 1, '@media print': { px: '3pt', py: '2pt', fontSize: '7.5pt' } };
 const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteSpace: 'nowrap', '@media print': { fontSize: '6.5pt', lineHeight: 1.3 } };
 
 /**
@@ -113,7 +113,7 @@ const META_SX = { fontSize: 11, color: 'text.secondary', lineHeight: 1.4, whiteS
  * 표로 읽힌다). 폭은 우선순위대로 — 캠페인 이름 > 영상·참여(지표 두 자리 + 순위) > 해석 두 열 > 숫자 칸 > 목표 > 순위.
  * 해석 문장은 6.5pt에서 92px이면 한 줄에 약 21자라 두세 줄로 접힌다(자르지 않는다).
  */
-const PRINT_COLUMN_WIDTH = [14, 88, 58, 58, 60, 140, 140, 84, 84];
+const PRINT_COLUMN_WIDTH = [14, 92, 54, 58, 60, 140, 140, 84, 84];
 /**
  * 대표 지표 한 자리 — "Hook 23.11%" 한 줄(라벨 옅게 + 값 600) 아래 과거 비교 한 줄("↗ best of 12", 없으면 생략).
  * 순위는 맥락이지 등급이 아니다. 값이 없으면 "—".

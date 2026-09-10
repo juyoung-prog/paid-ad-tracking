@@ -317,7 +317,7 @@ export function PhaseTimelineChart({ phases, barSuffix, today, emphasizedKey, on
           {/* 실지출(barSuffix)이 붙는 Performance 탭에서만 "Spend"를 말한다 —
               Plan 탭은 이 열에 계획 예산뿐이라 헤더가 없는 값을 약속하면 안 된다. */}
           <Typography component="div" sx={headCellSx}>{barSuffix ? 'Platform / Budget / Spend' : 'Platform / Budget'}</Typography>
-          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider', '@media print': { height: '24pt' } }}>
+          <Box ref={axisRef} aria-hidden sx={{ position: 'relative', height: 56, borderLeft: '1px solid', borderColor: 'divider', '@media print': { height: '30pt' } }}>
             {months.map((mo) => (mo.showLabel || mo.showLabelPrint) && (
               <Typography
                 key={mo.key}
