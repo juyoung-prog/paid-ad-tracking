@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -35,6 +35,7 @@ import {
   buildRecapHeadline,
   buildPeerComparison,
   localizedText,
+  withLang,
   campaignNameKey,
   effectiveBudgetPlanned,
   planTotal,
@@ -221,15 +222,9 @@ export function RecapDetailPage() {
 
   const allRows = useMemo(() => Object.values(byPlatform).flat(), [byPlatform]);
 
-  /* Edit을 누르면 편집 칸이 화면 아래(타임라인·표 뒤)에 있어 사용자가 직접 찾아 내려가야 했다 —
-     "어디서 고치나"를 바로 답하도록 편집 모드가 그려진 뒤 Notes 카드로 부드럽게 스크롤한다(2026-09-10).
-     플래그는 **사람이 Edit을 누른 경우에만** 켠다(startEditing은 Edit 버튼과 로그인 후 이어가기에서만 불린다) —
-     첫 로드·새로고침·언어 변경·타이핑·저장·취소에서는 화면이 움직이지 않는다. */
-  const notesRef = useRef(null);
-  const shouldScrollToNotes = useRef(false);
-
+  /* Edit을 눌러도 화면은 그 자리에 있는다(2026-09-10) — What worked · Could improve를 표 안에서 바로 고치므로
+     다른 자리로 옮길 이유가 없다. 한때 Notes 카드로 스크롤했는데, 지표를 보면서 해석을 쓰지 못하는 게 문제였다. */
   const startEditing = () => {
-    shouldScrollToNotes.current = true;
     setDraft({
       recap: recap
         ? { ...recap, learnings: (recap.learnings ?? []).map((l) => ({ ...l })) }
@@ -238,17 +233,6 @@ export function RecapDetailPage() {
     });
     setIsEditing(true);
   };
-
-  /* setDraft와 setIsEditing이 같은 이벤트에서 배치되므로, isEditing이 true가 된 렌더에는 Notes 카드가 이미 DOM에 있다.
-     그래서 픽셀 위치를 계산하지 않고 그 요소로 스크롤한다 — 위 여백은 카드의 scrollMarginTop이 맡는다. */
-  useEffect(() => {
-    if (!isEditing || !shouldScrollToNotes.current) return;
-    shouldScrollToNotes.current = false;
-    const el = notesRef.current;
-    if (!el) return;
-    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
-    el.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
-  }, [isEditing]);
 
   const handleEditClick = () => {
     if (!session) { setIsSignInOpen(true); return; }
@@ -279,6 +263,13 @@ export function RecapDetailPage() {
   };
 
   const updateDraftRecap = (patch) => setDraft((d) => ({ ...d, recap: { ...d.recap, ...patch } }));
+  /** 표의 인라인 칸 → 현재 언어 칸만 바꾼 LocalizedText. Notes 폼과 같은 규칙(schema withLang)을 쓴다 */
+  const updateDraftNoteText = (campaignId, field, value) =>
+    setDraft((d) => ({
+      ...d,
+      notesById: { ...d.notesById, [campaignId]: { ...d.notesById[campaignId], [field]: withLang(d.notesById[campaignId]?.[field], lang, value) } },
+    }));
+
   const updateDraftNote = (campaignId, patch) =>
     setDraft((d) => ({ ...d, notesById: { ...d.notesById, [campaignId]: { ...d.notesById[campaignId], ...patch } } }));
 
@@ -494,15 +485,18 @@ export function RecapDetailPage() {
                다른 캠페인 줄을 누르면 타임라인 선택 표시는 풀린다(같은 줄이면 그대로) */
             onRowClick={(campaignId) => { setDetailCampaignId(campaignId); if (!phaseSelection?.ids.includes(campaignId)) setPhaseSelection(null); }}
             selectedIds={phaseSelection?.ids ?? []}
+            /* 해석 두 칸을 표 안에서 바로 고친다 — 지표를 보면서 쓰도록(2026-09-10). 상태는 draft.notesById 하나뿐이라
+               AI 초안·번역이 채우는 값과 같은 곳을 본다 */
+            isEditing={isEditing && Boolean(draft)}
+            onNoteChange={updateDraftNoteText}
+            isDisabled={isBusy}
           />
         </Box>
       ))}
 
       {/* 코멘트 편집은 편집 모드에서만 별도 카드 — 읽을 때는 표의 줄을 펼쳐서 본다 */}
       {isEditing && draft && (
-        /* scrollMarginTop — Edit 직후 스크롤에서 제목이 화면 맨 위에 딱 붙지 않게. 섹션 사이 간격(24px)과 같은 값이라
-           "의도한 자리"로 읽힌다. 이 페이지에는 sticky 툴바가 없어 그 높이는 더하지 않는다 */
-        <Box ref={notesRef} sx={{ ...SECTION_CARD_SX, scrollMarginTop: '24px' }} data-print="card" data-recap-notes>
+        <Box sx={SECTION_CARD_SX} data-print="card" data-recap-notes>
           <SectionHeader
             title={t('recap.section.notes', lang)}
             scope={countScope(editRows.length, 'campaign', lang)}
@@ -513,7 +507,6 @@ export function RecapDetailPage() {
                 key={r.campaignId}
                 note={draft.notesById[r.campaignId]}
                 campaignLabel={`${r.phaseName} · ${PLATFORM_LABEL[r.platform] ?? r.platform}`}
-                hint={t('recap.edit.insightHint', lang)}
                 onChange={(patch) => updateDraftNote(r.campaignId, patch)}
                 lang={lang}
                 isDisabled={isBusy}

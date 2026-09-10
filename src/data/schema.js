@@ -1871,6 +1871,18 @@ export function buildRecapHeadline(eventName, allCampaigns, allRecords, options 
  * @param {string} [lang=RECAP_DEFAULT_LANG]
  * @returns {{ value: string, isFallback: boolean }}
  */
+/**
+ * LocalizedText의 한 언어 칸만 바꾼 새 객체 — 없던 객체면 en 빈 칸부터 만든다.
+ * 표의 인라인 편집과 Notes 폼이 같은 규칙으로 쓰도록 여기(데이터 규칙)에 둔다(2026-09-10).
+ * @param {LocalizedText|null} text
+ * @param {string} lang
+ * @param {string} value
+ * @returns {LocalizedText}
+ */
+export function withLang(text, lang, value) {
+  return { en: '', ko: null, 'zh-Hant': null, ...(text ?? {}), [lang]: value };
+}
+
 export function localizedText(text, lang = RECAP_DEFAULT_LANG) {
   if (!text) return { value: '', isFallback: false };
   const requested = text[lang];

@@ -5,6 +5,7 @@ import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Tooltip from '@mui/material/Tooltip';
+import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -12,7 +13,7 @@ import { ScrollArea } from '../container/ScrollArea';
 import { CampaignThumbnail } from '../media/CampaignThumbnail';
 import { BenchmarkDelta } from './BenchmarkDelta';
 import { t, metricLabel } from '../../data/recapStrings';
-import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS, localizedText } from '../../data/schema';
+import { RECAP_PACING_FLAG, GOAL_HEADLINE_METRICS } from '../../data/schema';
 import { money, count, countCompact, percent, seconds, dateRangeWithDays, EMPTY } from '../../utils/format';
 
 /** 대표 KPI 값 표기 — 비용 지표는 돈, 나머지는 비율. 계산이 아니라 표기다 */
@@ -53,6 +54,15 @@ const INSIGHT_COLUMNS = [
 ];
 /** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음 */
 const INSIGHT_TEXT_SX = { display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden', fontSize: 12, lineHeight: 1.45, whiteSpace: 'normal', overflowWrap: 'anywhere' };
+/**
+ * 인라인 편집 칸 — 표가 폼처럼 보이지 않게 본문과 같은 12px, 얕은 패딩, 옅은 테두리. 두 줄부터 시작해 여섯 줄까지 늘어난다.
+ * 비워 두면 자동 문장이 그대로 남는다는 뜻이라, 자동 문장을 placeholder로 깔아 그 사실이 보이게 한다(2026-09-10).
+ */
+const INSIGHT_INPUT_SX = {
+  '& .MuiOutlinedInput-root': { p: 0.75, fontSize: 12, lineHeight: 1.45, alignItems: 'flex-start' },
+  '& .MuiOutlinedInput-input': { p: 0 },
+  '& .MuiOutlinedInput-input::placeholder': { opacity: 0.7, fontStyle: 'italic' },
+};
 /** 수치 열과 해석 열 사이 — 옅은 세로 구분선 하나(머리글·본문 같은 자리) */
 const INSIGHT_DIVIDER_SX = { borderLeft: '1px solid', borderLeftColor: 'divider' };
 
@@ -175,13 +185,16 @@ function insightSentence(field, item, lang) {
  * @param {function} onRowClick - 숫자 줄 클릭 (campaignId) => void. 있으면 줄 전체가 버튼이고 Tab/Enter로도 눌린다 [Optional]
  * @param {function} onBenchmarkClick - 순위 글자 클릭 (campaignId, metricKey) => void — 비교군 대화상자 [Optional]
  * @param {string[]} selectedIds - 타임라인에서 고른 단계에 속한 캠페인 id들 [Optional, 기본값: []]
+ * @param {boolean} isEditing - true면 What worked · Could improve 칸이 인라인 편집 칸이 된다(지표를 보면서 해석을 쓰도록) [Optional, 기본값: false]
+ * @param {function} onNoteChange - (campaignId, field, value) => void. field는 'strength' | 'weakness', value는 사람이 쓴 원문 [Optional]
+ * @param {boolean} isDisabled - 저장 중 등 입력 잠금 [Optional, 기본값: false]
  * @param {string} label - 스크롤 영역의 접근성 이름 [Optional, 기본값: 'Recap campaign table']
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <RecapCampaignTable rows={byPlatform.meta} onRowClick={(id) => setDetailCampaignId(id)} selectedIds={phaseSelection?.ids ?? []} />
  */
-export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', sx }) {
+export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkClick, selectedIds = [], label = 'Recap campaign table', isEditing = false, onNoteChange, isDisabled = false, sx }) {
   if (!rows || rows.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ px: 2, py: 1.5, ...sx }}>
@@ -228,7 +241,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             <TableCell sx={HEAD_SX}>{t('recap.table.engagementAction', lang)}</TableCell>
             {/* 해석 두 열 — 첫 열 왼쪽에 옅은 구분선. 근거 수준은 머리글 툴팁 한 줄로만 */}
             {INSIGHT_COLUMNS.map((col, i) => (
-              <Tooltip key={col.key} title={t('insight.autoHint', lang)} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
+              <Tooltip key={col.key} title={isEditing ? `${t('insight.autoHint', lang)} ${t('recap.edit.insightHint', lang)}` : t('insight.autoHint', lang)} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 320 } } }}>
                 <TableCell sx={{ ...HEAD_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}), cursor: 'help' }}>{t(`insight.field.${col.field}`, lang)}</TableCell>
               </Tooltip>
             ))}
@@ -256,37 +269,41 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
               row.videoPlays != null ? `${metricLabel('videoPlays', lang)} ${countCompact(row.videoPlays)}` : null,
               row.avgWatchSeconds != null ? t('recap.table.avgWatch', lang, { s: seconds(row.avgWatchSeconds) }) : null,
             ].filter(Boolean).join(' · ');
-            /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—" */
+            /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
+               편집 중에는 사람이 쓴 **원문 그대로**(자리표시자도)를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
+               자동 문장은 placeholder로 깔아 "비우면 이게 남는다"를 보인다 — 자동 문장을 값으로 채워 넣지 않는다 */
             const insightCells = INSIGHT_COLUMNS.map((col) => {
-              const written = col.noteField ? (localizedText(row.note?.[col.noteField], lang).value ?? '').trim() : '';
-              if (written && !isPlaceholder(written)) return { ...col, text: written, isWritten: true };
-              if (!hasData) return { ...col, text: null, isWritten: false };
-              const auto = insightSentence(col.field, row.insight?.[col.field] ?? null, lang);
-              return { ...col, text: auto, isWritten: false };
+              const raw = col.noteField ? (row.note?.[col.noteField]?.[lang] ?? '') : '';
+              const written = raw.trim();
+              const auto = hasData ? insightSentence(col.field, row.insight?.[col.field] ?? null, lang) : null;
+              if (written && !isPlaceholder(written)) return { ...col, raw, text: written, auto, isWritten: true };
+              return { ...col, raw, text: auto, auto, isWritten: false };
             });
             const isSelected = selectedIds.includes(row.campaignId);
+            // 편집 중에는 줄 클릭(드로어)을 끈다 — 편집 칸을 누를 때마다 드로어가 열리면 글을 쓸 수 없다
+            const handleRowClick = isEditing ? undefined : onRowClick;
             const stores = String(row.storeCode ?? '').split(/,\s*/).filter(Boolean);
             const storeText = stores.length > 1 ? `${stores[0]} +${stores.length - 1}` : stores[0] ?? null;
             return (
               <TableRow
                 key={row.campaignId}
                 id={`recap-row-${row.campaignId}`}
-                hover={Boolean(onRowClick)}
-                tabIndex={onRowClick ? 0 : undefined}
-                onClick={onRowClick ? () => onRowClick(row.campaignId) : undefined}
+                hover={Boolean(handleRowClick)}
+                tabIndex={handleRowClick ? 0 : undefined}
+                onClick={handleRowClick ? () => handleRowClick(row.campaignId) : undefined}
                 onKeyDown={
-                  onRowClick
+                  handleRowClick
                     ? (event) => {
                         if (event.key === 'Enter' || event.key === ' ') {
                           event.preventDefault();
-                          onRowClick(row.campaignId);
+                          handleRowClick(row.campaignId);
                         }
                       }
                     : undefined
                 }
                 aria-selected={isSelected || undefined}
                 sx={(theme) => ({
-                  cursor: onRowClick ? 'pointer' : 'default',
+                  cursor: handleRowClick ? 'pointer' : 'default',
                   // 줄 hover는 MUI action.hover(중립) — 140ms로 부드럽게. 지표·순위 색은 그대로
                   transition: theme.transitions.create('background-color', { duration: 140 }),
                   /* 타임라인에서 찾아온 줄 — 옅은 accent 면 + 첫 칸 왼쪽 2px accent 선(inset shadow라 폭·경계선이 안 바뀐다).
@@ -295,7 +312,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                     '&&, &&:hover': { backgroundColor: alpha(theme.palette.accent.main, 0.06) },
                     '& > td:first-of-type': { boxShadow: `inset 2px 0 0 ${theme.palette.accent.main}` },
                   }),
-                  ...(onRowClick && {
+                  ...(handleRowClick && {
                     '&:focus-visible': {
                       outline: '1px solid',
                       outlineColor: 'accent.main',
@@ -407,7 +424,23 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                 {/* 해석 두 칸 — 상자 없이 문장만. 네 줄 넘으면 잘리고 전문은 hover. 비어 있으면 "—" */}
                 {insightCells.map((cell, i) => (
                   <TableCell key={cell.key} sx={{ ...CELL_SX, ...(i === 0 ? INSIGHT_DIVIDER_SX : {}) }}>
-                    {cell.text ? (
+                    {isEditing ? (
+                      <TextField
+                        value={cell.raw}
+                        onChange={(e) => onNoteChange?.(row.campaignId, cell.noteField, e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder={cell.auto ?? ''}
+                        title={cell.auto ?? ''}
+                        aria-label={`${t(`insight.field.${cell.field}`, lang)} — ${row.phaseName}`}
+                        multiline
+                        minRows={2}
+                        maxRows={6}
+                        size="small"
+                        fullWidth
+                        disabled={isDisabled}
+                        sx={INSIGHT_INPUT_SX}
+                      />
+                    ) : cell.text ? (
                       <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}>
                         <Typography component="span" sx={{ ...INSIGHT_TEXT_SX, color: 'text.primary', cursor: 'help' }}>{cell.text}</Typography>
                       </Tooltip>
