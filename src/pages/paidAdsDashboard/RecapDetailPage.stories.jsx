@@ -55,17 +55,19 @@ export default {
 5. **플랫폼별 캠페인 표**(RecapCampaignTable) — 숫자 줄 아무 데나 누르면 Performance와 같은 캠페인 상세 드로어(CampaignDetailPanel)가 이 페이지 위에 열린다: 소재·View ad·Ads Manager·Billing·예산·페이싱·일별 지출. 비율 지표마다 벤치마크(↗↘), Efficiency 배지. 줄 끝 셰브론·아래 펼침은 없다
 6. (Learnings 섹션도 2026-09-08에 뺐다 — 표의 해석 열과 중복. 편집 모드의 이벤트 글 폼은 남는다)
 
-편집 모드(Edit, 로그인)에서만 캠페인별 코멘트 카드(Notes, RecapNoteEditor)와 Learnings 편집기가 카드로 나온다.
-계산은 schema.js(buildRecapRows · buildRecapHeadline · buildRecapExecutiveSummary · buildCampaignInsight ·
+편집 모드(Edit, 로그인)는 화면을 옮기지 않는다(2026-09-10) — **표의 What worked · Could improve 칸이 그 자리에서
+입력 칸이 되어** 지표를 보면서 해석을 쓴다. 아래 Notes 카드에는 화면에 안 나오는 값(평가·이유·오가닉 조회/참여)만
+남고, 이벤트 글(상태·요약·배운 점·제언) 편집기가 함께 나온다. AI draft·Translate는 빈 칸에만 초안을 채운다.
+계산은 schema.js(buildRecapRows · buildRecapHeadline · buildCampaignInsight ·
 localizedText)와 paidAdsPageUtils(buildPhaseTimeline)가 한다. Export의 PDF는 브라우저
 인쇄를 부르고 PaidAdsShell의 @media print 규칙이 레일·버튼을 숨긴다. Google Sheets는 표를 클립보드에 복사한다.
 
 ### 확인 포인트
 - 머리글 순위 "Best of 5 comparable events by CPM"
 - Meta 표는 벤치마크(↗ best of 5 …), TikTok 표는 전부 not enough data
-- 표에 등급 열은 없다 — Primary KPI(목표별 실제 값)·vs past(순위)·해석 네 열뿐. Grand Opening의 What worked/Could improve/Why는 사람이 쓴 note(툴팁 "Written by a person in Edit."), 나머지는 순위 근거 문장
+- 표에 등급 열은 없다 — Primary KPI(목표별 실제 값, 그 아래 과거 비교 순위)와 해석 두 열(What worked · Could improve)뿐. 사람이 쓴 note가 있으면 그것이 우선(툴팁 "Written by a person in Edit."), 없으면 순위 근거 문장
 - 타임라인 "Grand Opening" 행 클릭 → 표의 그 줄로 스크롤 + 옅은 accent 면 + 왼쪽 2px 선(선택 표시). 드로어는 안 열린다. 빈 곳을 누르면 표시가 사라진다
-- 줄 클릭 → 드로어(성과·페이싱·일별 지출). 해석 두 열(What worked · Could improve)은 표의 오른쪽 끝에(2026-09-08)
+- 줄 클릭 → 드로어(성과·페이싱·일별 지출). 편집 모드에서는 줄 클릭이 꺼지고 해석 두 칸이 입력 칸이 된다 — 값은 사람이 쓴 글만, 자동 문장은 빈 칸 hover 툴팁("Generated note")과 "Add custom note…" 안내로만 보인다
 - Learnings 섹션 없음(2026-09-08) — 편집 모드에서만 이벤트 글(상태·요약·배운 점·제언) 폼
         `,
       },
@@ -78,7 +80,7 @@ export const Default = {
   render: () => render(recapStore(), '/recap/G10%20Opening'),
 };
 
-/** 보고서를 아직 시작하지 않은 이벤트 — 사람이 쓴 note가 없어 해석 네 열이 전부 자동 문장 */
+/** 보고서를 아직 시작하지 않은 이벤트 — 사람이 쓴 note가 없어 해석 두 열이 전부 자동 문장 */
 export const NotStarted = {
   render: () => render(recapStore(), '/recap/BF4%20Opening'),
 };

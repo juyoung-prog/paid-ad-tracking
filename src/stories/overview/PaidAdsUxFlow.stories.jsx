@@ -636,7 +636,7 @@ const components = [
   { name: 'RecapLearningsEditor', usage: '이벤트 단위 글 — 상태·요약·배운 점 카드·다음 제언', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 캠페인 단위와 저장 대상이 달라 RecapNoteEditor에서 분리' },
   { name: 'SignInDialog', usage: 'Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 앱 전체 게이트는 꺼진 채 쓰기가 필요한 자리에서만' },
   { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 EN · 한국어 · 繁中' },
-  { name: 'BenchmarkArrow', usage: '벤치마크 방향 기호 ↗↘ — Lucide arrow-up-right/down-right 기하의 얇은 선 svg', type: '신규(구현됨) — 2026-09', note: '카테고리: data-display — BenchmarkDelta와 RecapCampaignInsightPanel이 같이 쓴다. ▲▼ 글자 대체' },
+  { name: 'BenchmarkArrow', usage: '벤치마크 방향 기호 ↗↘ — Lucide arrow-up-right/down-right 기하의 얇은 선 svg', type: '신규(구현됨) — 2026-09', note: '카테고리: data-display — BenchmarkDelta가 쓴다. ▲▼ 글자 대체' },
   { name: 'RecapStatusBadge', usage: '보고서 상태 배지 — Draft / Ready / Not started', type: '신규(구현됨) — Recap 2단계', note: '카테고리: data-display — 목록과 머리글에서 같은 모양' },
   { name: 'PeerCompareDialog', usage: '벤치마크 글자를 누르면 비교군 캠페인을 나란히 보는 대화상자(열 정렬)', type: '신규(구현됨) — Recap 3단계', note: '카테고리: templates — schema.js buildPeerComparison()' },
   { name: 'ExportMenu', usage: 'Export 드롭다운 — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄)', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — utils/recapSheets.js' },
