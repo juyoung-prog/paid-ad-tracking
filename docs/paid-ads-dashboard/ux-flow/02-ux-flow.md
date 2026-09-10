@@ -217,7 +217,6 @@ Paid Ads Dashboard
         ├── 단계 타임라인 (PhaseTimelineChart 재활용)
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크)
         │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer(Performance와 같은 CampaignDetailPanel) — 성과 · 예산 페이싱 · 일별 지출(해석 네 열은 표에, 2026-09-08). 타임라인 행 클릭은 그 줄로 스크롤 + 선택 표시만
-        ├── 배운 점 · 다음 제언 (2단계, 언어별)
         └── 내보내기 — 인쇄/PDF(1단계) · Excel(3단계) · 언어 전환(3단계)
 ```
 
@@ -486,7 +485,6 @@ Paid Ads Dashboard
 | VerdictChip (신규 — Recap) | good / mid / bad 판정 표시. 자동 제안이면 점선 테두리 | 신규(구현됨) | 카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning |
 | RecapCampaignTable (신규 — Recap) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 | 신규(구현됨) | 카테고리: data-display — PerformanceReportTable과 열 정의를 공유하되 보고서용으로 셀에 여러 줄(Reach / Hook·Hold / 조회)을 담는다. 인쇄 시 가로 스크롤 없이 접히는 열 규칙 |
 | RecapNoteEditor (신규 — Recap 2단계) | 캠페인 한 줄의 판정(good/mid/bad, 제안값 "Use suggestion") + 장점·아쉬운 점·이유 + 오가닉 조회·참여 선택 입력 | 신규(구현됨) | 카테고리: templates — LocalizedText의 `lang` 칸 하나만 편집, 저장은 페이지(onChange patch) |
-| RecapLearningsEditor (신규 — Recap 2단계) | 이벤트 단위 글 — 상태(draft/final), 요약, 배운 점 카드(제목+본문, 추가·삭제·순서), 다음 제언 | 신규(구현됨) | 카테고리: templates — 계획 단계에서는 RecapNoteEditor 하나에 묶었으나 캠페인 단위와 이벤트 단위는 저장 대상(테이블)이 달라 분리 |
 | SignInDialog (신규 — Recap 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 | 신규(구현됨) | 카테고리: templates — LoginPage와 같은 로직. 앱 전체 게이트는 꺼진 채 "쓰기가 필요한 자리"에서만 연다 |
 | LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규(구현됨) | 카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 각 언어의 자기 이름(EN · 한국어 · 繁中) |
 | Print stylesheet (Recap) | 인쇄/PDF — 레일·툴바 숨김, 카드 분리 방지, 표 폭 축소 | 신규(구현됨) | 컴포넌트가 아니라 `@media print` 규칙. PaidAdsShell의 GlobalStyles + `data-print` 속성 |

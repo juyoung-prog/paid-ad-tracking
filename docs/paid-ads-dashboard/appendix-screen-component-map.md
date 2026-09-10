@@ -75,7 +75,6 @@
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |
 | **RecapNoteEditor** | 신규(구현됨, 2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
 | **LanguageSwitch** | 신규(구현됨, 3단계) | en / ko / zh-Hant 드롭다운 — URL ?lang= 동기화 |
-| **RecapLearningsEditor** | 신규(구현됨, 2단계) | 상태·요약·배운 점 카드·다음 제언 편집 |
 | **SignInDialog** | 신규(구현됨, 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 |
 | recapSheets (utils) | 신규(구현됨, 3단계) | Google Sheets — 표를 클립보드에 복사하고 sheets.new를 연다(Excel 대신, 사용자 결정) |
 | **ExportMenu** | 신규(구현됨, 3단계) | Export 드롭다운 — Google Sheets · PDF(인쇄) |

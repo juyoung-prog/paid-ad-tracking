@@ -20,7 +20,6 @@ import { BackendErrorBanner } from '../../components/data-display/BackendErrorBa
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
 import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
-import { RecapLearningsEditor } from '../../components/templates/RecapLearningsEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
 import { LanguageSwitch } from '../../components/input/LanguageSwitch';
 import { ExportMenu } from '../../components/input/ExportMenu';
@@ -268,7 +267,6 @@ export function RecapDetailPage() {
     setDraft(null);
   };
 
-  const updateDraftRecap = (patch) => setDraft((d) => ({ ...d, recap: { ...d.recap, ...patch } }));
   /** 표의 인라인 칸 → 현재 언어 칸만 바꾼 LocalizedText. Notes 폼과 같은 규칙(schema withLang)을 쓴다 */
   const updateDraftNoteText = (campaignId, field, value) =>
     setDraft((d) => ({
@@ -512,15 +510,6 @@ export function RecapDetailPage() {
           />
         </Box>
       ))}
-
-      {/* Learnings 읽기 섹션은 2026-09-08에 뺐다 — 표의 해석 열(캠페인별)이 같은 내용을 말해
-          중복이었다. 편집 모드의 이벤트 글(상태·요약·배운 점·제언) 폼은 저장·시트·AI 초안이 쓰므로 남긴다 */}
-      {isEditing && draft && (
-        <Box sx={SECTION_CARD_SX} data-print="card">
-          <SectionHeader title={t('recap.section.learnings', lang)} />
-          <RecapLearningsEditor recap={draft.recap} onChange={updateDraftRecap} lang={lang} isDisabled={isBusy} sx={{ p: 2 }} />
-        </Box>
-      )}
 
       {/* 수기 입력 팝오버 — 이유·오가닉만. 값은 draft.notesById 하나를 그대로 쓰고 저장은 Save가 한다 */}
       {noteAnchor && draft && (

@@ -227,7 +227,7 @@ const iaTree = `Paid Ads Dashboard
         ├── 단계 타임라인 (PhaseTimelineChart 재활용) — 행 클릭 → 아래 표의 그 단계 줄로 스크롤 + 선택 표시(드로어는 안 연다)
         ├── 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 (각 비율 지표에 벤치마크 ↗↘)
         │   └── 숫자 줄 클릭(어디든) → 캠페인 상세 Drawer (Performance와 같은 CampaignDetailPanel — 소재 · View ad · Ads Manager · Billing · 예산 · 페이싱 · 일별 지출(해석 두 열 What worked · Could improve는 표에, 2026-09-08)
-        ├── (편집 모드) 캠페인별 코멘트 카드 — 판정 · 장점 · 아쉬운 점 · 이유 (언어별) · Learnings 편집기
+        ├── (편집 모드) 표 안에서 What worked · Could improve 편집 + 캠페인 칸 ⋯ 버튼(이유·오가닉) — 예전 판정 · 장점 · 아쉬운 점 · 이유 (언어별) · Learnings 편집기
         └── Export — Google Sheets(클립보드 복사 + sheets.new) · PDF(인쇄) · 언어 전환(en/ko/zh-Hant)`;
 
 const pageList = [
@@ -633,7 +633,6 @@ const components = [
   { name: 'VerdictChip', usage: 'good / mid / bad 평가 표시(Good/Fair/Weak) — 옅은 틴트 + 같은 색 글자 + 옅은 실선 테두리. 자동 등급을 없앤 뒤(2026-09-08) 표·편집기에서는 쓰지 않는다', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning' },
   { name: 'RecapCampaignTable', usage: '플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동', type: '신규(구현됨) — Recap 1단계', note: '카테고리: data-display — 고정 열 폭 + ScrollArea, 비율 지표마다 BenchmarkDelta' },
   { name: 'RecapNoteEditor', usage: '캠페인 한 줄의 판정 + 장점·아쉬운 점·이유 + 오가닉 선택 입력', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — lang 칸 하나만 편집, 저장은 페이지' },
-  { name: 'RecapLearningsEditor', usage: '이벤트 단위 글 — 상태·요약·배운 점 카드·다음 제언', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 캠페인 단위와 저장 대상이 달라 RecapNoteEditor에서 분리' },
   { name: 'SignInDialog', usage: 'Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자', type: '신규(구현됨) — Recap 2단계', note: '카테고리: templates — 앱 전체 게이트는 꺼진 채 쓰기가 필요한 자리에서만' },
   { name: 'LanguageSwitch', usage: 'en / ko / zh-Hant 전환, URL ?lang= 동기화', type: '신규(구현됨) — Recap 3단계', note: '카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 EN · 한국어 · 繁中' },
   { name: 'BenchmarkArrow', usage: '벤치마크 방향 기호 ↗↘ — Lucide arrow-up-right/down-right 기하의 얇은 선 svg', type: '신규(구현됨) — 2026-09', note: '카테고리: data-display — BenchmarkDelta가 쓴다. ▲▼ 글자 대체' },

@@ -123,7 +123,6 @@ const recapPhases = [
       '마이그레이션 2개 — event_recaps, recap_campaign_notes: owner_id 기본값 auth.uid(), anon read 정책(00000000000019 방식), owner write. LocalizedText는 jsonb',
       'usePaidAdsStore — recaps/notes 읽기 + upsert 함수. 저장 실패는 BackendErrorBanner 문법 그대로',
       'RecapNoteEditor — templates. props: note(RecapCampaignNote|null), campaignLabel, lang, onChange, isDisabled. 평가는 사람이 고르는 것만(자동 제안 없음, 2026-09-08). 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
-      'RecapLearningsEditor — templates. props: learnings, nextSteps, lang, onChange. 카드 추가·삭제·순서',
       '로그인 게이트 — Recap 편집 버튼에서만 켠다(읽기는 그대로 공개). 지금 꺼둔 LoginPage 재사용',
     ],
   },
@@ -142,7 +141,7 @@ const recapPhases = [
     items: [
       'Key takeaways 섹션 제거(2026-09-08) — 캠페인 표가 Goal · Budget / Spend · Primary KPI · Video · Engagement / Action · What worked · Could improve로 같은 요약을 이미 준다. RecapTakeaways와 buildRecapExecutiveSummary·buildRecapTakeaways도 함께 뺐다(다른 곳에서 안 쓴다). 다른 요약 섹션으로 대체하지 않는다',
       '캠페인 해석 → 표의 두 열(What worked · Could improve, 2026-09-08 — 드로어의 Campaign insights를 표로 옮겨 현재 지표 → 과거 맥락 → 해석을 가로로 읽는다. Reason·Next action 열과 그 생성 로직은 뺐다 — 지표만으로는 원인이 서지 않고, 사람이 쓴 이유는 Edit 폼·시트에 남는다). 한 문장씩, 순위 근거만.',
-      'Learnings 섹션 제거(2026-09-08) — 표의 해석 열(캠페인별)이 같은 내용이라 중복. 플레이북 계산(buildRecapPlaybook·buildRecapPatterns)과 RecapPatterns도 함께 뺐다. 편집 모드의 RecapLearningsEditor(상태·요약·배운 점·제언)는 저장·시트·AI 초안이 쓰므로 남긴다',
+      'Learnings 섹션 완전 제거(2026-09-08 읽기 섹션 → 2026-09-10 편집 폼까지) — 표의 해석 열이 같은 내용이고, 상태 배지는 머리글에 있다. RecapLearningsEditor·RecapPatterns와 플레이북 계산도 함께 뺐다. summary·learnings·nextSteps·status 데이터와 시트 내보내기는 그대로 — UI만 없앴다. 플레이북 계산(buildRecapPlaybook·buildRecapPatterns)과 RecapPatterns도 함께 뺐다. 편집 모드의 RecapLearningsEditor(상태·요약·배운 점·제언)는 저장·시트·AI 초안이 쓰므로 남긴다',
       '기호·배지: ▲▼ → BenchmarkArrow(↗↘ 얇은 선), Efficiency 배지는 틴트 + 옅은 실선(점선 제거), ScrollArea edgeStrength="subtle"',
       '내비 이름: Reports → Performance, Recap → Reports(레일·목록 제목·"All reports"·저장 알림). 내부 경로 유지',
       'recap-draft SYSTEM 프롬프트도 같은 규칙(원인 지어내지 않기, 이벤트 범위) — 바꾼 뒤 재배포 필요',
