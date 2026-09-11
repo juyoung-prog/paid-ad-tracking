@@ -38,7 +38,7 @@
  *      단계 이름이 하나라도 겹치는 다른 이벤트들과 비교. 이 이벤트 포함 3개 미만이면 없음
  *  10. 계획 예산 = 저장된 budget_planned(>0) 아니면 일예산 × 기간 일수(양 끝 포함). 근거 없으면 없음
  *      집행률은 지출 ÷ 계획이 1.2 이상(Over) 또는 0.7 이하(Under)일 때만 적는다
- *  11. What worked / Could improve = 사람이 대시보드 Edit에서 쓴 글(영어, "ㅇㅇ"·TBD 같은 자리표시자 제외)이 있으면 그 글.
+ *  11. What worked / Could improve = 사람이 대시보드 Edit에서 쓴 글(영어)이 있으면 무엇이든 그 글(2026-09-12: 자리표시자 필터 제거).
  *      없으면 자동 문장: 목표가 정한 후보 지표(GOAL_INSIGHT_METRICS) 중 top / bottom 구간인 것 — 대표(primary) 지표가 먼저,
  *      같은 층이면 백분위 순. bottom이 없고 지출이 계획의 120%를 넘으면 초과 지출. 후보가 없으면 "—" — 억지로 만들지 않는다
  *
@@ -1072,21 +1072,11 @@ function notesForEvent(eventRecaps, notes, eventName) {
   return byId;
 }
 
-/**
- * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다 (recapRowView isPlaceholder)
- */
-function isPlaceholder(text) {
-  var t = String(text == null ? '' : text).trim();
-  if (!t) return true;
-  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(t)) return true;
-  return t.replace(/[ㄱ-ㆎ○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
-}
-
-/** 해석 칸 최종 글 — 사람이 쓴 영어 글(자리표시자 제외) 우선, 없으면 자동 문장, 데이터 없으면 null (recapRowView insightCellsOf) */
+/** 해석 칸 최종 글 — 사람이 쓴 영어 글이 있으면 무엇이든 그대로, 없으면 자동 문장, 데이터 없으면 null (recapRowView insightCellsOf) */
 function insightCellText(r, field, hasData) {
   var note = r.note && r.note[field] ? r.note[field].en : '';
   var written = String(note || '').trim();
-  if (written && !isPlaceholder(written)) return written;
+  if (written) return written;
   return hasData ? insightSentence(field, r.insight ? r.insight[field] : null) : null;
 }
 
@@ -1512,7 +1502,7 @@ function flattenRow(r) {
     saves: r.saves,
     reposts: r.reposts,
     conversions: r.conversions,
-    // 사람이 쓴 글(자리표시자 제외)이 우선, 없으면 자동 문장 — 대시보드 recapRowView insightCellsOf와 같은 규칙
+    // 사람이 쓴 글이 우선(무엇이든 그대로), 없으면 자동 문장 — 대시보드 recapRowView insightCellsOf와 같은 규칙
     worked: insightCellText(r, 'strength', hasData),
     improve: insightCellText(r, 'weakness', hasData),
     benchmarks: r.benchmarks,

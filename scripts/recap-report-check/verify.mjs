@@ -294,8 +294,8 @@ if (process.argv.includes('--real')) {
       linkChecks += 1; if (s.thumbnailUrl) withThumb += 1; if (s.campaignUrl) withLink += 1;
     });
   }
-  const writtenCount = events.reduce((n, e) => n + Object.values(notesFor(e.eventName)).filter((x) => ['strength', 'weakness'].some((f) => (x[f]?.en ?? '').trim() && !rowView.isPlaceholder(x[f].en))).length, 0);
-  console.log(`\n[real · notes] campaigns with a written (non-placeholder) note: ${writtenCount}`);
+  const writtenCount = events.reduce((n, e) => n + Object.values(notesFor(e.eventName)).filter((x) => ['strength', 'weakness'].some((f) => (x[f]?.en ?? '').trim())).length, 0);
+  console.log(`\n[real · notes] campaigns with a written note: ${writtenCount}`);
   console.log(`\n[real · campaign column] rows ${linkChecks}, with thumbnail ${withThumb}, with View ad link ${withLink}, mismatches ${mismatches.length - checksBefore}`);
   console.log(`\n[real · DB rows via rowsToGrid] campaigns ${campaigns.length}, events ${events.length}, campaign rows compared ${rows}, mismatches ${mismatches.length - checksBefore}`);
   checksBefore = mismatches.length;

@@ -63,18 +63,6 @@ export const INSIGHT_COLUMNS = [
 ];
 
 /**
- * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다(2026-09-08).
- * 글자·숫자가 하나도 없거나(자모·기호만), 흔한 임시 표기면 자동 문장으로 넘긴다.
- */
-export const isPlaceholder = (text) => {
-  const s = String(text ?? '').trim();
-  if (!s) return true;
-  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(s)) return true;
-  // 한글 자모(ㅇㅁㄴ…)·기호·공백만 남으면 내용 없음
-  return s.replace(/[ㄱ-ㆎ○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
-};
-
-/**
  * 해석 문장 — schema buildCampaignInsight()의 재료(어느 지표가 비교군에서 상위/하위였나)를 **해석** 한 문장으로.
  * 후보 지표는 목표가 정한다(schema GOAL_INSIGHT_METRICS) — 표가 그 목표에서 실제로 그리는 지표와 같은 목록이라,
  * 오른쪽 문장의 근거를 왼쪽 칸에서 눈으로 좇을 수 있다. 목표와 무관하거나 화면에 없는 지표는 문장이 되지 않는다.
@@ -94,8 +82,10 @@ export function insightSentence(field, item, lang) {
 }
 
 /**
- * 해석 두 칸의 최종 내용 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료에서 한 문장, 그것도 없으면 null.
- * raw는 편집 칸에 그대로 넣을 원문(자리표시자 포함)이고, auto는 자동 문장(툴팁용)이다.
+ * 해석 두 칸의 최종 내용 — 사람이 쓴 note가 있으면 **무엇이든 그대로**, 없으면 재료에서 한 문장, 그것도 없으면 null.
+ * 한때 "ㅇㅇ"·"..."·"TBD" 같은 자리표시자를 걸러 자동 문장으로 넘겼는데(2026-09-08), 사람이 고쳐 저장한 글이 화면에
+ * 안 보여 "왜 안 바뀌나"가 됐다(2026-09-12) — 저장한 것은 보인다가 원칙이고, 지우면 자동 문장으로 돌아간다.
+ * raw는 편집 칸에 그대로 넣을 원문이고, auto는 자동 문장(툴팁용)이다.
  */
 export function insightCellsOf(row, lang) {
   const hasData = hasRowData(row);
@@ -103,7 +93,7 @@ export function insightCellsOf(row, lang) {
     const raw = col.noteField ? (row.note?.[col.noteField]?.[lang] ?? '') : '';
     const written = raw.trim();
     const auto = hasData ? insightSentence(col.field, row.insight?.[col.field] ?? null, lang) : null;
-    if (written && !isPlaceholder(written)) return { ...col, raw, text: written, auto, isWritten: true };
+    if (written) return { ...col, raw, text: written, auto, isWritten: true };
     return { ...col, raw, text: auto, auto, isWritten: false };
   });
 }

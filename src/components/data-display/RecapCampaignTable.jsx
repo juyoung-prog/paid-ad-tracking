@@ -206,7 +206,7 @@ function SecondaryMetricGrid({ items, columns }) {
  * 해석 두 열은 왼쪽 숫자를 되풀이하지 않고 해석만 한다("Early video attention stood out against comparable campaigns.").
  * 근거는 그 목표에서 이 표가 보여주는 지표뿐이고(GOAL_INSIGHT_METRICS), 대표 KPI가 약하면 그 약점이 Could improve에
  * 먼저 온다 — 강한 진단 지표가 약점을 가리지 못한다. 근거가 없으면 억지로 만들지 않고 "—".
- * 사람이 Edit에서 쓴 note(strength/weakness)가 있으면 우선(툴팁 "Written by a person in Edit."), 자리표시자는 무시.
+ * 사람이 Edit에서 쓴 note(strength/weakness)가 있으면 무엇이든 그대로 우선(툴팁 "Written by a person in Edit.") — 지우면 자동 문장.
  *
  * 상호작용: **숫자 줄 어디를 눌러도** onRowClick — 캠페인 상세 드로어(성과·페이싱·일별 지출). 순위 글자(onBenchmarkClick)는
  * stopPropagation. selectedIds는 타임라인에서 고른 단계의 줄 표시(옅은 accent 면 + 왼쪽 2px 선).
@@ -305,8 +305,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const layout = engagementLayout(row.goal);
             const engagementSecondary = engagementBreakdownItems(row, lang);
             const videoSecondary = videoSecondaryItems(row, lang);
-            /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
-               편집 중에는 사람이 쓴 **원문 그대로**(자리표시자도)를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
+            /* 해석 두 칸 — 사람이 쓴 note가 있으면 그대로, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
+               편집 중에는 사람이 쓴 **원문 그대로**를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
                자동 문장은 placeholder로 깔아 "비우면 이게 남는다"를 보인다 — 자동 문장을 값으로 채워 넣지 않는다 */
             const insightCells = insightCellsOf(row, lang);
             const isSelected = selectedIds.includes(row.campaignId);
