@@ -176,8 +176,12 @@ function SecondaryMetricGrid({ items, columns }) {
     >
       {items.map((item) => (
         <Box key={item.key} sx={{ minWidth: 0 }}>
-          <Typography component="span" sx={{ display: 'block', fontSize: 11, lineHeight: 1.15, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { display: 'inline', fontSize: '6pt', lineHeight: 1.2 } }}>
-            {item.label}{'\u00A0'}
+          {/* 라벨은 정해진 짧은 단어뿐이라 자르지 않는다 — 5열(Meta)에서 "Repost"(37px)가 열(35px)보다 살짝 넓어
+              말줄임이 걸렸는데, 1~2px은 열 사이 간격(6px)이 받아 준다. 값은 자릿수가 길어질 수 있어 말줄임 유지.
+              라벨 뒤 공백은 인쇄(한 줄 표기)에서만 필요하다 — 화면에서는 폭만 먹어 print 전용으로 둔다 */}
+          <Typography component="span" sx={{ display: 'block', fontSize: 11, lineHeight: 1.15, color: 'text.secondary', whiteSpace: 'nowrap', '@media print': { display: 'inline', fontSize: '6pt', lineHeight: 1.2 } }}>
+            {item.label}
+            <Box component="span" sx={{ display: 'none', '@media print': { display: 'inline' } }}>{'\u00A0'}</Box>
           </Typography>
           <Typography component="span" sx={{ display: 'block', fontSize: 12, fontWeight: 600, lineHeight: 1.2, color: 'text.primary', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { display: 'inline', fontSize: '6.5pt', lineHeight: 1.2 } }}>
             {item.value}
@@ -454,8 +458,9 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                           <KpiSlot key={key} row={row} metricKey={key} format={kpiFormat(key)} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         ))}
                       </Box>
-                      {/* Like · Cmt · Share · Save (· Follow · Visits) — 한 줄에 넷, 넘치면 둘째 줄에 같은 열로 */}
-                      <SecondaryMetricGrid items={engagementSecondary} columns={4} />
+                      {/* Like · Cmt · Share · Save (Meta는 · Repost) — 기본 4열, Meta처럼 다섯이면 5열 한 줄
+                          (Repost 하나가 둘째 줄에 홀로 남으면 균형이 깨진다, 2026-09-12). TikTok(넷 이하)은 4열 그대로 */}
+                      <SecondaryMetricGrid items={engagementSecondary} columns={Math.max(4, Math.min(engagementSecondary.length, 5))} />
                     </TableCell>
                   </>
                 )}
