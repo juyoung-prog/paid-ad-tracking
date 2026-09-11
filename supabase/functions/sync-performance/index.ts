@@ -504,6 +504,34 @@ Deno.serve(async (req) => {
     (adAccounts ?? []).map((a) => [a.id, a.external_account_id])
   );
 
+  /* 진단 경로 — body { diagnose: 'meta_actions' }. Meta insights의 actions 배열에 **실제로 어떤 action_type이
+     오는지** 계정별로 집계해 돌려준다(DB는 건드리지 않고, 토큰은 응답에 싣지 않는다). "Meta 캠페인 레벨에는
+     팔로우·프로필 방문 지표가 없다"는 매핑의 전제를 실데이터로 확인하려고 만들었다(2026-09-12). 같은 insights
+     호출이라 rate limit 비용은 평소 동기화 한 번과 같다. 결과: { accounts: { [accountId]: { campaigns, actionTypes:
+     { [action_type]: { campaigns: 값이 온 캠페인 수, total: 합 } } } } } */
+  if (body?.diagnose === 'meta_actions') {
+    const metaAccounts = new Set((allCampaigns ?? []).filter((c) => c.platform === 'meta').map((c) => c.account_id));
+    const accounts: Record<string, unknown> = {};
+    for (const accountId of metaAccounts) {
+      const externalAccountId = externalIdByAccount.get(accountId);
+      const accessToken = [...tokenByAccount.entries()].find(([k]) => k.endsWith(`:${accountId}`))?.[1];
+      if (!externalAccountId || !accessToken) { accounts[accountId] = { error: 'no token or external id' }; continue; }
+      const result = await fetchMetaInsightsByCampaign(accessToken, externalAccountId);
+      const actionTypes: Record<string, { campaigns: number; total: number }> = {};
+      for (const raw of result.byCampaign.values()) {
+        for (const a of Array.isArray(raw?.actions) ? raw.actions : []) {
+          const key = String(a?.action_type ?? '?');
+          const entry = actionTypes[key] ?? { campaigns: 0, total: 0 };
+          entry.campaigns += 1;
+          entry.total += num(a?.value) ?? 0;
+          actionTypes[key] = entry;
+        }
+      }
+      accounts[accountId] = { campaigns: result.byCampaign.size, error: result.errorMessage, actionTypes };
+    }
+    return new Response(JSON.stringify({ accounts }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   // Meta는 계정 단위로 한 번만 부른다(캠페인마다 부르지 않는다 —
   // fetchMetaInsightsByCampaign 주석 참고). 대상에 있는 계정만 받는다.
   const errors: string[] = [];

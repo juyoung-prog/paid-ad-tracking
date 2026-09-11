@@ -128,10 +128,18 @@ sequenceDiagram
 | `avgWatchSeconds` | `video_avg_time_watched_actions` | `average_video_play` |
 | `likes` / `comments` / `shares` | `actions` 중 `post_reaction` / `comment` / `post` | `likes` / `comments` / `shares` |
 | `engagements` | `actions` 중 `post_reaction`+`comment`+`post` 합산 | `likes` + `comments` + `shares` (합산) |
-| `follows` | — (캠페인 레벨 대응 지표 없음) | `follows` |
-| `profileVisits` | — | `profile_visits` |
+| `follows` | — (캠페인 레벨 대응 지표 없음 — 아래 실측) | `follows` |
+| `profileVisits` | — (아래 실측) | `profile_visits` |
 | `saves` | `actions` 중 `onsite_conversion.post_save` (게시물 저장) | — (캠페인 레벨 `saves`/`bookmark`/`total_save` 거부됨) |
 | `reposts` | — (광고 지표 없음, 인스타그램 리포스트는 드로어 보충 입력) | — (TikTok 광고에는 리포스트가 없다) |
+
+**Meta에 팔로우·프로필 방문이 없다는 것은 실측이다(2026-09-12)**: `sync-performance`를 body
+`{"diagnose": "meta_actions"}`로 부르면 Meta insights의 `actions` 배열에 실제로 오는 action_type을 계정별로
+집계해 돌려준다(DB 무변경, 토큰 미노출). 세 계정 80캠페인에서 온 것: `link_click` `post_engagement`
+`page_engagement` `video_view` `post_reaction` `post` `comment` `onsite_conversion.post_save` /
+`post_net_like` / `post_net_save` / `post_net_comment` / `post_unlike` / `post_unsave`, `landing_page_view`,
+`onsite_conversion.messaging_*`, 그리고 `like`(페이스북 **페이지** 좋아요 — 7캠페인에 합 32건뿐). 인스타그램
+팔로우·프로필 방문에 해당하는 action_type은 없다. 매핑을 바꾸기 전에 이 경로로 다시 확인할 것.
 
 **참여 칸의 편집·이월 규칙(2026-09-11)**: Campaigns 드로어는 동기화 캠페인의 참여 내역 중 사람이 고칠 수
 있는 칸(`likes` `comments` `shares` `saves` `reposts` — `follows` `profile_visits`는 TikTok API만 주는 값이라
