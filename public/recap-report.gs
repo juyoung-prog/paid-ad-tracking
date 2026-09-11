@@ -113,6 +113,14 @@ var CONFIG = {
     conversion: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
     store_visit: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
   },
+  /** Engagement / Action 칸 구성 — 대표 두 지표(순위 포함) + 보조 줄. 목표가 정한다 (recapRowView ENGAGEMENT_ACTION_LAYOUT) */
+  ENGAGEMENT_ACTION_LAYOUT: {
+    awareness: { primary: ['engagementRate', 'ctr'], secondary: ['clicks', 'cpc'] },
+    traffic: { primary: ['ctr', 'cpc'], secondary: ['clicks', 'engagementRate'] },
+    engagement: { primary: ['engagementRate', 'cpe'], secondary: ['likes', 'shares'] },
+    conversion: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+    store_visit: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+  },
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -346,58 +354,55 @@ function placeReportSheet_(ss, sheet, previous) {
 
 /** 표 열 정의 — 캠페인 표. key는 model 행의 필드, fmt는 setNumberFormat, align은 가로 정렬 */
 /**
- * 물리 열 폭(B열부터) — 캠페인 표(13열)와 타임라인(8열)이 서로 다른 폭을 요구하므로, 두 표의 열 경계를 모두 담는
- * 잘게 나눈 물리 열 위에 각 논리 열을 병합(span)으로 얹는다. 좁은 조각 열(10~35px)은 병합 안에 숨어 보이지 않는다.
+ * 물리 열 폭(B열부터) — 캠페인 표(8열, 대시보드와 같은 구성)와 타임라인(8열)이 서로 다른 폭을 요구하므로, 두 표의 열 경계를
+ * 모두 담은 잘게 나눈 물리 열 위에 각 논리 열을 병합(span)으로 얹는다. 좁은 조각 열(10~40px)은 병합 안에 숨어 보이지 않는다.
  *
- *   경계(px, B열 시작 0):  250 340 370 470 570 580 625 660 720 740 815 825 905 920 995 1085 1165 1390 1615
- *   캠페인 표: Campaign 250 · Goal 90 · Budget/Spend 130 · Primary KPI 110 · Hook 80 · Hold 80 · Eng. rate 85 · CTR 80 ·
- *              Reach 90 · Plays 90 · Avg watch 80 · What worked 225 · Could improve 225
- *   타임라인:  Phase 250 · Platforms 120 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105
- *   KPI:       Period 250 · Campaigns 90 · Total spent 130 · Planned 100 · Stores 100
- * 첫 두 조각(36 + 214)이 Campaign — 36은 썸네일 칸.
+ *   경계(px, B열 시작 0):  260 360 380 480 495 580 620 635 730 825 920 930 1220 1480 1740
+ *   캠페인 표: Campaign 260 · Goal 100 · Budget/Spend 135 · Primary KPI 125 · Video response 300 · Engagement/Action 300 ·
+ *              What worked 260 · Could improve 260  (끝 1740 — 그 뒤 열은 없다)
+ *   타임라인:  Phase 260 · Platforms 120 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105
+ *   KPI:       Period 260 · Campaigns 100 · Total spent 120 · Planned 100 · Stores 55
+ * 첫 두 조각(36 + 224)이 Campaign — 36은 썸네일 칸.
  */
-var PHYSICAL_WIDTHS = [36, 214, 90, 30, 100, 100, 10, 45, 35, 60, 20, 75, 10, 80, 15, 75, 90, 80, 225, 225];
+var PHYSICAL_WIDTHS = [36, 224, 100, 20, 100, 15, 85, 40, 15, 95, 95, 95, 10, 290, 260, 260];
 
-/** 지표 열 공통 노트 꼬리 — 둘째 줄(순위)의 뜻 */
-var METRIC_RANK_NOTE = '\nSecond line: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
-  '; same phase when 3+ exist) — ↑ top · ↓ bottom · mid. No second line if fewer than 3 peers. Context only, not a grade.';
+/** 지표 순위 노트 꼬리 */
+var METRIC_RANK_NOTE = '\nAfter a value: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
+  '; same phase when 3+ exist) — ↑ top · ↓ bottom · mid. Nothing if fewer than 3 peers. Context only, not a grade.';
 
 /**
- * 캠페인 표 — 13열. span은 병합할 물리 열 수(합 20). lines는 두 줄 칸의 강조 규칙:
- *   'second-small' = 첫 줄 보통, 둘째 줄 작고 회색(지표 값 + 순위) · 'first-small' = 첫 줄 작고 회색, 둘째 줄 굵게(일예산 + 지출)
+ * 캠페인 표 — 대시보드 RecapCampaignTable과 같은 8열. span은 병합할 물리 열 수(합 16).
+ * rich: true인 열은 순수부가 만든 { text, runs }(줄·강조)를 RichText로 그린다.
  */
 var COLUMNS = [
   // 썸네일 칸 + 글 칸. 이름은 굵게 + Ads Manager 링크(있을 때만), 둘째 줄은 매장 · 기간(작고 회색)
   { key: 'campaignText', label: 'Campaign', span: 2, align: 'left', thumbKey: 'thumbnailUrl', linkKey: 'campaignUrl', linkLength: 'phaseNameLength',
-    note: 'Thumbnail (when the platform provides one), phase name, then store · period. The name links to the campaign in Meta / TikTok Ads Manager when the account id is known. Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
+    note: 'Thumbnail (when the platform provides one), phase name, then store · period (days). The name links to the campaign in Meta / TikTok Ads Manager when the account id is known. Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
   { key: 'goalLabel', label: 'Goal', span: 1, align: 'center' },
-  { key: 'budgetSpendText', label: 'Budget / Spend', span: 2, align: 'center', lines: 'first-small',
+  { key: 'budgetSpend', label: 'Budget / Spend', span: 3, align: 'center', rich: true,
     note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
-  { key: 'primaryKpiText', label: 'Primary KPI', span: 2, align: 'center', lines: 'second-small',
+  { key: 'primaryKpi', label: 'Primary KPI', span: 2, align: 'center', rich: true,
     note: 'The main result for the campaign goal — reported, not judged. Awareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.' + METRIC_RANK_NOTE },
-  { key: 'hookRateText', label: 'Hook', span: 2, align: 'center', lines: 'second-small', note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays). Same basis as the platform ads manager.' + METRIC_RANK_NOTE },
-  { key: 'holdRateText', label: 'Hold', span: 2, align: 'center', lines: 'second-small', note: 'Hold = completed views ÷ hook views — of the people who stayed past the hook, how many watched through.' + METRIC_RANK_NOTE },
-  { key: 'engagementRateText', label: 'Eng. rate', span: 2, align: 'center', lines: 'second-small', note: 'Engagement rate = platform engagements ÷ impressions.' + METRIC_RANK_NOTE },
-  { key: 'ctrText', label: 'CTR', span: 1, align: 'center', lines: 'second-small', note: 'CTR = clicks ÷ impressions.' + METRIC_RANK_NOTE },
-  { key: 'reach', label: 'Reach', span: 2, align: 'center', fmt: '#,##0', note: 'Unique people reached (platform value).' },
-  { key: 'videoPlays', label: 'Plays', span: 1, align: 'center', fmt: '#,##0', note: 'Video plays (platform value).' },
-  { key: 'avgWatchText', label: 'Avg watch', span: 1, align: 'center', note: 'Average watch time per play. Meta reports whole seconds, TikTok decimals — shown as given.' },
+  { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
+    note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
+  { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
+    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: supporting counts (clicks · CPC, likes · shares, results · CPC).\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
     note: 'Same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
 ];
 
-/** 타임라인 표 열 — 물리 열 15개에 병합으로 얹는다 */
+/** 타임라인 표 열 — 물리 열 13개에 병합으로 얹는다 */
 var TIMELINE_COLUMNS = [
   { key: 'name', label: 'Phase', span: 2, align: 'left' },
   { key: 'platformLabel', label: 'Platforms', span: 2, align: 'center' },
   { key: 'startDate', label: 'Start', span: 1, align: 'center' },
-  { key: 'endDate', label: 'End', span: 1, align: 'center' },
+  { key: 'endDate', label: 'End', span: 2, align: 'center' },
   { key: 'days', label: 'Days', span: 2, align: 'center', fmt: '0' },
-  { key: 'totalDaily', label: 'Daily budget', span: 2, align: 'right', fmt: '"$"#,##0.00' },
-  { key: 'totalBudget', label: 'Planned', span: 2, align: 'right', fmt: '"$"#,##0' },
-  { key: 'spent', label: 'Spent', span: 3, align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'totalDaily', label: 'Daily budget', span: 1, align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'totalBudget', label: 'Planned', span: 1, align: 'right', fmt: '"$"#,##0' },
+  { key: 'spent', label: 'Spent', span: 2, align: 'right', fmt: '"$"#,##0.00' },
 ];
 
 /** KPI 블록 — 헤더 줄 + 값 줄 */
@@ -405,9 +410,9 @@ var KPI_COLUMNS = [
   { key: 'periodText', label: 'Period', span: 2, align: 'left' },
   { key: 'campaignCount', label: 'Campaigns', span: 1, align: 'center', fmt: '0' },
   { key: 'spend', label: 'Total spent', span: 2, align: 'right', fmt: '"$"#,##0.00' },
-  { key: 'plannedBudget', label: 'Planned', span: 1, align: 'right', fmt: '"$"#,##0',
+  { key: 'plannedBudget', label: 'Planned', span: 2, align: 'right', fmt: '"$"#,##0',
     note: 'Sum of each campaign\'s planned budget: stored budget_planned, else daily budget × days (start and end inclusive). The dashboard uses the Plan document when one exists.' },
-  { key: 'storeCount', label: 'Stores', span: 3, align: 'center', fmt: '0' },
+  { key: 'storeCount', label: 'Stores', span: 2, align: 'center', fmt: '0' },
 ];
 
 /**
@@ -424,7 +429,7 @@ var STYLE = {
   sectionSize: 12,
   leftGutter: 20,
   left: 2,
-  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 48 },
+  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 64 },
   sectionGap: 2,
 };
 
@@ -560,20 +565,17 @@ function renderLinkedText_(cell, text, nameLength, url) {
 }
 
 /**
- * 두 줄 칸 — 'second-small': 첫 줄 보통 + 둘째 줄 작고 회색(지표 값 + 순위) · 'first-small': 첫 줄 작고 회색 + 둘째 줄 굵게(일예산 + 지출).
- * 한 줄뿐이면 그대로 둔다(빈 값 "—" 포함).
+ * 순수부가 만든 { text, runs } → RichText. run.style: 'small'(9pt 회색 — 순위·보조 줄·라벨) · 'bold'(값 강조).
+ * 글자 위치는 순수부가 계산했으므로 여기서는 옮겨 적기만 한다.
  */
-function renderTwoLineCell_(cell, text, mode) {
-  var cut = text.indexOf('\n');
-  if (cut < 0) return;
+function renderRichCell_(cell, rich) {
   var small = SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build();
-  var builder = SpreadsheetApp.newRichTextValue().setText(text);
-  if (mode === 'first-small') {
-    builder.setTextStyle(0, cut, small);
-    builder.setTextStyle(cut + 1, text.length, SpreadsheetApp.newTextStyle().setBold(true).build());
-  } else {
-    builder.setTextStyle(cut + 1, text.length, small);
-  }
+  var bold = SpreadsheetApp.newTextStyle().setBold(true).build();
+  var builder = SpreadsheetApp.newRichTextValue().setText(rich.text);
+  rich.runs.forEach(function (run) {
+    if (run.end <= run.start) return;
+    builder.setTextStyle(run.start, run.end, run.style === 'bold' ? bold : small);
+  });
   cell.setRichTextValue(builder.build());
 }
 
@@ -644,6 +646,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
       var v;
       if (j === totalIndex && i === 0) v = 'Total';
       else if (j === totalIndex && r[c.key] == null) v = '';
+      else if (c.rich) v = r[c.key] && r[c.key].text ? r[c.key].text : EMPTY;
       else v = cellValue_(r[c.key]);
       if (c.thumbKey && j !== totalIndex) { line.push(''); line.push(v); return; } // 그림 칸은 비워 두고 글은 둘째 칸에
       for (var k = 0; k < (c.span || 1); k += 1) line.push(k === 0 ? v : '');
@@ -671,10 +674,10 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
         renderThumbnail_(sheet.getRange(row + j, startCol + offsets[i]), r[c.thumbKey], r.phaseName);
         renderLinkedText_(sheet.getRange(row + j, textCol), String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null);
       });
-    } else if (c.lines) {
+    } else if (c.rich) {
       bodyRows.forEach(function (r, j) {
-        if (j === totalIndex) return;
-        renderTwoLineCell_(sheet.getRange(row + j, textCol), String(r[c.key] == null ? EMPTY : r[c.key]), c.lines);
+        if (j === totalIndex || !r[c.key] || !r[c.key].runs || !r[c.key].runs.length) return;
+        renderRichCell_(sheet.getRange(row + j, textCol), r[c.key]);
       });
     }
   });
@@ -1376,12 +1379,12 @@ function flattenRow(r) {
     benchmarks: r.benchmarks,
   };
   // 임원용 표의 문장형 칸 — 대시보드 RecapCampaignTable과 같은 표기. 값은 utils/format의 money·percent 규칙(2자리)
-  flat.campaignText = [r.phaseName, [storeText(r.storeCode), dateRange(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
-  flat.budgetSpendText = budgetSpendText(r);
-  flat.primaryKpiText = hasData ? primaryKpiText(kpi, kpiStat) : 'No performance data';
-  // 지표 열 — "값 ⏎ 순위" 두 줄. 값 없으면 "—", 비교군 없으면 한 줄
-  ['hookRate', 'holdRate', 'engagementRate', 'ctr'].forEach(function (k) { flat[k + 'Text'] = metricCellText(r, k); });
-  flat.avgWatchText = r.avgWatchSeconds == null ? null : secondsText(r.avgWatchSeconds);
+  // 대시보드 RecapCampaignTable과 같은 8열 구성의 칸 — 줄·강조는 { text, runs }로 넘기고 렌더가 RichText로 옮긴다
+  flat.campaignText = [r.phaseName, [storeText(r.storeCode), dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
+  flat.budgetSpend = budgetSpendCell(r);
+  flat.primaryKpi = hasData ? primaryKpiCell(kpi, kpiStat) : richLines([[{ text: EMPTY }]]);
+  flat.videoResponse = hasData ? videoResponseCell(r) : richLines([[{ text: 'No performance data' }]]);
+  flat.engagementAction = hasData ? engagementActionCell(r) : richLines([[{ text: EMPTY }]]);
   CONFIG.BENCHMARK_METRICS.forEach(function (m) {
     var b = r.benchmarks[m.key];
     flat[m.key] = r[m.key];
@@ -1394,7 +1397,10 @@ function flattenRow(r) {
 /** 금액 표기 — "$1,639.68" (utils/format money). 자리표시자·null은 "—" */
 function moneyText(v) {
   if (v == null || !isFinite(v)) return EMPTY;
-  var fixed = Math.abs(v).toFixed(2);
+  // 대시보드(toLocaleString)는 십진 표기 기준 반올림이다 — 229.565 → $229.57. toFixed는 이진 오차로 229.56을 내므로
+  // 십진 문자열(toPrecision)에서 센트 단위로 반올림한다
+  var cents = Math.round(Number(Number(Math.abs(v)).toPrecision(15) + 'e2'));
+  var fixed = (cents / 100).toFixed(2);
   var parts = fixed.split('.');
   var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   return (v < 0 ? '-' : '') + '$' + intPart + '.' + parts[1];
@@ -1422,30 +1428,106 @@ function storeText(storeCode) {
   return stores.length > 1 ? stores[0] + ' +' + (stores.length - 1) : stores[0];
 }
 
-/** "$30.00/day⏎$942.31 spent⏎Over 25%" — 줄마다 하나. 일예산 없으면 그 줄 생략, 지출 없으면 "—" */
-function budgetSpendText(r) {
+/**
+ * 줄·강조가 있는 칸의 재료 — lines: 줄마다 세그먼트 배열 [{ text, style? }]. style은 'small'(작고 회색) · 'bold'.
+ * 결과 { text, runs: [{ start, end, style }] }. 글자 위치를 여기서 계산해 두면 렌더는 옮겨 적기만 한다.
+ */
+function richLines(lines) {
+  var text = '';
+  var runs = [];
+  lines.forEach(function (segments, i) {
+    if (i > 0) text += '\n';
+    segments.forEach(function (seg) {
+      var start = text.length;
+      text += seg.text;
+      if (seg.style) runs.push({ start: start, end: text.length, style: seg.style });
+    });
+  });
+  return { text: text, runs: runs };
+}
+
+/** "Jul 6 – Aug 1 (27 days)" (utils/format dateRangeWithDays) */
+function dateRangeWithDays(startIso, endIso) {
+  var days = daysBetween(startIso, endIso);
+  var range = dateRange(startIso, endIso);
+  return days == null || days < 1 ? range : range + ' (' + countText(days, 'day') + ')';
+}
+
+/** Budget / Spend — "$20.00/day"(작게) ⏎ "$1,119.30 spent"(굵게) ⏎ "Over 25%"(작게, 문턱 밖일 때만). 지출 없으면 "—" */
+function budgetSpendCell(r) {
   var lines = [];
-  if (r.dailyBudget != null) lines.push(moneyText(r.dailyBudget) + '/day');
-  lines.push(r.spend != null ? moneyText(r.spend) + ' spent' : EMPTY);
+  if (r.dailyBudget != null) lines.push([{ text: moneyText(r.dailyBudget) + '/day', style: 'small' }]);
+  lines.push(r.spend != null ? [{ text: moneyText(r.spend) + ' spent', style: 'bold' }] : [{ text: EMPTY }]);
   var pacing = pacingText(r.pacingRatio);
-  if (pacing) lines.push(pacing);
-  return lines.join('\n');
+  if (pacing) lines.push([{ text: pacing, style: 'small' }]);
+  return richLines(lines);
 }
 
-/** "CPM $2.41⏎↑ best of 12" — 값 없으면 "—", 비교군 없으면 둘째 줄 생략 */
-function primaryKpiText(kpi, stat) {
-  if (!kpi || !kpi.metricKey || kpi.value == null) return EMPTY;
-  var text = CONFIG.METRIC_LABEL[kpi.metricKey] + ' ' + metricText(kpi.metricKey, kpi.value);
+/** Primary KPI — "CPM"(작게) ⏎ "$2.41"(굵게) ⏎ "↑ best of 12"(작게, 비교군 있을 때만). 값 없으면 "—" */
+function primaryKpiCell(kpi, stat) {
+  if (!kpi || !kpi.metricKey || kpi.value == null) return richLines([[{ text: EMPTY }]]);
+  var lines = [
+    [{ text: CONFIG.METRIC_LABEL[kpi.metricKey], style: 'small' }],
+    [{ text: metricText(kpi.metricKey, kpi.value), style: 'bold' }],
+  ];
   var position = benchmarkPositionText(stat);
-  return position ? text + '\n' + position : text;
+  if (position) lines.push([{ text: position, style: 'small' }]);
+  return richLines(lines);
 }
 
-/** 지표 한 칸 — "25.18%⏎↑ top 9%". 값 없으면 null(칸은 "—"), 비교군 없으면 값만 */
-function metricCellText(r, key) {
+/** 지표 한 줄 — "Hook 23.11%" + "  ↑ top 9%"(작게). 값 없으면 "Hook —" */
+function metricLine(r, key) {
+  var segments = [{ text: CONFIG.METRIC_LABEL[key] + ' ' + (r[key] == null ? EMPTY : metricText(key, r[key])) }];
+  var position = r[key] == null ? null : benchmarkPositionText(r.benchmarks ? r.benchmarks[key] : null);
+  if (position) segments.push({ text: '  ' + position, style: 'small' });
+  return segments;
+}
+
+/** 압축 수량 — 1만 미만 "1,074", 1만 이상 "163K", 100만 이상 "1.2M" (utils/format countCompact) */
+function countCompactText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  var abs = Math.abs(v);
+  if (abs >= 1000000) return (v / 1000000).toFixed(abs >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (abs >= 10000) return Math.round(v / 1000) + 'K';
+  return countNumberText(v);
+}
+
+/** "1,074" (utils/format count) */
+function countNumberText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** 보조 수량 한 조각 — "1,074 clicks" / "73 likes" / "9 shares" / "64 results", 비용·비율은 "CPC $0.88" (recapRowView secondaryText) */
+var COUNT_NOUN = { clicks: 'clicks', likes: 'likes', shares: 'shares', conversions: 'results' };
+function secondaryPartText(r, key) {
   if (r[key] == null) return null;
-  var value = metricText(key, r[key]);
-  var position = benchmarkPositionText(r.benchmarks ? r.benchmarks[key] : null);
-  return position ? value + '\n' + position : value;
+  if (COUNT_NOUN[key]) return countNumberText(r[key]) + ' ' + COUNT_NOUN[key];
+  return CONFIG.METRIC_LABEL[key] + ' ' + metricText(key, r[key]);
+}
+
+/**
+ * Video response — 대시보드와 같은 구성: Hook 줄, Hold 줄(각각 순위 포함), 보조 줄 "Reach 163K · Plays 296K · Avg 2s"(작게).
+ * (대시보드는 Hook·Hold를 좌우로 놓지만 시트 셀은 비례 글꼴이라 줄로 쌓는다 — 순위는 자기 지표 옆에 붙어 있다)
+ */
+function videoResponseCell(r) {
+  var lines = [metricLine(r, 'hookRate'), metricLine(r, 'holdRate')];
+  var secondary = [
+    r.reach != null ? 'Reach ' + countCompactText(r.reach) : null,
+    r.videoPlays != null ? 'Plays ' + countCompactText(r.videoPlays) : null,
+    r.avgWatchSeconds != null ? 'Avg ' + secondsText(r.avgWatchSeconds) : null,
+  ].filter(Boolean);
+  if (secondary.length) lines.push([{ text: secondary.join(' · '), style: 'small' }]);
+  return richLines(lines);
+}
+
+/** Engagement / Action — 목표가 정한 대표 두 지표 줄(순위 포함) + 보조 줄(작게). 구성은 대시보드 ENGAGEMENT_ACTION_LAYOUT */
+function engagementActionCell(r) {
+  var layout = CONFIG.ENGAGEMENT_ACTION_LAYOUT[r.goal] || CONFIG.ENGAGEMENT_ACTION_LAYOUT.awareness;
+  var lines = layout.primary.map(function (k) { return metricLine(r, k); });
+  var secondary = layout.secondary.map(function (k) { return secondaryPartText(r, k); }).filter(Boolean);
+  if (secondary.length) lines.push([{ text: secondary.join(' · '), style: 'small' }]);
+  return richLines(lines);
 }
 
 /** "2s" / "2.95s" — 값이 가진 만큼만 (utils/format seconds) */

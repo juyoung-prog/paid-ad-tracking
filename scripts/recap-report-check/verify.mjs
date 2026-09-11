@@ -131,24 +131,33 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     check(rs, 'improve', cells[1].text ?? null, s.improve);
     // 임원용 표의 문장형 칸 — 대시보드 표기 함수(utils/format · recapRowView · recapStrings)로 같은 문장을 만들어 비교. 줄바꿈은 셀 안 \n
     const { storeText } = rowView.storeTextOf(r);
-    check(rs, 'campaignText', [r.phaseName, [storeText, format.dateRange(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n'), s.campaignText);
+    check(rs, 'campaignText', [r.phaseName, [storeText, format.dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n'), s.campaignText);
     const hasData = rowView.hasRowData(r);
+    // Budget / Spend — perDay ⏎ spent ⏎ pacing(문턱 밖일 때만)
     const budgetLines = [];
     if (r.dailyBudget != null) budgetLines.push(strings.t('recap.table.perDay', 'en', { amount: format.money(r.dailyBudget) }));
     budgetLines.push(r.spend != null ? strings.t('recap.table.spent', 'en', { amount: format.money(r.spend) }) : format.EMPTY);
     const pacing = dashboardPacing(r.pacingRatio);
     if (pacing) budgetLines.push(pacing);
-    check(rs, 'budgetSpendText', budgetLines.join('\n'), s.budgetSpendText);
-    const kpiText = kpi?.value == null ? format.EMPTY
-      : `${strings.metricLabel(kpi.metricKey, 'en')} ${rowView.kpiFormat(kpi.metricKey)(kpi.value)}${dashboardPosition(stat) ? `\n${dashboardPosition(stat)}` : ''}`;
-    check(rs, 'primaryKpiText', hasData ? kpiText : strings.t('recap.table.noData', 'en'), s.primaryKpiText);
-    // 지표 열 — "값 ⏎ 순위" 두 줄. 값은 대시보드 kpiFormat(percent 2자리), 순위는 benchmarkPositionText
-    ['hookRate', 'holdRate', 'engagementRate', 'ctr'].forEach((k) => {
-      const expected = r[k] == null ? null : `${rowView.kpiFormat(k)(r[k])}${dashboardPosition(r.benchmarks[k]) ? `\n${dashboardPosition(r.benchmarks[k])}` : ''}`;
-      check(rs, `${k}Text`, expected, s[`${k}Text`]);
+    check(rs, 'budgetSpend', budgetLines.join('\n'), s.budgetSpend?.text);
+    // Primary KPI — 라벨 ⏎ 값 ⏎ 순위(비교군 있을 때만). 데이터 없으면 "—"
+    const kpiText = !hasData || kpi?.value == null ? format.EMPTY
+      : [strings.metricLabel(kpi.metricKey, 'en'), rowView.kpiFormat(kpi.metricKey)(kpi.value), dashboardPosition(stat)].filter(Boolean).join('\n');
+    check(rs, 'primaryKpi', kpiText, s.primaryKpi?.text);
+    // 지표 줄 — "Hook 23.11%  ↑ top 9%" (값 없으면 "Hook —")
+    const line = (k) => `${strings.metricLabel(k, 'en')} ${r[k] == null ? format.EMPTY : rowView.kpiFormat(k)(r[k])}${r[k] != null && dashboardPosition(r.benchmarks[k]) ? `  ${dashboardPosition(r.benchmarks[k])}` : ''}`;
+    // Video response — Hook 줄, Hold 줄, 보조 줄(dashboard videoSecondaryText)
+    const video = hasData ? [line('hookRate'), line('holdRate'), rowView.videoSecondaryText(r, 'en') || null].filter(Boolean).join('\n') : strings.t('recap.table.noData', 'en');
+    check(rs, 'videoResponse', video, s.videoResponse?.text);
+    // Engagement / Action — 목표별 대표 두 지표 줄 + 보조 줄(dashboard secondaryText)
+    const layout = rowView.engagementLayout(r.goal);
+    const engagement = hasData ? [...layout.primary.map(line), rowView.secondaryText(r, layout.secondary, 'en') || null].filter(Boolean).join('\n') : format.EMPTY;
+    check(rs, 'engagementAction', engagement, s.engagementAction?.text);
+    // runs가 text 범위 안에 있는지
+    ['budgetSpend', 'primaryKpi', 'videoResponse', 'engagementAction'].forEach((k) => {
+      const cell = s[k];
+      check(rs, `${k}.runsInRange`, true, Boolean(cell) && cell.runs.every((run) => run.start >= 0 && run.end <= cell.text.length && run.start < run.end));
     });
-    check(rs, 'avgWatchText', r.avgWatchSeconds == null ? null : format.seconds(r.avgWatchSeconds), s.avgWatchText);
-    check(rs, 'keyResponseRemoved', undefined, s.keyResponseText);
   });
   return { model, dash, headline, rowCount };
 }
@@ -159,12 +168,12 @@ function printSummary(model, dash, headline) {
   console.log(`\n== ${model.eventName} ==`);
   console.log(`headline  dashboard: ${dashboardHeadlineText(headline) ?? '—'} | sheet: ${model.headline?.text ?? '—'}`);
   console.log(`spend     dashboard: ${money(allRows.map((r) => r.spend).filter((v) => v != null).reduce((a, b) => a + b, 0))} | sheet: ${money(model.spend)}`);
-  const lines = [['platform', 'Campaign', 'Goal', 'Budget / Spend', 'Primary KPI', 'Hook', 'Hold', 'Eng. rate', 'CTR', 'Reach', 'Plays', 'Avg', 'worked =', 'improve =']];
+  const lines = [['platform', 'Campaign', 'Goal', 'Budget / Spend', 'Primary KPI', 'Video response', 'Engagement / Action', 'worked =', 'improve =']];
   model.sections.forEach((sec) => sec.rows.forEach((s) => {
     const r = allRows.find((x) => x.campaignId === s.campaignId);
     const cells = rowView.insightCellsOf(r, 'en');
     const nl = (v) => String(v ?? '—').replace(/\n/g, ' ⏎ ');
-    lines.push([sec.label, nl(s.campaignText), s.goalLabel ?? '—', nl(s.budgetSpendText), nl(s.primaryKpiText), nl(s.hookRateText), nl(s.holdRateText), nl(s.engagementRateText), nl(s.ctrText), s.reach ?? '—', s.videoPlays ?? '—', s.avgWatchText ?? '—',
+    lines.push([sec.label, nl(s.campaignText), s.goalLabel ?? '—', nl(s.budgetSpend?.text), nl(s.primaryKpi?.text), nl(s.videoResponse?.text), nl(s.engagementAction?.text),
       (cells[0].text ?? null) === s.worked ? 'same' : 'DIFF', (cells[1].text ?? null) === s.improve ? 'same' : 'DIFF']);
   }));
   const widths = lines[0].map((_, i) => Math.max(...lines.map((l) => String(l[i]).length)));
