@@ -49,7 +49,7 @@ function dashboardHeadlineText(h) {
 }
 function dashboardPosition(stat) {
   return stat && stat.peerScope !== 'none' && stat.percentile != null
-    ? `${stat.band === 'top' ? '↗ ' : stat.band === 'bottom' ? '↘ ' : ''}${strings.benchmarkPositionText(stat, 'en')}`
+    ? `${stat.band === 'top' ? '↑ ' : stat.band === 'bottom' ? '↓ ' : ''}${strings.benchmarkPositionText(stat, 'en')}`
     : null;
 }
 function dashboardPacing(ratio) {
@@ -129,25 +129,33 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     const cells = rowView.insightCellsOf(r, 'en');
     check(rs, 'worked', cells[0].text ?? null, s.worked);
     check(rs, 'improve', cells[1].text ?? null, s.improve);
-    // 임원용 표의 문장형 칸 — 대시보드 표기 함수(utils/format · recapRowView · recapStrings)로 같은 문장을 만들어 비교
+    // 임원용 표의 문장형 칸 — 대시보드 표기 함수(utils/format · recapRowView · recapStrings)로 같은 문장을 만들어 비교. 줄바꿈은 셀 안 \n
     const { storeText } = rowView.storeTextOf(r);
-    check(rs, 'campaignText', [r.phaseName, storeText, format.dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · '), s.campaignText);
+    check(rs, 'campaignText', [r.phaseName, [storeText, format.dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n'), s.campaignText);
     const hasData = rowView.hasRowData(r);
-    const budgetParts = [];
-    if (r.dailyBudget != null) budgetParts.push(strings.t('recap.table.perDay', 'en', { amount: format.money(r.dailyBudget) }));
-    budgetParts.push(r.spend != null ? strings.t('recap.table.spent', 'en', { amount: format.money(r.spend) }) : format.EMPTY);
+    const budgetLines = [];
+    if (r.dailyBudget != null) budgetLines.push(strings.t('recap.table.perDay', 'en', { amount: format.money(r.dailyBudget) }));
+    budgetLines.push(r.spend != null ? strings.t('recap.table.spent', 'en', { amount: format.money(r.spend) }) : format.EMPTY);
     const pacing = dashboardPacing(r.pacingRatio);
-    if (pacing) budgetParts.push(pacing);
-    check(rs, 'budgetSpendText', budgetParts.join(' · '), s.budgetSpendText);
+    if (pacing) budgetLines.push(pacing);
+    check(rs, 'budgetSpendText', budgetLines.join('\n'), s.budgetSpendText);
     const kpiText = kpi?.value == null ? format.EMPTY
-      : `${strings.metricLabel(kpi.metricKey, 'en')} ${rowView.kpiFormat(kpi.metricKey)(kpi.value)}${dashboardPosition(stat) ? ` · ${dashboardPosition(stat)}` : ''}`;
+      : `${strings.metricLabel(kpi.metricKey, 'en')} ${rowView.kpiFormat(kpi.metricKey)(kpi.value)}${dashboardPosition(stat) ? `\n${dashboardPosition(stat)}` : ''}`;
     check(rs, 'primaryKpiText', hasData ? kpiText : strings.t('recap.table.noData', 'en'), s.primaryKpiText);
-    const keyResponse = ['hookRate', 'holdRate', ...rowView.engagementLayout(r.goal).primary].map((k) => {
-      const label = `${strings.metricLabel(k, 'en')} ${rowView.kpiFormat(k)(r[k])}`;
-      const pos = r[k] == null ? null : dashboardPosition(r.benchmarks[k]);
-      return pos ? `${label} (${pos})` : label;
-    }).join(' · ');
-    check(rs, 'keyResponseText', hasData ? keyResponse : null, s.keyResponseText);
+    // Key response — 목표별 2~3줄. 지표 한 자리는 "Hook 25.18% ↑ top 9%", 보조 줄은 dashboard secondaryText/videoSecondaryText와 같은 조각
+    const slot = (k) => (r[k] == null ? null : `${strings.metricLabel(k, 'en')} ${rowView.kpiFormat(k)(r[k])}${dashboardPosition(r.benchmarks[k]) ? ` ${dashboardPosition(r.benchmarks[k])}` : ''}`);
+    const joinParts = (parts) => { const kept = parts.filter(Boolean); return kept.length ? kept.join(' · ') : null; };
+    const LAYOUT = {
+      awareness: { first: ['hookRate', 'holdRate'], second: ['engagementRate', 'ctr'], third: 'video' },
+      traffic: { first: ['ctr', 'cpc'], second: ['hookRate', 'holdRate'], third: ['clicks'] },
+      engagement: { first: ['engagementRate', 'cpe'], second: ['hookRate', 'holdRate'], third: ['likes', 'shares'] },
+      conversion: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
+      store_visit: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
+    };
+    const layout = LAYOUT[r.goal] ?? LAYOUT.awareness;
+    const third = layout.third === 'video' ? (rowView.videoSecondaryText(r, 'en') || null) : (rowView.secondaryText(r, layout.third, 'en') || null);
+    const keyLines = [joinParts(layout.first.map(slot)), joinParts(layout.second.map(slot)), third].filter(Boolean);
+    check(rs, 'keyResponseText', hasData ? (keyLines.length ? keyLines.join('\n') : format.EMPTY) : null, s.keyResponseText);
   });
   return { model, dash, headline, rowCount };
 }
@@ -162,7 +170,8 @@ function printSummary(model, dash, headline) {
   model.sections.forEach((sec) => sec.rows.forEach((s) => {
     const r = allRows.find((x) => x.campaignId === s.campaignId);
     const cells = rowView.insightCellsOf(r, 'en');
-    lines.push([sec.label, s.campaignText, s.goalLabel ?? '—', s.budgetSpendText, s.primaryKpiText, (s.keyResponseText ?? '—').slice(0, 70),
+    const nl = (v) => String(v ?? '—').replace(/\n/g, ' ⏎ ');
+    lines.push([sec.label, nl(s.campaignText), s.goalLabel ?? '—', nl(s.budgetSpendText), nl(s.primaryKpiText), nl(s.keyResponseText).slice(0, 110),
       (cells[0].text ?? null) === s.worked ? 'same' : 'DIFF', (cells[1].text ?? null) === s.improve ? 'same' : 'DIFF']);
   }));
   const widths = lines[0].map((_, i) => Math.max(...lines.map((l) => String(l[i]).length)));

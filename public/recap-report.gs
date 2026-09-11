@@ -47,7 +47,7 @@
  *   · buildReportModel 아래는 Apps Script API를 쓰지 않는 순수 함수다 — node로 떼어 돌려 대시보드와 대조한다:
  *       node --import ./scripts/recap-report-check/register.mjs scripts/recap-report-check/verify.mjs [--real]
  *     (schema.js의 규칙·상수를 바꿨으면 이 파일의 CONFIG·계산부도 고치고 위 명령으로 다시 대조할 것)
- *   · 매 실행마다 sheet.clear()이므로 손으로 고친 서식은 사라진다. 유지할 디자인은 renderReport_에 있다
+ *   · 매 실행마다 sheet.clear()이므로 손으로 고친 서식은 사라진다. 유지할 디자인(열 폭·행 높이·병합·테두리·줄바꿈)은 전부 renderReport_에 있다
  */
 
 // ============================================================
@@ -111,14 +111,6 @@ var CONFIG = {
     engagement: { primary: ['cpe', 'engagementRate'], diagnostic: ['hookRate', 'holdRate'] },
     conversion: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
     store_visit: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
-  },
-  /** Key response의 참여/행동 두 자리 — 목표가 정한다 (recapRowView ENGAGEMENT_ACTION_LAYOUT primary) */
-  ENGAGEMENT_ACTION_LAYOUT: {
-    awareness: ['engagementRate', 'ctr'],
-    traffic: ['ctr', 'cpc'],
-    engagement: ['engagementRate', 'cpe'],
-    conversion: ['cpa', 'ctr'],
-    store_visit: ['cpa', 'ctr'],
   },
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
@@ -350,63 +342,71 @@ function placeReportSheet_(ss, sheet, previous) {
 // ============================================================
 
 /** 표 열 정의 — 캠페인 표. key는 model 행의 필드, fmt는 setNumberFormat, align은 가로 정렬 */
+/**
+ * 물리 열 폭(B열부터) — 타임라인(8열)·KPI(5열)·캠페인 표(7열, 일부 병합)가 같은 열을 나눠 쓴다.
+ *   B 260 Campaign / Phase / Period      C 110 Goal / Platforms / Campaigns
+ *   D  85 Start                          E  85 End           (D:E 병합 = Budget / Spend 170)
+ *   F  60 Days                           G 100 Daily budget  (F:G 병합 = Primary KPI 160)
+ *   H 105 Planned   I 115 Spent   J 140  (H:J 병합 = Key response 360)
+ *   K 280 What worked                    L 280 Could improve
+ */
+var PHYSICAL_WIDTHS = [260, 110, 85, 85, 60, 100, 105, 115, 140, 280, 280];
+
+/** 캠페인 표 — 7열. span은 병합할 물리 열 수 */
 var COLUMNS = [
-  { key: 'campaignText', label: 'Campaign', width: 300, align: 'left',
-    note: 'Phase name · store · period (days). Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
-  { key: 'goalLabel', label: 'Goal', width: 100 },
-  { key: 'budgetSpendText', label: 'Budget / Spend', width: 220,
-    note: 'Daily budget · actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
-  { key: 'primaryKpiText', label: 'Primary KPI', width: 220,
-    note: 'The main result for the campaign goal — reported, not judged.\nAwareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.\nAfter the value: where it ranks among comparable past campaigns (' + 'same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE + '; same phase when 3+ exist). ↗ top · ↘ bottom · "mid" in between; nothing if fewer than 3 peers. Context only, no grade.' },
-  { key: 'keyResponseText', label: 'Key response', width: 560, align: 'left',
-    note: 'Video response (Hook = hook views ÷ plays, Hold = completed ÷ hook views) then the two engagement / action metrics the goal emphasises: Awareness → Eng. rate · CTR, Traffic → CTR · CPC, Engagement → Eng. rate · Cost/eng, Conversion / Store visit → CPA · CTR. In parentheses: rank among comparable past campaigns, when 3+ exist.' },
-  { key: 'worked', label: 'What worked', width: 340, align: 'left',
+  { key: 'campaignText', label: 'Campaign', span: 1, align: 'left',
+    note: 'Phase name, then store · period (days). Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
+  { key: 'goalLabel', label: 'Goal', span: 1, align: 'center' },
+  { key: 'budgetSpendText', label: 'Budget / Spend', span: 2, align: 'center',
+    note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
+  { key: 'primaryKpiText', label: 'Primary KPI', span: 2, align: 'center',
+    note: 'The main result for the campaign goal — reported, not judged.\nAwareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.\nSecond line: where it ranks among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE + '; same phase when 3+ exist). ↑ top · ↓ bottom · "mid" in between; no line if fewer than 3 peers. Context only, no grade.' },
+  { key: 'keyResponseText', label: 'Key response', span: 3, align: 'left',
+    note: 'Supporting signals, 2–3 lines. Awareness: Hook · Hold / Eng. rate · CTR / Reach · Plays · Avg watch. Traffic: CTR · CPC / Hook · Hold / clicks. Engagement: Eng. rate · Cost/eng / Hook · Hold / likes · shares. Conversion / Store visit: CPA · CTR / Hook · Hold / results · CPC.\nHook = hook views ÷ plays · Hold = completed ÷ hook views · Eng. rate = engagements ÷ impressions · Cost/eng = spend ÷ (likes + comments + shares). After a value: rank among comparable past campaigns when 3+ exist (↑ top · ↓ bottom · mid).' },
+  { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
-  { key: 'improve', label: 'Could improve', width: 340, align: 'left',
+  { key: 'improve', label: 'Could improve', span: 1, align: 'left',
     note: 'Same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
 ];
 
-var VS_PAST_NOTE = 'Where this value ranks among comparable past campaigns — same platform, same goal, other events, started on/after ' +
-  CONFIG.BENCHMARK_SINCE + '. Same phase name when 3+ exist, else same goal. "best of N" / "top X%" / "mid" / "bottom X%" / "lowest of N"; ' +
-  'percentile = (worse + ties ÷ 2) ÷ peers × 100, cost metrics inverted so higher is better. Fewer than 3 peers → "—". Context only, not a grade.';
-
-/** 타임라인 표 열 — 캠페인 표의 B~I 열을 나눠 쓴다(폭은 그 열을 따른다) */
+/** 타임라인 표 열 — B~I, 병합 없음 */
 var TIMELINE_COLUMNS = [
   { key: 'name', label: 'Phase', align: 'left' },
-  { key: 'platformLabel', label: 'Platforms' },
-  { key: 'startDate', label: 'Start' },
-  { key: 'endDate', label: 'End' },
-  { key: 'days', label: 'Days', fmt: '0' },
-  { key: 'totalDaily', label: 'Daily budget', fmt: '"$"#,##0.00' },
-  { key: 'totalBudget', label: 'Planned', fmt: '"$"#,##0' },
-  { key: 'spent', label: 'Spent', fmt: '"$"#,##0.00' },
+  { key: 'platformLabel', label: 'Platforms', align: 'center' },
+  { key: 'startDate', label: 'Start', align: 'center' },
+  { key: 'endDate', label: 'End', align: 'center' },
+  { key: 'days', label: 'Days', align: 'center', fmt: '0' },
+  { key: 'totalDaily', label: 'Daily budget', align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'totalBudget', label: 'Planned', align: 'right', fmt: '"$"#,##0' },
+  { key: 'spent', label: 'Spent', align: 'right', fmt: '"$"#,##0.00' },
 ];
 
-/** KPI 블록 — 작은 표 하나(헤더 줄 + 값 줄). 참고 디자인(i-28)과 같은 꼴 */
+/** KPI 블록 — 헤더 줄 + 값 줄, B~F */
 var KPI_COLUMNS = [
-  { key: 'periodText', label: 'Period' },
-  { key: 'campaignCount', label: 'Campaigns', fmt: '0' },
-  { key: 'spend', label: 'Total spent', fmt: '"$"#,##0.00' },
-  { key: 'plannedBudget', label: 'Planned', fmt: '"$"#,##0',
+  { key: 'periodText', label: 'Period', align: 'left' },
+  { key: 'campaignCount', label: 'Campaigns', align: 'center', fmt: '0' },
+  { key: 'spend', label: 'Total spent', align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'plannedBudget', label: 'Planned', align: 'right', fmt: '"$"#,##0',
     note: 'Sum of each campaign\'s planned budget: stored budget_planned, else daily budget × days (start and end inclusive). The dashboard uses the Plan document when one exists.' },
-  { key: 'storeCount', label: 'Stores', fmt: '0' },
+  { key: 'storeCount', label: 'Stores', align: 'center', fmt: '0' },
 ];
 
 /**
- * 디자인 상수 — 참고 디자인(issue/i-28.png): 흰 배경, 모든 셀 얇은 회색 테두리, 헤더 연회색 바탕·굵게, 기본 중앙 정렬,
- * 굵은 Total 행, A열은 좁은 여백. 색은 테두리·헤더 바탕·회색 글자 셋뿐이다.
+ * 디자인 상수 — 참고 디자인(issue/i-28.png)의 위계를 따르되 격자는 가볍게: 헤더는 연회색 바탕 + 위아래 중간 회색 선,
+ * 줄 사이는 옅은 가로선만, 세로선 없음. 표 사이는 빈 줄 둘. 캠페인 줄은 셀 안 줄바꿈(2~3줄)이 들어가 높다.
  */
 var STYLE = {
-  border: '#c9c9c9',
+  borderStrong: '#bdbdbd',
+  borderLight: '#e3e3e3',
   headerBg: '#f3f3f3',
   secondary: '#666666',
   fontSize: 10,
-  rowHeight: 27,
   titleSize: 16,
   sectionSize: 12,
   leftGutter: 20,
-  /** 표는 B열부터 — A열은 여백 */
   left: 2,
+  heights: { title: 34, section: 30, kpiHeader: 30, kpiValue: 34, timelineHeader: 30, timelineRow: 32, campaignHeader: 32, campaignRow: 64 },
+  sectionGap: 2,
 };
 
 /** 셀 하나에 놓을 값 — 없으면 "—"(문자열). 금액·비율은 숫자 그대로(서식은 열이 정한다) */
@@ -414,9 +414,9 @@ function cellValue_(v) {
   return v == null || v === '' ? EMPTY : v;
 }
 
-/** 모든 변 얇은 회색 실선 */
-function borderAll_(range) {
-  range.setBorder(true, true, true, true, true, true, STYLE.border, SpreadsheetApp.BorderStyle.SOLID);
+/** 열 정의의 span 합 — 표가 차지하는 물리 열 수 */
+function spanOf_(columns) {
+  return columns.reduce(function (sum, c) { return sum + (c.span || 1); }, 0);
 }
 
 /**
@@ -432,24 +432,25 @@ function renderReport_(sheet, model) {
   sheet.setFrozenRows(0);
   sheet.setFrozenColumns(0);
   sheet.setHiddenGridlines(true);
-  var totalCols = STYLE.left - 1 + COLUMNS.length;
+  var totalCols = STYLE.left - 1 + PHYSICAL_WIDTHS.length;
   if (sheet.getMaxColumns() < totalCols) sheet.insertColumnsAfter(sheet.getMaxColumns(), totalCols - sheet.getMaxColumns());
-  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).setFontSize(STYLE.fontSize).setVerticalAlignment('middle').setHorizontalAlignment('center');
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).setFontSize(STYLE.fontSize).setVerticalAlignment('middle');
 
   var L = STYLE.left;
+  var H = STYLE.heights;
   var row = 2; // 1행은 위 여백
 
   // 2) 제목 · 메타 줄
   sheet.getRange(row, L).setValue(model.eventName).setFontSize(STYLE.titleSize).setFontWeight('bold').setHorizontalAlignment('left')
     .setNote('Recap — read from the dashboard database (read-only) and drawn by the Report script. Rules match the dashboard (src/data/schema.js). Refresh: Report → Refresh report.');
-  sheet.setRowHeight(row, 32);
+  sheet.setRowHeight(row, H.title);
   row += 1;
   sheet.getRange(row, L).setValue(model.metaLine).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
   row += 2;
 
-  // 3) KPI 블록 — 헤더 줄 + 값 줄, 전체 테두리
+  // 3) KPI 블록
   var kpiRow = { periodText: model.periodText, campaignCount: model.campaignCount, spend: model.spend, plannedBudget: model.plannedBudget, storeCount: model.stores.length || null };
-  row = renderTable_(sheet, row, L, KPI_COLUMNS, [kpiRow], { valuesBold: true });
+  row = renderTable_(sheet, row, L, KPI_COLUMNS, [kpiRow], { headerHeight: H.kpiHeader, rowHeight: H.kpiValue, valuesBold: true });
   row += 1;
 
   // 4) 순위 한 줄 — 굵게, 비교 이벤트는 다음 줄 회색
@@ -459,28 +460,29 @@ function renderReport_(sheet, model) {
         '), recomputed from summed numerators and denominators, against other events that share at least one phase name. Needs 3+ events including this one.');
     row += 1;
     sheet.getRange(row, L).setValue(model.headline.peerEvents.join(' · ')).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
-    row += 2;
+    row += 1;
   }
+  row += STYLE.sectionGap;
 
   // 5) 타임라인 — 단계별 기간·예산·지출 + Total
   row = renderSectionTitle_(sheet, row, 'Timeline — ' + countText_(model.phases.length, 'phase'));
-  row = renderTable_(sheet, row, L, TIMELINE_COLUMNS, model.phases, { total: model.phaseTotal });
-  row += 2;
+  row = renderTable_(sheet, row, L, TIMELINE_COLUMNS, model.phases, { headerHeight: H.timelineHeader, rowHeight: H.timelineRow, total: model.phaseTotal });
+  row += STYLE.sectionGap;
 
-  // 6) 플랫폼별 캠페인 표 + Total
+  // 6) 플랫폼별 캠페인 표 — 셀 안 줄바꿈이 있어 줄이 높고 WRAP
   model.sections.forEach(function (section) {
     row = renderSectionTitle_(sheet, row, section.label + ' campaigns — ' + countText_(section.rows.length, 'campaign'));
-    row = renderTable_(sheet, row, L, COLUMNS, section.rows);
-    row += 2;
+    row = renderTable_(sheet, row, L, COLUMNS, section.rows, { headerHeight: H.campaignHeader, rowHeight: H.campaignRow, wrap: true });
+    row += STYLE.sectionGap;
   });
 
   // 7) 꼬리말
   sheet.getRange(row, L).setValue('Refreshed ' + model.refreshedText + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve are generated sentences; notes written by a person live in the dashboard.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
 
-  // 8) 열 폭 — A열 여백, B열부터 캠페인 표 기준. 타임라인·KPI는 같은 열을 나눠 쓴다
+  // 8) 열 폭 — A열 여백, B열부터 물리 열 폭
   sheet.setColumnWidth(1, STYLE.leftGutter);
-  COLUMNS.forEach(function (col, i) { sheet.setColumnWidth(L + i, col.width); });
+  PHYSICAL_WIDTHS.forEach(function (w, i) { sheet.setColumnWidth(L + i, w); });
   // 남는 빈 행·열은 지운다 — 스크롤 끝이 표 끝이어야 읽기 편하다
   if (sheet.getMaxRows() > row + 2) sheet.deleteRows(row + 3, sheet.getMaxRows() - row - 2);
   if (sheet.getMaxColumns() > totalCols) sheet.deleteColumns(totalCols + 1, sheet.getMaxColumns() - totalCols);
@@ -494,27 +496,41 @@ function countText_(n, noun) {
 /** 섹션 제목 줄 — 굵은 12pt 한 칸, 밑줄·바탕 없음 */
 function renderSectionTitle_(sheet, row, title) {
   sheet.getRange(row, STYLE.left).setValue(title).setFontSize(STYLE.sectionSize).setFontWeight('bold').setHorizontalAlignment('left');
-  sheet.setRowHeight(row, 30);
+  sheet.setRowHeight(row, STYLE.heights.section);
   return row + 1;
 }
 
 /**
- * 표 하나 — 헤더 줄(연회색 바탕·굵게·노트) + 데이터 줄 + 선택적 Total 줄(굵게). 모든 셀에 얇은 회색 테두리, 기본 중앙 정렬.
- * @param {{ total?: Object|null, valuesBold?: boolean }} [options]
+ * 표 하나 — 헤더 줄(연회색 바탕·굵게·위아래 중간 회색 선·노트) + 데이터 줄(옅은 가로선, 세로선 없음) + 선택적 Total 줄(굵게, 위 선 진하게).
+ * span > 1인 열은 물리 열을 병합한다.
+ * @param {{ headerHeight: number, rowHeight: number, total?: Object|null, valuesBold?: boolean, wrap?: boolean }} options
  * @returns {number} 다음 빈 줄
  */
 function renderTable_(sheet, row, startCol, columns, rows, options) {
   options = options || {};
-  var n = columns.length;
-  var header = columns.map(function (c) { return c.label; });
-  var headerRange = sheet.getRange(row, startCol, 1, n);
-  headerRange.setValues([header]).setFontWeight('bold').setBackground(STYLE.headerBg).setWrap(false).setHorizontalAlignment('center');
-  borderAll_(headerRange);
+  var width = spanOf_(columns);
+  var offsets = [];
+  var acc = 0;
+  columns.forEach(function (c) { offsets.push(acc); acc += (c.span || 1); });
+  var mergeRow = function (r) {
+    columns.forEach(function (c, i) {
+      if ((c.span || 1) > 1) sheet.getRange(r, startCol + offsets[i], 1, c.span).merge();
+    });
+  };
+
+  // 헤더
+  var headerRange = sheet.getRange(row, startCol, 1, width);
+  var header = [];
+  columns.forEach(function (c, i) { for (var k = 0; k < (c.span || 1); k += 1) header.push(k === 0 ? c.label : ''); });
+  headerRange.setValues([header]).setFontWeight('bold').setBackground(STYLE.headerBg).setWrap(false).setVerticalAlignment('middle');
+  headerRange.setBorder(true, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+  mergeRow(row);
   columns.forEach(function (c, i) {
-    var note = c.note === 'vsPast' ? VS_PAST_NOTE : c.note;
-    if (note) sheet.getRange(row, startCol + i).setNote(note);
+    var cell = sheet.getRange(row, startCol + offsets[i]);
+    cell.setHorizontalAlignment(c.align || 'center');
+    if (c.note) cell.setNote(c.note);
   });
-  sheet.setRowHeight(row, STYLE.rowHeight);
+  sheet.setRowHeight(row, options.headerHeight);
   row += 1;
 
   var bodyRows = rows.slice();
@@ -522,40 +538,47 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   if (options.total) { totalIndex = bodyRows.length; bodyRows.push(options.total); }
 
   if (bodyRows.length === 0) {
-    var emptyRange = sheet.getRange(row, startCol, 1, n);
-    emptyRange.setValue('No campaigns on this platform.').setFontColor(STYLE.secondary);
-    borderAll_(emptyRange);
-    sheet.setRowHeight(row, STYLE.rowHeight);
+    var emptyRange = sheet.getRange(row, startCol, 1, width);
+    emptyRange.merge().setValue('No campaigns on this platform.').setFontColor(STYLE.secondary).setHorizontalAlignment('left');
+    emptyRange.setBorder(false, false, true, false, false, false, STYLE.borderLight, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.setRowHeight(row, options.rowHeight);
     return row + 1;
   }
 
+  // 본문 — 값은 병합 첫 칸에, 나머지 칸은 빈 문자열
   var values = bodyRows.map(function (r, j) {
-    return columns.map(function (c, i) {
-      if (j === totalIndex && i === 0) return 'Total';
-      return j === totalIndex && r[c.key] == null ? '' : cellValue_(r[c.key]);
+    var line = [];
+    columns.forEach(function (c, i) {
+      var v;
+      if (j === totalIndex && i === 0) v = 'Total';
+      else if (j === totalIndex && r[c.key] == null) v = '';
+      else v = cellValue_(r[c.key]);
+      for (var k = 0; k < (c.span || 1); k += 1) line.push(k === 0 ? v : '');
     });
+    return line;
   });
-  var body = sheet.getRange(row, startCol, bodyRows.length, n);
-  body.setValues(values).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setHorizontalAlignment('center');
-  borderAll_(body);
-  sheet.setRowHeights(row, bodyRows.length, STYLE.rowHeight);
+  var body = sheet.getRange(row, startCol, bodyRows.length, width);
+  body.setValues(values).setVerticalAlignment('middle');
+  body.setWrapStrategy(options.wrap ? SpreadsheetApp.WrapStrategy.WRAP : SpreadsheetApp.WrapStrategy.CLIP);
+  // 줄 사이 옅은 가로선, 표 끝은 중간 회색. 세로선은 없다
+  body.setBorder(false, false, false, false, false, true, STYLE.borderLight, SpreadsheetApp.BorderStyle.SOLID);
+  body.setBorder(false, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+  for (var j = 0; j < bodyRows.length; j += 1) mergeRow(row + j);
+  sheet.setRowHeights(row, bodyRows.length, options.rowHeight);
   if (options.valuesBold) body.setFontWeight('bold').setFontSize(11);
 
   columns.forEach(function (c, i) {
-    var colRange = sheet.getRange(row, startCol + i, bodyRows.length, 1);
-    if (c.align) colRange.setHorizontalAlignment(c.align);
-    if (c.fmt) {
-      colRange.setNumberFormat(c.fmt);
-    } else if (c.key === 'startDate' || c.key === 'endDate') {
-      colRange.setNumberFormat('@');
-    }
-    if (c.bold) colRange.setFontWeight('bold');
+    var colRange = sheet.getRange(row, startCol + offsets[i], bodyRows.length, 1);
+    colRange.setHorizontalAlignment(c.align || 'center');
+    if (c.fmt) colRange.setNumberFormat(c.fmt);
+    else if (c.key === 'startDate' || c.key === 'endDate') colRange.setNumberFormat('@');
   });
 
   if (totalIndex >= 0) {
-    var totalRange = sheet.getRange(row + totalIndex, startCol, 1, n);
+    var totalRange = sheet.getRange(row + totalIndex, startCol, 1, width);
     totalRange.setFontWeight('bold');
-    if (columns[0].key === 'rank') sheet.getRange(row + totalIndex, startCol).setHorizontalAlignment('center');
+    totalRange.setBorder(true, false, false, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(row + totalIndex, startCol).setHorizontalAlignment('left');
   }
 
   return row + bodyRows.length;
@@ -1055,13 +1078,13 @@ function benchmarkStat(metricKey, value, peerRows, peerScope) {
   };
 }
 
-/** 벤치마크 위치 문구 (recapStrings benchmarkPositionText) — 화살표는 BenchmarkDelta의 top ↗ · bottom ↘ */
+/** 벤치마크 위치 문구 (recapStrings benchmarkPositionText) — 짧은 표기: top ↑ · bottom ↓ · mid는 기호 없음 */
 function benchmarkPositionText(stat) {
   if (!stat || stat.peerScope === 'none' || stat.percentile == null) return null;
-  if (stat.percentile >= 100) return '↗ best of ' + (stat.sampleSize + 1);
-  if (stat.percentile <= 0) return '↘ lowest of ' + (stat.sampleSize + 1);
-  if (stat.band === 'top') return '↗ top ' + (100 - stat.percentile) + '%';
-  if (stat.band === 'bottom') return '↘ bottom ' + stat.percentile + '%';
+  if (stat.percentile >= 100) return '↑ best of ' + (stat.sampleSize + 1);
+  if (stat.percentile <= 0) return '↓ lowest of ' + (stat.sampleSize + 1);
+  if (stat.band === 'top') return '↑ top ' + (100 - stat.percentile) + '%';
+  if (stat.band === 'bottom') return '↓ bottom ' + stat.percentile + '%';
   return 'mid';
 }
 
@@ -1206,7 +1229,7 @@ function flattenRow(r) {
     benchmarks: r.benchmarks,
   };
   // 임원용 표의 문장형 칸 — 대시보드 RecapCampaignTable과 같은 표기. 값은 utils/format의 money·percent 규칙(2자리)
-  flat.campaignText = [r.phaseName, storeText(r.storeCode), dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ');
+  flat.campaignText = [r.phaseName, [storeText(r.storeCode), dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n');
   flat.budgetSpendText = budgetSpendText(r);
   flat.primaryKpiText = hasData ? primaryKpiText(kpi, kpiStat) : 'No performance data';
   flat.keyResponseText = hasData ? keyResponseText(r) : null;
@@ -1257,33 +1280,92 @@ function dateRangeWithDays(startIso, endIso) {
   return days == null || days < 1 ? range : range + ' (' + countText(days, 'day') + ')';
 }
 
-/** "$30.00/day · $942.31 spent · Over 25%" — 일예산 없으면 "—/day" 대신 생략, 지출 없으면 "—" */
+/** "$30.00/day⏎$942.31 spent⏎Over 25%" — 줄마다 하나. 일예산 없으면 그 줄 생략, 지출 없으면 "—" */
 function budgetSpendText(r) {
-  var parts = [];
-  if (r.dailyBudget != null) parts.push(moneyText(r.dailyBudget) + '/day');
-  parts.push(r.spend != null ? moneyText(r.spend) + ' spent' : EMPTY);
+  var lines = [];
+  if (r.dailyBudget != null) lines.push(moneyText(r.dailyBudget) + '/day');
+  lines.push(r.spend != null ? moneyText(r.spend) + ' spent' : EMPTY);
   var pacing = pacingText(r.pacingRatio);
-  if (pacing) parts.push(pacing);
-  return parts.join(' · ');
+  if (pacing) lines.push(pacing);
+  return lines.join('\n');
 }
 
-/** "CPM $2.50 · ↗ top 9%" — 값 없으면 "—", 비교군 없으면 순위 생략 */
+/** "CPM $2.41⏎↑ best of 12" — 값 없으면 "—", 비교군 없으면 둘째 줄 생략 */
 function primaryKpiText(kpi, stat) {
   if (!kpi || !kpi.metricKey || kpi.value == null) return EMPTY;
   var text = CONFIG.METRIC_LABEL[kpi.metricKey] + ' ' + metricText(kpi.metricKey, kpi.value);
   var position = benchmarkPositionText(stat);
-  return position ? text + ' · ' + position : text;
+  return position ? text + '\n' + position : text;
 }
 
-/** "Hook 6.78% (mid) · Hold 2.69% (↘ bottom 26%) · Eng. rate 0.22% (↗ top 17%) · CTR 0.28% (↗ top 4%)" */
+/** 지표 한 자리 — "Hook 25.18% ↑ top 9%" / "Hold 4.08% mid". 값 없으면 null */
+function metricSlotText(r, key) {
+  if (r[key] == null) return null;
+  var text = CONFIG.METRIC_LABEL[key] + ' ' + metricText(key, r[key]);
+  var position = benchmarkPositionText(r.benchmarks ? r.benchmarks[key] : null);
+  return position ? text + ' ' + position : text;
+}
+
+/** 압축 수량 — 1만 미만 "1,074", 1만 이상 "163K", 100만 이상 "1.2M" (utils/format countCompact) */
+function countCompactText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  var abs = Math.abs(v);
+  if (abs >= 1000000) return (v / 1000000).toFixed(abs >= 10000000 ? 0 : 1).replace(/\.0$/, '') + 'M';
+  if (abs >= 10000) return Math.round(v / 1000) + 'K';
+  return countNumberText(v);
+}
+
+/** "1,074" (utils/format count) */
+function countNumberText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+/** "2s" / "2.95s" — 값이 가진 만큼만 (utils/format seconds) */
+function secondsText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  return (Math.round(v * 100) / 100).toFixed(2).replace(/\.?0+$/, '') + 's';
+}
+
+/** 보조 수량 한 조각 — "1,074 clicks" / "73 likes" / "9 shares" / "64 results", 비용·비율은 "CPC $0.88" (recapRowView secondaryText) */
+var COUNT_NOUN = { clicks: 'clicks', likes: 'likes', shares: 'shares', conversions: 'results' };
+function secondaryPartText(r, key) {
+  if (r[key] == null) return null;
+  if (COUNT_NOUN[key]) return countNumberText(r[key]) + ' ' + COUNT_NOUN[key];
+  return CONFIG.METRIC_LABEL[key] + ' ' + metricText(key, r[key]);
+}
+
+/**
+ * Key response — 목표별 2~3줄. 줄 안은 " · ", 줄 사이는 줄바꿈. 값 없는 조각은 빼고, 빈 줄은 없앤다.
+ *   awareness  : Hook · Hold  /  Eng. rate · CTR  /  Reach 163K · Plays 296K · Avg 2s
+ *   traffic    : CTR · CPC  /  Hook · Hold  /  1,074 clicks
+ *   engagement : Eng. rate · Cost/eng  /  Hook · Hold  /  73 likes · 9 shares
+ *   conversion·store_visit : CPA · CTR  /  Hook · Hold  /  64 results · CPC $4.51
+ * 지표 뒤에는 비교군 순위(있을 때만) — "Hook 25.18% ↑ top 9%".
+ */
+var KEY_RESPONSE_LAYOUT = {
+  awareness: { first: ['hookRate', 'holdRate'], second: ['engagementRate', 'ctr'], third: 'video' },
+  traffic: { first: ['ctr', 'cpc'], second: ['hookRate', 'holdRate'], third: ['clicks'] },
+  engagement: { first: ['engagementRate', 'cpe'], second: ['hookRate', 'holdRate'], third: ['likes', 'shares'] },
+  conversion: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
+  store_visit: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
+};
 function keyResponseText(r) {
-  var keys = ['hookRate', 'holdRate'].concat(CONFIG.ENGAGEMENT_ACTION_LAYOUT[r.goal] || CONFIG.ENGAGEMENT_ACTION_LAYOUT.awareness);
-  var parts = keys.map(function (k) {
-    var label = CONFIG.METRIC_LABEL[k] + ' ' + metricText(k, r[k]);
-    var position = r[k] == null ? null : benchmarkPositionText(r.benchmarks[k]);
-    return position ? label + ' (' + position + ')' : label;
-  });
-  return parts.join(' · ');
+  var layout = KEY_RESPONSE_LAYOUT[r.goal] || KEY_RESPONSE_LAYOUT.awareness;
+  var joinParts = function (parts) { var kept = parts.filter(Boolean); return kept.length ? kept.join(' · ') : null; };
+  var third = layout.third === 'video'
+    ? joinParts([
+      r.reach != null ? 'Reach ' + countCompactText(r.reach) : null,
+      r.videoPlays != null ? 'Plays ' + countCompactText(r.videoPlays) : null,
+      r.avgWatchSeconds != null ? 'Avg ' + secondsText(r.avgWatchSeconds) : null,
+    ])
+    : joinParts(layout.third.map(function (k) { return secondaryPartText(r, k); }));
+  var lines = [
+    joinParts(layout.first.map(function (k) { return metricSlotText(r, k); })),
+    joinParts(layout.second.map(function (k) { return metricSlotText(r, k); })),
+    third,
+  ].filter(Boolean);
+  return lines.length ? lines.join('\n') : EMPTY;
 }
 
 /** 집행률 문구 — 문턱 밖일 때만 "Over 25%" / "Under 40%" (RecapCampaignTable와 같은 규칙) */
