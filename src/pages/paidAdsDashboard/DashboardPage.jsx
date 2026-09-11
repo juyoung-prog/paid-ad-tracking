@@ -42,7 +42,7 @@ import { PerformanceForm } from '../../components/templates/PerformanceForm';
 import { SocialMetricsFields } from '../../components/templates/SocialMetricsFields';
 import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
-import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL, socialMetricKeysFor } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL, socialMetricKeysFor, editableSocialMetricKeysFor } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X, SECTION_CARD_SX, campaignInDateRange, generateId, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
@@ -741,7 +741,8 @@ export function DashboardPage() {
      뷰가 그 행을 우선해 나머지 지표가 전부 null로 덮이므로 upsertPerformanceRecord를 쓰지 않는다(스토어
      updatePerformanceEngagement 주석). 고친 칸만 manual_fields에 올라가 동기화가 건드리지 않는다 —
      그래서 스냅샷과 다른 칸만 patch에 넣는다(그대로인 칸은 계속 API가 갱신한다). */
-  const socialKeys = socialMetricKeysFor(selectedCampaign?.platform).map((m) => m.key);
+  // 고칠 수 있는 칸만 — Follows·Visits는 읽기 목록에 남는다(schema isEditable)
+  const socialKeys = editableSocialMetricKeysFor(selectedCampaign?.platform).map((m) => m.key);
   const socialPatch = Object.fromEntries(
     socialKeys.filter((key) => (performanceValues[key] ?? null) !== (originalPerformanceSnapshot?.[key] ?? null)).map((key) => [key, performanceValues[key] ?? null])
   );
@@ -1594,7 +1595,8 @@ export function DashboardPage() {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                   {`Synced from ${selectedCampaign.platform === PLATFORM.TIKTOK ? 'TikTok' : 'Meta'} Ads Manager — updates with the next sync.`}
                 </Typography>
-                {/* 참여 칸(likes…reposts)은 아래 편집 그리드가 그린다 — 같은 숫자가 두 번 나오지 않게 목록에서 뺀다 */}
+                {/* 고칠 수 있는 참여 칸(likes·comments·shares·saves·reposts)은 아래 편집 그리드가 그린다 — 같은 숫자가 두 번
+                    나오지 않게 목록에서 뺀다. Follows·Profile Visits는 고치지 못하는 값이라 이 목록에 그대로 남는다 */}
                 <PlatformMetricList metrics={performanceValues} hasCoreMetrics excludeKeys={socialKeys} />
                 {!hasAnyMetricValue(performanceValues) && (
                   <Typography variant="body2" color="text.secondary">
@@ -1614,7 +1616,7 @@ export function DashboardPage() {
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
                       {selectedCampaign.platform === PLATFORM.TIKTOK
-                        ? 'Synced from TikTok except Saves, which the ad API does not provide. Fields you edit are kept through the next sync.'
+                        ? 'Synced from TikTok except Saves, which the ad API does not provide. Fields you edit are kept through the next sync. Follows and Profile Visits come from the API only.'
                         : 'Synced from Meta except Reposts, which the ad API does not provide. Fields you edit are kept through the next sync.'}
                     </Typography>
                     <SocialMetricsFields

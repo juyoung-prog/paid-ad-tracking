@@ -14,9 +14,10 @@ export default {
         component: `
 ## SocialMetricsFields
 
-참여 내역 일곱 가지(Likes · Comments · Shares · Follows · Profile Visits · Saves · Reposts)의 숫자 입력 그리드.
-어느 칸을 보일지는 **플랫폼이 정한다**(schema.js \`SOCIAL_METRIC_KEYS\`): Meta는 Follows·Visits가 없고(API에
-대응 지표 없음), TikTok은 Reposts가 없다(인스타그램 개념). 플랫폼을 모르면 일곱 칸 전부.
+참여 내역 중 **사람이 고칠 수 있는 칸**(Likes · Comments · Shares · Saves · Reposts)의 숫자 입력 그리드.
+어느 칸을 보일지는 **플랫폼이 정한다**(schema.js \`SOCIAL_METRIC_KEYS\` · \`editableSocialMetricKeysFor\`):
+TikTok은 Reposts가 없다(인스타그램 개념). **Follows · Profile Visits는 어디서도 고치지 못한다**(2026-09-11 제품
+결정) — TikTok API만 주는 값이라 읽기 목록(PlatformMetricList)에만 남는다. 플랫폼을 모르면 다섯 칸 전부.
 
 ### 두 곳이 같은 컴포넌트를 쓴다 (2026-09-11)
 - **PerformanceForm**(수기 캠페인) — Social Metrics 섹션
@@ -30,8 +31,8 @@ export default {
     },
   },
   argTypes: {
-    platform: { control: 'select', options: [undefined, PLATFORM.META, PLATFORM.TIKTOK], description: '어느 칸을 보일지. 없으면 일곱 칸 전부' },
-    values: { control: 'object', description: '폼 값 { likes, comments, shares, follows, profileVisits, saves, reposts }' },
+    platform: { control: 'select', options: [undefined, PLATFORM.META, PLATFORM.TIKTOK], description: '어느 칸을 보일지. 없으면 고칠 수 있는 다섯 칸 전부' },
+    values: { control: 'object', description: '폼 값 { likes, comments, shares, saves, reposts }' },
     manualFields: { control: 'object', description: '사람이 고친 칸의 key 목록 — 라벨 옆 "edited"' },
     errors: { control: 'object', description: '필드별 에러 메시지' },
     isDisabled: { control: 'boolean', description: '입력 잠금' },
@@ -55,11 +56,11 @@ function Interactive(args) {
   );
 }
 
-/** TikTok — 여섯 칸(Reposts 없음). Saves는 API가 안 주는 칸이라 사람이 적은 값이고 "edited"가 붙는다 */
+/** TikTok — 네 칸(Reposts 없음, Follows·Visits는 고치지 못해 읽기 목록에만). Saves는 API가 안 주는 칸이라 사람이 적은 값이고 "edited"가 붙는다 */
 export const TikTok = { args: { platform: PLATFORM.TIKTOK, values: tiktokValues, manualFields: ['saves'] }, render: Interactive };
 
 /** Meta — 다섯 칸(Follows·Visits 없음). Saves는 API 값, Reposts는 사람이 적는 칸 */
 export const Meta = { args: { platform: PLATFORM.META, values: metaValues, manualFields: [] }, render: Interactive };
 
-/** 플랫폼 모름(수기 캠페인) — 일곱 칸 전부, 빈 값 */
+/** 플랫폼 모름(수기 캠페인) — 고칠 수 있는 다섯 칸 전부, 빈 값 */
 export const AllFields = { args: { platform: undefined, values: {}, manualFields: [] }, render: Interactive };

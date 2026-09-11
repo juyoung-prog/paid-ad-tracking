@@ -2,14 +2,15 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { socialMetricKeysFor } from '../../data/schema';
+import { editableSocialMetricKeysFor } from '../../data/schema';
 
 /**
  * SocialMetricsFields 컴포넌트
  *
- * 참여 내역 일곱 가지(Likes · Comments · Shares · Follows · Profile Visits · Saves · Reposts)의 숫자 입력
- * 그리드. 어느 칸을 보일지는 **플랫폼이 정한다**(schema.js SOCIAL_METRIC_KEYS) — Meta는 Follows·Visits가
- * 없고 TikTok은 Reposts가 없다(인스타그램 개념). 플랫폼을 모르면 일곱 칸 전부.
+ * 참여 내역 중 **사람이 고칠 수 있는 칸**(Likes · Comments · Shares · Saves · Reposts)의 숫자 입력 그리드.
+ * 어느 칸을 보일지는 **플랫폼이 정한다**(schema.js SOCIAL_METRIC_KEYS·editableSocialMetricKeysFor) —
+ * TikTok은 Reposts가 없다(인스타그램 개념). Follows · Profile Visits는 TikTok API만 주는 값이라 어느 곳에서도
+ * 고치지 못하고(2026-09-11 제품 결정) 읽기 목록(PlatformMetricList)에만 남는다.
  *
  * 두 곳이 같은 컴포넌트를 쓴다(2026-09-11): 수기 캠페인의 PerformanceForm(Social Metrics 섹션)과
  * 동기화 캠페인 드로어(API가 채운 값을 사람이 고치는 자리). 후자에서는 사람이 고친 칸을 `manualFields`로
@@ -20,8 +21,8 @@ import { socialMetricKeysFor } from '../../data/schema';
  * 값이 없는 칸은 null — 저장도 null이라 화면 목록에서 빠진다.
  *
  * Props:
- * @param {string} platform - Campaign.platform. 어느 칸을 보일지 정한다. 없으면 일곱 칸 전부 [Optional]
- * @param {object} values - 폼 값 { likes, comments, shares, follows, profileVisits, saves, reposts } [Required]
+ * @param {string} platform - Campaign.platform. 어느 칸을 보일지 정한다. 없으면 고칠 수 있는 다섯 칸 전부 [Optional]
+ * @param {object} values - 폼 값 { likes, comments, shares, saves, reposts } [Required]
  * @param {function} onChange - 필드 변경 핸들러 (field, value) => void. value는 number|null [Required]
  * @param {string[]} manualFields - 사람이 고친 칸의 key 목록(예: ['saves']). 해당 라벨 옆에 "edited" [Optional, 기본값: []]
  * @param {object} errors - 필드별 에러 메시지 { field: message } [Optional]
@@ -34,7 +35,7 @@ import { socialMetricKeysFor } from '../../data/schema';
 export function SocialMetricsFields({ platform, values, onChange, manualFields = [], errors = {}, isDisabled = false, sx }) {
   return (
     <Grid container spacing={2} sx={sx}>
-      {socialMetricKeysFor(platform).map((metric) => {
+      {editableSocialMetricKeysFor(platform).map((metric) => {
         const isEdited = manualFields.includes(metric.key);
         return (
           <Grid key={metric.key} size={{ xs: 6 }}>

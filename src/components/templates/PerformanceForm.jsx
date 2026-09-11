@@ -58,8 +58,9 @@ function NumberField({ label, field, value, onChange, error }) {
  *
  * 참여 내역(Social Metrics)은 goal과 무관하게 항상 있다(2026-09-11) — SocialMetricsFields가 그리고,
  * 어느 칸을 보일지는 플랫폼이 정한다(Meta: Likes · Comments · Shares · Saves · Reposts, TikTok: Likes ·
- * Comments · Shares · Follows · Profile Visits · Saves, 모르면 전부). 드로어·Performance·Reports가 같은
- * 일곱 가지를 한 목록으로 보는데 수기 캠페인은 이 폼이 유일한 입력 경로다.
+ * Comments · Shares · Saves, 모르면 다섯 칸 전부). Follows · Profile Visits는 TikTok API만 주는 값이라 사람이
+ * 고치지 못한다(2026-09-11). 드로어·Performance·Reports가 같은 일곱 가지를 한 목록으로 보는데 수기 캠페인은
+ * 이 폼이 유일한 입력 경로다.
  *
  * CLS(레이아웃 시프트) 주의사항: goal은 이 폼 내부에서 바뀌지 않는 고정 prop이다
  * (캠페인 생성 시 이미 확정된 값). 즉 조건부 필드는 마운트 시점에 한 번 결정되고

@@ -153,18 +153,22 @@ export const ALERT_TYPE = Object.freeze({
  * 값이 채워지는 범위는 플랫폼 API가 정한다(platforms): Like·Cmt·Share 양 플랫폼 · Follow·Visits TikTok만 ·
  * Save는 Meta API가 주고 TikTok은 수기 · Repost는 인스타그램(Meta) 개념이라 TikTok에는 없다.
  * column은 DB 컬럼 이름 — performance_records.manual_fields와 sync-performance의 SOCIAL_KEYS가 이 이름을 쓴다.
+ * isEditable: 사람이 드로어·수기 폼에서 고칠 수 있는 칸. Follows·Profile Visits는 TikTok API만 주는 값이라 고치지
+ * 못한다(2026-09-11 제품 결정) — 사람이 잴 수 없는 숫자는 사람이 고칠 수도 없다.
  */
 export const SOCIAL_METRIC_KEYS = Object.freeze([
-  Object.freeze({ key: 'likes', column: 'likes', label: 'Likes', platforms: ['meta', 'tiktok'] }),
-  Object.freeze({ key: 'comments', column: 'comments', label: 'Comments', platforms: ['meta', 'tiktok'] }),
-  Object.freeze({ key: 'shares', column: 'shares', label: 'Shares', platforms: ['meta', 'tiktok'] }),
-  Object.freeze({ key: 'follows', column: 'follows', label: 'Follows', platforms: ['tiktok'] }),
-  Object.freeze({ key: 'profileVisits', column: 'profile_visits', label: 'Profile Visits', platforms: ['tiktok'] }),
-  Object.freeze({ key: 'saves', column: 'saves', label: 'Saves', platforms: ['meta', 'tiktok'] }),
-  Object.freeze({ key: 'reposts', column: 'reposts', label: 'Reposts', platforms: ['meta'] }),
+  Object.freeze({ key: 'likes', column: 'likes', label: 'Likes', platforms: ['meta', 'tiktok'], isEditable: true }),
+  Object.freeze({ key: 'comments', column: 'comments', label: 'Comments', platforms: ['meta', 'tiktok'], isEditable: true }),
+  Object.freeze({ key: 'shares', column: 'shares', label: 'Shares', platforms: ['meta', 'tiktok'], isEditable: true }),
+  Object.freeze({ key: 'follows', column: 'follows', label: 'Follows', platforms: ['tiktok'], isEditable: false }),
+  Object.freeze({ key: 'profileVisits', column: 'profile_visits', label: 'Profile Visits', platforms: ['tiktok'], isEditable: false }),
+  Object.freeze({ key: 'saves', column: 'saves', label: 'Saves', platforms: ['meta', 'tiktok'], isEditable: true }),
+  Object.freeze({ key: 'reposts', column: 'reposts', label: 'Reposts', platforms: ['meta'], isEditable: true }),
 ]);
 /** 플랫폼에 뜻이 있는 참여 칸만. 플랫폼을 모르면(수기 캠페인 등) 전부 */
 export const socialMetricKeysFor = (platform) => SOCIAL_METRIC_KEYS.filter((m) => !platform || m.platforms.includes(platform));
+/** 그중 사람이 고칠 수 있는 칸 — 입력 그리드(SocialMetricsFields)와 드로어 저장(updatePerformanceEngagement)이 쓴다 */
+export const editableSocialMetricKeysFor = (platform) => socialMetricKeysFor(platform).filter((m) => m.isEditable);
 
 /**
  * 캠페인×날짜 단위 일별 성과(performance_daily, API 전용). PerformanceRecord가

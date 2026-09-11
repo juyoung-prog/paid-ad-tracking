@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { generateAlerts, SOCIAL_METRIC_KEYS } from '../../data/schema';
+import { generateAlerts, SOCIAL_METRIC_KEYS, editableSocialMetricKeysFor } from '../../data/schema';
 import {
   rowToStore,
   storeToRow,
@@ -505,8 +505,11 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
    */
   const updatePerformanceEngagement = useCallback(async (record, patch) => {
     const columnOf = Object.fromEntries(SOCIAL_METRIC_KEYS.map((m) => [m.key, m.column]));
-    const row = Object.fromEntries(Object.entries(patch).map(([key, value]) => [columnOf[key] ?? key, value]));
-    const manualFields = [...new Set([...(record.manualFields ?? []), ...Object.keys(patch).map((key) => columnOf[key] ?? key)])];
+    // 고칠 수 있는 칸만 통과시킨다 — Follows·Profile Visits는 화면에 입력이 없지만 여기서도 한 번 더 막는다
+    const editable = new Set(editableSocialMetricKeysFor().map((m) => m.key));
+    const entries = Object.entries(patch).filter(([key]) => editable.has(key));
+    const row = Object.fromEntries(entries.map(([key, value]) => [columnOf[key], value]));
+    const manualFields = [...new Set([...(record.manualFields ?? []), ...entries.map(([key]) => columnOf[key])])];
     const { data, error: updateError } = await supabase
       .from('performance_records')
       .update({ ...row, manual_fields: manualFields })

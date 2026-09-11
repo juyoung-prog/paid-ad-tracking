@@ -36,8 +36,8 @@ goal에 따라 조건부로 노출한다.
 
 ### Social Metrics (2026-09-11)
 goal과 무관하게 항상 있고 **SocialMetricsFields**가 그린다 — 칸 구성은 플랫폼이 정한다: Meta는 Likes · Comments ·
-Shares · Saves · Reposts, TikTok은 Likes · Comments · Shares · Follows · Profile Visits · Saves(리포스트는 인스타그램
-개념이라 TikTok에 없다), 플랫폼을 모르면 일곱 칸 전부. 드로어·Performance·Reports가 같은 일곱 가지를 한 목록으로
+Shares · Saves · Reposts, TikTok은 Likes · Comments · Shares · Saves(리포스트는 인스타그램 개념이라 TikTok에 없다),
+플랫폼을 모르면 다섯 칸 전부. **Follows · Profile Visits는 사람이 고치지 못한다**(TikTok API만 주는 값, 2026-09-11). 드로어·Performance·Reports가 같은 일곱 가지를 한 목록으로
 보는데 수기 캠페인은 이 폼이 유일한 입력 경로다. 빈 칸은 null로 저장되고 화면에서 빠진다. Engagements 합계 라벨은
 실제 정의(likes + comments + shares)에 맞췄다 — 예전 "+saves"는 어긋나 있었다.
 
@@ -58,7 +58,7 @@ goal은 폼 내부에서 바뀌지 않는 고정 prop이라, 조건부 필드는
     platform: {
       control: 'select',
       options: [PLATFORM.META, PLATFORM.TIKTOK],
-      description: 'Social Metrics의 칸 구성(Meta: +Reposts, TikTok: +Follows·Visits, 없으면 전부)',
+      description: 'Social Metrics의 칸 구성(Meta: +Reposts, TikTok: Reposts 없음, 없으면 다섯 칸 전부)',
     },
     values: { control: 'object', description: '폼 값 객체' },
     errors: { control: 'object', description: '필드별 에러 메시지' },
@@ -106,7 +106,7 @@ export const ConversionGoal = {
   render: Interactive,
 };
 
-/** TikTok 캠페인 — Social Metrics가 Likes · Comments · Shares · Follows · Profile Visits · Saves(Reposts 없음) */
+/** TikTok 캠페인 — Social Metrics가 Likes · Comments · Shares · Saves(Reposts 없음, Follows·Visits는 고치지 못한다) */
 export const TikTokNoReposts = {
   args: { goal: GOAL.AWARENESS, platform: PLATFORM.TIKTOK },
   render: Interactive,
