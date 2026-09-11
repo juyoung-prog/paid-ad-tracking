@@ -23,20 +23,28 @@ export const GOAL_KEYS = ['awareness', 'traffic', 'engagement', 'conversion', 's
 export const goalText = (goal, lang) => (GOAL_KEYS.includes(goal) ? t(`goalLabel.${goal}`, lang) : null);
 
 /**
- * 목표별 Engagement / Action 구성 — 대표 두 지표(순위 포함)와 옅은 보조 줄. 목표가 강조를 정한다(2026-09-08):
- * 인지 = 참여율·CTR + 클릭 수·CPC · 트래픽 = CTR·CPC + 클릭 수·참여율 · 참여 = 참여율·Cost/eng + 좋아요·공유 ·
- * 전환/매장 방문 = CPA·CTR + 결과 수·CPC. 모든 원본 값은 행(row)에 그대로 있다.
+ * 목표별 Engagement / Action 대표 두 지표(순위 포함). 목표가 강조를 정한다(2026-09-08):
+ * 인지 = 참여율·CTR · 트래픽 = CTR·CPC · 참여 = 참여율·Cost/eng · 전환/매장 방문 = CPA·CTR.
+ * 그 아래 보조 줄은 목표와 무관하게 참여 내역(ENGAGEMENT_BREAKDOWN_KEYS)이다 — 2026-09-11까지는 목표별 수량
+ * (클릭 수·CPC, 좋아요·공유, 결과 수·CPC)이었는데, 그러면 댓글은 어느 목표에서도 안 보이고 좋아요·공유도 참여 목표에서만
+ * 보여서 "참여가 실제로 몇 건이었나"를 보고서에서 답할 수 없었다(인플루언서 시트는 Like·Cmt·Share·Save·Repost를 다 적는다).
+ * 모든 원본 값은 행(row)에 그대로 있다.
  */
 export const ENGAGEMENT_ACTION_LAYOUT = {
-  awareness: { primary: ['engagementRate', 'ctr'], secondary: ['clicks', 'cpc'] },
-  traffic: { primary: ['ctr', 'cpc'], secondary: ['clicks', 'engagementRate'] },
-  engagement: { primary: ['engagementRate', 'cpe'], secondary: ['likes', 'shares'] },
-  conversion: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
-  store_visit: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+  awareness: { primary: ['engagementRate', 'ctr'] },
+  traffic: { primary: ['ctr', 'cpc'] },
+  engagement: { primary: ['engagementRate', 'cpe'] },
+  conversion: { primary: ['cpa', 'ctr'] },
+  store_visit: { primary: ['cpa', 'ctr'] },
 };
 export const engagementLayout = (goal) => ENGAGEMENT_ACTION_LAYOUT[goal] ?? ENGAGEMENT_ACTION_LAYOUT.awareness;
 
-const COUNT_KEYS = { clicks: 'recap.table.countClicks', likes: 'recap.table.countLikes', shares: 'recap.table.countShares', conversions: 'recap.table.countResults' };
+/**
+ * 참여 내역 줄의 항목 — 광고 API가 캠페인 단위로 주는 것 전부. Like·Cmt·Share는 양 플랫폼 공통, Follow·Profile은
+ * TikTok만(Meta는 null이라 빠진다). Save·Repost는 여기 없다 — TikTok 광고 API가 캠페인 레벨 saves를 거부했고
+ * (sync-performance 주석), Repost는 광고 API에 없는 지표라 수집 자체가 안 된다.
+ */
+export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'follows', 'profileVisits'];
 
 /** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 나머지 대표 자리(600) */
 export const emphasisOf = (row, metricKey) => ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey ? 'primary' : 'diagnostic');
@@ -104,14 +112,12 @@ export function primaryKpiOf(row) {
   return { kpi, metricKey, stat, hasComparison: Boolean(stat && stat.peerScope !== 'none' && stat.percentile != null) };
 }
 
-/** 보조 줄 — 수량은 "248 clicks", 비용·비율은 "CPC $4.51". 값이 없는 것은 뺀다 */
-export function secondaryText(row, keys, lang) {
-  return keys.map((key) => {
-    const v = row[key];
-    if (v == null) return null;
-    if (COUNT_KEYS[key]) return t(COUNT_KEYS[key], lang, { n: count(v) });
-    return `${metricLabel(key, lang)} ${kpiFormat(key)(v)}`;
-  }).filter(Boolean).join(' · ');
+/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601" (TikTok은 "· Follow 12 · Profile 40"까지). 값이 없는 항목은 뺀다 */
+export function engagementBreakdownText(row, lang) {
+  return ENGAGEMENT_BREAKDOWN_KEYS
+    .map((key) => (row[key] == null ? null : `${metricLabel(key, lang)} ${count(row[key])}`))
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /** 영상 칸의 보조 줄 — "Reach 163K · Plays 296K · Avg 2s" */

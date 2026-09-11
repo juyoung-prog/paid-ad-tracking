@@ -149,9 +149,9 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     // Video response — Hook 줄, Hold 줄, 보조 줄(dashboard videoSecondaryText)
     const video = hasData ? [line('hookRate'), line('holdRate'), rowView.videoSecondaryText(r, 'en') || null].filter(Boolean).join('\n') : strings.t('recap.table.noData', 'en');
     check(rs, 'videoResponse', video, s.videoResponse?.text);
-    // Engagement / Action — 목표별 대표 두 지표 줄 + 보조 줄(dashboard secondaryText)
+    // Engagement / Action — 목표별 대표 두 지표 줄 + 참여 내역 줄(dashboard engagementBreakdownText)
     const layout = rowView.engagementLayout(r.goal);
-    const engagement = hasData ? [...layout.primary.map(line), rowView.secondaryText(r, layout.secondary, 'en') || null].filter(Boolean).join('\n') : format.EMPTY;
+    const engagement = hasData ? [...layout.primary.map(line), rowView.engagementBreakdownText(r, 'en') || null].filter(Boolean).join('\n') : format.EMPTY;
     check(rs, 'engagementAction', engagement, s.engagementAction?.text);
     // runs가 text 범위 안에 있는지
     ['budgetSpend', 'primaryKpi', 'videoResponse', 'engagementAction'].forEach((k) => {

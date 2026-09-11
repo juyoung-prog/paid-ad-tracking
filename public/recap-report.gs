@@ -113,14 +113,16 @@ var CONFIG = {
     conversion: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
     store_visit: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
   },
-  /** Engagement / Action 칸 구성 — 대표 두 지표(순위 포함) + 보조 줄. 목표가 정한다 (recapRowView ENGAGEMENT_ACTION_LAYOUT) */
+  /** Engagement / Action 칸의 대표 두 지표(순위 포함) — 목표가 정한다 (recapRowView ENGAGEMENT_ACTION_LAYOUT) */
   ENGAGEMENT_ACTION_LAYOUT: {
-    awareness: { primary: ['engagementRate', 'ctr'], secondary: ['clicks', 'cpc'] },
-    traffic: { primary: ['ctr', 'cpc'], secondary: ['clicks', 'engagementRate'] },
-    engagement: { primary: ['engagementRate', 'cpe'], secondary: ['likes', 'shares'] },
-    conversion: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
-    store_visit: { primary: ['cpa', 'ctr'], secondary: ['conversions', 'cpc'] },
+    awareness: { primary: ['engagementRate', 'ctr'] },
+    traffic: { primary: ['ctr', 'cpc'] },
+    engagement: { primary: ['engagementRate', 'cpe'] },
+    conversion: { primary: ['cpa', 'ctr'] },
+    store_visit: { primary: ['cpa', 'ctr'] },
   },
+  /** 그 아래 참여 내역 줄 — 목표와 무관. Follow·Profile은 TikTok만 값이 있다 (recapRowView ENGAGEMENT_BREAKDOWN_KEYS) */
+  ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'follows', 'profileVisits'],
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -128,7 +130,7 @@ var CONFIG = {
   /** 목표 표시명 (recapStrings goalLabel.*) */
   GOAL_LABEL: { awareness: 'Awareness', traffic: 'Traffic', engagement: 'Engagement', conversion: 'Conversion', store_visit: 'Store visit' },
   /** 지표 표시명 (recapStrings metric.*) */
-  METRIC_LABEL: { cpm: 'CPM', cpc: 'CPC', cpa: 'CPA', cpe: 'Cost/eng', ctr: 'CTR', hookRate: 'Hook', holdRate: 'Hold', engagementRate: 'Eng. rate' },
+  METRIC_LABEL: { cpm: 'CPM', cpc: 'CPC', cpa: 'CPA', cpe: 'Cost/eng', ctr: 'CTR', hookRate: 'Hook', holdRate: 'Hold', engagementRate: 'Eng. rate', likes: 'Like', comments: 'Cmt', shares: 'Share', follows: 'Follow', profileVisits: 'Profile' },
 };
 
 /**
@@ -386,7 +388,7 @@ var COLUMNS = [
   { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
     note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
   { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
-    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: supporting counts (clicks · CPC, likes · shares, results · CPC).\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
+    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: the engagement breakdown as the ad platform reports it — likes · comments · shares, plus follows · profile visits on TikTok. Saves and reposts are not available from the ad APIs.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
@@ -1373,6 +1375,8 @@ function flattenRow(r) {
     likes: r.likes,
     comments: r.comments,
     shares: r.shares,
+    follows: r.follows,
+    profileVisits: r.profileVisits,
     conversions: r.conversions,
     worked: hasData ? insightSentence('strength', r.insight.strength) : null,
     improve: hasData ? insightSentence('weakness', r.insight.weakness) : null,
@@ -1498,12 +1502,12 @@ function countNumberText(v) {
   return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-/** 보조 수량 한 조각 — "1,074 clicks" / "73 likes" / "9 shares" / "64 results", 비용·비율은 "CPC $0.88" (recapRowView secondaryText) */
-var COUNT_NOUN = { clicks: 'clicks', likes: 'likes', shares: 'shares', conversions: 'results' };
-function secondaryPartText(r, key) {
-  if (r[key] == null) return null;
-  if (COUNT_NOUN[key]) return countNumberText(r[key]) + ' ' + COUNT_NOUN[key];
-  return CONFIG.METRIC_LABEL[key] + ' ' + metricText(key, r[key]);
+/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601" (TikTok은 "· Follow 12 · Profile 40"까지). 값이 없는 항목은 뺀다 (recapRowView engagementBreakdownText) */
+function engagementBreakdownText(r) {
+  return CONFIG.ENGAGEMENT_BREAKDOWN_KEYS
+    .map(function (k) { return r[k] == null ? null : CONFIG.METRIC_LABEL[k] + ' ' + countNumberText(r[k]); })
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /**
@@ -1521,12 +1525,12 @@ function videoResponseCell(r) {
   return richLines(lines);
 }
 
-/** Engagement / Action — 목표가 정한 대표 두 지표 줄(순위 포함) + 보조 줄(작게). 구성은 대시보드 ENGAGEMENT_ACTION_LAYOUT */
+/** Engagement / Action — 목표가 정한 대표 두 지표 줄(순위 포함) + 참여 내역 줄(작게). 구성은 대시보드와 같다 */
 function engagementActionCell(r) {
   var layout = CONFIG.ENGAGEMENT_ACTION_LAYOUT[r.goal] || CONFIG.ENGAGEMENT_ACTION_LAYOUT.awareness;
   var lines = layout.primary.map(function (k) { return metricLine(r, k); });
-  var secondary = layout.secondary.map(function (k) { return secondaryPartText(r, k); }).filter(Boolean);
-  if (secondary.length) lines.push([{ text: secondary.join(' · '), style: 'small' }]);
+  var breakdown = engagementBreakdownText(r);
+  if (breakdown) lines.push([{ text: breakdown, style: 'small' }]);
   return richLines(lines);
 }
 

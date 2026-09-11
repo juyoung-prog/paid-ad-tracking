@@ -26,7 +26,7 @@ import {
   insightCellsOf,
   kpiFormat,
   primaryKpiOf,
-  secondaryText,
+  engagementBreakdownText,
   storeTextOf,
   videoSecondaryText,
 } from './recapRowView';
@@ -259,7 +259,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const { kpi, metricKey: kpiKey, stat: kpiStat, hasComparison } = primaryKpiOf(row);
             const kpiHint = kpi?.value != null ? t('recap.table.primaryKpiValueHint', lang, { metric: metricLabel(kpi.metricKey, lang), basis: t(`recap.table.primaryKpiBasis.${kpi.metricKey}`, lang) }) : '';
             const layout = engagementLayout(row.goal);
-            const engagementSecondary = secondaryText(row, layout.secondary, lang);
+            const engagementSecondary = engagementBreakdownText(row, lang);
             const videoSecondary = videoSecondaryText(row, lang);
             /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
                편집 중에는 사람이 쓴 **원문 그대로**(자리표시자도)를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
@@ -408,7 +408,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         <Typography component="span" sx={(theme) => ({ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5, color: alpha(theme.palette.text.secondary, 0.85), fontVariantNumeric: 'tabular-nums' })}>{videoSecondary}</Typography>
                       )}
                     </TableCell>
-                    {/* Engagement / Action — 목표가 대표 두 자리와 보조 줄을 정한다(ENGAGEMENT_ACTION_LAYOUT) */}
+                    {/* Engagement / Action — 대표 두 자리는 목표가 정하고(ENGAGEMENT_ACTION_LAYOUT), 보조 줄은 참여 내역 Like · Cmt · Share(· Follow · Profile) */}
                     <TableCell sx={CELL_SX}>
                       <Box sx={{ display: 'flex', gap: 0.75, '@media print': { gap: '4pt' } }}>
                         {layout.primary.map((key) => (
