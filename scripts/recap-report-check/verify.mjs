@@ -63,9 +63,9 @@ function dashboardPacing(ratio) {
   return null;
 }
 
-function compareEvent(label, eventName, campaigns, records, grids) {
+function compareEvent(label, eventName, campaigns, records, grids, notesById = {}) {
   const model = gs.buildReportModel(grids, new Date('2026-09-11'), eventName);
-  const dash = schema.buildRecapRows(eventName, campaigns, records, {});
+  const dash = schema.buildRecapRows(eventName, campaigns, records, { notesById });
   const headline = schema.buildRecapHeadline(eventName, campaigns, records);
   const eventCampaigns = dash.campaigns;
   const allRows = Object.values(dash.byPlatform).flat();
@@ -251,12 +251,21 @@ if (process.argv.includes('--real')) {
   const perfRows = await fetchAll('performance_records', 'campaign_id,recorded_at');
   const latestRows = await fetchAll('performance_records_latest', 'campaign_id');
   const accountRows = await fetchAll('ad_accounts', 'id');
+  const recapRows = await fetchAll('event_recaps', 'updated_at.desc');
+  const noteRows = await fetchAll('recap_campaign_notes', 'campaign_id');
+  const eventRecaps = recapRows.map(mappers.rowToEventRecap);
+  const recapNotes = noteRows.map(mappers.rowToRecapCampaignNote);
+  // 대시보드 RecapDetailPage와 같은 선별 — 이 이벤트의 recap에 달린 note만
+  const notesFor = (eventName) => {
+    const recap = eventRecaps.find((r) => schema.campaignNameKey(r.eventName) === schema.campaignNameKey(eventName));
+    return recap ? Object.fromEntries(recapNotes.filter((n) => n.recapId === recap.id).map((n) => [n.campaignId, n])) : {};
+  };
   const accounts = accountRows.map(mappers.rowToAdAccount);
   const accountById = Object.fromEntries(accounts.map((a) => [a.id, a]));
   const campaigns = campaignRows.map(mappers.rowToCampaign);
   const records = latestRows.map(mappers.rowToPerformanceRecord); // 대시보드가 실제로 읽는 것
   // 기본 경로(DATA_SOURCE='supabase'): 스크립트는 campaigns + performance_records_latest JSON을 rowsToGrid로 2차원 배열로 만든다
-  const grids = { campaigns: gs.rowsToGrid(campaignRows), performance: gs.rowsToGrid(latestRows), accounts: gs.rowsToGrid(accountRows) };
+  const grids = { campaigns: gs.rowsToGrid(campaignRows), performance: gs.rowsToGrid(latestRows), accounts: gs.rowsToGrid(accountRows), eventRecaps: gs.rowsToGrid(recapRows), recapNotes: gs.rowsToGrid(noteRows) };
   // 대안 경로(DATA_SOURCE='sheet'): CSV를 탭에 가져온 것 — 날짜는 Date, 성과는 전체 이력(최신 1건 고르기는 스크립트 규칙 1)
   const sheetGrids = { campaigns: [CAMPAIGN_COLS, ...campaignRows.map((r) => CAMPAIGN_COLS.map((k) => (k.endsWith('_date') ? toSheetDate(r[k]) : k === 'target_store_ids' ? `{${(r[k] ?? []).join(',')}}` : r[k] ?? '')))],
     performance: [PERF_COLS, ...perfRows.map((r) => PERF_COLS.map((k) => (k === 'recorded_at' ? toSheetDate(r[k]) : r[k] ?? '')))] };
@@ -264,7 +273,7 @@ if (process.argv.includes('--real')) {
   let rows = 0;
   let primary = null;
   for (const e of events) {
-    const out = compareEvent('real', e.eventName, campaigns, records, grids);
+    const out = compareEvent('real', e.eventName, campaigns, records, grids, notesFor(e.eventName));
     rows += out.rowCount;
     if (!primary) primary = out;
   }
@@ -285,11 +294,13 @@ if (process.argv.includes('--real')) {
       linkChecks += 1; if (s.thumbnailUrl) withThumb += 1; if (s.campaignUrl) withLink += 1;
     });
   }
+  const writtenCount = events.reduce((n, e) => n + Object.values(notesFor(e.eventName)).filter((x) => ['strength', 'weakness'].some((f) => (x[f]?.en ?? '').trim() && !rowView.isPlaceholder(x[f].en))).length, 0);
+  console.log(`\n[real · notes] campaigns with a written (non-placeholder) note: ${writtenCount}`);
   console.log(`\n[real · campaign column] rows ${linkChecks}, with thumbnail ${withThumb}, with View ad link ${withLink}, mismatches ${mismatches.length - checksBefore}`);
   console.log(`\n[real · DB rows via rowsToGrid] campaigns ${campaigns.length}, events ${events.length}, campaign rows compared ${rows}, mismatches ${mismatches.length - checksBefore}`);
   checksBefore = mismatches.length;
   let sheetRowsCompared = 0;
-  for (const e of events) sheetRowsCompared += compareEvent('real/sheet', e.eventName, campaigns, records, sheetGrids).rowCount;
+  for (const e of events) sheetRowsCompared += compareEvent('real/sheet', e.eventName, campaigns, records, { ...sheetGrids, eventRecaps: gs.rowsToGrid(recapRows), recapNotes: gs.rowsToGrid(noteRows) }, notesFor(e.eventName)).rowCount;
   console.log(`[real · CSV tabs] performance rows ${perfRows.length}, campaign rows compared ${sheetRowsCompared}, mismatches ${mismatches.length - checksBefore}`);
   // 다운로드 시 템플릿 채우기 — 자리표시자가 남지 않아야 한다
   const filled = recapSheets.fillRecapScript(src, { url: env.VITE_SUPABASE_URL, anonKey: env.VITE_SUPABASE_ANON_KEY });
