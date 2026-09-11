@@ -453,8 +453,9 @@ var STYLE = {
   sectionSize: 12,
   leftGutter: 20,
   left: 2,
-  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 64 },
-  sectionGap: 2,
+  heights: { blank: 21, title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 64 },
+  /** 섹션 사이 빈 줄 수(기본 높이 21px) */
+  sectionGap: 1,
 };
 
 /** 셀 하나에 놓을 값 — 없으면 "—"(문자열). 금액·비율은 숫자 그대로(서식은 열이 정한다) */
@@ -472,6 +473,9 @@ function renderReport_(sheet, model) {
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
   sheet.clearNotes();
+  // 행 높이도 clear()가 되돌리지 않는다 — 이전 실행의 높은 줄(캠페인 64px, 깨졌던 실행의 수백 px)이 빈 줄 자리에 남아
+  // 섹션 사이가 벌어졌다. 전부 기본 높이로 되돌리고 필요한 줄만 다시 키운다
+  sheet.setRowHeights(1, sheet.getMaxRows(), STYLE.heights.blank);
   sheet.setFrozenRows(0);
   sheet.setFrozenColumns(0);
   sheet.setHiddenGridlines(true);
@@ -495,12 +499,12 @@ function renderReport_(sheet, model) {
   sheet.setRowHeight(row, H.title);
   row += 1;
   sheet.getRange(row, T).setValue(model.metaLine).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
-  row += 2;
+  row += 1 + STYLE.sectionGap;
 
   // 4) KPI 블록
   var kpiRow = { periodText: model.periodText, campaignCount: model.campaignCount, spend: model.spend, plannedBudget: model.plannedBudget, storeCount: model.stores.length || null };
   row = renderTable_(sheet, row, T, KPI_COLUMNS, [kpiRow], { headerHeight: H.kpiHeader, rowHeight: H.kpiValue, valuesBold: true });
-  row += 1;
+  row += STYLE.sectionGap;
 
   // 5) 순위 한 줄 — 굵게, 비교 이벤트는 다음 줄 회색
   if (model.headline) {
@@ -509,9 +513,8 @@ function renderReport_(sheet, model) {
         '), recomputed from summed numerators and denominators, against other events that share at least one phase name. Needs 3+ events including this one.');
     row += 1;
     sheet.getRange(row, T).setValue(model.headline.peerEvents.join(' · ')).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
-    row += 1;
+    row += 1 + STYLE.sectionGap;
   }
-  row += STYLE.sectionGap;
 
   // 6) 타임라인 — 단계별 기간·예산·지출 + Total
   row = renderSectionTitle_(sheet, row, T, 'Timeline — ' + countText_(model.phases.length, 'phase'));
