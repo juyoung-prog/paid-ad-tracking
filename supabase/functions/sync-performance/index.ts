@@ -446,15 +446,22 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: campaignsError.message }), { status: 500, headers: corsHeaders });
   }
 
-  // 이미 성과를 한 번이라도 받아둔 캠페인 집합.
+  /* 캠페인당 최신 성과 1건 — (1) 이미 성과를 한 번이라도 받아둔 캠페인 집합, (2) 사람이 보충해 둔
+     saves·reposts. 광고 API가 캠페인 단위로 주지 않는 값(TikTok Save, Meta Repost)은 대시보드 드로어에서
+     최신 api 행에 직접 적는데(performance_records_latest 우선순위 때문에 manual 행을 따로 두면 나머지
+     지표가 null로 덮인다), 매일 새 행을 만드는 이 함수가 그 값을 이월하지 않으면 다음 날 사라진다.
+     규칙: API가 값을 주면 API 값, 아니면 직전 행의 값을 물려받는다(2026-09-11). */
   const { data: recorded, error: recordedError } = await admin
-    .from('performance_records')
-    .select('campaign_id');
+    .from('performance_records_latest')
+    .select('campaign_id, saves, reposts');
 
   if (recordedError) {
     return new Response(JSON.stringify({ error: recordedError.message }), { status: 500, headers: corsHeaders });
   }
   const hasRecord = new Set((recorded ?? []).map((r) => r.campaign_id));
+  const supplementByCampaign = new Map(
+    (recorded ?? []).map((r) => [r.campaign_id, { saves: r.saves ?? null, reposts: r.reposts ?? null }])
+  );
 
   // 일별 데이터가 이미 있는 캠페인 집합. 행 전체가 아니라 distinct 캠페인 id를
   // 돌려주는 SQL 함수를 쓴다 — 일별 테이블은 캠페인×날짜라 행으로 세면
@@ -534,12 +541,16 @@ Deno.serve(async (req) => {
 
     if (!metrics) { skip('no_data'); continue; }
 
+    const supplement = supplementByCampaign.get(c.id);
     const { error: upsertError } = await admin.from('performance_records').upsert(
       {
         campaign_id: c.id,
         recorded_at: today,
         source: 'api',
         ...metrics,
+        // 사람이 보충한 값의 이월 — API가 안 주는 칸만(위 supplementByCampaign 주석)
+        saves: metrics.saves ?? supplement?.saves ?? null,
+        reposts: metrics.reposts ?? supplement?.reposts ?? null,
       },
       { onConflict: 'campaign_id,recorded_at,source' }
     );

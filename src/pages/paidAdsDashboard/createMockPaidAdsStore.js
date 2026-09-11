@@ -62,6 +62,7 @@ export function createMockPaidAdsStore(overrides = {}) {
     addStore: noop,
     updateStore: noop,
     upsertPerformanceRecord: noop,
+    updatePerformanceSupplement: noop,
     savePlan: noop,
     deletePlan: noop,
     saveEventRecap: noop,

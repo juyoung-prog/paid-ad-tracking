@@ -494,6 +494,36 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   }, []);
 
   /**
+   * 동기화 캠페인의 **보충 값**(saves · reposts) 저장 — 광고 API가 캠페인 단위로 주지 않는 칸을
+   * 사람이 채우는 유일한 경로다(TikTok Save, Meta Repost). upsertPerformanceRecord처럼 manual 행을
+   * 만들지 않고 **최신 api 행에 그 두 칸만 update**한다 — performance_records_latest가 같은 날
+   * manual 행을 우선하므로, 두 칸만 든 manual 행이 생기면 노출·지출·클릭까지 전부 null로 덮인다.
+   * 다음 동기화가 이 값을 지우지 않는 건 sync-performance가 직전 행의 saves·reposts를 이월하기 때문.
+   *
+   * @param {string} recordId - performance_records.id (최신 api 행)
+   * @param {{ saves?: number|null, reposts?: number|null }} patch
+   */
+  const updatePerformanceSupplement = useCallback(async (recordId, patch) => {
+    const { data, error: updateError } = await supabase
+      .from('performance_records')
+      .update(patch)
+      .eq('id', recordId)
+      .select()
+      .single();
+
+    if (updateError) {
+      setError(describeBackendError(updateError, "Couldn't save your change. Try again."));
+      return null;
+    }
+    const saved = rowToPerformanceRecord(data);
+    setState((prev) => ({
+      ...prev,
+      performanceRecords: prev.performanceRecords.map((p) => (p.id === saved.id ? saved : p)),
+    }));
+    return saved;
+  }, []);
+
+  /**
    * 이 스토어의 "오늘" — 화면(status/알림/pacing/Now 뷰)이 전부 이 값을 쓴다.
    * 알림과 status가 서로 다른 "오늘"을 쓰면 D-3/D-5 어긋남 버그가 재발하므로
    * 기준일의 단일 출처는 스토어다. 마운트 시점에 고정(useMemo []) — 렌더마다
@@ -531,5 +561,6 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     addStore,
     updateStore,
     upsertPerformanceRecord,
+    updatePerformanceSupplement,
   };
 }
