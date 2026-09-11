@@ -198,6 +198,8 @@ export const RECAP_STRINGS = Object.freeze({
   'recap.export.sheetsHint': { en: 'Copies the tables, then opens a new sheet — paste with Ctrl+V / ⌘V', ko: '표를 복사한 뒤 새 시트를 엽니다 — Ctrl+V / ⌘V로 붙여 넣으세요', 'zh-Hant': '複製表格並開啟新試算表——以 Ctrl+V / ⌘V 貼上' },
   'recap.export.sheetsDone': { en: 'Copied. Paste into the new sheet (Ctrl+V / ⌘V).', ko: '복사했습니다. 새 시트에 붙여 넣으세요(Ctrl+V / ⌘V).', 'zh-Hant': '已複製。請在新試算表中貼上（Ctrl+V / ⌘V）。' },
   'recap.export.sheetsFailed': { en: "Couldn't copy to the clipboard. Allow clipboard access and try again.", ko: '클립보드에 복사하지 못했습니다. 클립보드 권한을 허용하고 다시 시도하세요.', 'zh-Hant': '無法複製到剪貼簿。請允許剪貼簿權限後再試。' },
+  'recap.script.download': { en: 'Apps Script', ko: 'Apps Script', 'zh-Hant': 'Apps Script' },
+  'recap.script.downloadHint': { en: 'Download the Google Sheets Apps Script that rebuilds this report inside a spreadsheet with the same rules. Setup steps are at the top of the file.', ko: '이 보고서를 같은 규칙으로 구글 시트 안에 다시 그리는 Apps Script를 내려받습니다. 설치법은 파일 맨 위에 있습니다.', 'zh-Hant': '下載可在 Google 試算表中以相同規則重建此報告的 Apps Script。安裝步驟在檔案最上方。' },
   'recap.export.pdf': { en: 'PDF (print)', ko: 'PDF (인쇄)', 'zh-Hant': 'PDF（列印）' },
   'recap.export.pdfHint': { en: 'Opens the browser print dialog — choose "Save as PDF"', ko: '브라우저 인쇄 창을 엽니다 — "PDF로 저장"을 고르세요', 'zh-Hant': '開啟瀏覽器列印視窗——選擇「儲存為 PDF」' },
   'recap.compare.title': { en: 'Compare with similar campaigns', ko: '비슷한 캠페인과 비교', 'zh-Hant': '與相似廣告比較' },

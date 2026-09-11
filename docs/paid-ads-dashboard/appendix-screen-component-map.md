@@ -78,6 +78,7 @@
 | **SignInDialog** | 신규(구현됨, 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 |
 | recapSheets (utils) | 신규(구현됨, 3단계) | Google Sheets — 표를 클립보드에 복사하고 sheets.new를 연다(Excel 대신, 사용자 결정) |
 | **ExportMenu** | 신규(구현됨, 3단계) | Export 드롭다운 — Google Sheets · PDF(인쇄) |
+| recap-report.gs (public) | 신규(구현됨) | 구글 시트 Apps Script — 대시보드 DB(Supabase anon 읽기)를 직접 읽어 아무 시트에나 "Recap" 탭을 같은 산정 규칙으로 그린다. 제목 옆 Apps Script 링크가 URL·읽기 키를 채워 내려준다. 순수 계산부는 `scripts/recap-report-check/verify.mjs`로 대시보드와 대조 |
 | **PeerCompareDialog** | 신규(구현됨) | 벤치마크 글자를 누르면 비교군 캠페인을 나란히 — 열 정렬 |
 | recap-draft (Edge Function) | 신규(구현됨, 3단계) | Claude로 빈 코멘트·배운 점 초안과 ko/zh-Hant 번역. 로그인 세션만 호출 가능, 결과는 에디터의 빈 칸에만 채운다 |
 | Print stylesheet | 신규(구현됨 — PaidAdsShell GlobalStyles + 각 컴포넌트의 `@media print`) | `@page { size: letter portrait; margin: 12mm }`, 레일·툴바 숨김(data-print="hide"), 스크롤 컨테이너 해제. **인쇄용 보고서 컴포넌트는 없다**(2026-09-10) — 대시보드 컴포넌트 자체가 종이 치수로 갈아입는다 |

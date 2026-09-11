@@ -83,6 +83,47 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
   return lines.join('\n');
 }
 
+/** Apps Script 템플릿 파일 이름 — public/에 있고, 자리표시자(__SUPABASE_URL__ 등)는 그 파일 CONFIG.SUPABASE와 같은 문자열이어야 한다 */
+const RECAP_SCRIPT_FILENAME = 'recap-report.gs';
+
+/**
+ * Apps Script 템플릿에 대시보드의 Supabase 주소·공개 읽기 키를 채운다. 순수 문자열 처리 — 테스트 가능.
+ * 키는 화면이 이미 쓰는 anon 키(공개)라 새로 노출되는 것은 없다.
+ *
+ * @param {string} template - public/recap-report.gs 원문
+ * @param {{ url: string, anonKey: string }} env
+ * @returns {string}
+ */
+export function fillRecapScript(template, { url, anonKey }) {
+  return template.replace('__SUPABASE_URL__', url ?? '').replace('__SUPABASE_ANON_KEY__', anonKey ?? '');
+}
+
+/**
+ * 제목 옆 링크 — 템플릿을 받아 CONFIG를 채운 뒤 파일로 내려준다. 시트에서 붙여 넣기만 하면 되도록.
+ * 실패하면 false(호출부가 스낵바로 알린다).
+ *
+ * @returns {Promise<boolean>}
+ */
+export async function downloadRecapScript() {
+  try {
+    // BASE_URL은 배포 경로 — 함수 안에서 읽어 node(테스트)에서 import만 할 때는 평가되지 않게 한다
+    const res = await fetch(`${import.meta.env.BASE_URL}${RECAP_SCRIPT_FILENAME}`);
+    if (!res.ok) return false;
+    const filled = fillRecapScript(await res.text(), { url: import.meta.env.VITE_SUPABASE_URL, anonKey: import.meta.env.VITE_SUPABASE_ANON_KEY });
+    const blobUrl = URL.createObjectURL(new Blob([filled], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = RECAP_SCRIPT_FILENAME;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 표를 클립보드에 복사하고 새 Google 시트를 연다. 복사에 실패하면(권한 거부 등)
  * false를 돌려주고 시트는 열지 않는다 — 빈 시트만 열리면 무엇을 해야 할지 알 수 없다.

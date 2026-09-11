@@ -9,6 +9,7 @@ import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import MoreHorizOutlinedIcon from '@mui/icons-material/MoreHorizOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
@@ -25,7 +26,7 @@ import { LanguageSwitch } from '../../components/input/LanguageSwitch';
 import { ExportMenu } from '../../components/input/ExportMenu';
 import { PeerCompareDialog } from '../../components/templates/PeerCompareDialog';
 import { supabase } from '../../lib/supabase';
-import { copyRecapForGoogleSheets } from '../../utils/recapSheets';
+import { copyRecapForGoogleSheets, downloadRecapScript } from '../../utils/recapSheets';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { usePaidAdsStore } from './usePaidAdsStore';
 import { useSupabaseSession } from '../../lib/useSupabaseSession';
@@ -451,6 +452,23 @@ export function RecapDetailPage() {
         headline={headline}
         status={shownRecap?.status ?? null}
         lang={lang}
+        /* 구글 시트용 Apps Script(public/recap-report.gs) — 대시보드 DB를 직접 읽어 같은 산정 규칙으로 시트 안에 보고서 탭을 그린다.
+           내려받을 때 템플릿에 Supabase 주소·공개 읽기 키를 채워 준다(붙여 넣기만 하면 되도록). 제목 옆 작은 링크, 인쇄에서는 숨긴다 */
+        titleAdornment={(
+          <Tooltip title={t('recap.script.downloadHint', lang)} placement="top" enterDelay={300}>
+            <Link
+              component="button"
+              type="button"
+              onClick={async () => { if (!(await downloadRecapScript())) notify(t('recap.script.downloadFailed', lang), 'error'); }}
+              underline="hover"
+              data-print="hide"
+              sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.25, fontSize: 12, color: 'text.secondary', whiteSpace: 'nowrap' }}
+            >
+              <FileDownloadOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />
+              {t('recap.script.download', lang)}
+            </Link>
+          </Tooltip>
+        )}
         actions={actions}
         sx={{ mb: 3, '@media print': { mb: '8pt' } }}
       />

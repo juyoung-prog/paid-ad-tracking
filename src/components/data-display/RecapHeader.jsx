@@ -27,6 +27,7 @@ import { money, moneyWhole, dateRange, EMPTY } from '../../utils/format';
  * @param {{ metricKey: string, rank: number, total: number, peerEvents: string[] }|null} headline - schema.js buildRecapHeadline() 결과 [Optional]
  * @param {'draft'|'final'|null} status - 보고서 상태. null이면 아직 시작 전 [Optional]
  * @param {string} lang - 문구 언어(RECAP_LANG) [Optional, 기본값: 'en']
+ * @param {ReactNode} titleAdornment - 제목·상태 칩 뒤에 붙는 작은 것(Apps Script 다운로드 링크 등). 인쇄에서는 호출부가 숨긴다 [Optional]
  * @param {ReactNode} actions - 오른쪽 위 액션(인쇄 버튼 등) [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
  *
@@ -45,6 +46,7 @@ export function RecapHeader({
   headline = null,
   status = null,
   lang = 'en',
+  titleAdornment,
   actions,
   sx,
 }) {
@@ -77,6 +79,7 @@ export function RecapHeader({
               {eventName}
             </Typography>
             <RecapStatusBadge status={status} lang={lang} />
+            {titleAdornment}
           </Box>
           <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, '@media print': { fontSize: '7.5pt' } }}>
             {metaLine}
