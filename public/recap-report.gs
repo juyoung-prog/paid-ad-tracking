@@ -424,9 +424,9 @@ var TIMELINE_COLUMNS = [
   { key: 'startDate', label: 'Start', span: 2, align: 'center' },
   { key: 'endDate', label: 'End', span: 1, align: 'center' },
   { key: 'days', label: 'Days', span: 2, align: 'center', fmt: '0' },
-  { key: 'totalDaily', label: 'Daily budget', span: 1, align: 'right', fmt: '"$"#,##0.00' },
-  { key: 'totalBudget', label: 'Planned', span: 1, align: 'right', fmt: '"$"#,##0' },
-  { key: 'spent', label: 'Spent', span: 2, align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'totalDaily', label: 'Daily budget', span: 1, align: 'center', fmt: '"$"#,##0.00' },
+  { key: 'totalBudget', label: 'Planned', span: 1, align: 'center', fmt: '"$"#,##0' },
+  { key: 'spent', label: 'Spent', span: 2, align: 'center', fmt: '"$"#,##0.00' },
 ];
 
 /** KPI 블록 — 헤더 줄 + 값 줄, C열부터(합 240·110·100·100·55) */
