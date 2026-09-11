@@ -149,12 +149,33 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     // Video response — Hook 줄, Hold 줄, 보조 줄(dashboard videoSecondaryText)
     const video = hasData ? [line('hookRate'), line('holdRate'), rowView.videoSecondaryText(r, 'en') || null].filter(Boolean).join('\n') : strings.t('recap.table.noData', 'en');
     check(rs, 'videoResponse', video, s.videoResponse?.text);
-    // Engagement / Action — 목표별 대표 두 지표 줄 + 참여 내역 줄(dashboard engagementBreakdownText)
+    // Engagement / Action — 대표 지표 둘(대시보드 engagementLayout) + 참여 내역 고정 슬롯(대시보드 engagementBreakdownItems와 같은 값)
     const layout = rowView.engagementLayout(r.goal);
-    const engagement = hasData ? [...layout.primary.map(line), rowView.engagementBreakdownText(r, 'en') || null].filter(Boolean).join('\n') : format.EMPTY;
-    check(rs, 'engagementAction', engagement, s.engagementAction?.text);
-    // runs가 text 범위 안에 있는지
-    ['budgetSpend', 'primaryKpi', 'videoResponse', 'engagementAction'].forEach((k) => {
+    const ea = s.engagementAction;
+    if (!hasData) {
+      check(rs, 'engagementAction.noData', null, ea);
+    } else {
+      check(rs, 'engagementAction.primary.keys', layout.primary, ea?.primary?.map((m) => m.key));
+      layout.primary.forEach((k, idx) => {
+        const m = ea?.primary?.[idx] ?? {};
+        check(rs, `engagementAction.primary.${k}.label`, strings.metricLabel(k, 'en'), m.label);
+        check(rs, `engagementAction.primary.${k}.value`, r[k] == null ? format.EMPTY : rowView.kpiFormat(k)(r[k]), m.value);
+        check(rs, `engagementAction.primary.${k}.position`, r[k] == null ? null : dashboardPosition(r.benchmarks[k]), m.position);
+      });
+      const slots = { meta: ['likes', 'comments', 'shares', 'saves', 'reposts'], tiktok: ['likes', 'comments', 'shares', 'saves'] }[r.platform];
+      check(rs, 'engagementAction.breakdown.slots', slots, ea?.breakdown?.map((m) => m.key));
+      // 대시보드가 그리는 항목(값 있음 · 숨김 아님)은 전부 같은 값으로 들어 있고, 나머지 슬롯은 "—"
+      const dashItems = rowView.engagementBreakdownItems(r, 'en');
+      dashItems.forEach((item) => {
+        const m = ea?.breakdown?.find((x) => x.key === item.key);
+        check(rs, `engagementAction.breakdown.${item.key}`, `${item.label} ${item.value}`, m ? `${m.label} ${m.value}` : null);
+      });
+      (ea?.breakdown ?? []).forEach((m) => {
+        if (!dashItems.some((item) => item.key === m.key)) check(rs, `engagementAction.breakdown.${m.key}.empty`, format.EMPTY, m.value);
+      });
+      check(rs, 'engagementAction.noHidden', false, (ea?.breakdown ?? []).some((m) => schema.isHiddenMetric(m.key)));
+    }
+    ['budgetSpend', 'primaryKpi', 'videoResponse'].forEach((k) => {
       const cell = s[k];
       check(rs, `${k}.runsInRange`, true, Boolean(cell) && cell.runs.every((run) => run.start >= 0 && run.end <= cell.text.length && run.start < run.end));
     });
