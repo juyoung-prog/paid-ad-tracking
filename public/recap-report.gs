@@ -383,8 +383,9 @@ function placeReportSheet_(ss, sheet, previous) {
  *
  *   캠페인 표: 썸네일 36 · Campaign 235 · Goal 90 · Budget/Spend 120 · Primary KPI 115 · Video response 270 ·
  *              Engagement/Action 300 · What worked 250 · Could improve 250
- *   타임라인:  Phase 240 · Platforms 110 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105 (C열부터)
- *   요약:      Period 240 · Campaigns 110 · Total spent 100 · Planned 100 · Stores 55 (C열부터)
+ *   타임라인:  Phase 276 · Platforms 110 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105 (B열부터)
+ *   요약:      Period 276 · Campaigns 110 · Total spent 100 · Planned 100 · Stores 55 (B열부터)
+ * 제목·요약·타임라인·캠페인 표 전부 B열에서 시작한다 — 왼쪽 시작점이 한 줄로 맞는다.
  */
 var SHEET_COLUMN_WIDTHS = [36, 235, 5, 85, 25, 95, 5, 100, 10, 45, 95, 95, 35, 70, 230, 250, 250];
 
@@ -417,9 +418,9 @@ var COLUMNS = [
     note: 'Same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
 ];
 
-/** 타임라인 표 열 — C열부터, 물리 열 13개에 병합으로 얹는다(합 240·110·100·100·55·95·95·105) */
+/** 타임라인 표 열 — B열부터(캠페인 표와 같은 시작점), 물리 열 14개에 병합으로 얹는다(합 276·110·100·100·55·95·95·105) */
 var TIMELINE_COLUMNS = [
-  { key: 'name', label: 'Phase', span: 2, align: 'left' },
+  { key: 'name', label: 'Phase', span: 3, align: 'left' },
   { key: 'platformLabel', label: 'Platforms', span: 2, align: 'center' },
   { key: 'startDate', label: 'Start', span: 2, align: 'center' },
   { key: 'endDate', label: 'End', span: 1, align: 'center' },
@@ -429,9 +430,9 @@ var TIMELINE_COLUMNS = [
   { key: 'spent', label: 'Spent', span: 2, align: 'center', fmt: '"$"#,##0.00' },
 ];
 
-/** KPI 블록 — 헤더 줄 + 값 줄, C열부터(합 240·110·100·100·55) */
+/** KPI 블록 — 헤더 줄 + 값 줄, B열부터(합 276·110·100·100·55) */
 var KPI_COLUMNS = [
-  { key: 'periodText', label: 'Period', span: 2, align: 'left' },
+  { key: 'periodText', label: 'Period', span: 3, align: 'left' },
   { key: 'campaignCount', label: 'Campaigns', span: 2, align: 'center', fmt: '0' },
   { key: 'spend', label: 'Total spent', span: 2, align: 'right', fmt: '"$"#,##0.00' },
   { key: 'plannedBudget', label: 'Planned', span: 1, align: 'right', fmt: '"$"#,##0',
@@ -489,16 +490,16 @@ function renderReport_(sheet, model) {
   SHEET_COLUMN_WIDTHS.forEach(function (w, i) { sheet.setColumnWidth(L + i, w); });
   sheet.getRange(1, 1, sheet.getMaxRows(), totalCols).setFontSize(STYLE.fontSize).setVerticalAlignment('middle').setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 
-  var T = L + 1; // 글 열(C) — 제목·요약·타임라인은 썸네일 열(B)을 비우고 여기서 시작한다
+  var T = L; // 제목·요약·타임라인·캠페인 표 전부 B열에서 시작 — 왼쪽 시작점이 맞는다
   var H = STYLE.heights;
   var row = 2; // 1행은 위 여백
 
   // 3) 제목 · 메타 줄
-  sheet.getRange(row, T).setValue(model.eventName).setFontSize(STYLE.titleSize).setFontWeight('bold').setHorizontalAlignment('left')
+  sheet.getRange(row, T).setValue(model.eventName).setFontSize(STYLE.titleSize).setFontWeight('bold').setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW)
     .setNote('Recap — read from the dashboard database (read-only) and drawn by the Report script. Rules match the dashboard (src/data/schema.js). Refresh: Report → Refresh report.');
   sheet.setRowHeight(row, H.title);
   row += 1;
-  sheet.getRange(row, T).setValue(model.metaLine).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
+  sheet.getRange(row, T).setValue(model.metaLine).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
   row += 1 + STYLE.sectionGap;
 
   // 4) KPI 블록
@@ -508,11 +509,11 @@ function renderReport_(sheet, model) {
 
   // 5) 순위 한 줄 — 굵게, 비교 이벤트는 다음 줄 회색
   if (model.headline) {
-    sheet.getRange(row, T).setValue(model.headline.text).setFontWeight('bold').setFontSize(STYLE.sectionSize).setHorizontalAlignment('left')
+    sheet.getRange(row, T).setValue(model.headline.text).setFontWeight('bold').setFontSize(STYLE.sectionSize).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW)
       .setNote('Event-level rank by the primary KPI of the event\'s most common goal (' + CONFIG.METRIC_LABEL[model.headline.metricKey] +
         '), recomputed from summed numerators and denominators, against other events that share at least one phase name. Needs 3+ events including this one.');
     row += 1;
-    sheet.getRange(row, T).setValue(model.headline.peerEvents.join(' · ')).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
+    sheet.getRange(row, T).setValue(model.headline.peerEvents.join(' · ')).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
     row += 1 + STYLE.sectionGap;
   }
 
@@ -530,7 +531,7 @@ function renderReport_(sheet, model) {
 
   // 8) 꼬리말
   sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve are generated sentences; notes written by a person live in the dashboard.')
-    .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left');
+    .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
   // 9) 남는 빈 행은 지운다 — 스크롤 끝이 표 끝이어야 읽기 편하다
   if (sheet.getMaxRows() > row + 2) sheet.deleteRows(row + 3, sheet.getMaxRows() - row - 2);
@@ -614,7 +615,8 @@ function countText_(n, noun) {
 
 /** 섹션 제목 줄 — 굵은 12pt 한 칸, 밑줄·바탕 없음 */
 function renderSectionTitle_(sheet, row, col, title) {
-  sheet.getRange(row, col).setValue(title).setFontSize(STYLE.sectionSize).setFontWeight('bold').setHorizontalAlignment('left');
+  // 오른쪽 이웃 칸이 비어 있으니 넘쳐 보이게(OVERFLOW) — 전역 CLIP이면 "Meta campaigns — 5 campaigr"처럼 잘린다
+  sheet.getRange(row, col).setValue(title).setFontSize(STYLE.sectionSize).setFontWeight('bold').setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
   sheet.setRowHeight(row, STYLE.heights.section);
   return row + 1;
 }
