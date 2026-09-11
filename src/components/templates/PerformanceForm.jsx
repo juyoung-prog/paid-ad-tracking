@@ -2,7 +2,8 @@ import Box from '@mui/material/Box';
 import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { GOAL, PLATFORM } from '../../data/schema';
+import { GOAL } from '../../data/schema';
+import { SocialMetricsFields } from './SocialMetricsFields';
 
 function SectionLabel({ children }) {
   return (
@@ -55,12 +56,10 @@ function NumberField({ label, field, value, onChange, error }) {
  * 노출하고, Tier 3 합계(참여, goal=engagement)·Tier 4(전환, goal=conversion|store_visit)는
  * goal에 따라 조건부로 노출한다.
  *
- * 참여 내역(Likes · Comments · Shares · Saves · Reposts)은 goal과 무관하게 항상 있다(2026-09-11) —
- * 드로어·Performance·Reports가 이 일곱 가지(+ Follows · Visits)를 한 목록으로 보는데, 수기 캠페인은
- * 이 폼이 유일한 입력 경로다. Saves(TikTok)와 Reposts는 광고 API가 캠페인 단위로 주지 않아 손으로 적는
- * 것 말고는 채울 길이 없다. 단 **Reposts는 인스타그램(Meta) 개념이라 TikTok 캠페인에는 칸을 두지 않는다**
- * — TikTok 광고에는 리포스트가 없고, 참고 시트(인플루언서)에서도 TikTok 행은 Reposts가 비어 있다.
- * Follows · Visits는 TikTok API 전용 지표라 폼에 두지 않는다.
+ * 참여 내역(Social Metrics)은 goal과 무관하게 항상 있다(2026-09-11) — SocialMetricsFields가 그리고,
+ * 어느 칸을 보일지는 플랫폼이 정한다(Meta: Likes · Comments · Shares · Saves · Reposts, TikTok: Likes ·
+ * Comments · Shares · Follows · Profile Visits · Saves, 모르면 전부). 드로어·Performance·Reports가 같은
+ * 일곱 가지를 한 목록으로 보는데 수기 캠페인은 이 폼이 유일한 입력 경로다.
  *
  * CLS(레이아웃 시프트) 주의사항: goal은 이 폼 내부에서 바뀌지 않는 고정 prop이다
  * (캠페인 생성 시 이미 확정된 값). 즉 조건부 필드는 마운트 시점에 한 번 결정되고
@@ -69,7 +68,7 @@ function NumberField({ label, field, value, onChange, error }) {
  *
  * Props:
  * @param {string} goal - Campaign.goal 값, 조건부 필드 노출 기준 [Required]
- * @param {string} platform - Campaign.platform 값. TikTok이면 Reposts 칸을 숨긴다(리포스트는 인스타그램 개념) [Optional]
+ * @param {string} platform - Campaign.platform 값. Social Metrics의 칸 구성을 정한다(SocialMetricsFields) [Optional]
  * @param {object} values - 폼 값 { impressions, reach, clicks, spend, hookViews, heldViews, likes, comments, shares, saves, reposts, engagements, conversions } [Required]
  * @param {function} onChange - 필드 변경 핸들러 (field, value) => void [Required]
  * @param {object} errors - 필드별 에러 메시지 { field: message } [Optional]
@@ -84,7 +83,6 @@ function NumberField({ label, field, value, onChange, error }) {
  */
 export function PerformanceForm({ goal, platform, values, onChange, errors = {}, sx }) {
   const showEngagement = goal === GOAL.ENGAGEMENT;
-  const showReposts = platform !== PLATFORM.TIKTOK;
   const showConversion = goal === GOAL.CONVERSION || goal === GOAL.STORE_VISIT;
 
   return (
@@ -103,16 +101,9 @@ export function PerformanceForm({ goal, platform, values, onChange, errors = {},
         <NumberField label="Held Views" field="heldViews" value={values.heldViews} onChange={onChange} error={errors.heldViews} />
       </Grid>
 
-      {/* 참여 내역 — 광고 API가 주는 것(Like·Cmt·Share, Meta의 Save)과 안 주는 것(TikTok Save, Repost) 모두
-          수기 캠페인에서는 여기서만 들어온다. 값이 없는 칸은 저장도 null이라 화면에서 빠진다 */}
+      {/* 참여 내역 — 수기 캠페인에서는 여기서만 들어온다. 칸 구성은 플랫폼이 정한다(SocialMetricsFields) */}
       <SectionLabel>Social Metrics</SectionLabel>
-      <Grid container spacing={2}>
-        <NumberField label="Likes" field="likes" value={values.likes} onChange={onChange} error={errors.likes} />
-        <NumberField label="Comments" field="comments" value={values.comments} onChange={onChange} error={errors.comments} />
-        <NumberField label="Shares" field="shares" value={values.shares} onChange={onChange} error={errors.shares} />
-        <NumberField label="Saves" field="saves" value={values.saves} onChange={onChange} error={errors.saves} />
-        {showReposts && <NumberField label="Reposts" field="reposts" value={values.reposts} onChange={onChange} error={errors.reposts} />}
-      </Grid>
+      <SocialMetricsFields platform={platform} values={values} onChange={onChange} errors={errors} />
 
       {showEngagement && (
         <>

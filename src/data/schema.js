@@ -145,7 +145,26 @@ export const ALERT_TYPE = Object.freeze({
  * @property {number|null} saves - Tier 3 · 게시물 저장. Meta 전용(actions.onsite_conversion.post_save) — TikTok 광고 API는 캠페인 레벨 미제공
  * @property {number|null} reposts - Tier 3 · 리포스트. 두 광고 API 모두 캠페인 레벨 미제공 — 수기 레코드 전용, API 동기화는 null
  * @property {number|null} conversions - Tier 4 · goal=conversion|store_visit일 때만
+ * @property {string[]} manualFields - 사람이 드로어에서 고친 참여 칸의 DB 컬럼 이름 목록(SOCIAL_METRIC_KEYS의 column). 동기화는 이 칸을 API 값으로 덮지 않고 직전 값을 이월한다
  */
+
+/**
+ * 참여 내역 일곱 가지 — 드로어·Performance·Reports가 한 목록으로 보고, 사람이 고칠 수 있는 칸이다(2026-09-11).
+ * 값이 채워지는 범위는 플랫폼 API가 정한다(platforms): Like·Cmt·Share 양 플랫폼 · Follow·Visits TikTok만 ·
+ * Save는 Meta API가 주고 TikTok은 수기 · Repost는 인스타그램(Meta) 개념이라 TikTok에는 없다.
+ * column은 DB 컬럼 이름 — performance_records.manual_fields와 sync-performance의 SOCIAL_KEYS가 이 이름을 쓴다.
+ */
+export const SOCIAL_METRIC_KEYS = Object.freeze([
+  Object.freeze({ key: 'likes', column: 'likes', label: 'Likes', platforms: ['meta', 'tiktok'] }),
+  Object.freeze({ key: 'comments', column: 'comments', label: 'Comments', platforms: ['meta', 'tiktok'] }),
+  Object.freeze({ key: 'shares', column: 'shares', label: 'Shares', platforms: ['meta', 'tiktok'] }),
+  Object.freeze({ key: 'follows', column: 'follows', label: 'Follows', platforms: ['tiktok'] }),
+  Object.freeze({ key: 'profileVisits', column: 'profile_visits', label: 'Profile Visits', platforms: ['tiktok'] }),
+  Object.freeze({ key: 'saves', column: 'saves', label: 'Saves', platforms: ['meta', 'tiktok'] }),
+  Object.freeze({ key: 'reposts', column: 'reposts', label: 'Reposts', platforms: ['meta'] }),
+]);
+/** 플랫폼에 뜻이 있는 참여 칸만. 플랫폼을 모르면(수기 캠페인 등) 전부 */
+export const socialMetricKeysFor = (platform) => SOCIAL_METRIC_KEYS.filter((m) => !platform || m.platforms.includes(platform));
 
 /**
  * 캠페인×날짜 단위 일별 성과(performance_daily, API 전용). PerformanceRecord가

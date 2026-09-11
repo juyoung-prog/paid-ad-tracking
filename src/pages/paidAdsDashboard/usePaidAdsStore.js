@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { generateAlerts } from '../../data/schema';
+import { generateAlerts, SOCIAL_METRIC_KEYS } from '../../data/schema';
 import {
   rowToStore,
   storeToRow,
@@ -494,20 +494,23 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
   }, []);
 
   /**
-   * 동기화 캠페인의 **보충 값**(saves · reposts) 저장 — 광고 API가 캠페인 단위로 주지 않는 칸을
-   * 사람이 채우는 유일한 경로다(TikTok Save, Meta Repost). upsertPerformanceRecord처럼 manual 행을
-   * 만들지 않고 **최신 api 행에 그 두 칸만 update**한다 — performance_records_latest가 같은 날
-   * manual 행을 우선하므로, 두 칸만 든 manual 행이 생기면 노출·지출·클릭까지 전부 null로 덮인다.
-   * 다음 동기화가 이 값을 지우지 않는 건 sync-performance가 직전 행의 saves·reposts를 이월하기 때문.
+   * 동기화 캠페인의 **참여 칸 편집**(likes · comments · shares · follows · profileVisits · saves · reposts).
+   * upsertPerformanceRecord처럼 manual 행을 만들지 않고 **최신 api 행의 그 칸만 update**한다 —
+   * performance_records_latest가 같은 날 manual 행을 우선하므로, 몇 칸만 든 manual 행이 생기면
+   * 노출·지출·클릭까지 전부 null로 덮인다. 고친 칸은 manual_fields(DB 컬럼 이름)에 적어 두고,
+   * sync-performance가 그 칸은 API 값으로 덮지 않고 직전 값을 이월한다(마이그레이션 22).
    *
-   * @param {string} recordId - performance_records.id (최신 api 행)
-   * @param {{ saves?: number|null, reposts?: number|null }} patch
+   * @param {object} record - 최신 api 레코드(id · manualFields를 읽는다)
+   * @param {object} patch - 바뀐 칸만 { likes?, …, reposts? } (프론트 key)
    */
-  const updatePerformanceSupplement = useCallback(async (recordId, patch) => {
+  const updatePerformanceEngagement = useCallback(async (record, patch) => {
+    const columnOf = Object.fromEntries(SOCIAL_METRIC_KEYS.map((m) => [m.key, m.column]));
+    const row = Object.fromEntries(Object.entries(patch).map(([key, value]) => [columnOf[key] ?? key, value]));
+    const manualFields = [...new Set([...(record.manualFields ?? []), ...Object.keys(patch).map((key) => columnOf[key] ?? key)])];
     const { data, error: updateError } = await supabase
       .from('performance_records')
-      .update(patch)
-      .eq('id', recordId)
+      .update({ ...row, manual_fields: manualFields })
+      .eq('id', record.id)
       .select()
       .single();
 
@@ -561,6 +564,6 @@ export function useSupabasePaidAdsStore(isEnabled = true) {
     addStore,
     updateStore,
     upsertPerformanceRecord,
-    updatePerformanceSupplement,
+    updatePerformanceEngagement,
   };
 }

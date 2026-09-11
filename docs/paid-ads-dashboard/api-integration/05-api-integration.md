@@ -133,11 +133,14 @@ sequenceDiagram
 | `saves` | `actions` 중 `onsite_conversion.post_save` (게시물 저장) | — (캠페인 레벨 `saves`/`bookmark`/`total_save` 거부됨) |
 | `reposts` | — (광고 지표 없음, 인스타그램 리포스트는 드로어 보충 입력) | — (TikTok 광고에는 리포스트가 없다) |
 
-**보충 값(saves · reposts)의 이월 규칙(2026-09-11)**: 광고 API가 캠페인 단위로 주지 않는 칸(TikTok의
-`saves`, Meta의 `reposts`)은 Campaigns 드로어의 보충 입력이 **최신 `source='api'` 행에 그 칸만 update**한다
-(manual 행을 따로 만들면 `performance_records_latest`가 같은 날 manual을 우선해 나머지 지표가 null로 덮인다).
-`sync-performance`는 매일 새 행을 만들 때 `performance_records_latest`의 직전 `saves`/`reposts`를 읽어,
-API가 값을 주면 API 값, 아니면 직전 값을 물려받는다 — 그래서 한 번 적은 보충 값은 다음 동기화에도 남는다.
+**참여 칸의 편집·이월 규칙(2026-09-11)**: Campaigns 드로어는 동기화 캠페인의 참여 내역 일곱 칸
+(`likes` `comments` `shares` `follows` `profile_visits` `saves` `reposts`)을 **최신 `source='api'` 행에 직접
+update**한다(manual 행을 따로 만들면 `performance_records_latest`가 같은 날 manual을 우선해 나머지 지표가
+null로 덮인다). 사람이 고친 칸의 컬럼 이름은 그 행의 `manual_fields`(마이그레이션 22)에 적힌다.
+`sync-performance`는 새 행을 만들 때 `performance_records_latest`에서 직전 값과 `manual_fields`를 읽어:
+- `manual_fields`에 든 칸 → API 값을 무시하고 직전 값(사람이 다시 고칠 때까지 남는다)
+- 그 밖의 칸 → API가 값을 주면 API 값, 아니면(TikTok `saves`, `reposts`) 직전 값
+`manual_fields` 자체도 새 행으로 이월된다.
 | `conversions` | `actions` 중 `offsite_conversion` 등 | `conversion` |
 
 **`hookViews`/`heldViews`/`clicks`는 각 플랫폼 광고 관리자의 정의를 그대로 담는다.**

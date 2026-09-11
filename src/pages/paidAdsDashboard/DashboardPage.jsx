@@ -39,9 +39,10 @@ import { CampaignThumbnail } from '../../components/media/CampaignThumbnail';
 import { FilterBar } from '../../components/templates/FilterBar';
 import { CampaignForm } from '../../components/templates/CampaignForm';
 import { PerformanceForm } from '../../components/templates/PerformanceForm';
+import { SocialMetricsFields } from '../../components/templates/SocialMetricsFields';
 import { PlatformMetricList } from '../../components/data-display/PlatformMetricList';
 
-import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL } from '../../data/schema';
+import { getEffectiveStatus, calcBudgetPacing, budgetPaceRatio, effectiveBudgetPlanned, calcAutoBudgetPlanned, campaignGroupKey, daysSince, effectiveEndDate, hasAnyMetricValue, isSyncedCampaign, ALERT_SEVERITY, ALERT_TYPE, MANUAL_STATUS, TARGET_SCOPE, PLATFORM, GOAL, socialMetricKeysFor } from '../../data/schema';
 import { usePaidAdsStore, PaidAdsStoreContext } from './usePaidAdsStore';
 import { useSyncRuns } from './useSyncRuns';
 import { PAGE_GUTTER_X, SECTION_CARD_SX, campaignInDateRange, generateId, adsManagerUrl, billingUrl, buildEventFilterGroup } from './paidAdsPageUtils';
@@ -272,7 +273,7 @@ export function DashboardPage() {
     refresh,
     updateCampaign,
     upsertPerformanceRecord,
-    updatePerformanceSupplement,
+    updatePerformanceEngagement,
   } = usePaidAdsStore();
 
   // 동기화 상태를 매일 진입점인 이 화면까지 끌어올린다 — cron이 하루 1회라
@@ -736,22 +737,27 @@ export function DashboardPage() {
   // 성공 여부를 반환한다 — Save & Next(아래)가 저장이 실제로 된 경우에만
   // 다음 캠페인으로 이동해야 하기 때문. 실패했는데 이동하면 실패한 입력이
   // Drawer 전환과 함께 조용히 사라진다.
-  /* 동기화 캠페인의 보충 값(TikTok Save · Meta Repost) — 광고 API가 안 주는 칸 하나만 최신 api 행에
-     덧쓴다. manual 행을 만들면 최신 뷰가 그 행을 우선해 나머지 지표가 전부 null로 덮이므로
-     upsertPerformanceRecord를 쓰지 않는다(스토어 updatePerformanceSupplement 주석). */
-  const supplementField = selectedCampaign?.platform === PLATFORM.TIKTOK ? 'saves' : 'reposts';
-  const handleSaveSupplement = async () => {
-    if (isSubmitting || !performanceValues.id) return;
+  /* 동기화 캠페인의 참여 칸 편집(Likes … Reposts) — 바뀐 칸만 최신 api 행에 덧쓴다. manual 행을 만들면 최신
+     뷰가 그 행을 우선해 나머지 지표가 전부 null로 덮이므로 upsertPerformanceRecord를 쓰지 않는다(스토어
+     updatePerformanceEngagement 주석). 고친 칸만 manual_fields에 올라가 동기화가 건드리지 않는다 —
+     그래서 스냅샷과 다른 칸만 patch에 넣는다(그대로인 칸은 계속 API가 갱신한다). */
+  const socialKeys = socialMetricKeysFor(selectedCampaign?.platform).map((m) => m.key);
+  const socialPatch = Object.fromEntries(
+    socialKeys.filter((key) => (performanceValues[key] ?? null) !== (originalPerformanceSnapshot?.[key] ?? null)).map((key) => [key, performanceValues[key] ?? null])
+  );
+  const hasSocialChanges = Object.keys(socialPatch).length > 0;
+  const handleSaveEngagement = async () => {
+    if (isSubmitting || !performanceValues.id || !hasSocialChanges) return;
     setIsSubmitting(true);
-    const result = await updatePerformanceSupplement(performanceValues.id, { [supplementField]: performanceValues[supplementField] ?? null });
+    const result = await updatePerformanceEngagement(performanceValues, socialPatch);
     setIsSubmitting(false);
     if (!result) {
-      notify('Save failed — the value was not stored. Try again.', 'error');
+      notify('Save failed — the values were not stored. Try again.', 'error');
       return;
     }
     setPerformanceValues(result);
     setOriginalPerformanceSnapshot(result);
-    notify(`${supplementField === 'saves' ? 'Saves' : 'Reposts'} saved — it stays through the next sync.`, 'success');
+    notify('Engagement saved — edited fields stay through the next sync.', 'success');
   };
 
   const handleSavePerformance = async () => {
@@ -1588,39 +1594,39 @@ export function DashboardPage() {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 2 }}>
                   {`Synced from ${selectedCampaign.platform === PLATFORM.TIKTOK ? 'TikTok' : 'Meta'} Ads Manager — updates with the next sync.`}
                 </Typography>
-                <PlatformMetricList metrics={performanceValues} hasCoreMetrics />
+                {/* 참여 칸(likes…reposts)은 아래 편집 그리드가 그린다 — 같은 숫자가 두 번 나오지 않게 목록에서 뺀다 */}
+                <PlatformMetricList metrics={performanceValues} hasCoreMetrics excludeKeys={socialKeys} />
                 {!hasAnyMetricValue(performanceValues) && (
                   <Typography variant="body2" color="text.secondary">
                     No performance data has arrived yet.
                   </Typography>
                 )}
-                {/* 보충 입력 — 광고 API가 캠페인 단위로 주지 않는 칸 하나(TikTok: Saves, Meta: Reposts)만.
-                    api 행이 하나라도 있어야 덧쓸 자리가 있다. 값은 다음 동기화가 이월한다(sync-performance). */}
+                {/* 참여 칸 편집 — API가 채운 값을 사람이 고치는 자리(2026-09-11). api 행이 하나라도 있어야
+                    덧쓸 자리가 있다. 고친 칸은 "edited"가 붙고 다음 동기화가 덮지 않는다(sync-performance). */}
                 {performanceValues.id && (
                   <Box
                     component="form"
-                    onSubmit={(e) => { e.preventDefault(); handleSaveSupplement(); }}
+                    onSubmit={(e) => { e.preventDefault(); handleSaveEngagement(); }}
                     sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}
                   >
                     <Typography component="h4" sx={{ fontSize: 13, fontWeight: 600, color: 'text.primary', mb: 0.5 }}>
-                      {supplementField === 'saves' ? 'Saves' : 'Reposts'}
+                      Engagement
                     </Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-                      {supplementField === 'saves'
-                        ? 'Not provided by the TikTok ad API — enter it from TikTok Ads Manager. Kept through the next sync.'
-                        : 'Not provided by the Meta ad API — enter it from Instagram insights. Kept through the next sync.'}
+                      {selectedCampaign.platform === PLATFORM.TIKTOK
+                        ? 'Synced from TikTok except Saves, which the ad API does not provide. Fields you edit are kept through the next sync.'
+                        : 'Synced from Meta except Reposts, which the ad API does not provide. Fields you edit are kept through the next sync.'}
                     </Typography>
-                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                      <TextField
-                        size="small"
-                        type="number"
-                        value={performanceValues[supplementField] ?? ''}
-                        onChange={(e) => setPerformanceValues((v) => ({ ...v, [supplementField]: e.target.value === '' ? null : Number(e.target.value) }))}
-                        slotProps={{ htmlInput: { 'aria-label': supplementField === 'saves' ? 'Saves' : 'Reposts', min: 0 } }}
-                        sx={{ width: 160 }}
-                      />
-                      <Button type="submit" size="small" variant="contained" disabled={isSubmitting} sx={{ boxShadow: 'none' }}>
-                        Save
+                    <SocialMetricsFields
+                      platform={selectedCampaign.platform}
+                      values={performanceValues}
+                      manualFields={(performanceValues.manualFields ?? []).map((column) => socialMetricKeysFor().find((m) => m.column === column)?.key ?? column)}
+                      onChange={(field, value) => setPerformanceValues((v) => ({ ...v, [field]: value }))}
+                      isDisabled={isSubmitting}
+                    />
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                      <Button type="submit" size="small" variant="contained" disabled={isSubmitting || !hasSocialChanges} sx={{ boxShadow: 'none' }}>
+                        Save Engagement
                       </Button>
                     </Box>
                   </Box>

@@ -105,13 +105,14 @@ const FIELDS = [
  * @param {object} metrics - 성과 레코드. videoPlays/heldViews/avgWatchSeconds/likes/comments/shares/saves/reposts/follows/profileVisits(+hasCoreMetrics면 spend/impressions/reach/clicks/engagements/conversions)를 읽는다. 세 그룹(Delivery / Traffic & Engagement / Video & Social)으로 나눠 그린다 [Required]
  * @param {string} title - 목록 위 소제목(13px 600 문장형 — 위의 PERFORMANCE 라벨보다 한 단 아래) [Optional, 기본값: 'Platform metrics']
  * @param {boolean} hasCoreMetrics - 핵심 지표(Spend·Impressions·Reach·Clicks·CTR·CPM·CPC·Engagements·Conversions·CPA)를 목록 맨 앞에 붙인다. 입력 폼이 없는 동기화 캠페인 드로어에서만 켠다 — 폼이 있으면 같은 값이 필드에 이미 있다 [Optional, 기본값: false]
+ * @param {string[]} excludeKeys - 목록에서 뺄 지표 key. 동기화 캠페인 드로어가 참여 칸(likes…reposts)을 편집 그리드(SocialMetricsFields)로 대신 그릴 때 같은 숫자가 두 번 나오지 않게 [Optional, 기본값: []]
  * @param {object} sx - 추가 스타일 [Optional]
  *
  * Example usage:
  * <PlatformMetricList metrics={ performanceRecord } />
  */
-export function PlatformMetricList({ metrics, title = 'Platform metrics', hasCoreMetrics = false, sx }) {
-  const rows = [...(hasCoreMetrics ? CORE_FIELDS : []), ...FIELDS].reduce((acc, field) => {
+export function PlatformMetricList({ metrics, title = 'Platform metrics', hasCoreMetrics = false, excludeKeys = [], sx }) {
+  const rows = [...(hasCoreMetrics ? CORE_FIELDS : []), ...FIELDS].filter((field) => !excludeKeys.includes(field.key)).reduce((acc, field) => {
     const raw = field.derive ? field.derive(metrics ?? {}) : metrics?.[field.key];
     if (raw != null) acc.push({ label: field.label, value: field.format(raw), group: field.group });
     return acc;

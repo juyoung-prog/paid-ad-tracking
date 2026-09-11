@@ -37,6 +37,9 @@ type Metrics = {
   conversions: number | null;
 };
 
+/** 사람이 드로어에서 고칠 수 있는 참여 칸 — 대시보드 SocialMetricsFields · schema.js SOCIAL_METRIC_KEYS와 같은 목록(DB 컬럼 이름) */
+const SOCIAL_KEYS = ['likes', 'comments', 'shares', 'follows', 'profile_visits', 'saves', 'reposts'] as const;
+
 /** performance_daily에 넣는 일별 행. 가산 가능한 Tier 1만 — 마이그레이션 18 주석 참고. */
 type DailyRow = {
   date: string; // YYYY-MM-DD
@@ -446,22 +449,21 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: campaignsError.message }), { status: 500, headers: corsHeaders });
   }
 
-  /* 캠페인당 최신 성과 1건 — (1) 이미 성과를 한 번이라도 받아둔 캠페인 집합, (2) 사람이 보충해 둔
-     saves·reposts. 광고 API가 캠페인 단위로 주지 않는 값(TikTok Save, Meta Repost)은 대시보드 드로어에서
-     최신 api 행에 직접 적는데(performance_records_latest 우선순위 때문에 manual 행을 따로 두면 나머지
-     지표가 null로 덮인다), 매일 새 행을 만드는 이 함수가 그 값을 이월하지 않으면 다음 날 사라진다.
-     규칙: API가 값을 주면 API 값, 아니면 직전 행의 값을 물려받는다(2026-09-11). */
+  /* 캠페인당 최신 성과 1건 — (1) 이미 성과를 한 번이라도 받아둔 캠페인 집합, (2) 사람이 드로어에서 고친
+     참여 칸(manual_fields)과 그 값. 대시보드는 동기화 캠페인의 참여 내역(SOCIAL_KEYS)을 최신 api 행에
+     직접 고치는데(performance_records_latest 우선순위 때문에 manual 행을 따로 두면 나머지 지표가 null로
+     덮인다), 매일 새 행을 만드는 이 함수가 그 값을 이월하지 않으면 다음 날 사라진다.
+     규칙(2026-09-11): manual_fields에 든 칸은 API 값을 무시하고 직전 값 — 사람이 고친 것은 사람이 다시
+     고칠 때까지 남는다. 그 밖의 칸은 API가 값을 주면 API 값, 아니면(TikTok saves, reposts) 직전 값. */
   const { data: recorded, error: recordedError } = await admin
     .from('performance_records_latest')
-    .select('campaign_id, saves, reposts');
+    .select('campaign_id, likes, comments, shares, follows, profile_visits, saves, reposts, manual_fields');
 
   if (recordedError) {
     return new Response(JSON.stringify({ error: recordedError.message }), { status: 500, headers: corsHeaders });
   }
   const hasRecord = new Set((recorded ?? []).map((r) => r.campaign_id));
-  const supplementByCampaign = new Map(
-    (recorded ?? []).map((r) => [r.campaign_id, { saves: r.saves ?? null, reposts: r.reposts ?? null }])
-  );
+  const previousByCampaign = new Map((recorded ?? []).map((r) => [r.campaign_id, r]));
 
   // 일별 데이터가 이미 있는 캠페인 집합. 행 전체가 아니라 distinct 캠페인 id를
   // 돌려주는 SQL 함수를 쓴다 — 일별 테이블은 캠페인×날짜라 행으로 세면
@@ -541,16 +543,22 @@ Deno.serve(async (req) => {
 
     if (!metrics) { skip('no_data'); continue; }
 
-    const supplement = supplementByCampaign.get(c.id);
+    const previous = previousByCampaign.get(c.id);
+    const manualFields: string[] = Array.isArray(previous?.manual_fields) ? previous.manual_fields : [];
+    const carried: Partial<Metrics> = {};
+    for (const key of SOCIAL_KEYS) {
+      // 사람이 고친 칸은 그대로, API가 안 주는 칸은 직전 값 — 위 previousByCampaign 주석
+      if (manualFields.includes(key)) carried[key] = previous?.[key] ?? null;
+      else if (metrics[key] == null) carried[key] = previous?.[key] ?? null;
+    }
     const { error: upsertError } = await admin.from('performance_records').upsert(
       {
         campaign_id: c.id,
         recorded_at: today,
         source: 'api',
         ...metrics,
-        // 사람이 보충한 값의 이월 — API가 안 주는 칸만(위 supplementByCampaign 주석)
-        saves: metrics.saves ?? supplement?.saves ?? null,
-        reposts: metrics.reposts ?? supplement?.reposts ?? null,
+        ...carried,
+        manual_fields: manualFields,
       },
       { onConflict: 'campaign_id,recorded_at,source' }
     );

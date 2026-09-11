@@ -175,6 +175,8 @@ export function rowToPerformanceRecord(row) {
     saves: num(row.saves),
     reposts: num(row.reposts),
     conversions: num(row.conversions),
+    // 사람이 드로어에서 고친 참여 칸(DB 컬럼 이름). 동기화가 이 칸은 덮지 않는다 — 마이그레이션 22
+    manualFields: Array.isArray(row.manual_fields) ? row.manual_fields : [],
   };
 }
 
