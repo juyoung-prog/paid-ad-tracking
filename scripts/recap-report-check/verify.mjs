@@ -153,8 +153,15 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     const layout = rowView.engagementLayout(r.goal);
     const ea = s.engagementAction;
     if (!hasData) {
-      check(rs, 'engagementAction.noData', null, ea);
+      check(rs, 'engagementAction.noData', format.EMPTY, ea?.text);
     } else {
+      // 세 줄 텍스트 — 1·2줄 "라벨 값  순위", 3줄 고정 슬롯 "Like 39 · Cmt 3 · …"
+      const expectedLines = [...layout.primary.map(line)];
+      const slotKeys = { meta: ['likes', 'comments', 'shares', 'saves', 'reposts'], tiktok: ['likes', 'comments', 'shares', 'saves'] }[r.platform] ?? [];
+      const expectedThird = slotKeys.map((k) => `${strings.metricLabel(k, 'en')} ${r[k] == null ? format.EMPTY : format.count(r[k])}`).join(' · ');
+      if (expectedThird) expectedLines.push(expectedThird);
+      check(rs, 'engagementAction.text', expectedLines.join('\n'), ea?.text);
+      check(rs, 'engagementAction.lineCount', expectedLines.length, ea?.text?.split('\n').length);
       check(rs, 'engagementAction.primary.keys', layout.primary, ea?.primary?.map((m) => m.key));
       layout.primary.forEach((k, idx) => {
         const m = ea?.primary?.[idx] ?? {};
@@ -175,7 +182,7 @@ function compareEvent(label, eventName, campaigns, records, grids) {
       });
       check(rs, 'engagementAction.noHidden', false, (ea?.breakdown ?? []).some((m) => schema.isHiddenMetric(m.key)));
     }
-    ['budgetSpend', 'primaryKpi', 'videoResponse'].forEach((k) => {
+    ['budgetSpend', 'primaryKpi', 'videoResponse', 'engagementAction'].forEach((k) => {
       const cell = s[k];
       check(rs, `${k}.runsInRange`, true, Boolean(cell) && cell.runs.every((run) => run.start >= 0 && run.end <= cell.text.length && run.start < run.end));
     });

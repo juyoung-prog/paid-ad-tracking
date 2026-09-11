@@ -373,22 +373,7 @@ function placeReportSheet_(ss, sheet, previous) {
  *   KPI:       Period 260 · Campaigns 100 · Total spent 120 · Planned 100 · Stores 55
  * 첫 두 조각(36 + 224)이 Campaign — 36은 썸네일 칸.
  */
-var PHYSICAL_WIDTHS = [36, 224, 100, 20, 100, 15, 85, 40, 15, 95, 95, 95, 10].concat(repeat_(15, 20)).concat([260, 260]);
-
-/** 같은 값 n개 배열 */
-function repeat_(value, n) {
-  var out = [];
-  for (var i = 0; i < n; i += 1) out.push(value);
-  return out;
-}
-
-/**
- * Engagement / Action 블록 — 물리 열 20개(15px씩 = 300px) 위에 캠페인마다 두 줄:
- *   윗줄  대표 지표 둘(10칸씩): "Eng. rate 0.00%" ⏎ "mid"
- *   아랫줄 참여 내역 미니 그리드(Meta 5칸 = 4열씩 · TikTok 4칸 = 5열씩): "Like" ⏎ "39"
- * 칸 안의 격자는 지우고 블록 바깥 격자만 남긴다 — 한 칸처럼 읽히되 자리는 고정된다.
- */
-var ENGAGEMENT_GRID_COLS = 20;
+var PHYSICAL_WIDTHS = [36, 224, 100, 20, 100, 15, 85, 40, 15, 95, 95, 95, 10, 290, 260, 260];
 
 /** 지표 순위 노트 꼬리 */
 var METRIC_RANK_NOTE = '\nAfter a value: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
@@ -407,10 +392,10 @@ var COLUMNS = [
     note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
   { key: 'primaryKpi', label: 'Primary KPI', span: 2, align: 'center', rich: true,
     note: 'The main result for the campaign goal — reported, not judged. Awareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.' + METRIC_RANK_NOTE },
-  { key: 'videoResponse', label: 'Video response', span: 5, align: 'left', rich: true,
+  { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
     note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
-  { key: 'engagementAction', label: 'Engagement / Action', span: ENGAGEMENT_GRID_COLS, align: 'left', grid: true,
-    note: 'Top: the two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR — each with its rank underneath. Bottom: the engagement breakdown in fixed slots — Meta: Like · Cmt · Share · Save · Repost, TikTok: Like · Cmt · Share · Save ("—" when the platform did not report it). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
+  { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
+    note: 'Lines 1–2: the two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR — each with its rank after the value. Line 3: the engagement breakdown in a fixed order — Meta: Like · Cmt · Share · Save · Repost, TikTok: Like · Cmt · Share · Save ("—" when the platform did not report it). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
@@ -453,7 +438,7 @@ var STYLE = {
   sectionSize: 12,
   leftGutter: 20,
   left: 2,
-  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 32 },
+  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 64 },
   sectionGap: 2,
 };
 
@@ -520,8 +505,7 @@ function renderReport_(sheet, model) {
   // 6) 플랫폼별 캠페인 표 — 셀 안 줄바꿈이 있어 줄이 높고 WRAP
   model.sections.forEach(function (section) {
     row = renderSectionTitle_(sheet, row, section.label + ' campaigns — ' + countText_(section.rows.length, 'campaign'));
-    // 캠페인 하나 = 시트 두 줄(Engagement / Action 블록의 위·아래). 다른 열은 두 줄을 세로로 병합한다
-    row = renderTable_(sheet, row, L, COLUMNS, section.rows, { headerHeight: H.campaignHeader, rowHeight: H.campaignRow, wrap: true, rowsPerRecord: 2 });
+    row = renderTable_(sheet, row, L, COLUMNS, section.rows, { headerHeight: H.campaignHeader, rowHeight: H.campaignRow, wrap: true });
     row += STYLE.sectionGap;
   });
 
@@ -590,16 +574,19 @@ function renderLinkedText_(cell, text, nameLength, url) {
 }
 
 /**
- * 순수부가 만든 { text, runs } → RichText. run.style: 'small'(9pt 회색 — 순위·보조 줄·라벨) · 'bold'(값 강조).
+ * 순수부가 만든 { text, runs } → RichText. run.style: 'small'(9pt 회색 — 순위·보조 줄) · 'muted'(회색, 보통 크기 — 라벨) · 'bold'(값 강조).
  * 글자 위치는 순수부가 계산했으므로 여기서는 옮겨 적기만 한다.
  */
 function renderRichCell_(cell, rich) {
-  var small = SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build();
-  var bold = SpreadsheetApp.newTextStyle().setBold(true).build();
+  var styles = {
+    small: SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build(),
+    muted: SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).build(),
+    bold: SpreadsheetApp.newTextStyle().setBold(true).build(),
+  };
   var builder = SpreadsheetApp.newRichTextValue().setText(rich.text);
   rich.runs.forEach(function (run) {
     if (run.end <= run.start) return;
-    builder.setTextStyle(run.start, run.end, run.style === 'bold' ? bold : small);
+    builder.setTextStyle(run.start, run.end, styles[run.style] || styles.small);
   });
   cell.setRichTextValue(builder.build());
 }
@@ -668,7 +655,6 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
         if (line === 0) {
           if (j === totalIndex && i === 0) v = 'Total';
           else if (j === totalIndex && r[c.key] == null) v = '';
-          else if (c.grid) v = ''; // 블록은 아래서 칸마다 따로 쓴다
           else if (c.rich) v = r[c.key] && r[c.key].text ? r[c.key].text : EMPTY;
           else v = cellValue_(r[c.key]);
         }
@@ -692,7 +678,6 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
     columns.forEach(function (c, i) {
       var col = startCol + offsets[i];
       var span = c.span || 1;
-      if (c.grid && j !== totalIndex) return;
       if (c.thumbKey && j !== totalIndex) {
         if (rpr > 1) { sheet.getRange(r0, col, rpr, 1).merge(); sheet.getRange(r0, col + 1, rpr, 1).merge(); }
         return;
@@ -715,8 +700,6 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
         sheet.getRange(r0, col).setHorizontalAlignment('center');
         renderThumbnail_(sheet.getRange(r0, col), r[c.thumbKey], r.phaseName);
         renderLinkedText_(sheet.getRange(r0, textCol), String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null);
-      } else if (c.grid) {
-        renderEngagementBlock_(sheet, r0, col, rpr, c.span, r[c.key]);
       } else if (c.rich && r[c.key] && r[c.key].runs && r[c.key].runs.length) {
         renderRichCell_(sheet.getRange(r0, textCol), r[c.key]);
       }
@@ -729,54 +712,6 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   }
 
   return row + sheetRows;
-}
-
-/**
- * Engagement / Action 블록 — 윗줄 대표 지표 둘("Eng. rate 0.00%" ⏎ "mid"), 아랫줄 참여 내역 미니 그리드("Like" ⏎ "39").
- * 자리는 플랫폼별로 고정(순수부 breakdown 슬롯)이라 캠페인끼리 세로로 맞는다. 블록 안 격자는 지운다.
- * cell = { primary: [{ label, value, position }], breakdown: [{ label, value }] } 또는 null(데이터 없음 → "—" 한 칸)
- */
-function renderEngagementBlock_(sheet, r0, col, rpr, span, cell) {
-  var block = sheet.getRange(r0, col, rpr, span);
-  if (!cell || !cell.primary || cell.primary.length === 0) {
-    block.merge().setValue(EMPTY).setHorizontalAlignment('center');
-    return;
-  }
-  var small = SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build();
-  var bold = SpreadsheetApp.newTextStyle().setBold(true).build();
-  var muted = SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).build();
-
-  // 윗줄 — 대표 지표: 라벨(회색) + 값(굵게) ⏎ 순위(작게)
-  var topWidth = Math.floor(span / cell.primary.length);
-  cell.primary.forEach(function (m, k) {
-    var range = sheet.getRange(r0, col + k * topWidth, 1, k === cell.primary.length - 1 ? span - k * topWidth : topWidth).merge();
-    var text = m.label + ' ' + m.value + (m.position ? '\n' + m.position : '');
-    var builder = SpreadsheetApp.newRichTextValue().setText(text)
-      .setTextStyle(0, m.label.length, muted)
-      .setTextStyle(m.label.length + 1, m.label.length + 1 + m.value.length, bold);
-    if (m.position) builder.setTextStyle(text.length - m.position.length, text.length, small);
-    range.setRichTextValue(builder.build()).setHorizontalAlignment('left').setVerticalAlignment('middle');
-  });
-
-  // 아랫줄 — 미니 그리드: 라벨(작게) ⏎ 값(굵게), 가운데. 슬롯 수만큼 폭을 나눈다(Meta 5 → 4칸씩, TikTok 4 → 5칸씩)
-  if (rpr > 1) {
-    var items = cell.breakdown || [];
-    if (items.length === 0) {
-      sheet.getRange(r0 + 1, col, 1, span).merge().setValue(EMPTY).setHorizontalAlignment('center');
-    } else {
-      var w = Math.floor(span / items.length);
-      items.forEach(function (m, k) {
-        var range = sheet.getRange(r0 + 1, col + k * w, 1, k === items.length - 1 ? span - k * w : w).merge();
-        var text = m.label + '\n' + m.value;
-        range.setRichTextValue(SpreadsheetApp.newRichTextValue().setText(text)
-          .setTextStyle(0, m.label.length, small)
-          .setTextStyle(m.label.length + 1, text.length, bold).build())
-          .setHorizontalAlignment('center').setVerticalAlignment('middle');
-      });
-    }
-  }
-  // 블록 안 격자 제거 — 바깥 네 변은 그대로
-  block.setBorder(null, null, null, null, false, false);
 }
 
 // ============================================================
@@ -1481,7 +1416,7 @@ function flattenRow(r) {
   flat.budgetSpend = budgetSpendCell(r);
   flat.primaryKpi = hasData ? primaryKpiCell(kpi, kpiStat) : richLines([[{ text: EMPTY }]]);
   flat.videoResponse = hasData ? videoResponseCell(r) : richLines([[{ text: 'No performance data' }]]);
-  flat.engagementAction = hasData ? engagementActionCell(r) : null;
+  flat.engagementAction = hasData ? engagementActionCell(r) : richLines([[{ text: EMPTY }]]);
   CONFIG.BENCHMARK_METRICS.forEach(function (m) {
     var b = r.benchmarks[m.key];
     flat[m.key] = r[m.key];
@@ -1612,9 +1547,11 @@ function videoResponseCell(r) {
 }
 
 /**
- * Engagement / Action — 두 층: 대표 지표 둘(목표가 정한다, 순위 포함) + 참여 내역 미니 그리드(플랫폼별 고정 슬롯).
- * 대시보드(RecapCampaignTable)와 같은 지표·같은 값이고, 자리만 고정이다 — 대시보드는 값 없는 항목을 빼지만 시트는 "—"로 자리를 지킨다.
- * text는 같은 내용의 한 줄 표기(대조·대체용).
+ * Engagement / Action — 세 줄. Video response와 같은 결(라벨 · 값 · 순위가 한 줄):
+ *   1·2줄  대표 지표(목표가 정한다): "Eng. rate"(회색) + "0.00%"(굵게) + "  mid"(작게)
+ *   3줄    참여 내역, 플랫폼별 고정 순서: "Like 39 · Cmt 3 · Share 32 · Save 25 · Repost 3" — 라벨·구분자 회색, 값 보통. 값 없으면 "—"
+ * 지표·값·순위는 대시보드(RecapCampaignTable)와 같다 — 대시보드는 값 없는 항목을 빼지만 시트는 "—"로 자리를 지킨다.
+ * primary·breakdown은 대조용 재료, text·runs는 셀 내용이다.
  */
 function engagementActionCell(r) {
   var layout = CONFIG.ENGAGEMENT_ACTION_LAYOUT[r.goal] || CONFIG.ENGAGEMENT_ACTION_LAYOUT.awareness;
@@ -1631,10 +1568,21 @@ function engagementActionCell(r) {
   var breakdown = slots.map(function (k) {
     return { key: k, label: CONFIG.METRIC_LABEL[k], value: r[k] == null ? EMPTY : countNumberText(r[k]) };
   });
-  var text = primary.map(function (m) { return m.label + ' ' + m.value + (m.position ? '  ' + m.position : ''); })
-    .concat([breakdown.map(function (m) { return m.label + ' ' + m.value; }).join(' · ')])
-    .join('\n');
-  return { primary: primary, breakdown: breakdown, text: text };
+
+  var lines = primary.map(function (m) {
+    var segments = [{ text: m.label, style: 'muted' }, { text: ' ' + m.value, style: 'bold' }];
+    if (m.position) segments.push({ text: '  ' + m.position, style: 'small' });
+    return segments;
+  });
+  var third = [];
+  breakdown.forEach(function (m, i) {
+    if (i > 0) third.push({ text: ' · ', style: 'muted' });
+    third.push({ text: m.label + ' ', style: 'muted' });
+    third.push({ text: m.value });
+  });
+  if (third.length) lines.push(third);
+  var rich = richLines(lines);
+  return { primary: primary, breakdown: breakdown, text: rich.text, runs: rich.runs };
 }
 
 /** "2s" / "2.95s" — 값이 가진 만큼만 (utils/format seconds) */
