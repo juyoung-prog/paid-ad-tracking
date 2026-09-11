@@ -271,16 +271,17 @@ if (process.argv.includes('--real')) {
     const model = gs.buildReportModel(grids, new Date('2026-09-11'), e.eventName);
     model.sections.flatMap((sec) => sec.rows).forEach((s) => {
       const c = campaignById[s.campaignId];
-      const expectedUrl = pageUtils.adsManagerUrl(c, accountById[c.accountId]);
+      // Campaign 칸 링크 = 대시보드 드로어의 View ad (creativeUrl || adLink)
+      const expectedUrl = c.creativeUrl || c.adLink || null;
       check(`real / ${e.eventName} / ${s.phaseName} (${c.platform})`, 'campaignUrl', expectedUrl, s.campaignUrl);
       check(`real / ${e.eventName} / ${s.phaseName} (${c.platform})`, 'thumbnailUrl', c.thumbnailUrl ?? null, s.thumbnailUrl);
-      if (expectedUrl && c.platform === 'meta') check(`real / ${s.phaseName}`, 'meta link host', true, s.campaignUrl.startsWith('https://adsmanager.facebook.com/'));
-      if (expectedUrl && c.platform === 'tiktok') check(`real / ${s.phaseName}`, 'tiktok link host', true, s.campaignUrl.startsWith('https://ads.tiktok.com/'));
+      if (expectedUrl && c.platform === 'meta') check(`real / ${s.phaseName}`, 'meta link host', true, /^https:\/\/(www\.)?(instagram|facebook)\.com\//.test(s.campaignUrl) || Boolean(c.creativeUrl));
+      if (expectedUrl && c.platform === 'tiktok') check(`real / ${s.phaseName}`, 'tiktok link host', true, /^https:\/\/(www\.)?tiktok\.com\//.test(s.campaignUrl) || Boolean(c.creativeUrl));
       check(`real / ${s.phaseName}`, 'phaseNameLength', s.phaseName.length, s.phaseNameLength);
       linkChecks += 1; if (s.thumbnailUrl) withThumb += 1; if (s.campaignUrl) withLink += 1;
     });
   }
-  console.log(`\n[real · campaign column] rows ${linkChecks}, with thumbnail ${withThumb}, with Ads Manager link ${withLink}, mismatches ${mismatches.length - checksBefore}`);
+  console.log(`\n[real · campaign column] rows ${linkChecks}, with thumbnail ${withThumb}, with View ad link ${withLink}, mismatches ${mismatches.length - checksBefore}`);
   console.log(`\n[real · DB rows via rowsToGrid] campaigns ${campaigns.length}, events ${events.length}, campaign rows compared ${rows}, mismatches ${mismatches.length - checksBefore}`);
   checksBefore = mismatches.length;
   let sheetRowsCompared = 0;

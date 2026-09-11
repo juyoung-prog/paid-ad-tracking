@@ -402,7 +402,7 @@ var COLUMNS = [
   { key: 'thumbnailUrl', label: '', span: 1, align: 'center', thumb: true },
   // 이름은 굵게 + Ads Manager 링크(있을 때만), 둘째 줄은 매장 · 기간(작고 회색)
   { key: 'campaignText', label: 'Campaign', span: 1, align: 'left', linkKey: 'campaignUrl', linkLength: 'phaseNameLength',
-    note: 'Thumbnail (when the platform provides one), phase name, then store · period (days). The name links to the campaign in Meta / TikTok Ads Manager when the account id is known. Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
+    note: 'Thumbnail (when the platform provides one), phase name, then store · period (days). The name links to the ad itself — the same "View ad" link as the dashboard (the original Instagram post / TikTok video, or a link a person entered). Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
   { key: 'goalLabel', label: 'Goal', span: 2, align: 'center' },
   { key: 'budgetSpend', label: 'Budget / Spend', span: 2, align: 'center', rich: true,
     note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
@@ -784,9 +784,10 @@ function buildReportModel(grids, today, eventName) {
       rows: recap.byPlatform[p].map(function (r) {
         var campaign = campaignById[r.campaignId] || null;
         return Object.assign(flattenRow(r), {
-          // Campaign 칸의 장식 — 썸네일은 플랫폼이 준 주소 그대로, 링크는 대시보드와 같은 Ads Manager 규칙(adsManagerUrl)
+          // Campaign 칸의 장식 — 썸네일은 플랫폼이 준 주소 그대로, 링크는 대시보드 드로어의 "View ad"와 같은 규칙
+          // (사람이 입력한 creative_url이 있으면 그것, 없으면 동기화가 채운 ad_link = 원본 게시물·영상). 둘 다 없으면 링크 없음
           thumbnailUrl: campaign ? campaign.thumbnailUrl : null,
-          campaignUrl: campaign ? adsManagerUrl(campaign, accountById[campaign.accountId]) : null,
+          campaignUrl: campaign ? viewAdUrl(campaign) : null,
           phaseNameLength: r.phaseName.length,
         });
       }),
@@ -986,6 +987,8 @@ function parseCampaigns(grid) {
       // Campaign 칸의 장식 재료 — 계산에는 쓰지 않는다
       thumbnailUrl: str(r.thumbnailurl),
       externalCampaignId: str(r.externalcampaignid),
+      creativeUrl: str(r.creativeurl),
+      adLink: str(r.adlink),
     };
   }).filter(function (c) { return c.id; });
 }
@@ -997,8 +1000,13 @@ function parseAccounts(grid) {
   }).filter(function (a) { return a.id; });
 }
 
+/** "View ad" 링크 — 대시보드 CampaignDetailPanel과 같은 규칙: creativeUrl(사람 입력) 우선, 없으면 adLink(동기화). 없으면 null */
+function viewAdUrl(campaign) {
+  return campaign.creativeUrl || campaign.adLink || null;
+}
+
 /**
- * Ads Manager 캠페인 링크 — 대시보드 paidAdsPageUtils.adsManagerUrl과 같은 규칙. 계정 id를 모르면 null(추측해서 만들지 않는다).
+ * Ads Manager 캠페인 링크 — 대시보드 paidAdsPageUtils.adsManagerUrl과 같은 규칙. (Campaign 칸은 View ad를 쓰고, 이 함수는 남겨 둔다) 계정 id를 모르면 null(추측해서 만들지 않는다).
  *   Meta   : 계정(act_ 접두사 제거) + 외부 캠페인 id → 그 캠페인이 선택된 캠페인 목록
  *   TikTok : 광고주(aadvid) 캠페인 목록 — TikTok Ads Manager는 캠페인 하나로 바로 가는 주소를 주지 않는다
  */
@@ -1763,5 +1771,5 @@ function uniqueSorted(list) {
 
 // node 검증용 — Apps Script에서는 module이 없어 무시된다
 if (typeof module === 'object' && module && module.exports) {
-  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
+  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
 }
