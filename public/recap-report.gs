@@ -31,6 +31,7 @@
  *      같은 단계 이름이 3개 이상이면 그 안에서(phase), 아니면 같은 목표 전체(goal), 그것도 3개 미만이면 비교 없음
  *   6. 백분위 = (더 나쁜 수 + 동점 ÷ 2) ÷ 비교군 수 × 100, 반올림. 비용 지표는 낮을수록 좋음으로 뒤집는다.
  *      구간: ≥70 top · ≤30 bottom · 그 사이 mid. 값이 있는 비교군이 3개 미만이면 비교 없음
+ *      (순위·구간은 줄 순서와 What worked · Could improve에만 쓰고 셀에는 적지 않는다 — CONFIG.SHOW_BENCHMARK_POSITION)
  *   7. Primary KPI = 목표별 하나: 인지 CPM · 트래픽 CPC · 참여 Cost/eng · 전환/매장 방문 CPA. 판정·등급 없음
  *   8. 플랫폼 안 순위 = Primary KPI 백분위 내림차순, 같으면 지출 내림차순. 백분위 없으면 맨 뒤
  *   9. 머리글 순위 = 이벤트의 최다 목표의 Primary KPI를 이벤트 단위로(분자·분모를 합쳐) 다시 계산해,
@@ -74,6 +75,8 @@ var CONFIG = {
   ANCHOR_SHEET_NAME: null,
   /** 보고할 이벤트(campaign_group 값). null이면 가장 최근에 끝난 이벤트 — 대시보드 Reports 목록의 첫 줄 */
   EVENT_NAME: null,
+  /** 셀에 과거 비교 순위("↑ best of 12" · "mid" · "↓ lowest of 4")를 적을지. 시트는 값만 보인다(2026-09-12 결정) — 순위는 대시보드에서 */
+  SHOW_BENCHMARK_POSITION: false,
 
   // ---- 아래는 src/data/schema.js와 같은 값이어야 한다 ----
   /** 비교 대상 시작일 — 2024년 이전 캠페인은 지표가 거의 없다 (schema BENCHMARK_SINCE) */
@@ -390,7 +393,7 @@ function placeReportSheet_(ss, sheet, previous) {
 var SHEET_COLUMN_WIDTHS = [36, 235, 5, 85, 25, 95, 5, 100, 10, 45, 95, 95, 35, 70, 230, 250, 250];
 
 /** 지표 순위 노트 꼬리 */
-var METRIC_RANK_NOTE = '\nAfter a value: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
+var METRIC_RANK_NOTE = !CONFIG.SHOW_BENCHMARK_POSITION ? '' : '\nAfter a value: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
   '; same phase when 3+ exist) — ↑ top · ↓ bottom · mid. Nothing if fewer than 3 peers. Context only, not a grade.';
 
 /**
@@ -411,7 +414,7 @@ var COLUMNS = [
   { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
     note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
   { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
-    note: 'Lines 1–2: the two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR — each with its rank after the value. Line 3: the engagement breakdown in a fixed order — Meta: Like · Cmt · Share · Save · Repost, TikTok: Like · Cmt · Share · Save ("—" when the platform did not report it). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
+    note: 'Lines 1–2: the two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Line 3: the engagement breakdown in a fixed order — Meta: Like · Cmt · Share · Save · Repost, TikTok: Like · Cmt · Share · Save ("—" when the platform did not report it). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
@@ -1502,14 +1505,19 @@ function budgetSpendCell(r) {
   return richLines(lines);
 }
 
-/** Primary KPI — "CPM"(작게) ⏎ "$2.41"(굵게) ⏎ "↑ best of 12"(작게, 비교군 있을 때만). 값 없으면 "—" */
+/** 셀에 적을 순위 — CONFIG.SHOW_BENCHMARK_POSITION이 꺼져 있으면 항상 null(값만 보인다) */
+function cellPositionText(stat) {
+  return CONFIG.SHOW_BENCHMARK_POSITION ? benchmarkPositionText(stat) : null;
+}
+
+/** Primary KPI — "CPM"(작게) ⏎ "$2.41"(굵게) ⏎ "↑ best of 12"(작게, 순위를 켰고 비교군 있을 때만). 값 없으면 "—" */
 function primaryKpiCell(kpi, stat) {
   if (!kpi || !kpi.metricKey || kpi.value == null) return richLines([[{ text: EMPTY }]]);
   var lines = [
     [{ text: CONFIG.METRIC_LABEL[kpi.metricKey], style: 'small' }],
     [{ text: metricText(kpi.metricKey, kpi.value), style: 'bold' }],
   ];
-  var position = benchmarkPositionText(stat);
+  var position = cellPositionText(stat);
   if (position) lines.push([{ text: position, style: 'small' }]);
   return richLines(lines);
 }
@@ -1517,7 +1525,7 @@ function primaryKpiCell(kpi, stat) {
 /** 지표 한 줄 — "Hook 23.11%" + "  ↑ top 9%"(작게). 값 없으면 "Hook —" */
 function metricLine(r, key) {
   var segments = [{ text: CONFIG.METRIC_LABEL[key] + ' ' + (r[key] == null ? EMPTY : metricText(key, r[key])) }];
-  var position = r[key] == null ? null : benchmarkPositionText(r.benchmarks ? r.benchmarks[key] : null);
+  var position = r[key] == null ? null : cellPositionText(r.benchmarks ? r.benchmarks[key] : null);
   if (position) segments.push({ text: '  ' + position, style: 'small' });
   return segments;
 }
@@ -1567,7 +1575,7 @@ function engagementActionCell(r) {
       key: k,
       label: CONFIG.METRIC_LABEL[k],
       value: r[k] == null ? EMPTY : metricText(k, r[k]),
-      position: r[k] == null ? null : benchmarkPositionText(r.benchmarks ? r.benchmarks[k] : null),
+      position: r[k] == null ? null : cellPositionText(r.benchmarks ? r.benchmarks[k] : null),
     };
   });
   var slots = CONFIG.ENGAGEMENT_BREAKDOWN_SLOTS[r.platform]

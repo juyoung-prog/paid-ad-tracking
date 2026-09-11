@@ -47,7 +47,11 @@ function dashboardHeadlineText(h) {
   if (!h) return null;
   return strings.t(h.rank === 1 ? 'recap.headline.best' : 'recap.headline.rank', 'en', { rank: h.rank, total: h.total, metric: strings.metricLabel(h.metricKey, 'en') });
 }
+/** 셀에 적히는 순위 — 스크립트 CONFIG.SHOW_BENCHMARK_POSITION이 꺼져 있으면 셀 문장에는 없다(순위 계산 자체는 아래 benchmarkPosition으로 따로 대조) */
 function dashboardPosition(stat) {
+  return gs.CONFIG.SHOW_BENCHMARK_POSITION ? benchmarkPosition(stat) : null;
+}
+function benchmarkPosition(stat) {
   return stat && stat.peerScope !== 'none' && stat.percentile != null
     ? `${stat.band === 'top' ? '↑ ' : stat.band === 'bottom' ? '↓ ' : ''}${strings.benchmarkPositionText(stat, 'en')}`
     : null;
@@ -116,11 +120,11 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     const { kpi, stat } = rowView.primaryKpiOf(r);
     check(rs, 'primaryKpi.metricKey', kpi.metricKey, s.primaryKpiKey);
     check(rs, 'primaryKpi.value', kpi.value, s.primaryKpiValue);
-    check(rs, 'primaryKpi.vsPast', dashboardPosition(stat), s.primaryKpiVsPast);
+    check(rs, 'primaryKpi.vsPast', benchmarkPosition(stat), s.primaryKpiVsPast);
     ['reach', 'impressions', 'videoPlays', 'avgWatchSeconds', 'clicks', 'likes', 'comments', 'shares', 'conversions'].forEach((k) => check(rs, k, r[k], s[k]));
     schema.BENCHMARK_METRICS.forEach((m) => {
       check(rs, m.key, r[m.key], s[m.key]);
-      check(rs, `${m.key}.vsPast`, dashboardPosition(r.benchmarks[m.key]), s[`${m.key}VsPast`]);
+      check(rs, `${m.key}.vsPast`, benchmarkPosition(r.benchmarks[m.key]), s[`${m.key}VsPast`]);
       check(rs, `${m.key}.percentile`, r.benchmarks[m.key].percentile, s.benchmarks[m.key].percentile);
       check(rs, `${m.key}.median`, r.benchmarks[m.key].median, s.benchmarks[m.key].median);
       check(rs, `${m.key}.peerScope`, r.benchmarks[m.key].peerScope, s.benchmarks[m.key].peerScope);
