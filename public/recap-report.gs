@@ -326,18 +326,52 @@ function fetchSupabaseTable_(table, order) {
   return rows;
 }
 
-/** 원본 두 표를 2차원 배열(첫 줄 = 헤더)로 — DB에서 읽거나(기본) 이 시트의 탭에서 읽는다 */
+/**
+ * 표 여러 개를 한 번에(병렬) 읽는다 — 표마다 차례로 왕복하면 그만큼 느리다. 1000행 넘는 표는 그 표만 이어서 더 읽는다.
+ * @param {Array<{ key: string, table: string, order: string }>} specs
+ * @returns {Object<string, Object[]>} key → 행 객체 배열
+ */
+function fetchSupabaseTables_(specs) {
+  var cfg = CONFIG.SUPABASE;
+  if (!cfg.url || !cfg.anonKey || /^__/.test(cfg.url) || /^__/.test(cfg.anonKey)) {
+    throw new Error('CONFIG.SUPABASE.url / anonKey is not filled in. Download the script again from the dashboard (the link next to the report title fills them in), or paste the values from the dashboard\'s environment.');
+  }
+  var PAGE = 1000;
+  var base = cfg.url.replace(/\/$/, '') + '/rest/v1/';
+  var headers = { apikey: cfg.anonKey, Authorization: 'Bearer ' + cfg.anonKey };
+  var requests = specs.map(function (sp) {
+    return { url: base + sp.table + '?select=*&order=' + encodeURIComponent(sp.order) + '&offset=0&limit=' + PAGE, headers: headers, muteHttpExceptions: true };
+  });
+  var responses = UrlFetchApp.fetchAll(requests);
+  var out = {};
+  specs.forEach(function (sp, i) {
+    var res = responses[i];
+    if (res.getResponseCode() !== 200) throw new Error('Supabase ' + sp.table + ': HTTP ' + res.getResponseCode() + ' ' + res.getContentText().slice(0, 200));
+    var rows = JSON.parse(res.getContentText());
+    if (rows.length === PAGE) rows = rows.concat(fetchSupabaseTable_(sp.table, sp.order).slice(PAGE)); // 드물게 1000행을 넘으면 그 표만 이어서
+    out[sp.key] = rows;
+  });
+  return out;
+}
+
+/** 원본 표들을 2차원 배열(첫 줄 = 헤더)로 — DB에서 읽거나(기본) 이 시트의 탭에서 읽는다 */
 function readGrids_() {
   if (CONFIG.DATA_SOURCE !== 'sheet') {
-    // 성과는 캠페인당 최신 1건 뷰(performance_records_latest) — 대시보드 화면이 읽는 것과 같은 원천
+    // 성과는 캠페인당 최신 1건 뷰(performance_records_latest) — 대시보드 화면이 읽는 것과 같은 원천.
+    // 광고 계정은 Ads Manager 링크에만, event_recaps · recap_campaign_notes는 사람이 대시보드 Edit에서 쓴 What worked · Could improve에만 쓴다
+    var tables = fetchSupabaseTables_([
+      { key: 'campaigns', table: 'campaigns', order: 'start_date.desc' },
+      { key: 'performance', table: 'performance_records_latest', order: 'campaign_id' },
+      { key: 'accounts', table: 'ad_accounts', order: 'id' },
+      { key: 'eventRecaps', table: 'event_recaps', order: 'updated_at.desc' },
+      { key: 'recapNotes', table: 'recap_campaign_notes', order: 'campaign_id' },
+    ]);
     return {
-      campaigns: rowsToGrid(fetchSupabaseTable_('campaigns', 'start_date.desc')),
-      performance: rowsToGrid(fetchSupabaseTable_('performance_records_latest', 'campaign_id')),
-      // 광고 계정 — Ads Manager 링크(external_account_id)에만 쓴다. 없어도 보고서는 그려진다(링크만 빠진다)
-      accounts: rowsToGrid(fetchSupabaseTable_('ad_accounts', 'id')),
-      // 사람이 대시보드 Edit에서 쓴 What worked · Could improve — 있으면 자동 문장 대신 그 글(대시보드와 같은 규칙)
-      eventRecaps: rowsToGrid(fetchSupabaseTable_('event_recaps', 'updated_at.desc')),
-      recapNotes: rowsToGrid(fetchSupabaseTable_('recap_campaign_notes', 'campaign_id')),
+      campaigns: rowsToGrid(tables.campaigns),
+      performance: rowsToGrid(tables.performance),
+      accounts: rowsToGrid(tables.accounts),
+      eventRecaps: rowsToGrid(tables.eventRecaps),
+      recapNotes: rowsToGrid(tables.recapNotes),
     };
   }
   return readSheetGrids_();
@@ -579,26 +613,47 @@ var MAX_DATA_URL_LENGTH = 1900000;
  * 썸네일 한 칸 — 셀 안 이미지(비율 유지, 칸에 맞춤). 깨진 그림 아이콘을 남기지 않기 위해 https 주소는 먼저 받아 보고
  * 이미지(2xx + image/*)일 때만 넣는다. data: 주소는 그대로 넣는다. 실패하면 칸을 비운다.
  */
-function renderThumbnail_(cell, url, altText) {
-  if (!url) return;
-  var source = String(url);
+/**
+ * 썸네일 주소를 한 번에(병렬) 확인한다 — 앞 1KB만 받아(Range 헤더) 2xx/206 + image/* 인 것만 통과. 깨진 그림 아이콘을 남기지 않기 위해서다.
+ * data: 주소는 크기만 본다. 결과는 같은 실행 안에서 기억한다.
+ */
+function checkThumbnails_(urls) {
+  var pending = [];
+  urls.forEach(function (u) {
+    if (!u) return;
+    var source = String(u);
+    if (thumbnailCheckCache_[source] !== undefined) return;
+    if (/^data:image\//i.test(source)) { thumbnailCheckCache_[source] = source.length <= MAX_DATA_URL_LENGTH; return; }
+    if (/^https?:/i.test(source) && pending.indexOf(source) < 0) pending.push(source);
+    else if (!/^https?:/i.test(source)) thumbnailCheckCache_[source] = false;
+  });
+  if (pending.length === 0) return;
   try {
-    if (/^https?:/i.test(source)) {
-      if (thumbnailCheckCache_[source] === undefined) {
-        var res = UrlFetchApp.fetch(source, { muteHttpExceptions: true, followRedirects: true });
-        var type = String(res.getHeaders()['Content-Type'] || res.getHeaders()['content-type'] || '');
-        thumbnailCheckCache_[source] = res.getResponseCode() >= 200 && res.getResponseCode() < 300 && /^image\//i.test(type);
-      }
-      if (!thumbnailCheckCache_[source]) return;
-    } else if (!/^data:image\//i.test(source) || source.length > MAX_DATA_URL_LENGTH) {
-      // data: 주소는 그대로 넣되, 너무 큰 것(수백 KB의 base64)은 셀 이미지로 들어가지 않으므로 건너뛴다
-      return;
-    }
-    var image = SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(altText || 'Campaign thumbnail').build();
-    cell.setValue(image);
+    var responses = UrlFetchApp.fetchAll(pending.map(function (u) {
+      return { url: u, muteHttpExceptions: true, followRedirects: true, headers: { Range: 'bytes=0-1023' } };
+    }));
+    pending.forEach(function (u, i) {
+      var res = responses[i];
+      var code = res.getResponseCode();
+      var type = String(res.getHeaders()['Content-Type'] || res.getHeaders()['content-type'] || '');
+      thumbnailCheckCache_[u] = code >= 200 && code < 300 && /^image\//i.test(type);
+    });
   } catch (e) {
-    // 그림은 장식이다 — 못 넣으면 조용히 비운다
+    pending.forEach(function (u) { thumbnailCheckCache_[u] = false; });
+    console.warn('Thumbnail check skipped: ' + (e && e.message ? e.message : e));
+  }
+}
+
+/** 썸네일 셀 값 — 확인을 통과한 주소만 CellImage, 아니면 빈 칸 */
+function thumbnailValue_(url, altText) {
+  if (!url) return '';
+  var source = String(url);
+  if (!thumbnailCheckCache_[source]) return '';
+  try {
+    return SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(altText || 'Campaign thumbnail').build();
+  } catch (e) {
     console.warn('Thumbnail skipped: ' + (e && e.message ? e.message : e));
+    return '';
   }
 }
 
@@ -606,7 +661,7 @@ function renderThumbnail_(cell, url, altText) {
  * 캠페인 글 칸 — 첫 줄(이름)은 굵게 + Ads Manager 링크(있을 때만), 둘째 줄(매장 · 기간)은 회색.
  * 링크가 없어도 이름은 그대로 읽힌다. 주소 원문은 화면에 보이지 않는다.
  */
-function renderLinkedText_(cell, text, nameLength, url) {
+function linkedTextValue_(text, nameLength, url) {
   var nameEnd = Math.min(nameLength || 0, text.length);
   var builder = SpreadsheetApp.newRichTextValue().setText(text);
   if (nameEnd > 0) {
@@ -616,14 +671,14 @@ function renderLinkedText_(cell, text, nameLength, url) {
   if (nameEnd < text.length) {
     builder.setTextStyle(nameEnd, text.length, SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build());
   }
-  cell.setRichTextValue(builder.build());
+  return builder.build();
 }
 
 /**
  * 순수부가 만든 { text, runs } → RichText. run.style: 'small'(9pt 회색 — 순위·보조 줄) · 'muted'(회색, 보통 크기 — 라벨) · 'bold'(값 강조).
  * 글자 위치는 순수부가 계산했으므로 여기서는 옮겨 적기만 한다.
  */
-function renderRichCell_(cell, rich) {
+function richValue_(rich) {
   var styles = {
     small: SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build(),
     muted: SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).build(),
@@ -634,7 +689,7 @@ function renderRichCell_(cell, rich) {
     if (run.end <= run.start) return;
     builder.setTextStyle(run.start, run.end, styles[run.style] || styles.small);
   });
-  cell.setRichTextValue(builder.build());
+  return builder.build();
 }
 
 /** "4 phases" / "1 campaign" */
@@ -661,10 +716,10 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   var width = 0;
   columns.forEach(function (c) { offsets.push(width); width += (c.span || 1); });
   var borderAll = function (range) { range.setBorder(true, true, true, true, true, true, STYLE.border, SpreadsheetApp.BorderStyle.SOLID); };
-  // 한 줄의 병합 — span > 1인 칸만. (시트 전체 병합은 renderReport_가 미리 풀어 두므로 충돌하지 않는다)
-  var mergeRow = function (r) {
+  // 병합 — span > 1인 칸을 여러 줄 한 번에(mergeAcross는 줄마다 따로 병합한다). 시트 전체 병합은 renderReport_가 미리 풀어 둔다
+  var mergeRows = function (r, n) {
     columns.forEach(function (c, i) {
-      if ((c.span || 1) > 1) sheet.getRange(r, startCol + offsets[i], 1, c.span).merge();
+      if ((c.span || 1) > 1) sheet.getRange(r, startCol + offsets[i], n, c.span).mergeAcross();
     });
   };
   var lineOf = function (fn) {
@@ -681,12 +736,9 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   headerRange.setValues([lineOf(function (c) { return c.label; })])
     .setFontWeight('bold').setBackground(STYLE.headerBg).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment('middle');
   borderAll(headerRange);
-  mergeRow(row);
-  columns.forEach(function (c, i) {
-    var cell = sheet.getRange(row, startCol + offsets[i]);
-    cell.setHorizontalAlignment(c.align || 'center');
-    if (c.note) cell.setNote(c.note);
-  });
+  mergeRows(row, 1);
+  headerRange.setHorizontalAlignments([lineOf(function (c) { return c.align || 'center'; })]);
+  headerRange.setNotes([lineOf(function (c) { return c.note || ''; })]);
   sheet.setRowHeight(row, options.headerHeight);
   row += 1;
 
@@ -715,23 +767,31 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   body.setValues(values).setVerticalAlignment('middle');
   body.setWrapStrategy(options.wrap ? SpreadsheetApp.WrapStrategy.WRAP : SpreadsheetApp.WrapStrategy.CLIP);
   borderAll(body);
-  for (var j = 0; j < bodyRows.length; j += 1) mergeRow(row + j);
+  mergeRows(row, bodyRows.length);
   sheet.setRowHeights(row, bodyRows.length, options.rowHeight);
   if (options.valuesBold) body.setFontWeight('bold').setFontSize(11);
+  body.setHorizontalAlignments(bodyRows.map(function () { return lineOf(function (c) { return c.align || 'center'; }); }));
 
+  var dataRows = bodyRows.filter(function (r, j) { return j !== totalIndex; });
   columns.forEach(function (c, i) {
     var col = startCol + offsets[i];
     var colRange = sheet.getRange(row, col, bodyRows.length, 1);
-    colRange.setHorizontalAlignment(c.align || 'center');
     if (c.fmt) colRange.setNumberFormat(c.fmt);
     else if (c.key === 'startDate' || c.key === 'endDate') colRange.setNumberFormat('@');
-    bodyRows.forEach(function (r, j) {
-      if (j === totalIndex) return;
-      var cell = sheet.getRange(row + j, col);
-      if (c.thumb) renderThumbnail_(cell, r[c.key], r.phaseName);
-      else if (c.linkKey) renderLinkedText_(cell, String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null);
-      else if (c.rich && r[c.key] && r[c.key].runs && r[c.key].runs.length) renderRichCell_(cell, r[c.key]);
-    });
+    if (dataRows.length === 0) return;
+    var dataRange = sheet.getRange(row, col, dataRows.length, 1); // Total 줄은 항상 마지막이라 데이터 줄은 위에서부터 연속
+    // 칸마다 부르지 않고 열 단위로 한 번에 — Apps Script는 호출 수가 곧 시간이다
+    if (c.thumb) {
+      checkThumbnails_(dataRows.map(function (r) { return r[c.key]; }));
+      dataRange.setValues(dataRows.map(function (r) { return [thumbnailValue_(r[c.key], r.phaseName)]; }));
+    } else if (c.linkKey) {
+      dataRange.setRichTextValues(dataRows.map(function (r) { return [linkedTextValue_(String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null)]; }));
+    } else if (c.rich) {
+      dataRange.setRichTextValues(dataRows.map(function (r) {
+        var v = r[c.key];
+        return [v && v.runs && v.runs.length ? richValue_(v) : SpreadsheetApp.newRichTextValue().setText(v && v.text ? v.text : EMPTY).build()];
+      }));
+    }
   });
 
   if (totalIndex >= 0) {
