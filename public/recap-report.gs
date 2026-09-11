@@ -8,8 +8,9 @@
  *   4. Report → Refresh report. 첫 실행에서 권한 허용 1회(본인 계정, 이 스프레드시트 읽기·쓰기 + 대시보드 DB 읽기).
  *      이후로는 시트를 열 때마다 자동 갱신되고, 열어 둔 채 최신을 보려면 메뉴의 Refresh만 누른다.
  *
- * 데이터 흐름: 스크립트가 대시보드 데이터베이스(Supabase)를 **읽기 전용**으로 가져와 이 스프레드시트 안에 "Recap"
- * 탭을 그린다. 시트의 내용을 밖으로 보내는 요청은 없다. 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
+ * 데이터 흐름: 스크립트가 대시보드 데이터베이스(Supabase)의 campaigns · performance_records_latest · ad_accounts를
+ * **읽기 전용**으로 가져와 이 스프레드시트 안에 "Recap" 탭을 그린다. 시트의 내용을 밖으로 보내는 요청은 없다
+ * (썸네일 주소를 한 번 받아 보는 것은 그림이 깨지지 않는지 확인하는 읽기다). 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
  * 대시보드 제목 옆 링크로 내려받으면 CONFIG.SUPABASE에 채워져 있다. (직접 복사한 파일이면 거기에 URL·키를 적는다.)
  *
  * 대안 — DB 대신 이 시트의 탭을 읽기: CONFIG.DATA_SOURCE = 'sheet'로 두고 SOURCE_GIDS에 탭 gid를 적는다
@@ -287,6 +288,8 @@ function readGrids_() {
     return {
       campaigns: rowsToGrid(fetchSupabaseTable_('campaigns', 'start_date.desc')),
       performance: rowsToGrid(fetchSupabaseTable_('performance_records_latest', 'campaign_id')),
+      // 광고 계정 — Ads Manager 링크(external_account_id)에만 쓴다. 없어도 보고서는 그려진다(링크만 빠진다)
+      accounts: rowsToGrid(fetchSupabaseTable_('ad_accounts', 'id')),
     };
   }
   return readSheetGrids_();
@@ -344,18 +347,20 @@ function placeReportSheet_(ss, sheet, previous) {
 /** 표 열 정의 — 캠페인 표. key는 model 행의 필드, fmt는 setNumberFormat, align은 가로 정렬 */
 /**
  * 물리 열 폭(B열부터) — 타임라인(8열)·KPI(5열)·캠페인 표(7열, 일부 병합)가 같은 열을 나눠 쓴다.
- *   B 260 Campaign / Phase / Period      C 110 Goal / Platforms / Campaigns
- *   D  85 Start                          E  85 End           (D:E 병합 = Budget / Spend 170)
- *   F  60 Days                           G 100 Daily budget  (F:G 병합 = Primary KPI 160)
- *   H 105 Planned   I 115 Spent   J 140  (H:J 병합 = Key response 360)
- *   K 280 What worked                    L 280 Could improve
+ *   B  44 썸네일  C 244 Campaign 글        (B:C = Campaign 288 · 타임라인 Phase / KPI Period는 B:C 병합)
+ *   D 110 Goal / Platforms / Campaigns
+ *   E  85 Start                          F  85 End           (E:F 병합 = Budget / Spend 170)
+ *   G  60 Days                           H 100 Daily budget  (G:H 병합 = Primary KPI 160)
+ *   I 105 Planned   J 115 Spent   K 140  (I:K 병합 = Key response 360)
+ *   L 280 What worked                    M 280 Could improve
  */
-var PHYSICAL_WIDTHS = [260, 110, 85, 85, 60, 100, 105, 115, 140, 280, 280];
+var PHYSICAL_WIDTHS = [44, 244, 110, 85, 85, 60, 100, 105, 115, 140, 280, 280];
 
 /** 캠페인 표 — 7열. span은 병합할 물리 열 수 */
 var COLUMNS = [
-  { key: 'campaignText', label: 'Campaign', span: 1, align: 'left',
-    note: 'Phase name, then store · period (days). Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
+  // 썸네일 칸(B) + 글 칸(C). 이름은 Ads Manager 링크(있을 때만), 둘째 줄은 매장 · 기간
+  { key: 'campaignText', label: 'Campaign', span: 2, align: 'left', thumbKey: 'thumbnailUrl', linkKey: 'campaignUrl', linkLength: 'phaseNameLength',
+    note: 'Thumbnail (when the platform provides one), phase name, then store · period (days). The name links to the campaign in Meta / TikTok Ads Manager when the account id is known. Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
   { key: 'goalLabel', label: 'Goal', span: 1, align: 'center' },
   { key: 'budgetSpendText', label: 'Budget / Spend', span: 2, align: 'center',
     note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
@@ -371,7 +376,7 @@ var COLUMNS = [
 
 /** 타임라인 표 열 — B~I, 병합 없음 */
 var TIMELINE_COLUMNS = [
-  { key: 'name', label: 'Phase', align: 'left' },
+  { key: 'name', label: 'Phase', span: 2, align: 'left' },
   { key: 'platformLabel', label: 'Platforms', align: 'center' },
   { key: 'startDate', label: 'Start', align: 'center' },
   { key: 'endDate', label: 'End', align: 'center' },
@@ -383,7 +388,7 @@ var TIMELINE_COLUMNS = [
 
 /** KPI 블록 — 헤더 줄 + 값 줄, B~F */
 var KPI_COLUMNS = [
-  { key: 'periodText', label: 'Period', align: 'left' },
+  { key: 'periodText', label: 'Period', span: 2, align: 'left' },
   { key: 'campaignCount', label: 'Campaigns', align: 'center', fmt: '0' },
   { key: 'spend', label: 'Total spent', align: 'right', fmt: '"$"#,##0.00' },
   { key: 'plannedBudget', label: 'Planned', align: 'right', fmt: '"$"#,##0',
@@ -488,6 +493,55 @@ function renderReport_(sheet, model) {
   if (sheet.getMaxColumns() > totalCols) sheet.deleteColumns(totalCols + 1, sheet.getMaxColumns() - totalCols);
 }
 
+/** 같은 실행 안에서 썸네일 URL 확인 결과를 기억한다 — 한 이벤트에 같은 소재가 여러 번 나온다 */
+var thumbnailCheckCache_ = {};
+/** data: 썸네일 최대 길이 — 이보다 길면(≈150KB 이상) 셀 이미지로 넣지 않고 글만 보인다 */
+var MAX_DATA_URL_LENGTH = 200000;
+
+/**
+ * 썸네일 한 칸 — 셀 안 이미지(비율 유지, 칸에 맞춤). 깨진 그림 아이콘을 남기지 않기 위해 https 주소는 먼저 받아 보고
+ * 이미지(2xx + image/*)일 때만 넣는다. data: 주소는 그대로 넣는다. 실패하면 칸을 비운다.
+ */
+function renderThumbnail_(cell, url, altText) {
+  if (!url) return;
+  var source = String(url);
+  try {
+    if (/^https?:/i.test(source)) {
+      if (thumbnailCheckCache_[source] === undefined) {
+        var res = UrlFetchApp.fetch(source, { muteHttpExceptions: true, followRedirects: true });
+        var type = String(res.getHeaders()['Content-Type'] || res.getHeaders()['content-type'] || '');
+        thumbnailCheckCache_[source] = res.getResponseCode() >= 200 && res.getResponseCode() < 300 && /^image\//i.test(type);
+      }
+      if (!thumbnailCheckCache_[source]) return;
+    } else if (!/^data:image\//i.test(source) || source.length > MAX_DATA_URL_LENGTH) {
+      // data: 주소는 그대로 넣되, 너무 큰 것(수백 KB의 base64)은 셀 이미지로 들어가지 않으므로 건너뛴다
+      return;
+    }
+    var image = SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(altText || 'Campaign thumbnail').build();
+    cell.setValue(image);
+  } catch (e) {
+    // 그림은 장식이다 — 못 넣으면 조용히 비운다
+    console.warn('Thumbnail skipped: ' + (e && e.message ? e.message : e));
+  }
+}
+
+/**
+ * 캠페인 글 칸 — 첫 줄(이름)은 굵게 + Ads Manager 링크(있을 때만), 둘째 줄(매장 · 기간)은 회색.
+ * 링크가 없어도 이름은 그대로 읽힌다. 주소 원문은 화면에 보이지 않는다.
+ */
+function renderLinkedText_(cell, text, nameLength, url) {
+  var nameEnd = Math.min(nameLength || 0, text.length);
+  var builder = SpreadsheetApp.newRichTextValue().setText(text);
+  if (nameEnd > 0) {
+    builder.setTextStyle(0, nameEnd, SpreadsheetApp.newTextStyle().setBold(true).build());
+    if (url) builder.setLinkUrl(0, nameEnd, url);
+  }
+  if (nameEnd < text.length) {
+    builder.setTextStyle(nameEnd, text.length, SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).build());
+  }
+  cell.setRichTextValue(builder.build());
+}
+
 /** "4 phases" / "1 campaign" */
 function countText_(n, noun) {
   return n + ' ' + noun + (n === 1 ? '' : 's');
@@ -512,9 +566,10 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   var offsets = [];
   var acc = 0;
   columns.forEach(function (c) { offsets.push(acc); acc += (c.span || 1); });
-  var mergeRow = function (r) {
+  // 병합 — 썸네일 칸이 있는 열(thumbKey)은 본문에서 병합하지 않는다(그림 칸 + 글 칸). 헤더는 병합한다
+  var mergeRow = function (r, isHeader) {
     columns.forEach(function (c, i) {
-      if ((c.span || 1) > 1) sheet.getRange(r, startCol + offsets[i], 1, c.span).merge();
+      if ((c.span || 1) > 1 && (isHeader || !c.thumbKey)) sheet.getRange(r, startCol + offsets[i], 1, c.span).merge();
     });
   };
 
@@ -524,7 +579,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   columns.forEach(function (c, i) { for (var k = 0; k < (c.span || 1); k += 1) header.push(k === 0 ? c.label : ''); });
   headerRange.setValues([header]).setFontWeight('bold').setBackground(STYLE.headerBg).setWrap(false).setVerticalAlignment('middle');
   headerRange.setBorder(true, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
-  mergeRow(row);
+  mergeRow(row, true);
   columns.forEach(function (c, i) {
     var cell = sheet.getRange(row, startCol + offsets[i]);
     cell.setHorizontalAlignment(c.align || 'center');
@@ -553,6 +608,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
       if (j === totalIndex && i === 0) v = 'Total';
       else if (j === totalIndex && r[c.key] == null) v = '';
       else v = cellValue_(r[c.key]);
+      if (c.thumbKey && j !== totalIndex) { line.push(''); line.push(v); return; } // 그림 칸은 비워 두고 글은 둘째 칸에
       for (var k = 0; k < (c.span || 1); k += 1) line.push(k === 0 ? v : '');
     });
     return line;
@@ -563,15 +619,24 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   // 줄 사이 옅은 가로선, 표 끝은 중간 회색. 세로선은 없다
   body.setBorder(false, false, false, false, false, true, STYLE.borderLight, SpreadsheetApp.BorderStyle.SOLID);
   body.setBorder(false, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
-  for (var j = 0; j < bodyRows.length; j += 1) mergeRow(row + j);
+  for (var j = 0; j < bodyRows.length; j += 1) mergeRow(row + j, false);
   sheet.setRowHeights(row, bodyRows.length, options.rowHeight);
   if (options.valuesBold) body.setFontWeight('bold').setFontSize(11);
 
   columns.forEach(function (c, i) {
-    var colRange = sheet.getRange(row, startCol + offsets[i], bodyRows.length, 1);
+    var textCol = startCol + offsets[i] + (c.thumbKey ? 1 : 0);
+    var colRange = sheet.getRange(row, textCol, bodyRows.length, 1);
     colRange.setHorizontalAlignment(c.align || 'center');
     if (c.fmt) colRange.setNumberFormat(c.fmt);
     else if (c.key === 'startDate' || c.key === 'endDate') colRange.setNumberFormat('@');
+    if (c.thumbKey) {
+      sheet.getRange(row, startCol + offsets[i], bodyRows.length, 1).setHorizontalAlignment('center');
+      bodyRows.forEach(function (r, j) {
+        if (j === totalIndex) return;
+        renderThumbnail_(sheet.getRange(row + j, startCol + offsets[i]), r[c.thumbKey], r.phaseName);
+        renderLinkedText_(sheet.getRange(row + j, textCol), String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null);
+      });
+    }
   });
 
   if (totalIndex >= 0) {
@@ -593,7 +658,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
 /**
  * 원본 표 두 개 → 보고서 모델. 대시보드 RecapDetailPage가 화면에 놓는 값과 같은 숫자를 낸다.
  *
- * @param {{ campaigns: any[][], performance: any[][]|null }} grids - 첫 줄이 헤더인 2차원 배열. performance가 null이면 campaigns 안에 두 표가 헤더 줄로 나뉘어 있다고 본다
+ * @param {{ campaigns: any[][], performance: any[][]|null, accounts?: any[][]|null }} grids - 첫 줄이 헤더인 2차원 배열. performance가 null이면 campaigns 안에 두 표가 헤더 줄로 나뉘어 있다고 본다. accounts(ad_accounts)는 Ads Manager 링크에만 쓰고 없어도 된다
  * @param {Date|string} today - 생성 시각(꼬리말·"generatedAt"에만 쓴다 — 계산은 날짜에 의존하지 않는다)
  * @param {string|null} [eventName] - 보고할 이벤트. 없으면 가장 최근에 끝난 이벤트
  * @returns {Object} { eventName, generatedAt, metaLine, periodText, startDate, endDate, campaignCount, spend, plannedBudget, stores, platforms, headline, phases, sections, events }
@@ -602,6 +667,10 @@ function buildReportModel(grids, today, eventName) {
   var source = grids.performance ? grids : splitBlocks(grids.campaigns);
   var campaigns = parseCampaigns(source.campaigns);
   var records = parsePerformance(source.performance);
+  var accountById = {};
+  parseAccounts(grids.accounts).forEach(function (a) { accountById[a.id] = a; });
+  var campaignById = {};
+  campaigns.forEach(function (c) { campaignById[c.id] = c; });
   var events = buildRecapEvents(campaigns, records);
   if (campaigns.length === 0) throw new Error('The campaigns tab has no rows (or no recognizable header).');
   if (events.length === 0) throw new Error('No campaign has a campaign_group, so there is no event to report.');
@@ -645,7 +714,19 @@ function buildReportModel(grids, today, eventName) {
   });
 
   var sections = platformOrder.map(function (p) {
-    return { platform: p, label: CONFIG.PLATFORM_LABEL[p], rows: recap.byPlatform[p].map(flattenRow) };
+    return {
+      platform: p,
+      label: CONFIG.PLATFORM_LABEL[p],
+      rows: recap.byPlatform[p].map(function (r) {
+        var campaign = campaignById[r.campaignId] || null;
+        return Object.assign(flattenRow(r), {
+          // Campaign 칸의 장식 — 썸네일은 플랫폼이 준 주소 그대로, 링크는 대시보드와 같은 Ads Manager 규칙(adsManagerUrl)
+          thumbnailUrl: campaign ? campaign.thumbnailUrl : null,
+          campaignUrl: campaign ? adsManagerUrl(campaign, accountById[campaign.accountId]) : null,
+          phaseNameLength: r.phaseName.length,
+        });
+      }),
+    };
   });
 
   var headlineModel = headline ? {
@@ -838,8 +919,36 @@ function parseCampaigns(grid) {
       budgetPlanned: num(r.budgetplanned) || 0,
       budgetDaily: num(r.budgetdaily),
       goal: str(r.goal),
+      // Campaign 칸의 장식 재료 — 계산에는 쓰지 않는다
+      thumbnailUrl: str(r.thumbnailurl),
+      externalCampaignId: str(r.externalcampaignid),
     };
   }).filter(function (c) { return c.id; });
+}
+
+/** ad_accounts 표 → { id, platform, externalAccountId }. 표가 없으면 빈 배열 */
+function parseAccounts(grid) {
+  return gridToObjects(grid).map(function (r) {
+    return { id: str(r.id), platform: (str(r.platform) || '').toLowerCase(), externalAccountId: str(r.externalaccountid) };
+  }).filter(function (a) { return a.id; });
+}
+
+/**
+ * Ads Manager 캠페인 링크 — 대시보드 paidAdsPageUtils.adsManagerUrl과 같은 규칙. 계정 id를 모르면 null(추측해서 만들지 않는다).
+ *   Meta   : 계정(act_ 접두사 제거) + 외부 캠페인 id → 그 캠페인이 선택된 캠페인 목록
+ *   TikTok : 광고주(aadvid) 캠페인 목록 — TikTok Ads Manager는 캠페인 하나로 바로 가는 주소를 주지 않는다
+ */
+function adsManagerUrl(campaign, account) {
+  if (!account || !account.externalAccountId) return null;
+  if (campaign.platform === 'meta') {
+    if (!campaign.externalCampaignId) return null;
+    var accountId = String(account.externalAccountId).replace(/^act_/, '');
+    return 'https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=' + encodeURIComponent(accountId) + '&selected_campaign_ids=' + encodeURIComponent(campaign.externalCampaignId);
+  }
+  if (campaign.platform === 'tiktok') {
+    return 'https://ads.tiktok.com/i18n/perf/campaign?aadvid=' + encodeURIComponent(String(account.externalAccountId));
+  }
+  return null;
 }
 
 /** performance_records 표 → 대시보드 PerformanceRecord 모델(rowToPerformanceRecord와 같은 필드 + recordedAt·source) */
@@ -1541,5 +1650,5 @@ function uniqueSorted(list) {
 
 // node 검증용 — Apps Script에서는 module이 없어 무시된다
 if (typeof module === 'object' && module && module.exports) {
-  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
+  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
 }

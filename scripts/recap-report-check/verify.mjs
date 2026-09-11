@@ -216,10 +216,13 @@ if (process.argv.includes('--real')) {
   const campaignRows = await fetchAll('campaigns', 'start_date.desc');
   const perfRows = await fetchAll('performance_records', 'campaign_id,recorded_at');
   const latestRows = await fetchAll('performance_records_latest', 'campaign_id');
+  const accountRows = await fetchAll('ad_accounts', 'id');
+  const accounts = accountRows.map(mappers.rowToAdAccount);
+  const accountById = Object.fromEntries(accounts.map((a) => [a.id, a]));
   const campaigns = campaignRows.map(mappers.rowToCampaign);
   const records = latestRows.map(mappers.rowToPerformanceRecord); // 대시보드가 실제로 읽는 것
   // 기본 경로(DATA_SOURCE='supabase'): 스크립트는 campaigns + performance_records_latest JSON을 rowsToGrid로 2차원 배열로 만든다
-  const grids = { campaigns: gs.rowsToGrid(campaignRows), performance: gs.rowsToGrid(latestRows) };
+  const grids = { campaigns: gs.rowsToGrid(campaignRows), performance: gs.rowsToGrid(latestRows), accounts: gs.rowsToGrid(accountRows) };
   // 대안 경로(DATA_SOURCE='sheet'): CSV를 탭에 가져온 것 — 날짜는 Date, 성과는 전체 이력(최신 1건 고르기는 스크립트 규칙 1)
   const sheetGrids = { campaigns: [CAMPAIGN_COLS, ...campaignRows.map((r) => CAMPAIGN_COLS.map((k) => (k.endsWith('_date') ? toSheetDate(r[k]) : k === 'target_store_ids' ? `{${(r[k] ?? []).join(',')}}` : r[k] ?? '')))],
     performance: [PERF_COLS, ...perfRows.map((r) => PERF_COLS.map((k) => (k === 'recorded_at' ? toSheetDate(r[k]) : r[k] ?? '')))] };
@@ -231,6 +234,23 @@ if (process.argv.includes('--real')) {
     rows += out.rowCount;
     if (!primary) primary = out;
   }
+  // Campaign 칸 장식 — 썸네일은 저장값 그대로, 링크는 대시보드 adsManagerUrl과 같아야 한다(플랫폼별 Ads Manager)
+  let linkChecks = 0; let withThumb = 0; let withLink = 0;
+  const campaignById = Object.fromEntries(campaigns.map((c) => [c.id, c]));
+  for (const e of events) {
+    const model = gs.buildReportModel(grids, new Date('2026-09-11'), e.eventName);
+    model.sections.flatMap((sec) => sec.rows).forEach((s) => {
+      const c = campaignById[s.campaignId];
+      const expectedUrl = pageUtils.adsManagerUrl(c, accountById[c.accountId]);
+      check(`real / ${e.eventName} / ${s.phaseName} (${c.platform})`, 'campaignUrl', expectedUrl, s.campaignUrl);
+      check(`real / ${e.eventName} / ${s.phaseName} (${c.platform})`, 'thumbnailUrl', c.thumbnailUrl ?? null, s.thumbnailUrl);
+      if (expectedUrl && c.platform === 'meta') check(`real / ${s.phaseName}`, 'meta link host', true, s.campaignUrl.startsWith('https://adsmanager.facebook.com/'));
+      if (expectedUrl && c.platform === 'tiktok') check(`real / ${s.phaseName}`, 'tiktok link host', true, s.campaignUrl.startsWith('https://ads.tiktok.com/'));
+      check(`real / ${s.phaseName}`, 'phaseNameLength', s.phaseName.length, s.phaseNameLength);
+      linkChecks += 1; if (s.thumbnailUrl) withThumb += 1; if (s.campaignUrl) withLink += 1;
+    });
+  }
+  console.log(`\n[real · campaign column] rows ${linkChecks}, with thumbnail ${withThumb}, with Ads Manager link ${withLink}, mismatches ${mismatches.length - checksBefore}`);
   console.log(`\n[real · DB rows via rowsToGrid] campaigns ${campaigns.length}, events ${events.length}, campaign rows compared ${rows}, mismatches ${mismatches.length - checksBefore}`);
   checksBefore = mismatches.length;
   let sheetRowsCompared = 0;
