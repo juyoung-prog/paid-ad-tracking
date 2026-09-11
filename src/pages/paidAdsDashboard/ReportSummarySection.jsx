@@ -26,7 +26,7 @@ import { FilterBar } from '../../components/templates/FilterBar';
 import { PhaseTimelineChart } from './PhaseTimelineChart';
 import { PlanForm } from '../../components/templates/PlanForm';
 import { KpiBar } from '../../components/data-display/KpiBar';
-import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL } from '../../data/schema';
+import { getReportSummary, getGoalMetricsRow, getRangedSpend, buildDailySpendMatrix, campaignGroupKey, campaignNameKey, effectiveBudgetPlanned, planVsActual, planItemTotal, PLATFORM, GOAL, isHiddenMetric } from '../../data/schema';
 import { campaignInDateRange, shortDate, PAGE_GUTTER_X, adsManagerUrl, billingUrl, buildEventFilterGroup, SECTION_CARD_SX, PLATFORM_LABEL, buildPhaseTimeline } from './paidAdsPageUtils';
 import { money, moneyWhole, count, percent, seconds, dateMed, dateRange as formatDateRange, rangeDays } from '../../utils/format';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
@@ -344,12 +344,14 @@ const CREATIVE_VIDEO_COLUMNS = [
 
    전부 비어 있는 컬럼은 keep()이 표 단위로 자동으로 걷어낸다 — Meta만 있는
    표에서는 Follows·Visits가 알아서 빠진다. */
+/* 일단 감춘 지표(schema HIDDEN_METRIC_KEYS — TikTok Follows·Visits)는 표에서 뺀다. 정의는 남겨 두어 목록에서 빼면 바로 돌아온다.
+   CSV 내보내기는 데이터라 그대로 둔다. */
 const CREATIVE_ENGAGEMENT_COLUMNS = [
   metricColumn('Likes', (r) => r.likes, fmtNumber, { width: 88 }),
   metricColumn('Comments', (r) => r.comments, fmtNumber, { width: 96 }),
   metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88 }),
-  metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 108, note: NOTE.follows }),
-  metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { width: 96, note: `Profile visits. ${NOTE.profileVisits}` }),
+  metricColumn('Follows', (r) => r.follows, fmtNumber, { key: 'follows', width: 108, note: NOTE.follows }),
+  metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { key: 'profileVisits', width: 96, note: `Profile visits. ${NOTE.profileVisits}` }),
   /* 저장·리포스트(2026-09-11) — 인플루언서 시트가 적는 일곱 가지를 유료 광고도 같은 자리에서 답한다.
      Saves는 Meta만, Reposts는 수기 레코드만 값이 있다. 값이 전부 빈 표에서는 다른 열과 같이 keep()이 걷어낸다. */
   metricColumn('Saves', (r) => r.saves, fmtNumber, { width: 88, note: NOTE.saves }),
@@ -1944,7 +1946,7 @@ export function ReportSummarySection({ campaigns, performanceRecords, performanc
             { key: 'cost', columns: costCols },
             { key: 'perf', columns: perfCols },
             { key: 'video', columns: keep(CREATIVE_VIDEO_COLUMNS) },
-            { key: 'social', columns: keep([...(hasGoalColumn('Engagements') ? [] : [ENGAGEMENTS_COLUMN]), ...CREATIVE_ENGAGEMENT_COLUMNS]) },
+            { key: 'social', columns: keep([...(hasGoalColumn('Engagements') ? [] : [ENGAGEMENTS_COLUMN]), ...CREATIVE_ENGAGEMENT_COLUMNS.filter((c) => !isHiddenMetric(c.key))]) },
           ].filter((g) => g.columns.length > 0);
           const dataColumns = columnGroups.flatMap((g) => g.columns.map((col, colIndex) => ({ ...col, group: g.key, isGroupStart: colIndex === 0 })));
           /* 컬럼 폭의 합 = 표의 **최소** 폭. 화면이 이보다 넓으면 컬럼들이 남는

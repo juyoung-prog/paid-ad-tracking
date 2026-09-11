@@ -123,6 +123,8 @@ var CONFIG = {
   },
   /** 그 아래 참여 내역 줄 — 목표와 무관. Follow·Profile은 TikTok만 값이 있다 (recapRowView ENGAGEMENT_BREAKDOWN_KEYS) */
   ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'saves', 'reposts', 'follows', 'profileVisits'],
+  /** 화면에서 일단 감춘 지표 — TikTok Follows·Visits (schema HIDDEN_METRIC_KEYS). 값은 수집되지만 참여 내역 줄에서 뺀다 */
+  HIDDEN_METRIC_KEYS: ['follows', 'profileVisits'],
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -388,7 +390,7 @@ var COLUMNS = [
   { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
     note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
   { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
-    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: the engagement breakdown — likes · comments · shares, plus follows · visits (TikTok) and saves (Meta). Reposts come only from manual records; neither ad API reports them.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
+    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: the engagement breakdown — likes · comments · shares · saves (· reposts on Meta). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
@@ -1512,6 +1514,7 @@ function countNumberText(v) {
     대시보드 표는 같은 목록을 미니 그리드로 그리지만 시트 셀은 문자열 한 줄이라 " · "로 잇는다 — 내용·순서는 같다 (recapRowView engagementBreakdownText) */
 function engagementBreakdownText(r) {
   return CONFIG.ENGAGEMENT_BREAKDOWN_KEYS
+    .filter(function (k) { return CONFIG.HIDDEN_METRIC_KEYS.indexOf(k) < 0; })
     .map(function (k) { return r[k] == null ? null : CONFIG.METRIC_LABEL[k] + ' ' + countNumberText(r[k]); })
     .filter(Boolean)
     .join(' · ');

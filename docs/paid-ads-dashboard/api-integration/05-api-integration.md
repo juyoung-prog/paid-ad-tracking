@@ -133,6 +133,10 @@ sequenceDiagram
 | `saves` | `actions` 중 `onsite_conversion.post_save` (게시물 저장) | — (캠페인 레벨 `saves`/`bookmark`/`total_save` 거부됨) |
 | `reposts` | — (광고 지표 없음, 인스타그램 리포스트는 드로어 보충 입력) | — (TikTok 광고에는 리포스트가 없다) |
 
+**TikTok의 `follows` · `profile_visits`는 수집하되 화면에서 일단 감춘다(2026-09-12)**: Meta에 같은 지표가
+없어 두 플랫폼이 다른 칸을 보이던 것을 없앴다. 동기화·DB·CSV 내보내기는 그대로이고, 드로어 목록·Performance 표·
+Reports 참여 내역·구글 시트에서만 빠진다. 목록은 `schema.js HIDDEN_METRIC_KEYS` 한 곳.
+
 **Meta에 팔로우·프로필 방문이 없다는 것은 실측이다(2026-09-12)**: `sync-performance`를 body
 `{"diagnose": "meta_actions"}`로 부르면 Meta insights의 `actions` 배열에 실제로 오는 action_type을 계정별로
 집계해 돌려준다(DB 무변경, 토큰 미노출). 세 계정 80캠페인에서 온 것: `link_click` `post_engagement`

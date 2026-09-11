@@ -1,5 +1,5 @@
 import { t, metricLabel } from '../../data/recapStrings';
-import { GOAL_HEADLINE_METRICS, phaseNameOf } from '../../data/schema';
+import { GOAL_HEADLINE_METRICS, phaseNameOf, isHiddenMetric } from '../../data/schema';
 import { money, count, countCompact, percent, seconds } from '../../utils/format';
 
 /**
@@ -127,7 +127,8 @@ const metricItem = (key, lang, value) => ({ key, label: metricLabel(key, lang), 
 /** 참여 내역 — [{ key, label, value }]. 목록·순서는 ENGAGEMENT_BREAKDOWN_KEYS */
 export function engagementBreakdownItems(row, lang) {
   return ENGAGEMENT_BREAKDOWN_KEYS
-    .filter((key) => row[key] != null)
+    // 값이 없는 것과 일단 감춘 것(schema HIDDEN_METRIC_KEYS — TikTok Follows·Visits)은 뺀다
+    .filter((key) => row[key] != null && !isHiddenMetric(key))
     .map((key) => metricItem(key, lang, count(row[key])));
 }
 

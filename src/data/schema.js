@@ -165,6 +165,14 @@ export const SOCIAL_METRIC_KEYS = Object.freeze([
   Object.freeze({ key: 'saves', column: 'saves', label: 'Saves', platforms: ['meta', 'tiktok'], isEditable: true }),
   Object.freeze({ key: 'reposts', column: 'reposts', label: 'Reposts', platforms: ['meta'], isEditable: true }),
 ]);
+/**
+ * 화면에서 **일단 감추는** 참여 지표(2026-09-12 제품 결정). TikTok의 Follows · Profile Visits — 광고 API가 주는
+ * 값이라 수집·저장은 그대로 하되(동기화·DB·CSV 내보내기 그대로) 드로어 목록·Performance 표·Reports 참여 내역에서
+ * 뺀다. Meta에는 같은 지표가 없어 두 플랫폼이 다른 칸을 보이던 것을 없앤 것이다. 다시 보이려면 이 목록에서 빼면 된다.
+ */
+export const HIDDEN_METRIC_KEYS = Object.freeze(['follows', 'profileVisits']);
+export const isHiddenMetric = (key) => HIDDEN_METRIC_KEYS.includes(key);
+
 /** 플랫폼에 뜻이 있는 참여 칸만. 플랫폼을 모르면(수기 캠페인 등) 전부 */
 export const socialMetricKeysFor = (platform) => SOCIAL_METRIC_KEYS.filter((m) => !platform || m.platforms.includes(platform));
 /** 그중 사람이 고칠 수 있는 칸 — 입력 그리드(SocialMetricsFields)와 드로어 저장(updatePerformanceEngagement)이 쓴다 */

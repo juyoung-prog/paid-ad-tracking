@@ -4,7 +4,7 @@ import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 
-import { calcHookRate, calcHoldRate, calcCPM, calcCTR, calcCPC, calcCPA } from '../../data/schema';
+import { calcHookRate, calcHoldRate, calcCPM, calcCTR, calcCPC, calcCPA, isHiddenMetric } from '../../data/schema';
 import { count, percent, seconds, money } from '../../utils/format';
 
 // 표기는 utils/format.js에서만 정한다 (PerformanceReportTable과 같은 규칙).
@@ -112,7 +112,8 @@ const FIELDS = [
  * <PlatformMetricList metrics={ performanceRecord } />
  */
 export function PlatformMetricList({ metrics, title = 'Platform metrics', hasCoreMetrics = false, excludeKeys = [], sx }) {
-  const rows = [...(hasCoreMetrics ? CORE_FIELDS : []), ...FIELDS].filter((field) => !excludeKeys.includes(field.key)).reduce((acc, field) => {
+  // 호출부가 뺀 것 + 제품이 일단 감춘 것(schema HIDDEN_METRIC_KEYS — TikTok Follows·Profile Visits)
+  const rows = [...(hasCoreMetrics ? CORE_FIELDS : []), ...FIELDS].filter((field) => !excludeKeys.includes(field.key) && !isHiddenMetric(field.key)).reduce((acc, field) => {
     const raw = field.derive ? field.derive(metrics ?? {}) : metrics?.[field.key];
     if (raw != null) acc.push({ label: field.label, value: field.format(raw), group: field.group });
     return acc;
