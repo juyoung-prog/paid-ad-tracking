@@ -346,80 +346,85 @@ function placeReportSheet_(ss, sheet, previous) {
 
 /** 표 열 정의 — 캠페인 표. key는 model 행의 필드, fmt는 setNumberFormat, align은 가로 정렬 */
 /**
- * 물리 열 폭(B열부터) — 캠페인 표 13열 기준. 타임라인(8열)·KPI(5열)는 같은 열을 나눠 쓴다.
- *   B  40 썸네일  C 210 Campaign 글   (B:C = Campaign 250 · 타임라인 Phase / KPI Period는 B:C 병합)
- *   D  90 Goal / Platforms            E 130 Budget / Spend / Start      F 115 Primary KPI / End
- *   G  95 Hook / Days                 H  95 Hold / Daily budget          I  95 Eng. rate / Planned
- *   J  95 CTR / Spent                 K  95 Reach                        L  95 Plays
- *   M  90 Avg watch                   N 240 What worked                  O 240 Could improve
- * 지표 열은 "값 ⏎ 순위" 두 줄까지 — 아래로 훑으며 캠페인끼리 바로 비교되게(참고: G10_Grand Opening Influencer 시트).
+ * 물리 열 폭(B열부터) — 캠페인 표(13열)와 타임라인(8열)이 서로 다른 폭을 요구하므로, 두 표의 열 경계를 모두 담는
+ * 잘게 나눈 물리 열 위에 각 논리 열을 병합(span)으로 얹는다. 좁은 조각 열(10~35px)은 병합 안에 숨어 보이지 않는다.
+ *
+ *   경계(px, B열 시작 0):  250 340 370 470 570 580 625 660 720 740 815 825 905 920 995 1085 1165 1390 1615
+ *   캠페인 표: Campaign 250 · Goal 90 · Budget/Spend 130 · Primary KPI 110 · Hook 80 · Hold 80 · Eng. rate 85 · CTR 80 ·
+ *              Reach 90 · Plays 90 · Avg watch 80 · What worked 225 · Could improve 225
+ *   타임라인:  Phase 250 · Platforms 120 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105
+ *   KPI:       Period 250 · Campaigns 90 · Total spent 130 · Planned 100 · Stores 100
+ * 첫 두 조각(36 + 214)이 Campaign — 36은 썸네일 칸.
  */
-var PHYSICAL_WIDTHS = [40, 210, 90, 130, 115, 95, 95, 95, 95, 95, 95, 90, 240, 240];
+var PHYSICAL_WIDTHS = [36, 214, 90, 30, 100, 100, 10, 45, 35, 60, 20, 75, 10, 80, 15, 75, 90, 80, 225, 225];
 
 /** 지표 열 공통 노트 꼬리 — 둘째 줄(순위)의 뜻 */
 var METRIC_RANK_NOTE = '\nSecond line: rank among comparable past campaigns (same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE +
   '; same phase when 3+ exist) — ↑ top · ↓ bottom · mid. No second line if fewer than 3 peers. Context only, not a grade.';
 
-/** 캠페인 표 — 13열. span은 병합할 물리 열 수 */
+/**
+ * 캠페인 표 — 13열. span은 병합할 물리 열 수(합 20). lines는 두 줄 칸의 강조 규칙:
+ *   'second-small' = 첫 줄 보통, 둘째 줄 작고 회색(지표 값 + 순위) · 'first-small' = 첫 줄 작고 회색, 둘째 줄 굵게(일예산 + 지출)
+ */
 var COLUMNS = [
-  // 썸네일 칸(B) + 글 칸(C). 이름은 Ads Manager 링크(있을 때만), 둘째 줄은 매장 · 기간
+  // 썸네일 칸 + 글 칸. 이름은 굵게 + Ads Manager 링크(있을 때만), 둘째 줄은 매장 · 기간(작고 회색)
   { key: 'campaignText', label: 'Campaign', span: 2, align: 'left', thumbKey: 'thumbnailUrl', linkKey: 'campaignUrl', linkLength: 'phaseNameLength',
     note: 'Thumbnail (when the platform provides one), phase name, then store · period. The name links to the campaign in Meta / TikTok Ads Manager when the account id is known. Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
-  { key: 'goalLabel', label: 'Goal', align: 'center' },
-  { key: 'budgetSpendText', label: 'Budget / Spend', align: 'center',
+  { key: 'goalLabel', label: 'Goal', span: 1, align: 'center' },
+  { key: 'budgetSpendText', label: 'Budget / Spend', span: 2, align: 'center', lines: 'first-small',
     note: 'Daily budget, then actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
-  { key: 'primaryKpiText', label: 'Primary KPI', align: 'center',
+  { key: 'primaryKpiText', label: 'Primary KPI', span: 2, align: 'center', lines: 'second-small',
     note: 'The main result for the campaign goal — reported, not judged. Awareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.' + METRIC_RANK_NOTE },
-  { key: 'hookRateText', label: 'Hook', align: 'center', note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays). Same basis as the platform ads manager.' + METRIC_RANK_NOTE },
-  { key: 'holdRateText', label: 'Hold', align: 'center', note: 'Hold = completed views ÷ hook views — of the people who stayed past the hook, how many watched through.' + METRIC_RANK_NOTE },
-  { key: 'engagementRateText', label: 'Eng. rate', align: 'center', note: 'Engagement rate = platform engagements ÷ impressions.' + METRIC_RANK_NOTE },
-  { key: 'ctrText', label: 'CTR', align: 'center', note: 'CTR = clicks ÷ impressions.' + METRIC_RANK_NOTE },
-  { key: 'reach', label: 'Reach', align: 'center', fmt: '#,##0', note: 'Unique people reached (platform value).' },
-  { key: 'videoPlays', label: 'Plays', align: 'center', fmt: '#,##0', note: 'Video plays (platform value).' },
-  { key: 'avgWatchText', label: 'Avg watch', align: 'center', note: 'Average watch time per play. Meta reports whole seconds, TikTok decimals — shown as given.' },
-  { key: 'worked', label: 'What worked', align: 'left',
+  { key: 'hookRateText', label: 'Hook', span: 2, align: 'center', lines: 'second-small', note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays). Same basis as the platform ads manager.' + METRIC_RANK_NOTE },
+  { key: 'holdRateText', label: 'Hold', span: 2, align: 'center', lines: 'second-small', note: 'Hold = completed views ÷ hook views — of the people who stayed past the hook, how many watched through.' + METRIC_RANK_NOTE },
+  { key: 'engagementRateText', label: 'Eng. rate', span: 2, align: 'center', lines: 'second-small', note: 'Engagement rate = platform engagements ÷ impressions.' + METRIC_RANK_NOTE },
+  { key: 'ctrText', label: 'CTR', span: 1, align: 'center', lines: 'second-small', note: 'CTR = clicks ÷ impressions.' + METRIC_RANK_NOTE },
+  { key: 'reach', label: 'Reach', span: 2, align: 'center', fmt: '#,##0', note: 'Unique people reached (platform value).' },
+  { key: 'videoPlays', label: 'Plays', span: 1, align: 'center', fmt: '#,##0', note: 'Video plays (platform value).' },
+  { key: 'avgWatchText', label: 'Avg watch', span: 1, align: 'center', note: 'Average watch time per play. Meta reports whole seconds, TikTok decimals — shown as given.' },
+  { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
-  { key: 'improve', label: 'Could improve', align: 'left',
+  { key: 'improve', label: 'Could improve', span: 1, align: 'left',
     note: 'Same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
 ];
 
-/** 타임라인 표 열 — B~I, 병합 없음 */
+/** 타임라인 표 열 — 물리 열 15개에 병합으로 얹는다 */
 var TIMELINE_COLUMNS = [
   { key: 'name', label: 'Phase', span: 2, align: 'left' },
-  { key: 'platformLabel', label: 'Platforms', align: 'center' },
-  { key: 'startDate', label: 'Start', align: 'center' },
-  { key: 'endDate', label: 'End', align: 'center' },
-  { key: 'days', label: 'Days', align: 'center', fmt: '0' },
-  { key: 'totalDaily', label: 'Daily budget', align: 'right', fmt: '"$"#,##0.00' },
-  { key: 'totalBudget', label: 'Planned', align: 'right', fmt: '"$"#,##0' },
-  { key: 'spent', label: 'Spent', align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'platformLabel', label: 'Platforms', span: 2, align: 'center' },
+  { key: 'startDate', label: 'Start', span: 1, align: 'center' },
+  { key: 'endDate', label: 'End', span: 1, align: 'center' },
+  { key: 'days', label: 'Days', span: 2, align: 'center', fmt: '0' },
+  { key: 'totalDaily', label: 'Daily budget', span: 2, align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'totalBudget', label: 'Planned', span: 2, align: 'right', fmt: '"$"#,##0' },
+  { key: 'spent', label: 'Spent', span: 3, align: 'right', fmt: '"$"#,##0.00' },
 ];
 
-/** KPI 블록 — 헤더 줄 + 값 줄, B~F */
+/** KPI 블록 — 헤더 줄 + 값 줄 */
 var KPI_COLUMNS = [
   { key: 'periodText', label: 'Period', span: 2, align: 'left' },
-  { key: 'campaignCount', label: 'Campaigns', align: 'center', fmt: '0' },
-  { key: 'spend', label: 'Total spent', align: 'right', fmt: '"$"#,##0.00' },
-  { key: 'plannedBudget', label: 'Planned', align: 'right', fmt: '"$"#,##0',
+  { key: 'campaignCount', label: 'Campaigns', span: 1, align: 'center', fmt: '0' },
+  { key: 'spend', label: 'Total spent', span: 2, align: 'right', fmt: '"$"#,##0.00' },
+  { key: 'plannedBudget', label: 'Planned', span: 1, align: 'right', fmt: '"$"#,##0',
     note: 'Sum of each campaign\'s planned budget: stored budget_planned, else daily budget × days (start and end inclusive). The dashboard uses the Plan document when one exists.' },
-  { key: 'storeCount', label: 'Stores', align: 'center', fmt: '0' },
+  { key: 'storeCount', label: 'Stores', span: 3, align: 'center', fmt: '0' },
 ];
 
 /**
- * 디자인 상수 — 참고 디자인(issue/i-28.png)의 위계를 따르되 격자는 가볍게: 헤더는 연회색 바탕 + 위아래 중간 회색 선,
- * 줄 사이는 옅은 가로선만, 세로선 없음. 표 사이는 빈 줄 둘. 캠페인 줄은 셀 안 줄바꿈(2~3줄)이 들어가 높다.
+ * 디자인 상수 — 참고: G10_Grand Opening Influencer 시트. 모든 셀에 얇은 연회색 격자(가로·세로·바깥), 헤더는 연회색 바탕 + 굵게,
+ * 행 높이 일정, 지표 칸은 값(보통) + 순위(작고 회색) 두 줄. 대시보드 카드가 아니라 스프레드시트 보고서다.
  */
 var STYLE = {
-  borderStrong: '#bdbdbd',
-  borderLight: '#e3e3e3',
+  border: '#dadce0',
   headerBg: '#f3f3f3',
   secondary: '#666666',
   fontSize: 10,
+  smallFontSize: 9,
   titleSize: 16,
   sectionSize: 12,
   leftGutter: 20,
   left: 2,
-  heights: { title: 34, section: 30, kpiHeader: 30, kpiValue: 34, timelineHeader: 30, timelineRow: 32, campaignHeader: 30, campaignRow: 52 },
+  heights: { title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 48 },
   sectionGap: 2,
 };
 
@@ -549,7 +554,25 @@ function renderLinkedText_(cell, text, nameLength, url) {
     if (url) builder.setLinkUrl(0, nameEnd, url);
   }
   if (nameEnd < text.length) {
-    builder.setTextStyle(nameEnd, text.length, SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).build());
+    builder.setTextStyle(nameEnd, text.length, SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build());
+  }
+  cell.setRichTextValue(builder.build());
+}
+
+/**
+ * 두 줄 칸 — 'second-small': 첫 줄 보통 + 둘째 줄 작고 회색(지표 값 + 순위) · 'first-small': 첫 줄 작고 회색 + 둘째 줄 굵게(일예산 + 지출).
+ * 한 줄뿐이면 그대로 둔다(빈 값 "—" 포함).
+ */
+function renderTwoLineCell_(cell, text, mode) {
+  var cut = text.indexOf('\n');
+  if (cut < 0) return;
+  var small = SpreadsheetApp.newTextStyle().setForegroundColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).build();
+  var builder = SpreadsheetApp.newRichTextValue().setText(text);
+  if (mode === 'first-small') {
+    builder.setTextStyle(0, cut, small);
+    builder.setTextStyle(cut + 1, text.length, SpreadsheetApp.newTextStyle().setBold(true).build());
+  } else {
+    builder.setTextStyle(cut + 1, text.length, small);
   }
   cell.setRichTextValue(builder.build());
 }
@@ -585,12 +608,14 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
     });
   };
 
-  // 헤더
+  var borderAll = function (range) { range.setBorder(true, true, true, true, true, true, STYLE.border, SpreadsheetApp.BorderStyle.SOLID); };
+
+  // 헤더 — 연회색 바탕, 굵게, 모든 변 테두리, 세로 가운데
   var headerRange = sheet.getRange(row, startCol, 1, width);
   var header = [];
-  columns.forEach(function (c, i) { for (var k = 0; k < (c.span || 1); k += 1) header.push(k === 0 ? c.label : ''); });
+  columns.forEach(function (c) { for (var k = 0; k < (c.span || 1); k += 1) header.push(k === 0 ? c.label : ''); });
   headerRange.setValues([header]).setFontWeight('bold').setBackground(STYLE.headerBg).setWrap(false).setVerticalAlignment('middle');
-  headerRange.setBorder(true, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+  borderAll(headerRange);
   mergeRow(row, true);
   columns.forEach(function (c, i) {
     var cell = sheet.getRange(row, startCol + offsets[i]);
@@ -607,12 +632,12 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   if (bodyRows.length === 0) {
     var emptyRange = sheet.getRange(row, startCol, 1, width);
     emptyRange.merge().setValue('No campaigns on this platform.').setFontColor(STYLE.secondary).setHorizontalAlignment('left');
-    emptyRange.setBorder(false, false, true, false, false, false, STYLE.borderLight, SpreadsheetApp.BorderStyle.SOLID);
+    borderAll(emptyRange);
     sheet.setRowHeight(row, options.rowHeight);
     return row + 1;
   }
 
-  // 본문 — 값은 병합 첫 칸에, 나머지 칸은 빈 문자열
+  // 본문 — 값은 병합 첫 칸에, 나머지 칸은 빈 문자열. 모든 셀에 격자
   var values = bodyRows.map(function (r, j) {
     var line = [];
     columns.forEach(function (c, i) {
@@ -628,9 +653,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   var body = sheet.getRange(row, startCol, bodyRows.length, width);
   body.setValues(values).setVerticalAlignment('middle');
   body.setWrapStrategy(options.wrap ? SpreadsheetApp.WrapStrategy.WRAP : SpreadsheetApp.WrapStrategy.CLIP);
-  // 줄 사이 옅은 가로선, 표 끝은 중간 회색. 세로선은 없다
-  body.setBorder(false, false, false, false, false, true, STYLE.borderLight, SpreadsheetApp.BorderStyle.SOLID);
-  body.setBorder(false, false, true, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+  borderAll(body);
   for (var j = 0; j < bodyRows.length; j += 1) mergeRow(row + j, false);
   sheet.setRowHeights(row, bodyRows.length, options.rowHeight);
   if (options.valuesBold) body.setFontWeight('bold').setFontSize(11);
@@ -648,13 +671,16 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
         renderThumbnail_(sheet.getRange(row + j, startCol + offsets[i]), r[c.thumbKey], r.phaseName);
         renderLinkedText_(sheet.getRange(row + j, textCol), String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null);
       });
+    } else if (c.lines) {
+      bodyRows.forEach(function (r, j) {
+        if (j === totalIndex) return;
+        renderTwoLineCell_(sheet.getRange(row + j, textCol), String(r[c.key] == null ? EMPTY : r[c.key]), c.lines);
+      });
     }
   });
 
   if (totalIndex >= 0) {
-    var totalRange = sheet.getRange(row + totalIndex, startCol, 1, width);
-    totalRange.setFontWeight('bold');
-    totalRange.setBorder(true, false, false, false, false, false, STYLE.borderStrong, SpreadsheetApp.BorderStyle.SOLID);
+    sheet.getRange(row + totalIndex, startCol, 1, width).setFontWeight('bold');
     sheet.getRange(row + totalIndex, startCol).setHorizontalAlignment('left');
   }
 
