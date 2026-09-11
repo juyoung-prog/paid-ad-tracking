@@ -26,9 +26,9 @@ import {
   insightCellsOf,
   kpiFormat,
   primaryKpiOf,
-  engagementBreakdownText,
+  engagementBreakdownItems,
   storeTextOf,
-  videoSecondaryText,
+  videoSecondaryItems,
 } from './recapRowView';
 
 /**
@@ -149,6 +149,46 @@ function KpiSlot({ row, metricKey, format, lang, onBenchmarkClick }) {
 }
 
 /**
+ * 보조 지표 미니 그리드 — 라벨(옅게) 위, 값(진하게) 아래. 한 줄에 최대 columns개이고 넘치면 다음 줄로 가되
+ * 같은 열에 선다(grid라 둘째 줄 첫 항목이 첫째 줄 첫 항목과 같은 x). 2026-09-12: 예전엔 " · "로 이은 한 문장
+ * ("Like 719 · Cmt 0 · Share 702 · Follow 18 · Visits 1,054")이었는데, 숫자를 훑는 자리에 문장을 두면 읽어야
+ * 답이 나온다 — 라벨과 값을 세로로 가르고 값에 무게를 줘서 숫자가 먼저 보이게 한다.
+ * 상자·테두리는 없다(카드가 아니다). 위계: 대표 지표(13px 600~700) > 보조 값(12px 600) > 라벨(11px 400).
+ *
+ * 인쇄에서는 같은 그리드·같은 열이되 라벨과 값이 **한 줄**에 선다("Like 39") — 칸마다 두 줄이면 캠페인 한 줄이
+ * 23px 높아져 Meta 다섯 캠페인이 1쪽을 넘는다(승인된 인쇄 구성: 1쪽 = 머리글·Timeline·Meta 전부).
+ * 종이에서는 라벨을 5.5pt로 따로 떼어 놓는 이득보다 줄 수를 지키는 쪽이 크다 — 열 정렬은 그대로라 훑는 건 같다.
+ */
+function SecondaryMetricGrid({ items, columns }) {
+  if (items.length === 0) return null;
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+        columnGap: 0.75,
+        rowGap: 0.75,
+        mt: 1.25,
+        /* 종이에서는 같은 그리드를 조인다 — 줄 높이가 커지면 Meta 다섯 캠페인이 1쪽을 넘는다.
+           열은 항상 셋: 인쇄 칸이 140px라 넷으로 쪼개면 "Share 702"가 한 줄에 못 들어가 칸마다 두 줄이 된다 */
+        '@media print': { gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', columnGap: '3pt', rowGap: '0.5pt', mt: '2pt', lineHeight: 1.2 },
+      }}
+    >
+      {items.map((item) => (
+        <Box key={item.key} sx={{ minWidth: 0 }}>
+          <Typography component="span" sx={{ display: 'block', fontSize: 11, lineHeight: 1.15, color: 'text.secondary', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { display: 'inline', fontSize: '6pt', lineHeight: 1.2 } }}>
+            {item.label}{'\u00A0'}
+          </Typography>
+          <Typography component="span" sx={{ display: 'block', fontSize: 12, fontWeight: 600, lineHeight: 1.2, color: 'text.primary', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', '@media print': { display: 'inline', fontSize: '6.5pt', lineHeight: 1.2 } }}>
+            {item.value}
+          </Typography>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
+/**
  * RecapCampaignTable 컴포넌트
  *
  * 보고서(캠페인 종료 후 결과 보고)의 플랫폼별 캠페인 표 — **임원용 평가 시트**(2026-09-08). 한 줄을 왼쪽에서 오른쪽으로
@@ -259,8 +299,8 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
             const { kpi, metricKey: kpiKey, stat: kpiStat, hasComparison } = primaryKpiOf(row);
             const kpiHint = kpi?.value != null ? t('recap.table.primaryKpiValueHint', lang, { metric: metricLabel(kpi.metricKey, lang), basis: t(`recap.table.primaryKpiBasis.${kpi.metricKey}`, lang) }) : '';
             const layout = engagementLayout(row.goal);
-            const engagementSecondary = engagementBreakdownText(row, lang);
-            const videoSecondary = videoSecondaryText(row, lang);
+            const engagementSecondary = engagementBreakdownItems(row, lang);
+            const videoSecondary = videoSecondaryItems(row, lang);
             /* 해석 두 칸 — 사람이 쓴 note(자리표시자 제외)가 우선, 없으면 재료(insight)에서 한 문장. 데이터·근거가 없으면 "—".
                편집 중에는 사람이 쓴 **원문 그대로**(자리표시자도)를 입력 칸에 넣어 고치거나 지울 수 있게 하고,
                자동 문장은 placeholder로 깔아 "비우면 이게 남는다"를 보인다 — 자동 문장을 값으로 채워 넣지 않는다 */
@@ -398,26 +438,24 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                   <TableCell colSpan={2} sx={{ ...CELL_SX, color: 'text.secondary' }}>{t('recap.table.noData', lang)}</TableCell>
                 ) : (
                   <>
-                    {/* Video response — Hook / Hold가 앞(순위 포함), Reach · Plays · Avg는 옅은 보조 줄 */}
+                    {/* Video response — Hook / Hold가 앞(순위 포함), Reach · Plays · Avg는 아래 미니 그리드 */}
                     <TableCell sx={CELL_SX}>
                       <Box sx={{ display: 'flex', gap: 0.75, '@media print': { gap: '4pt' } }}>
                         <KpiSlot row={row} metricKey="hookRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         <KpiSlot row={row} metricKey="holdRate" format={fmtPercent} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                       </Box>
-                      {videoSecondary && (
-                        <Typography component="span" sx={(theme) => ({ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5, color: alpha(theme.palette.text.secondary, 0.85), fontVariantNumeric: 'tabular-nums' })}>{videoSecondary}</Typography>
-                      )}
+                      {/* Reach · Plays · Avg — 셋이라 3열 한 줄 */}
+                      <SecondaryMetricGrid items={videoSecondary} columns={3} />
                     </TableCell>
-                    {/* Engagement / Action — 대표 두 자리는 목표가 정하고(ENGAGEMENT_ACTION_LAYOUT), 보조 줄은 참여 내역 Like · Cmt · Share(· Follow · Profile) */}
+                    {/* Engagement / Action — 대표 두 자리는 목표가 정하고(ENGAGEMENT_ACTION_LAYOUT), 아래는 참여 내역 미니 그리드 */}
                     <TableCell sx={CELL_SX}>
                       <Box sx={{ display: 'flex', gap: 0.75, '@media print': { gap: '4pt' } }}>
                         {layout.primary.map((key) => (
                           <KpiSlot key={key} row={row} metricKey={key} format={kpiFormat(key)} lang={lang} onBenchmarkClick={onBenchmarkClick} />
                         ))}
                       </Box>
-                      {engagementSecondary && (
-                        <Typography component="span" sx={(theme) => ({ ...META_SX, display: 'block', whiteSpace: 'normal', mt: 0.5, color: alpha(theme.palette.text.secondary, 0.85), fontVariantNumeric: 'tabular-nums' })}>{engagementSecondary}</Typography>
-                      )}
+                      {/* Like · Cmt · Share · Save (· Follow · Visits) — 한 줄에 넷, 넘치면 둘째 줄에 같은 열로 */}
+                      <SecondaryMetricGrid items={engagementSecondary} columns={4} />
                     </TableCell>
                   </>
                 )}

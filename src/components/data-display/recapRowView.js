@@ -45,8 +45,10 @@ export const engagementLayout = (goal) => ENGAGEMENT_ACTION_LAYOUT[goal] ?? ENGA
  * (actions.onsite_conversion.post_save; TikTok 광고 API는 캠페인 레벨 saves를 거부) · Repost는 인스타그램(Meta) 개념이라
  * Meta 수기 레코드에만 있다(TikTok 광고에는 리포스트가 없고, Meta 광고 API도 캠페인 단위로는 안 준다).
  * 없는 값(null)은 줄에서 빠진다 — 자리는 있고 숫자만 없는 것이다.
+ * 순서는 양 플랫폼 공통(Like · Cmt · Share · Save)이 앞, 플랫폼 전용(Repost · Follow · Visits)이 뒤다 —
+ * 표의 미니 그리드가 한 줄에 넷이라 첫 줄이 어느 캠페인에서나 같은 네 지표가 된다(2026-09-12).
  */
-export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts'];
+export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'saves', 'reposts', 'follows', 'profileVisits'];
 
 /** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 나머지 대표 자리(600) */
 export const emphasisOf = (row, metricKey) => ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey ? 'primary' : 'diagnostic');
@@ -114,22 +116,35 @@ export function primaryKpiOf(row) {
   return { kpi, metricKey, stat, hasComparison: Boolean(stat && stat.peerScope !== 'none' && stat.percentile != null) };
 }
 
-/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601 · Save 183" (TikTok은 "· Follow 12 · Visits 40"). 값이 없는 항목은 뺀다 */
-export function engagementBreakdownText(row, lang) {
+/**
+ * 보조 지표는 **문장이 아니라 숫자**다(2026-09-12). 표에서는 라벨 위 · 값 아래의 미니 그리드로 그리므로
+ * 라벨과 값을 따로 내놓는다 — "Like 719 · Cmt 0 · Share 702 · Follow 18 · Visits 1,054"처럼 한 줄로 이으면
+ * 로그 텍스트처럼 읽혀 훑을 수가 없었다. 값이 없는 항목은 목록에서 빠진다(자리를 비워 두지 않는다).
+ * 문자열이 필요한 자리(구글 시트 셀·대조 스크립트)는 아래 *Text가 같은 목록을 " · "로 잇는다 — 내용은 같다.
+ */
+const metricItem = (key, lang, value) => ({ key, label: metricLabel(key, lang), value });
+
+/** 참여 내역 — [{ key, label, value }]. 목록·순서는 ENGAGEMENT_BREAKDOWN_KEYS */
+export function engagementBreakdownItems(row, lang) {
   return ENGAGEMENT_BREAKDOWN_KEYS
-    .map((key) => (row[key] == null ? null : `${metricLabel(key, lang)} ${count(row[key])}`))
-    .filter(Boolean)
-    .join(' · ');
+    .filter((key) => row[key] != null)
+    .map((key) => metricItem(key, lang, count(row[key])));
 }
 
-/** 영상 칸의 보조 줄 — "Reach 163K · Plays 296K · Avg 2s" */
-export function videoSecondaryText(row, lang) {
+/** 영상 칸 보조 지표 — Reach · Plays · Avg */
+export function videoSecondaryItems(row, lang) {
   return [
-    row.reach != null ? `${metricLabel('reach', lang)} ${countCompact(row.reach)}` : null,
-    row.videoPlays != null ? `${metricLabel('videoPlays', lang)} ${countCompact(row.videoPlays)}` : null,
-    row.avgWatchSeconds != null ? t('recap.table.avgWatch', lang, { s: seconds(row.avgWatchSeconds) }) : null,
-  ].filter(Boolean).join(' · ');
+    row.reach != null ? metricItem('reach', lang, countCompact(row.reach)) : null,
+    row.videoPlays != null ? metricItem('videoPlays', lang, countCompact(row.videoPlays)) : null,
+    row.avgWatchSeconds != null ? metricItem('avgWatchSeconds', lang, seconds(row.avgWatchSeconds)) : null,
+  ].filter(Boolean);
 }
+
+/** 참여 내역 한 줄 — "Like 508 · Cmt 10 · Share 601 · Save 183". 시트 셀처럼 문자열만 놓을 수 있는 자리용 */
+export const engagementBreakdownText = (row, lang) => engagementBreakdownItems(row, lang).map((i) => `${i.label} ${i.value}`).join(' · ');
+
+/** 영상 칸 보조 한 줄 — "Reach 163K · Plays 296K · Avg 2s" */
+export const videoSecondaryText = (row, lang) => videoSecondaryItems(row, lang).map((i) => `${i.label} ${i.value}`).join(' · ');
 
 /** 매장 표기 — 여러 곳이면 "G10 +2"(전체 목록은 title로) */
 export function storeTextOf(row) {

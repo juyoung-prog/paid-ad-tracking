@@ -122,7 +122,7 @@ var CONFIG = {
     store_visit: { primary: ['cpa', 'ctr'] },
   },
   /** 그 아래 참여 내역 줄 — 목표와 무관. Follow·Profile은 TikTok만 값이 있다 (recapRowView ENGAGEMENT_BREAKDOWN_KEYS) */
-  ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts'],
+  ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'saves', 'reposts', 'follows', 'profileVisits'],
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -1508,7 +1508,8 @@ function countNumberText(v) {
   return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
-/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601" (TikTok은 "· Follow 12 · Profile 40"까지). 값이 없는 항목은 뺀다 (recapRowView engagementBreakdownText) */
+/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601 · Save 183" (TikTok은 "· Follow 12 · Visits 40"까지). 값이 없는 항목은 뺀다.
+    대시보드 표는 같은 목록을 미니 그리드로 그리지만 시트 셀은 문자열 한 줄이라 " · "로 잇는다 — 내용·순서는 같다 (recapRowView engagementBreakdownText) */
 function engagementBreakdownText(r) {
   return CONFIG.ENGAGEMENT_BREAKDOWN_KEYS
     .map(function (k) { return r[k] == null ? null : CONFIG.METRIC_LABEL[k] + ' ' + countNumberText(r[k]); })
