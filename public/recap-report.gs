@@ -38,9 +38,9 @@
  *      단계 이름이 하나라도 겹치는 다른 이벤트들과 비교. 이 이벤트 포함 3개 미만이면 없음
  *  10. 계획 예산 = 저장된 budget_planned(>0) 아니면 일예산 × 기간 일수(양 끝 포함). 근거 없으면 없음
  *      집행률은 지출 ÷ 계획이 1.2 이상(Over) 또는 0.7 이하(Under)일 때만 적는다
- *  11. What worked / Could improve = 사람이 대시보드 Edit에서 쓴 글(영어, "ㅇㅇ"·TBD 같은 자리표시자 제외)이 있으면 그 글.
- *      없으면 자동 문장: 목표가 정한 후보 지표(GOAL_INSIGHT_METRICS) 중 top / bottom 구간인 것 — 대표(primary) 지표가 먼저,
- *      같은 층이면 백분위 순. bottom이 없고 지출이 계획의 120%를 넘으면 초과 지출. 후보가 없으면 "—" — 억지로 만들지 않는다
+ *  11. What worked / Could improve = 목표가 정한 후보 지표(GOAL_INSIGHT_METRICS) 중 top / bottom 구간인 것.
+ *      대표(primary) 지표가 먼저, 같은 층이면 백분위 순. bottom이 없고 지출이 계획의 120%를 넘으면 초과 지출.
+ *      후보가 없으면 "—" — 억지로 만들지 않는다. (사람이 대시보드 Edit에서 쓴 글은 이 시트에 없다)
  *
  * 구조
  *   · onOpen(단순 트리거) → 메뉴 + 갱신 시도(try/catch). 단순 트리거는 외부 읽기 권한이 없어 첫 갱신은 메뉴에서 해야 하고,
@@ -335,9 +335,6 @@ function readGrids_() {
       performance: rowsToGrid(fetchSupabaseTable_('performance_records_latest', 'campaign_id')),
       // 광고 계정 — Ads Manager 링크(external_account_id)에만 쓴다. 없어도 보고서는 그려진다(링크만 빠진다)
       accounts: rowsToGrid(fetchSupabaseTable_('ad_accounts', 'id')),
-      // 사람이 대시보드 Edit에서 쓴 What worked · Could improve — 있으면 자동 문장 대신 그 글(대시보드와 같은 규칙)
-      eventRecaps: rowsToGrid(fetchSupabaseTable_('event_recaps', 'updated_at.desc')),
-      recapNotes: rowsToGrid(fetchSupabaseTable_('recap_campaign_notes', 'campaign_id')),
     };
   }
   return readSheetGrids_();
@@ -444,9 +441,9 @@ var COLUMNS = [
   { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
     note: 'Lines 1–2: the two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Line 3: the engagement breakdown in a fixed order — Meta: Like · Cmt · Share · Save · Repost, TikTok: Like · Cmt · Share · Save ("—" when the platform did not report it). TikTok follows and profile visits are collected but hidden for now.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
-    note: 'A note written in the dashboard (Edit) when there is one; otherwise generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
+    note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
-    note: 'A note written in the dashboard (Edit) when there is one; otherwise the same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
+    note: 'Same candidates as "What worked", the one in the bottom band (primary KPI first). If none, and spend ran more than 20% over plan, that is noted instead. "—" means no evidence.' },
 ];
 
 /** 타임라인 표 열 — B열부터(캠페인 표와 같은 시작점), 물리 열 14개에 병합으로 얹는다(합 276·110·100·100·55·95·95·105) */
@@ -561,7 +558,7 @@ function renderReport_(sheet, model) {
   });
 
   // 8) 꼬리말
-  sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
+  sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve are generated sentences; notes written by a person live in the dashboard.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
   // 9) 남는 빈 행은 지운다 — 스크롤 끝이 표 끝이어야 읽기 편하다
@@ -773,8 +770,7 @@ function buildReportModel(grids, today, eventName) {
   var chosen = eventName ? findEvent(events, eventName) : events[0];
   if (!chosen) throw new Error('No event named "' + eventName + '". Available: ' + events.map(function (e) { return e.eventName; }).join(', '));
 
-  var notesById = notesForEvent(parseEventRecaps(grids.eventRecaps), parseRecapNotes(grids.recapNotes), chosen.eventName);
-  var recap = buildRecapRows(chosen.eventName, campaigns, records, notesById);
+  var recap = buildRecapRows(chosen.eventName, campaigns, records);
   var headline = buildRecapHeadline(chosen.eventName, campaigns, records);
   var eventCampaigns = recap.campaigns;
   var allRows = [];
@@ -1035,59 +1031,6 @@ function parseCampaigns(grid) {
       adLink: str(r.adlink),
     };
   }).filter(function (c) { return c.id; });
-}
-
-/** JSON 문자열 또는 객체 → LocalizedText { en, ko, zh-Hant } (paidAdsMappers localizedFromRow). 아니면 null */
-function localizedOf(v) {
-  if (v == null || v === '') return null;
-  var obj = v;
-  if (typeof v === 'string') {
-    try { obj = JSON.parse(v); } catch (e) { return { en: v, ko: null, 'zh-Hant': null }; }
-  }
-  if (!obj || typeof obj !== 'object') return null;
-  return { en: obj.en == null ? '' : String(obj.en), ko: obj.ko == null ? null : String(obj.ko), 'zh-Hant': obj['zh-Hant'] == null ? null : String(obj['zh-Hant']) };
-}
-
-/** event_recaps 표 → { id, eventName } */
-function parseEventRecaps(grid) {
-  return gridToObjects(grid).map(function (r) { return { id: str(r.id), eventName: str(r.eventname) }; })
-    .filter(function (r) { return r.id && r.eventName; });
-}
-
-/** recap_campaign_notes 표 → { recapId, campaignId, strength, weakness } */
-function parseRecapNotes(grid) {
-  return gridToObjects(grid).map(function (r) {
-    return { recapId: str(r.recapid), campaignId: str(r.campaignid), strength: localizedOf(r.strength), weakness: localizedOf(r.weakness) };
-  }).filter(function (n) { return n.recapId && n.campaignId; });
-}
-
-/** 이 이벤트의 보고서에 달린 코멘트만 campaignId → note (대시보드 RecapDetailPage storedNotesById와 같은 선별) */
-function notesForEvent(eventRecaps, notes, eventName) {
-  var key = campaignNameKey(eventName);
-  var recap = null;
-  eventRecaps.forEach(function (r) { if (!recap && campaignNameKey(r.eventName) === key) recap = r; });
-  var byId = {};
-  if (!recap) return byId;
-  notes.forEach(function (n) { if (n.recapId === recap.id) byId[n.campaignId] = n; });
-  return byId;
-}
-
-/**
- * 사람이 쓴 note가 실제 내용인지 — "ㅇㅇ"·"○○"·"TBD"·"N/A"·"-" 같은 자리표시자는 없는 것으로 본다 (recapRowView isPlaceholder)
- */
-function isPlaceholder(text) {
-  var t = String(text == null ? '' : text).trim();
-  if (!t) return true;
-  if (/^(tbd|n\/?a|todo|none|null|-+|—)$/i.test(t)) return true;
-  return t.replace(/[ㄱ-ㆎ○◯●•·.,;:!?\-–—_/\\()[\]{}'"\s]/g, '').length === 0;
-}
-
-/** 해석 칸 최종 글 — 사람이 쓴 영어 글(자리표시자 제외) 우선, 없으면 자동 문장, 데이터 없으면 null (recapRowView insightCellsOf) */
-function insightCellText(r, field, hasData) {
-  var note = r.note && r.note[field] ? r.note[field].en : '';
-  var written = String(note || '').trim();
-  if (written && !isPlaceholder(written)) return written;
-  return hasData ? insightSentence(field, r.insight ? r.insight[field] : null) : null;
 }
 
 /** ad_accounts 표 → { id, platform, externalAccountId }. 표가 없으면 빈 배열 */
@@ -1429,8 +1372,7 @@ function storeCodeOf(campaign) {
   return campaign.targetStoreIds.join(', ');
 }
 
-function buildRecapRows(eventName, allCampaigns, allRecords, notesById) {
-  notesById = notesById || {};
+function buildRecapRows(eventName, allCampaigns, allRecords) {
   var eventKey = campaignNameKey(eventName);
   var eventCampaigns = (allCampaigns || []).filter(function (c) { return campaignNameKey(campaignGroupKey(c)) === eventKey; });
   var peerEventNames = {};
@@ -1455,7 +1397,6 @@ function buildRecapRows(eventName, allCampaigns, allRecords, notesById) {
       rank: 0,
       budgetEfficiency: budgetEfficiency(row, c.goal),
       insight: buildCampaignInsight(withBenchmarks, planned),
-      note: notesById[c.id] || null,
     });
   });
 
@@ -1512,9 +1453,8 @@ function flattenRow(r) {
     saves: r.saves,
     reposts: r.reposts,
     conversions: r.conversions,
-    // 사람이 쓴 글(자리표시자 제외)이 우선, 없으면 자동 문장 — 대시보드 recapRowView insightCellsOf와 같은 규칙
-    worked: insightCellText(r, 'strength', hasData),
-    improve: insightCellText(r, 'weakness', hasData),
+    worked: hasData ? insightSentence('strength', r.insight.strength) : null,
+    improve: hasData ? insightSentence('weakness', r.insight.weakness) : null,
     benchmarks: r.benchmarks,
   };
   // 임원용 표의 문장형 칸 — 대시보드 RecapCampaignTable과 같은 표기. 값은 utils/format의 money·percent 규칙(2자리)
