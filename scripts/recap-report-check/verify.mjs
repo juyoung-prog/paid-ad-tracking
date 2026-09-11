@@ -131,7 +131,7 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     check(rs, 'improve', cells[1].text ?? null, s.improve);
     // 임원용 표의 문장형 칸 — 대시보드 표기 함수(utils/format · recapRowView · recapStrings)로 같은 문장을 만들어 비교. 줄바꿈은 셀 안 \n
     const { storeText } = rowView.storeTextOf(r);
-    check(rs, 'campaignText', [r.phaseName, [storeText, format.dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n'), s.campaignText);
+    check(rs, 'campaignText', [r.phaseName, [storeText, format.dateRange(r.startDate, r.endDate)].filter(Boolean).join(' · ')].filter(Boolean).join('\n'), s.campaignText);
     const hasData = rowView.hasRowData(r);
     const budgetLines = [];
     if (r.dailyBudget != null) budgetLines.push(strings.t('recap.table.perDay', 'en', { amount: format.money(r.dailyBudget) }));
@@ -142,20 +142,13 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     const kpiText = kpi?.value == null ? format.EMPTY
       : `${strings.metricLabel(kpi.metricKey, 'en')} ${rowView.kpiFormat(kpi.metricKey)(kpi.value)}${dashboardPosition(stat) ? `\n${dashboardPosition(stat)}` : ''}`;
     check(rs, 'primaryKpiText', hasData ? kpiText : strings.t('recap.table.noData', 'en'), s.primaryKpiText);
-    // Key response — 목표별 2~3줄. 지표 한 자리는 "Hook 25.18% ↑ top 9%", 보조 줄은 dashboard secondaryText/videoSecondaryText와 같은 조각
-    const slot = (k) => (r[k] == null ? null : `${strings.metricLabel(k, 'en')} ${rowView.kpiFormat(k)(r[k])}${dashboardPosition(r.benchmarks[k]) ? ` ${dashboardPosition(r.benchmarks[k])}` : ''}`);
-    const joinParts = (parts) => { const kept = parts.filter(Boolean); return kept.length ? kept.join(' · ') : null; };
-    const LAYOUT = {
-      awareness: { first: ['hookRate', 'holdRate'], second: ['engagementRate', 'ctr'], third: 'video' },
-      traffic: { first: ['ctr', 'cpc'], second: ['hookRate', 'holdRate'], third: ['clicks'] },
-      engagement: { first: ['engagementRate', 'cpe'], second: ['hookRate', 'holdRate'], third: ['likes', 'shares'] },
-      conversion: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
-      store_visit: { first: ['cpa', 'ctr'], second: ['hookRate', 'holdRate'], third: ['conversions', 'cpc'] },
-    };
-    const layout = LAYOUT[r.goal] ?? LAYOUT.awareness;
-    const third = layout.third === 'video' ? (rowView.videoSecondaryText(r, 'en') || null) : (rowView.secondaryText(r, layout.third, 'en') || null);
-    const keyLines = [joinParts(layout.first.map(slot)), joinParts(layout.second.map(slot)), third].filter(Boolean);
-    check(rs, 'keyResponseText', hasData ? (keyLines.length ? keyLines.join('\n') : format.EMPTY) : null, s.keyResponseText);
+    // 지표 열 — "값 ⏎ 순위" 두 줄. 값은 대시보드 kpiFormat(percent 2자리), 순위는 benchmarkPositionText
+    ['hookRate', 'holdRate', 'engagementRate', 'ctr'].forEach((k) => {
+      const expected = r[k] == null ? null : `${rowView.kpiFormat(k)(r[k])}${dashboardPosition(r.benchmarks[k]) ? `\n${dashboardPosition(r.benchmarks[k])}` : ''}`;
+      check(rs, `${k}Text`, expected, s[`${k}Text`]);
+    });
+    check(rs, 'avgWatchText', r.avgWatchSeconds == null ? null : format.seconds(r.avgWatchSeconds), s.avgWatchText);
+    check(rs, 'keyResponseRemoved', undefined, s.keyResponseText);
   });
   return { model, dash, headline, rowCount };
 }
@@ -166,12 +159,12 @@ function printSummary(model, dash, headline) {
   console.log(`\n== ${model.eventName} ==`);
   console.log(`headline  dashboard: ${dashboardHeadlineText(headline) ?? '—'} | sheet: ${model.headline?.text ?? '—'}`);
   console.log(`spend     dashboard: ${money(allRows.map((r) => r.spend).filter((v) => v != null).reduce((a, b) => a + b, 0))} | sheet: ${money(model.spend)}`);
-  const lines = [['platform', 'Campaign', 'Goal', 'Budget / Spend', 'Primary KPI', 'Key response', 'worked =', 'improve =']];
+  const lines = [['platform', 'Campaign', 'Goal', 'Budget / Spend', 'Primary KPI', 'Hook', 'Hold', 'Eng. rate', 'CTR', 'Reach', 'Plays', 'Avg', 'worked =', 'improve =']];
   model.sections.forEach((sec) => sec.rows.forEach((s) => {
     const r = allRows.find((x) => x.campaignId === s.campaignId);
     const cells = rowView.insightCellsOf(r, 'en');
     const nl = (v) => String(v ?? '—').replace(/\n/g, ' ⏎ ');
-    lines.push([sec.label, nl(s.campaignText), s.goalLabel ?? '—', nl(s.budgetSpendText), nl(s.primaryKpiText), nl(s.keyResponseText).slice(0, 110),
+    lines.push([sec.label, nl(s.campaignText), s.goalLabel ?? '—', nl(s.budgetSpendText), nl(s.primaryKpiText), nl(s.hookRateText), nl(s.holdRateText), nl(s.engagementRateText), nl(s.ctrText), s.reach ?? '—', s.videoPlays ?? '—', s.avgWatchText ?? '—',
       (cells[0].text ?? null) === s.worked ? 'same' : 'DIFF', (cells[1].text ?? null) === s.improve ? 'same' : 'DIFF']);
   }));
   const widths = lines[0].map((_, i) => Math.max(...lines.map((l) => String(l[i]).length)));
