@@ -51,9 +51,14 @@ function NumberField({ label, field, value, onChange, error }) {
 /**
  * PerformanceForm 컴포넌트
  *
- * 캠페인 성과 지표 입력 폼. Tier 1(공통 필수)·Tier 2(영상 지표)는 항상 노출하고,
- * Tier 3(참여, goal=engagement)·Tier 4(전환, goal=conversion|store_visit)는
+ * 캠페인 성과 지표 입력 폼. Tier 1(공통 필수)·Tier 2(영상 지표)·참여 내역(Social)은 항상
+ * 노출하고, Tier 3 합계(참여, goal=engagement)·Tier 4(전환, goal=conversion|store_visit)는
  * goal에 따라 조건부로 노출한다.
+ *
+ * 참여 내역(Likes · Comments · Shares · Saves · Reposts)은 goal과 무관하게 항상 있다(2026-09-11) —
+ * 드로어·Performance·Reports가 이 일곱 가지(+ Follows · Visits)를 한 목록으로 보는데, 수기 캠페인은
+ * 이 폼이 유일한 입력 경로다. 특히 Saves(TikTok)와 Reposts(양 플랫폼)는 광고 API가 캠페인 단위로
+ * 주지 않아 손으로 적는 것 말고는 채울 길이 없다. Follows · Visits는 TikTok API 전용 지표라 폼에 두지 않는다.
  *
  * CLS(레이아웃 시프트) 주의사항: goal은 이 폼 내부에서 바뀌지 않는 고정 prop이다
  * (캠페인 생성 시 이미 확정된 값). 즉 조건부 필드는 마운트 시점에 한 번 결정되고
@@ -62,7 +67,7 @@ function NumberField({ label, field, value, onChange, error }) {
  *
  * Props:
  * @param {string} goal - Campaign.goal 값, 조건부 필드 노출 기준 [Required]
- * @param {object} values - 폼 값 { impressions, reach, clicks, spend, hookViews, heldViews, engagements, conversions } [Required]
+ * @param {object} values - 폼 값 { impressions, reach, clicks, spend, hookViews, heldViews, likes, comments, shares, saves, reposts, engagements, conversions } [Required]
  * @param {function} onChange - 필드 변경 핸들러 (field, value) => void [Required]
  * @param {object} errors - 필드별 에러 메시지 { field: message } [Optional]
  * @param {object} sx - 추가 스타일 [Optional]
@@ -94,11 +99,23 @@ export function PerformanceForm({ goal, values, onChange, errors = {}, sx }) {
         <NumberField label="Held Views" field="heldViews" value={values.heldViews} onChange={onChange} error={errors.heldViews} />
       </Grid>
 
+      {/* 참여 내역 — 광고 API가 주는 것(Like·Cmt·Share, Meta의 Save)과 안 주는 것(TikTok Save, Repost) 모두
+          수기 캠페인에서는 여기서만 들어온다. 값이 없는 칸은 저장도 null이라 화면에서 빠진다 */}
+      <SectionLabel>Social Metrics</SectionLabel>
+      <Grid container spacing={2}>
+        <NumberField label="Likes" field="likes" value={values.likes} onChange={onChange} error={errors.likes} />
+        <NumberField label="Comments" field="comments" value={values.comments} onChange={onChange} error={errors.comments} />
+        <NumberField label="Shares" field="shares" value={values.shares} onChange={onChange} error={errors.shares} />
+        <NumberField label="Saves" field="saves" value={values.saves} onChange={onChange} error={errors.saves} />
+        <NumberField label="Reposts" field="reposts" value={values.reposts} onChange={onChange} error={errors.reposts} />
+      </Grid>
+
       {showEngagement && (
         <>
           <SectionLabel>Engagement Metrics</SectionLabel>
           <Grid container spacing={2}>
-            <NumberField label="Engagements (likes+comments+shares+saves)" field="engagements" value={values.engagements} onChange={onChange} error={errors.engagements} />
+            {/* 합계는 동기화 캠페인과 같은 정의(likes + comments + shares) — 예전 라벨의 "+saves"는 정의와 어긋나 있었다 */}
+            <NumberField label="Engagements (likes + comments + shares)" field="engagements" value={values.engagements} onChange={onChange} error={errors.engagements} />
           </Grid>
         </>
       )}

@@ -10,6 +10,11 @@ const baseValues = {
   spend: null,
   hookViews: null,
   heldViews: null,
+  likes: null,
+  comments: null,
+  shares: null,
+  saves: null,
+  reposts: null,
   engagements: null,
   conversions: null,
 };
@@ -25,9 +30,16 @@ export default {
         component: `
 ## PerformanceForm
 
-캠페인 성과 지표 입력 폼. Tier 1(공통 필수)·Tier 2(영상 지표)는 항상 노출하고,
-Tier 3(참여, goal=engagement)·Tier 4(전환, goal=conversion|store_visit)는
+캠페인 성과 지표 입력 폼. Tier 1(공통 필수)·Tier 2(영상 지표)·**Social Metrics**(참여 내역)는 항상 노출하고,
+Tier 3 합계(참여, goal=engagement)·Tier 4(전환, goal=conversion|store_visit)는
 goal에 따라 조건부로 노출한다.
+
+### Social Metrics — Likes · Comments · Shares · Saves · Reposts (2026-09-11)
+goal과 무관하게 항상 있다. 드로어·Performance·Reports가 참여 내역 일곱 가지를 한 목록으로 보는데
+수기 캠페인은 이 폼이 유일한 입력 경로다. **Saves(TikTok)와 Reposts(양 플랫폼)는 광고 API가 캠페인
+단위로 주지 않아** 손으로 적는 것 말고는 채울 길이 없다. Follows · Visits는 TikTok API 전용이라 폼에 없다.
+빈 칸은 null로 저장되고 화면에서 빠진다(값 없는 지표는 숨기는 규칙). Engagements 합계 라벨은 실제
+정의(likes + comments + shares)에 맞췄다 — 예전 "+saves"는 어긋나 있었다.
 
 ### CLS(레이아웃 시프트) 메모
 goal은 폼 내부에서 바뀌지 않는 고정 prop이라, 조건부 필드는 마운트 시점에
@@ -66,7 +78,7 @@ function Interactive(args) {
 }
 
 /**
- * goal=awareness — Tier 1/2만 노출 (Tier 3/4 없음)
+ * goal=awareness — Tier 1/2 + Social Metrics (Tier 3 합계/4 없음)
  */
 export const Default = {
   args: { goal: GOAL.AWARENESS },
