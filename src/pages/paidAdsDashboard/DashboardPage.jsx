@@ -1583,6 +1583,7 @@ export function DashboardPage() {
               </Typography>
               <PerformanceForm
                 goal={selectedCampaign.goal}
+                platform={selectedCampaign.platform}
                 values={performanceValues}
                 onChange={(field, value) => setPerformanceValues((v) => ({ ...v, [field]: value }))}
               />

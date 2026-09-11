@@ -42,8 +42,9 @@ export const engagementLayout = (goal) => ENGAGEMENT_ACTION_LAYOUT[goal] ?? ENGA
 /**
  * 참여 내역 줄의 항목 — 인플루언서 시트와 같은 일곱 가지(드로어·Performance·Reports가 같은 목록을 본다, 2026-09-11).
  * 값이 채워지는 범위는 플랫폼 API가 정한다: Like·Cmt·Share 양 플랫폼 · Follow·Visits TikTok만 · Save Meta만
- * (actions.onsite_conversion.post_save; TikTok 광고 API는 캠페인 레벨 saves를 거부) · Repost는 두 광고 API 모두
- * 없어 수기 레코드에만 있다. 없는 값(null)은 줄에서 빠진다 — 자리는 있고 숫자만 없는 것이다.
+ * (actions.onsite_conversion.post_save; TikTok 광고 API는 캠페인 레벨 saves를 거부) · Repost는 인스타그램(Meta) 개념이라
+ * Meta 수기 레코드에만 있다(TikTok 광고에는 리포스트가 없고, Meta 광고 API도 캠페인 단위로는 안 준다).
+ * 없는 값(null)은 줄에서 빠진다 — 자리는 있고 숫자만 없는 것이다.
  */
 export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts'];
 

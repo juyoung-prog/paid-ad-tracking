@@ -241,7 +241,7 @@ const NOTE = {
   follows: 'New followers attributed to the campaign. TikTok only — Meta has no campaign-level equivalent.',
   profileVisits: 'Profile visits from the ad. TikTok only.',
   saves: 'Post saves. Meta only (Ads Manager "Post saves") — the TikTok ad API does not report saves at campaign level.',
-  reposts: 'Reposts. Neither ad API reports this at campaign level — filled only by manual records.',
+  reposts: 'Instagram reposts. Not reported by the Meta ad API at campaign level — filled only by manual records. TikTok ads have no repost metric.',
 };
 
 /* CPE·Engagements는 goal과 무관하게 모든 표에 붙는다(사용자 요청, 2026-08-26).
