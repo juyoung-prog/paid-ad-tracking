@@ -453,9 +453,13 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
     }
   }
   if (permissionNote) console.error('Meta 원본 게시물 permalink 조회 실패 — 광고 사본 링크로 대신한다(Meta 재연결로 instagram_basic 권한 필요할 수 있음)', { externalAccountId, message: permissionNote });
+  /* 릴스 permalink는 /reel/<code>/ 형식으로 오는데, 웹에서 열면 인스타가 릴스 전용 화면(/reels/…)으로 넘겨
+     사용자가 "엉뚱한 주소"로 읽었다(2026-09-12). 같은 코드의 /p/<code>/는 일반 게시물 화면이고, 앱의 "링크 복사"가
+     주는 형식과도 같다 — 그 형식으로 저장한다. 코드가 같으니 가리키는 게시물은 동일하다. */
+  const asPostUrl = (url: string) => url.replace(/instagram\.com\/reels?\//, 'instagram.com/p/');
   for (const [campaignId, info] of byCampaign) {
     const original = info.sourceMediaId ? permalinkById.get(info.sourceMediaId) : undefined;
-    if (original) byCampaign.set(campaignId, { ...info, link: original });
+    if (original) byCampaign.set(campaignId, { ...info, link: asPostUrl(original) });
   }
   return byCampaign;
 }
