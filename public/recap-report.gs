@@ -74,7 +74,7 @@ var CONFIG = {
    * 예: '{store}_Report' → "G10_Report". 이벤트가 바뀌면 같은 탭의 이름만 바뀐다(탭이 늘어나지 않는다)
    */
   REPORT_SHEET_NAME: '{store}_Report',
-  /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 둔다. null이거나 없으면 맨 왼쪽 */
+  /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
   ANCHOR_SHEET_NAME: null,
   /** 보고할 이벤트(campaign_group 값). null이면 가장 최근에 끝난 이벤트 — 대시보드 Reports 목록의 첫 줄 */
   EVENT_NAME: null,
@@ -372,17 +372,15 @@ function readSheetGrids_() {
  * moveActiveSheet는 활성 탭만 옮기므로 잠깐 활성화했다가 복귀한다.
  */
 function placeReportSheet_(ss, sheet, previous) {
+  // 자리는 건드리지 않는다 — 사용자가 옮겨 둔 위치가 갱신마다 초기화되면 안 된다. ANCHOR_SHEET_NAME을 적었을 때만 그 탭 오른쪽으로
   var anchor = CONFIG.ANCHOR_SHEET_NAME ? ss.getSheetByName(CONFIG.ANCHOR_SHEET_NAME) : null;
-  var target;
   if (anchor && anchor.getSheetId() !== sheet.getSheetId()) {
     var anchorIndex = anchor.getIndex();
-    target = sheet.getIndex() < anchorIndex ? anchorIndex : anchorIndex + 1;
-  } else {
-    target = 1; // 앵커가 없으면 맨 왼쪽 — 열었을 때 바로 보이는 자리
-  }
-  if (sheet.getIndex() !== target) {
-    ss.setActiveSheet(sheet);
-    ss.moveActiveSheet(target);
+    var target = sheet.getIndex() < anchorIndex ? anchorIndex : anchorIndex + 1;
+    if (sheet.getIndex() !== target) {
+      ss.setActiveSheet(sheet);
+      ss.moveActiveSheet(target);
+    }
   }
   if (previous) ss.setActiveSheet(previous);
 }
