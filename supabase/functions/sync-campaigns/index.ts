@@ -388,20 +388,26 @@ async function fetchMetaAdSetBudgets(
  * 동기화 전체가 "실패"로 표시되면 예산·성과가 멀쩡히 들어왔는데도 사용자가
  * 잘못된 신호를 받는다.
  */
-/** 캠페인당 대표 광고 하나에서 뽑은 소재 정보 — 썸네일과 공개 링크가 같은 광고에서 나온다. */
-type CreativeInfo = { thumb: string | null; link: string | null };
+/** 캠페인당 대표 광고 하나에서 뽑은 소재 정보 — 썸네일과 공개 링크가 같은 광고에서 나온다.
+    sourceMediaId는 Meta 전용: 광고를 만들 때 쓴 원본 인스타 미디어(permalink 0순위 조회에 쓴다). */
+type CreativeInfo = { thumb: string | null; link: string | null; sourceMediaId?: string | null };
 
 async function fetchMetaThumbnails(accessToken: string, externalAccountId: string): Promise<Map<string, CreativeInfo>> {
   const byCampaign = new Map<string, CreativeInfo>();
   /* 링크 우선순위 — 소비자가 실제로 그 광고를 본 곳으로 보낸다:
-       1. instagram_permalink_url — 인스타그램 게시물 주소. 이 계정의 부스팅
-          원본은 대부분 인스타 게시물이라("Instagram post: …" 캠페인들) 이게
-          1순위다. 페이스북 게시물 링크로 보내면 같은 소재라도 소비자가 본
-          지면이 아니다(실사용 지적).
+       0. source_instagram_media_id의 permalink — 광고를 만들 때 쓴 **원본** 인스타 게시물(2026-09-12).
+          instagram_permalink_url은 광고에 실제로 쓰인 미디어를 가리키는데, 기존 게시물로 만든 광고에서
+          그건 원본이 아니라 **광고용 사본**이다(실측: G10 1 Month Deals의 effective 18604978564031389 ≠
+          source 17922519765166074, 사본 페이지의 조회수 554 vs 앱의 원본 수만). 사본 페이지는 사람이
+          인스타에서 보는 그 게시물이 아니라서 숫자가 맞지 않았다. 원본 permalink는 Instagram Graph API
+          권한(instagram_basic·pages_read_engagement)이 있어야 읽히므로, 없으면 아래로 내려간다.
+       1. instagram_permalink_url — 인스타그램 게시물 주소(광고에 쓰인 미디어). 이 계정의 부스팅
+          원본은 대부분 인스타 게시물이라("Instagram post: …" 캠페인들) 페이스북보다 앞이다.
+          페이스북 게시물 링크로 보내면 같은 소재라도 소비자가 본 지면이 아니다(실사용 지적).
        2. effective_object_story_id — 페이스북 게시물("페이지id_게시물id").
           인스타 permalink가 없는 페이스북 지면 부스팅용.
        3. preview_shareable_link — 게시물 없이 만든 다크 광고의 미리보기. */
-  const fields = 'campaign_id,preview_shareable_link,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url,effective_object_story_id,instagram_permalink_url}';
+  const fields = 'campaign_id,preview_shareable_link,creative.thumbnail_width(320).thumbnail_height(320){thumbnail_url,effective_object_story_id,instagram_permalink_url,source_instagram_media_id}';
   let url: string | null =
     `https://graph.facebook.com/v19.0/act_${externalAccountId}/ads?fields=${fields}&limit=200&access_token=${accessToken}`;
 
@@ -424,9 +430,32 @@ async function fetchMetaThumbnails(accessToken: string, externalAccountId: strin
         ?? (storyId ? `https://www.facebook.com/${String(storyId).replace('_', '/posts/')}` : null)
         ?? ad?.preview_shareable_link
         ?? null;
-      if (thumb || link) byCampaign.set(campaignId, { thumb, link });
+      const sourceMediaId = ad?.creative?.source_instagram_media_id ? String(ad.creative.source_instagram_media_id) : null;
+      if (thumb || link) byCampaign.set(campaignId, { thumb, link, sourceMediaId });
     }
     url = json.paging?.next ?? null;
+  }
+
+  /* 0순위 — 원본 게시물 permalink. 한 계정의 원본 미디어 id를 모아 50개씩 한 번에 묻는다(Graph ?ids=).
+     권한이 없거나(재연결 전) 미디어가 안 읽히면 그 캠페인은 기존 링크 그대로 — 조용히 내려가되 한 번은 남긴다. */
+  const sourceIds = [...new Set([...byCampaign.values()].map((c) => c.sourceMediaId).filter((id): id is string => Boolean(id)))];
+  const permalinkById = new Map<string, string>();
+  let permissionNote: string | null = null;
+  for (let i = 0; i < sourceIds.length; i += 50) {
+    const batch = sourceIds.slice(i, i + 50);
+    const res = await fetchWithTimeout(`https://graph.facebook.com/v19.0/?ids=${batch.join(',')}&fields=permalink&access_token=${accessToken}`);
+    const json: any = await res.json();
+    if (json?.error) { permissionNote = json.error.message; break; }
+    for (const id of batch) {
+      const node = json?.[id];
+      if (node?.permalink) permalinkById.set(id, String(node.permalink));
+      else if (node?.error && !permissionNote) permissionNote = node.error.message;
+    }
+  }
+  if (permissionNote) console.error('Meta 원본 게시물 permalink 조회 실패 — 광고 사본 링크로 대신한다(Meta 재연결로 instagram_basic 권한 필요할 수 있음)', { externalAccountId, message: permissionNote });
+  for (const [campaignId, info] of byCampaign) {
+    const original = info.sourceMediaId ? permalinkById.get(info.sourceMediaId) : undefined;
+    if (original) byCampaign.set(campaignId, { ...info, link: original });
   }
   return byCampaign;
 }

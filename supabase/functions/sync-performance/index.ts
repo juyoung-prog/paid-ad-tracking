@@ -509,6 +509,38 @@ Deno.serve(async (req) => {
      팔로우·프로필 방문 지표가 없다"는 매핑의 전제를 실데이터로 확인하려고 만들었다(2026-09-12). 같은 insights
      호출이라 rate limit 비용은 평소 동기화 한 번과 같다. 결과: { accounts: { [accountId]: { campaigns, actionTypes:
      { [action_type]: { campaigns: 값이 온 캠페인 수, total: 합 } } } } } */
+  /* 진단 경로 — body { diagnose: 'meta_ads', externalCampaignId }. 그 캠페인의 광고 전부와 소재 필드
+     (instagram_permalink_url · effective/source_instagram_media_id · object_story_id), 광고별 노출·지출, 그리고
+     source/effective 인스타 미디어의 permalink 조회 결과를 돌려준다. "View ad가 여는 게시물의 조회수가 앱과
+     다르다"(2026-09-12)를 좇으려고 만들었다 — 링크가 원본 게시물이 아니라 광고용 사본 미디어를 가리키는지,
+     캠페인에 광고가 여럿이라 첫 광고가 엉뚱한 소재인지 가른다. DB 무변경, 토큰 미노출. */
+  if (body?.diagnose === 'meta_ads') {
+    const target = String(body.externalCampaignId ?? '');
+    const c = (allCampaigns ?? []).find((x) => x.platform === 'meta' && String(x.external_campaign_id) === target);
+    if (!c) return new Response(JSON.stringify({ error: 'campaign not found' }), { status: 404, headers: corsHeaders });
+    const externalAccountId = externalIdByAccount.get(c.account_id);
+    const accessToken = [...tokenByAccount.entries()].find(([k]) => k.endsWith(`:${c.account_id}`))?.[1];
+    if (!externalAccountId || !accessToken) return new Response(JSON.stringify({ error: 'no token' }), { status: 404, headers: corsHeaders });
+    const creativeFields = 'id,name,status,effective_status,preview_shareable_link,creative{id,instagram_permalink_url,effective_instagram_media_id,source_instagram_media_id,effective_object_story_id,object_story_id,instagram_user_id,thumbnail_url}';
+    const adsRes: any = await (await fetch(`https://graph.facebook.com/v19.0/${target}/ads?fields=${creativeFields}&limit=50&access_token=${accessToken}`)).json();
+    const insRes: any = await (await fetch(`https://graph.facebook.com/v19.0/${target}/insights?level=ad&fields=ad_id,ad_name,impressions,spend,video_play_actions&date_preset=maximum&limit=50&access_token=${accessToken}`)).json();
+    const mediaLookup = async (id: string | undefined) => {
+      if (!id) return null;
+      const r: any = await (await fetch(`https://graph.facebook.com/v19.0/${id}?fields=id,permalink,media_type,media_product_type,like_count,comments_count,timestamp&access_token=${accessToken}`)).json();
+      return r?.error ? { error: r.error.message } : r;
+    };
+    const ads = [];
+    for (const ad of adsRes?.data ?? []) {
+      ads.push({
+        ad: { id: ad.id, name: ad.name, status: ad.effective_status, preview: ad.preview_shareable_link },
+        creative: ad.creative ?? null,
+        sourceMedia: await mediaLookup(ad.creative?.source_instagram_media_id),
+        effectiveMedia: await mediaLookup(ad.creative?.effective_instagram_media_id),
+      });
+    }
+    return new Response(JSON.stringify({ campaign: { id: c.id, external: target, storedLink: null }, adsError: adsRes?.error?.message ?? null, insightsError: insRes?.error?.message ?? null, insights: insRes?.data ?? [], ads }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
   if (body?.diagnose === 'meta_actions') {
     const metaAccounts = new Set((allCampaigns ?? []).filter((c) => c.platform === 'meta').map((c) => c.account_id));
     const accounts: Record<string, unknown> = {};

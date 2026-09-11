@@ -48,7 +48,11 @@ Deno.serve(async (req) => {
   const authUrl = new URL('https://www.facebook.com/v19.0/dialog/oauth');
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
-  authUrl.searchParams.set('scope', 'ads_read');
+  /* ads_read 하나였다가 인스타 권한을 더했다(2026-09-12). 광고 소재의 permalink는 광고에 쓰인 **사본 미디어**를
+     가리켜 View ad가 조회수 몇백짜리 페이지를 열었다 — 원본 게시물(source_instagram_media_id)의 permalink를
+     읽으려면 Instagram Graph API 권한(instagram_basic + pages_read_engagement, 페이지 목록에 pages_show_list)이
+     필요하다. 범위를 바꾸면 기존 토큰으로는 안 되고 Settings에서 Meta를 한 번 다시 연결해야 한다. */
+  authUrl.searchParams.set('scope', 'ads_read,instagram_basic,pages_read_engagement,pages_show_list');
   authUrl.searchParams.set('state', state);
 
   return Response.redirect(authUrl.toString(), 302);

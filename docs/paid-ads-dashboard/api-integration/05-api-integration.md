@@ -133,6 +133,14 @@ sequenceDiagram
 | `saves` | `actions` 중 `onsite_conversion.post_save` (게시물 저장) | — (캠페인 레벨 `saves`/`bookmark`/`total_save` 거부됨) |
 | `reposts` | — (광고 지표 없음, 인스타그램 리포스트는 드로어 보충 입력) | — (TikTok 광고에는 리포스트가 없다) |
 
+**View ad 링크는 원본 인스타 게시물이다(2026-09-12)**: 광고 소재의 `instagram_permalink_url`은 광고에
+실제로 쓰인 미디어를 가리키는데, 기존 게시물로 만든 광고에서 그건 **광고용 사본**이라 페이지의 조회수가
+앱에서 보는 원본과 달랐다(실측 554 vs 수만). `sync-campaigns`는 `creative.source_instagram_media_id`(원본)의
+permalink를 Graph `?ids=` 일괄 조회로 읽어 0순위로 쓰고, 못 읽으면(권한 없음 등) 기존 순서로 내려간다.
+원본 permalink 조회에는 Instagram Graph API 권한이 필요해 Meta OAuth 범위를
+`ads_read,instagram_basic,pages_read_engagement,pages_show_list`로 넓혔다 — 범위를 바꾼 뒤에는 Settings에서
+Meta를 한 번 다시 연결해야 한다(기존 토큰에는 새 권한이 없다).
+
 **TikTok의 `follows` · `profile_visits`는 수집하되 화면에서 일단 감춘다(2026-09-12)**: Meta에 같은 지표가
 없어 두 플랫폼이 다른 칸을 보이던 것을 없앴다. 동기화·DB·CSV 내보내기는 그대로이고, 드로어 목록·Performance 표·
 Reports 참여 내역·구글 시트에서만 빠진다. 목록은 `schema.js HIDDEN_METRIC_KEYS` 한 곳.
