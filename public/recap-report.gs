@@ -112,6 +112,14 @@ var CONFIG = {
     conversion: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
     store_visit: { primary: ['cpa'], diagnostic: ['ctr', 'cpc', 'hookRate', 'holdRate'] },
   },
+  /** Key response의 참여/행동 두 자리 — 목표가 정한다 (recapRowView ENGAGEMENT_ACTION_LAYOUT primary) */
+  ENGAGEMENT_ACTION_LAYOUT: {
+    awareness: ['engagementRate', 'ctr'],
+    traffic: ['ctr', 'cpc'],
+    engagement: ['engagementRate', 'cpe'],
+    conversion: ['cpa', 'ctr'],
+    store_visit: ['cpa', 'ctr'],
+  },
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -343,49 +351,15 @@ function placeReportSheet_(ss, sheet, previous) {
 
 /** 표 열 정의 — 캠페인 표. key는 model 행의 필드, fmt는 setNumberFormat, align은 가로 정렬 */
 var COLUMNS = [
-  { key: 'rank', label: '#', width: 50, fmt: '0' },
-  { key: 'phaseName', label: 'Campaign', width: 200, align: 'left' },
-  { key: 'storeCode', label: 'Store', width: 110 },
+  { key: 'campaignText', label: 'Campaign', width: 300, align: 'left',
+    note: 'Phase name · store · period (days). Rows are ordered by the primary KPI\'s rank among comparable past campaigns, then by spend.' },
   { key: 'goalLabel', label: 'Goal', width: 100 },
-  { key: 'startDate', label: 'Start', width: 90 },
-  { key: 'endDate', label: 'End', width: 90 },
-  { key: 'days', label: 'Days', width: 60, fmt: '0' },
-  { key: 'dailyBudget', label: 'Daily budget', width: 100, fmt: '"$"#,##0.00' },
-  { key: 'spend', label: 'Spend', width: 100, fmt: '"$"#,##0.00', bold: true },
-  { key: 'pacingText', label: 'Pacing', width: 90,
-    note: 'Spend ÷ planned budget (stored budget_planned, else daily budget × days). Shown only when ≥20% over or ≥30% under plan; otherwise blank.' },
-  { key: 'primaryKpiLabel', label: 'Primary KPI', width: 100,
-    note: 'The main result for the campaign goal — reported, not judged.\nAwareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.\nThere is no overall grade.' },
-  { key: 'primaryKpiValue', label: 'KPI value', width: 100, fmt: 'kpi', bold: true },
-  { key: 'primaryKpiVsPast', label: 'KPI vs past', width: 110, note: 'vsPast' },
-  { key: 'hookRate', label: 'Hook', width: 80, fmt: '0.00%',
-    note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays). Same basis as the platform ads manager.' },
-  { key: 'hookRateVsPast', label: 'Hook vs past', width: 110, note: 'vsPast' },
-  { key: 'holdRate', label: 'Hold', width: 80, fmt: '0.00%',
-    note: 'Hold = completed views ÷ hook views — of the people who stayed past the hook, how many watched through.' },
-  { key: 'holdRateVsPast', label: 'Hold vs past', width: 110, note: 'vsPast' },
-  { key: 'engagementRate', label: 'Eng. rate', width: 90, fmt: '0.00%', note: 'Engagement rate = platform engagements ÷ impressions.' },
-  { key: 'engagementRateVsPast', label: 'Eng. rate vs past', width: 120, note: 'vsPast' },
-  { key: 'ctr', label: 'CTR', width: 80, fmt: '0.00%', note: 'CTR = clicks ÷ impressions.' },
-  { key: 'ctrVsPast', label: 'CTR vs past', width: 110, note: 'vsPast' },
-  { key: 'cpc', label: 'CPC', width: 90, fmt: '"$"#,##0.00', note: 'CPC = spend ÷ clicks.' },
-  { key: 'cpcVsPast', label: 'CPC vs past', width: 110, note: 'vsPast' },
-  { key: 'cpe', label: 'Cost/eng', width: 90, fmt: '"$"#,##0.00',
-    note: 'Cost per engagement = spend ÷ (likes + comments + shares). The platform "engagements" total is not used here so the value matches the Likes · Comments · Shares columns.' },
-  { key: 'cpeVsPast', label: 'Cost/eng vs past', width: 120, note: 'vsPast' },
-  { key: 'cpa', label: 'CPA', width: 90, fmt: '"$"#,##0.00', note: 'CPA = spend ÷ results (conversions).' },
-  { key: 'cpaVsPast', label: 'CPA vs past', width: 110, note: 'vsPast' },
-  { key: 'cpm', label: 'CPM', width: 90, fmt: '"$"#,##0.00', note: 'CPM = spend ÷ impressions × 1,000.' },
-  { key: 'cpmVsPast', label: 'CPM vs past', width: 110, note: 'vsPast' },
-  { key: 'reach', label: 'Reach', width: 90, fmt: '#,##0' },
-  { key: 'impressions', label: 'Impressions', width: 100, fmt: '#,##0' },
-  { key: 'videoPlays', label: 'Plays', width: 90, fmt: '#,##0' },
-  { key: 'avgWatchSeconds', label: 'Avg watch (s)', width: 100, fmt: '0.00' },
-  { key: 'clicks', label: 'Clicks', width: 80, fmt: '#,##0' },
-  { key: 'likes', label: 'Likes', width: 80, fmt: '#,##0' },
-  { key: 'comments', label: 'Comments', width: 90, fmt: '#,##0' },
-  { key: 'shares', label: 'Shares', width: 80, fmt: '#,##0' },
-  { key: 'conversions', label: 'Results', width: 80, fmt: '#,##0' },
+  { key: 'budgetSpendText', label: 'Budget / Spend', width: 220,
+    note: 'Daily budget · actual spend. "Over N%" / "Under N%" appears only when spend is ≥20% over or ≥30% under the planned budget (stored budget_planned, else daily budget × days).' },
+  { key: 'primaryKpiText', label: 'Primary KPI', width: 220,
+    note: 'The main result for the campaign goal — reported, not judged.\nAwareness → CPM · Traffic → CPC · Engagement → Cost/eng · Conversion / Store visit → CPA.\nCPM = spend ÷ impressions × 1,000 · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares) · CPA = spend ÷ results.\nAfter the value: where it ranks among comparable past campaigns (' + 'same platform, same goal, other events since ' + CONFIG.BENCHMARK_SINCE + '; same phase when 3+ exist). ↗ top · ↘ bottom · "mid" in between; nothing if fewer than 3 peers. Context only, no grade.' },
+  { key: 'keyResponseText', label: 'Key response', width: 560, align: 'left',
+    note: 'Video response (Hook = hook views ÷ plays, Hold = completed ÷ hook views) then the two engagement / action metrics the goal emphasises: Awareness → Eng. rate · CTR, Traffic → CTR · CPC, Engagement → Eng. rate · Cost/eng, Conversion / Store visit → CPA · CTR. In parentheses: rank among comparable past campaigns, when 3+ exist.' },
   { key: 'worked', label: 'What worked', width: 340, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', width: 340, align: 'left',
@@ -496,7 +470,7 @@ function renderReport_(sheet, model) {
   // 6) 플랫폼별 캠페인 표 + Total
   model.sections.forEach(function (section) {
     row = renderSectionTitle_(sheet, row, section.label + ' campaigns — ' + countText_(section.rows.length, 'campaign'));
-    row = renderTable_(sheet, row, L, COLUMNS, section.rows, { total: section.total });
+    row = renderTable_(sheet, row, L, COLUMNS, section.rows);
     row += 2;
   });
 
@@ -570,12 +544,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   columns.forEach(function (c, i) {
     var colRange = sheet.getRange(row, startCol + i, bodyRows.length, 1);
     if (c.align) colRange.setHorizontalAlignment(c.align);
-    if (c.fmt === 'kpi') {
-      // Primary KPI는 목표마다 다른 지표라 줄마다 서식이 다르다(비용 = 금액, 나머지 = 비율)
-      bodyRows.forEach(function (r, j) {
-        sheet.getRange(row + j, startCol + i).setNumberFormat(r.primaryKpiIsMoney === false ? '0.00%' : '"$"#,##0.00');
-      });
-    } else if (c.fmt) {
+    if (c.fmt) {
       colRange.setNumberFormat(c.fmt);
     } else if (c.key === 'startDate' || c.key === 'endDate') {
       colRange.setNumberFormat('@');
@@ -653,7 +622,7 @@ function buildReportModel(grids, today, eventName) {
   });
 
   var sections = platformOrder.map(function (p) {
-    return { platform: p, label: CONFIG.PLATFORM_LABEL[p], rows: recap.byPlatform[p].map(flattenRow), total: sectionTotalOf(recap.byPlatform[p]) };
+    return { platform: p, label: CONFIG.PLATFORM_LABEL[p], rows: recap.byPlatform[p].map(flattenRow) };
   });
 
   var headlineModel = headline ? {
@@ -702,32 +671,6 @@ function phaseTotalOf(phases) {
     return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
   };
   return { totalDaily: sum('totalDaily'), totalBudget: sum('totalBudget'), spent: sum('spent') };
-}
-
-/**
- * 플랫폼 표 Total 줄 — 합계는 더하고, 비율·비용 지표는 분자·분모를 합쳐 다시 계산한다(aggregateMetric, 대시보드 머리글 순위와 같은 방식).
- * 순위·목표·기간·vs past·해석은 합계가 없으므로 비운다.
- */
-function sectionTotalOf(rows) {
-  var sum = function (key) {
-    var vals = rows.map(function (r) { return r[key]; }).filter(function (v) { return v != null; });
-    return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
-  };
-  var total = {
-    dailyBudget: sum('dailyBudget'),
-    spend: sum('spend'),
-    reach: sum('reach'),
-    impressions: sum('impressions'),
-    videoPlays: sum('videoPlays'),
-    clicks: sum('clicks'),
-    likes: sum('likes'),
-    comments: sum('comments'),
-    shares: sum('shares'),
-    conversions: sum('conversions'),
-    primaryKpiIsMoney: true,
-  };
-  CONFIG.BENCHMARK_METRICS.forEach(function (m) { total[m.key] = aggregateMetric(rows, m.key); });
-  return total;
 }
 
 /** 이벤트 이름 목록(최근 끝난 순) — 메뉴 "Refresh for event…"가 쓴다 */
@@ -1262,6 +1205,11 @@ function flattenRow(r) {
     improve: hasData ? insightSentence('weakness', r.insight.weakness) : null,
     benchmarks: r.benchmarks,
   };
+  // 임원용 표의 문장형 칸 — 대시보드 RecapCampaignTable과 같은 표기. 값은 utils/format의 money·percent 규칙(2자리)
+  flat.campaignText = [r.phaseName, storeText(r.storeCode), dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · ');
+  flat.budgetSpendText = budgetSpendText(r);
+  flat.primaryKpiText = hasData ? primaryKpiText(kpi, kpiStat) : 'No performance data';
+  flat.keyResponseText = hasData ? keyResponseText(r) : null;
   CONFIG.BENCHMARK_METRICS.forEach(function (m) {
     var b = r.benchmarks[m.key];
     flat[m.key] = r[m.key];
@@ -1269,6 +1217,73 @@ function flattenRow(r) {
     flat[m.key + 'Band'] = b ? b.band : null;
   });
   return flat;
+}
+
+/** 금액 표기 — "$1,639.68" (utils/format money). 자리표시자·null은 "—" */
+function moneyText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  var fixed = Math.abs(v).toFixed(2);
+  var parts = fixed.split('.');
+  var intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (v < 0 ? '-' : '') + '$' + intPart + '.' + parts[1];
+}
+
+/** 비율 표기 — "6.78%" (utils/format percent, 2자리) */
+function percentText(v) {
+  if (v == null || !isFinite(v)) return EMPTY;
+  return (v * 100).toFixed(2) + '%';
+}
+
+function isMoneyMetric(key) {
+  return ['cpm', 'cpc', 'cpa', 'cpe'].indexOf(key) >= 0;
+}
+
+/** 지표 값 표기 — 비용은 돈, 나머지는 비율 (recapRowView kpiFormat) */
+function metricText(key, v) {
+  return isMoneyMetric(key) ? moneyText(v) : percentText(v);
+}
+
+/** 매장 표기 — 여러 곳이면 "G10 +2" (recapRowView storeTextOf) */
+function storeText(storeCode) {
+  var stores = String(storeCode || '').split(/,\s*/).filter(Boolean);
+  if (stores.length === 0) return null;
+  return stores.length > 1 ? stores[0] + ' +' + (stores.length - 1) : stores[0];
+}
+
+/** "Jul 6 – Aug 1 (27 days)" (utils/format dateRangeWithDays) */
+function dateRangeWithDays(startIso, endIso) {
+  var days = daysBetween(startIso, endIso);
+  var range = dateRange(startIso, endIso);
+  return days == null || days < 1 ? range : range + ' (' + countText(days, 'day') + ')';
+}
+
+/** "$30.00/day · $942.31 spent · Over 25%" — 일예산 없으면 "—/day" 대신 생략, 지출 없으면 "—" */
+function budgetSpendText(r) {
+  var parts = [];
+  if (r.dailyBudget != null) parts.push(moneyText(r.dailyBudget) + '/day');
+  parts.push(r.spend != null ? moneyText(r.spend) + ' spent' : EMPTY);
+  var pacing = pacingText(r.pacingRatio);
+  if (pacing) parts.push(pacing);
+  return parts.join(' · ');
+}
+
+/** "CPM $2.50 · ↗ top 9%" — 값 없으면 "—", 비교군 없으면 순위 생략 */
+function primaryKpiText(kpi, stat) {
+  if (!kpi || !kpi.metricKey || kpi.value == null) return EMPTY;
+  var text = CONFIG.METRIC_LABEL[kpi.metricKey] + ' ' + metricText(kpi.metricKey, kpi.value);
+  var position = benchmarkPositionText(stat);
+  return position ? text + ' · ' + position : text;
+}
+
+/** "Hook 6.78% (mid) · Hold 2.69% (↘ bottom 26%) · Eng. rate 0.22% (↗ top 17%) · CTR 0.28% (↗ top 4%)" */
+function keyResponseText(r) {
+  var keys = ['hookRate', 'holdRate'].concat(CONFIG.ENGAGEMENT_ACTION_LAYOUT[r.goal] || CONFIG.ENGAGEMENT_ACTION_LAYOUT.awareness);
+  var parts = keys.map(function (k) {
+    var label = CONFIG.METRIC_LABEL[k] + ' ' + metricText(k, r[k]);
+    var position = r[k] == null ? null : benchmarkPositionText(r.benchmarks[k]);
+    return position ? label + ' (' + position + ')' : label;
+  });
+  return parts.join(' · ');
 }
 
 /** 집행률 문구 — 문턱 밖일 때만 "Over 25%" / "Under 40%" (RecapCampaignTable와 같은 규칙) */

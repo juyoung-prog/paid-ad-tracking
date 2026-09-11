@@ -129,6 +129,25 @@ function compareEvent(label, eventName, campaigns, records, grids) {
     const cells = rowView.insightCellsOf(r, 'en');
     check(rs, 'worked', cells[0].text ?? null, s.worked);
     check(rs, 'improve', cells[1].text ?? null, s.improve);
+    // 임원용 표의 문장형 칸 — 대시보드 표기 함수(utils/format · recapRowView · recapStrings)로 같은 문장을 만들어 비교
+    const { storeText } = rowView.storeTextOf(r);
+    check(rs, 'campaignText', [r.phaseName, storeText, format.dateRangeWithDays(r.startDate, r.endDate)].filter(Boolean).join(' · '), s.campaignText);
+    const hasData = rowView.hasRowData(r);
+    const budgetParts = [];
+    if (r.dailyBudget != null) budgetParts.push(strings.t('recap.table.perDay', 'en', { amount: format.money(r.dailyBudget) }));
+    budgetParts.push(r.spend != null ? strings.t('recap.table.spent', 'en', { amount: format.money(r.spend) }) : format.EMPTY);
+    const pacing = dashboardPacing(r.pacingRatio);
+    if (pacing) budgetParts.push(pacing);
+    check(rs, 'budgetSpendText', budgetParts.join(' · '), s.budgetSpendText);
+    const kpiText = kpi?.value == null ? format.EMPTY
+      : `${strings.metricLabel(kpi.metricKey, 'en')} ${rowView.kpiFormat(kpi.metricKey)(kpi.value)}${dashboardPosition(stat) ? ` · ${dashboardPosition(stat)}` : ''}`;
+    check(rs, 'primaryKpiText', hasData ? kpiText : strings.t('recap.table.noData', 'en'), s.primaryKpiText);
+    const keyResponse = ['hookRate', 'holdRate', ...rowView.engagementLayout(r.goal).primary].map((k) => {
+      const label = `${strings.metricLabel(k, 'en')} ${rowView.kpiFormat(k)(r[k])}`;
+      const pos = r[k] == null ? null : dashboardPosition(r.benchmarks[k]);
+      return pos ? `${label} (${pos})` : label;
+    }).join(' · ');
+    check(rs, 'keyResponseText', hasData ? keyResponse : null, s.keyResponseText);
   });
   return { model, dash, headline, rowCount };
 }
@@ -136,18 +155,14 @@ function compareEvent(label, eventName, campaigns, records, grids) {
 function printSummary(model, dash, headline) {
   const allRows = Object.values(dash.byPlatform).flat();
   const money = (v) => (v == null ? '—' : `$${v.toFixed(2)}`);
-  const pct = (v) => (v == null ? '—' : `${(v * 100).toFixed(2)}%`);
   console.log(`\n== ${model.eventName} ==`);
   console.log(`headline  dashboard: ${dashboardHeadlineText(headline) ?? '—'} | sheet: ${model.headline?.text ?? '—'}`);
   console.log(`spend     dashboard: ${money(allRows.map((r) => r.spend).filter((v) => v != null).reduce((a, b) => a + b, 0))} | sheet: ${money(model.spend)}`);
-  const lines = [['platform', 'rank', 'campaign', 'kpi', 'dash value', 'sheet value', 'dash vs past', 'sheet vs past', 'hook d/s', 'hold d/s', 'worked =', 'improve =']];
+  const lines = [['platform', 'Campaign', 'Goal', 'Budget / Spend', 'Primary KPI', 'Key response', 'worked =', 'improve =']];
   model.sections.forEach((sec) => sec.rows.forEach((s) => {
     const r = allRows.find((x) => x.campaignId === s.campaignId);
-    const { kpi, stat } = rowView.primaryKpiOf(r);
     const cells = rowView.insightCellsOf(r, 'en');
-    const f = rowView.kpiFormat(kpi.metricKey);
-    lines.push([sec.label, `${r.rank}/${s.rank}`, s.phaseName, kpi.metricKey ?? '—', kpi.value == null ? '—' : f(kpi.value), s.primaryKpiValue == null ? '—' : f(s.primaryKpiValue),
-      dashboardPosition(stat) ?? '—', s.primaryKpiVsPast ?? '—', `${pct(r.hookRate)}/${pct(s.hookRate)}`, `${pct(r.holdRate)}/${pct(s.holdRate)}`,
+    lines.push([sec.label, s.campaignText, s.goalLabel ?? '—', s.budgetSpendText, s.primaryKpiText, (s.keyResponseText ?? '—').slice(0, 70),
       (cells[0].text ?? null) === s.worked ? 'same' : 'DIFF', (cells[1].text ?? null) === s.improve ? 'same' : 'DIFF']);
   }));
   const widths = lines[0].map((_, i) => Math.max(...lines.map((l) => String(l[i]).length)));
