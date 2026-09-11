@@ -172,6 +172,8 @@ export function rowToPerformanceRecord(row) {
     engagements: num(row.engagements),
     follows: num(row.follows),
     profileVisits: num(row.profile_visits),
+    saves: num(row.saves),
+    reposts: num(row.reposts),
     conversions: num(row.conversions),
   };
 }
@@ -218,6 +220,8 @@ export function performanceRecordToRow(record, recordedAt) {
     engagements: record.engagements ?? null,
     follows: record.follows ?? null,
     profile_visits: record.profileVisits ?? null,
+    saves: record.saves ?? null,
+    reposts: record.reposts ?? null,
     conversions: record.conversions ?? null,
   };
 }

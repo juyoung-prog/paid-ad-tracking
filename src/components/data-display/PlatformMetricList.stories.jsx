@@ -90,6 +90,7 @@ export const PartialMetrics = {
       heldViews: 1240,
       avgWatchSeconds: 3.4,
       likes: 310,
+      saves: 48,
       comments: 12,
       shares: 44,
       follows: null,

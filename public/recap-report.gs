@@ -122,7 +122,7 @@ var CONFIG = {
     store_visit: { primary: ['cpa', 'ctr'] },
   },
   /** 그 아래 참여 내역 줄 — 목표와 무관. Follow·Profile은 TikTok만 값이 있다 (recapRowView ENGAGEMENT_BREAKDOWN_KEYS) */
-  ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'follows', 'profileVisits'],
+  ENGAGEMENT_BREAKDOWN_KEYS: ['likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts'],
   /** 예외 명단 — 이벤트가 아니라 "이벤트 미배정"을 뜻하는 campaign_group 값 (schema isUnassignedEvent) */
   UNASSIGNED_EVENT_PATTERN: /^(noname|no[\s_-]?name|unassigned|none|n\/a|-)$/i,
   /** 플랫폼 표시명·순서 (paidAdsPageUtils PLATFORM_LABEL) */
@@ -130,7 +130,7 @@ var CONFIG = {
   /** 목표 표시명 (recapStrings goalLabel.*) */
   GOAL_LABEL: { awareness: 'Awareness', traffic: 'Traffic', engagement: 'Engagement', conversion: 'Conversion', store_visit: 'Store visit' },
   /** 지표 표시명 (recapStrings metric.*) */
-  METRIC_LABEL: { cpm: 'CPM', cpc: 'CPC', cpa: 'CPA', cpe: 'Cost/eng', ctr: 'CTR', hookRate: 'Hook', holdRate: 'Hold', engagementRate: 'Eng. rate', likes: 'Like', comments: 'Cmt', shares: 'Share', follows: 'Follow', profileVisits: 'Profile' },
+  METRIC_LABEL: { cpm: 'CPM', cpc: 'CPC', cpa: 'CPA', cpe: 'Cost/eng', ctr: 'CTR', hookRate: 'Hook', holdRate: 'Hold', engagementRate: 'Eng. rate', likes: 'Like', comments: 'Cmt', shares: 'Share', follows: 'Follow', profileVisits: 'Visits', saves: 'Save', reposts: 'Repost' },
 };
 
 /**
@@ -388,7 +388,7 @@ var COLUMNS = [
   { key: 'videoResponse', label: 'Video response', span: 4, align: 'left', rich: true,
     note: 'Hook = hook views ÷ video plays (Meta: 3-second plays, TikTok: 2-second plays) · Hold = completed views ÷ hook views. Third line: reach · plays · average watch time as the platform reports them.' + METRIC_RANK_NOTE },
   { key: 'engagementAction', label: 'Engagement / Action', span: 2, align: 'left', rich: true,
-    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: the engagement breakdown as the ad platform reports it — likes · comments · shares, plus follows · profile visits on TikTok. Saves and reposts are not available from the ad APIs.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
+    note: 'The two engagement / action metrics the goal emphasises — Awareness: Eng. rate · CTR, Traffic: CTR · CPC, Engagement: Eng. rate · Cost/eng, Conversion / Store visit: CPA · CTR. Third line: the engagement breakdown — likes · comments · shares, plus follows · visits (TikTok) and saves (Meta). Reposts come only from manual records; neither ad API reports them.\nEng. rate = engagements ÷ impressions · CTR = clicks ÷ impressions · CPC = spend ÷ clicks · Cost/eng = spend ÷ (likes + comments + shares).' + METRIC_RANK_NOTE },
   { key: 'worked', label: 'What worked', span: 1, align: 'left',
     note: 'Generated from this campaign\'s metrics and comparable past campaigns. Candidates are the metrics the goal shows (primary KPI first, then diagnostic Hook/Hold/CTR/Eng. rate); the one ranked in the top band wins. Nothing here is a claim about creative, targeting or messaging. "—" means no evidence.' },
   { key: 'improve', label: 'Could improve', span: 1, align: 'left',
@@ -1017,6 +1017,8 @@ function parsePerformance(grid) {
       engagements: num(r.engagements),
       follows: num(r.follows),
       profileVisits: num(r.profilevisits),
+      saves: num(r.saves),
+      reposts: num(r.reposts),
       conversions: num(r.conversions),
     };
   }).filter(function (r) { return r.campaignId; });
@@ -1189,6 +1191,8 @@ function getGoalMetricsRow(campaign, record) {
     shares: g('shares'),
     follows: g('follows'),
     profileVisits: g('profileVisits'),
+    saves: g('saves'),
+    reposts: g('reposts'),
     hookRate: calcHookRate(g('hookViews'), g('videoPlays')),
     holdRate: calcHoldRate(g('heldViews'), g('hookViews')),
   };
@@ -1377,6 +1381,8 @@ function flattenRow(r) {
     shares: r.shares,
     follows: r.follows,
     profileVisits: r.profileVisits,
+    saves: r.saves,
+    reposts: r.reposts,
     conversions: r.conversions,
     worked: hasData ? insightSentence('strength', r.insight.strength) : null,
     improve: hasData ? insightSentence('weakness', r.insight.weakness) : null,

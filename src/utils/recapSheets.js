@@ -51,7 +51,7 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
       t('recap.table.rank', lang), t('recap.table.store', lang), t('recap.table.campaign', lang), 'Campaign name', 'Start', 'End',
       t('recap.table.dailyBudget', lang), t('recap.table.spend', lang), t('recap.edit.verdict', lang),
       metricLabel('reach', lang), metricLabel('impressions', lang), metricLabel('videoPlays', lang), metricLabel('clicks', lang),
-      metricLabel('likes', lang), metricLabel('comments', lang), metricLabel('shares', lang), metricLabel('conversions', lang),
+      metricLabel('likes', lang), metricLabel('comments', lang), metricLabel('shares', lang), metricLabel('follows', lang), metricLabel('profileVisits', lang), metricLabel('saves', lang), metricLabel('reposts', lang), metricLabel('conversions', lang),
       ...BENCHMARK_METRICS.flatMap((m) => [metricLabel(m.key, lang), `${metricLabel(m.key, lang)} vs peers`]),
       t('recap.note.strength', lang), t('recap.note.weakness', lang), t('recap.note.reason', lang),
     ]);
@@ -62,7 +62,7 @@ export function buildRecapSheetText({ eventName, byPlatform, platformLabel, reca
         r.rank, r.storeCode, r.phaseName, r.name, r.startDate, r.endDate,
         asMoney(r.dailyBudget), asMoney(r.spend),
         verdict ? t(`verdict.${verdict}`, lang) : '',
-        r.reach, r.impressions, r.videoPlays, r.clicks, r.likes, r.comments, r.shares, r.conversions,
+        r.reach, r.impressions, r.videoPlays, r.clicks, r.likes, r.comments, r.shares, r.follows, r.profileVisits, r.saves, r.reposts, r.conversions,
         ...BENCHMARK_METRICS.flatMap((m) => {
           const isMoney = ['cpm', 'cpc', 'cpa', 'cpe'].includes(m.key);
           return [isMoney ? asMoney(r[m.key]) : asPercent(r[m.key]), benchmarkText(r.benchmarks?.[m.key], isMoney, lang)];

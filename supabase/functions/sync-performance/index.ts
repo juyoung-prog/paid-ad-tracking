@@ -32,6 +32,8 @@ type Metrics = {
   engagements: number | null;
   follows: number | null;
   profile_visits: number | null;
+  saves: number | null;
+  reposts: number | null;
   conversions: number | null;
 };
 
@@ -161,6 +163,10 @@ function mapMetaInsight(raw: any): Metrics {
     // Meta 캠페인 레벨에는 팔로우/프로필 방문에 대응하는 지표가 없다.
     follows: null,
     profile_visits: null,
+    // 게시물 저장 — actions의 onsite_conversion.post_save(광고 관리자 "Post saves" 컬럼). 0은 배열에서 빠지므로 위와 같은 규칙
+    saves: metaAction(raw, 'actions', 'onsite_conversion.post_save') ?? (hasActions ? 0 : null),
+    // 리포스트는 Meta 광고 지표에 없다 — 수기 레코드만 적는다
+    reposts: null,
     conversions: metaAction(raw, 'actions', 'offsite_conversion'),
   };
 }
@@ -328,6 +334,9 @@ function mapTikTokReport(raw: any): Metrics {
     engagements: sumInteractions([likes, comments, shares]),
     follows: num(raw.follows),
     profile_visits: num(raw.profile_visits),
+    // TikTok 광고 API는 캠페인 레벨 saves(bookmark/total_save)를 거부했고(TIKTOK_METRICS 주석), 리포스트 지표는 없다
+    saves: null,
+    reposts: null,
     conversions: num(raw.conversion),
   };
 }

@@ -40,11 +40,12 @@ export const ENGAGEMENT_ACTION_LAYOUT = {
 export const engagementLayout = (goal) => ENGAGEMENT_ACTION_LAYOUT[goal] ?? ENGAGEMENT_ACTION_LAYOUT.awareness;
 
 /**
- * 참여 내역 줄의 항목 — 광고 API가 캠페인 단위로 주는 것 전부. Like·Cmt·Share는 양 플랫폼 공통, Follow·Profile은
- * TikTok만(Meta는 null이라 빠진다). Save·Repost는 여기 없다 — TikTok 광고 API가 캠페인 레벨 saves를 거부했고
- * (sync-performance 주석), Repost는 광고 API에 없는 지표라 수집 자체가 안 된다.
+ * 참여 내역 줄의 항목 — 인플루언서 시트와 같은 일곱 가지(드로어·Performance·Reports가 같은 목록을 본다, 2026-09-11).
+ * 값이 채워지는 범위는 플랫폼 API가 정한다: Like·Cmt·Share 양 플랫폼 · Follow·Visits TikTok만 · Save Meta만
+ * (actions.onsite_conversion.post_save; TikTok 광고 API는 캠페인 레벨 saves를 거부) · Repost는 두 광고 API 모두
+ * 없어 수기 레코드에만 있다. 없는 값(null)은 줄에서 빠진다 — 자리는 있고 숫자만 없는 것이다.
  */
-export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'follows', 'profileVisits'];
+export const ENGAGEMENT_BREAKDOWN_KEYS = ['likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts'];
 
 /** 값의 무게는 지표의 역할이 정한다: 목표의 대표 KPI(700) > 나머지 대표 자리(600) */
 export const emphasisOf = (row, metricKey) => ((GOAL_HEADLINE_METRICS[row.goal] ?? [])[0] === metricKey ? 'primary' : 'diagnostic');
@@ -112,7 +113,7 @@ export function primaryKpiOf(row) {
   return { kpi, metricKey, stat, hasComparison: Boolean(stat && stat.peerScope !== 'none' && stat.percentile != null) };
 }
 
-/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601" (TikTok은 "· Follow 12 · Profile 40"까지). 값이 없는 항목은 뺀다 */
+/** 참여 내역 줄 — "Like 508 · Cmt 10 · Share 601 · Save 183" (TikTok은 "· Follow 12 · Visits 40"). 값이 없는 항목은 뺀다 */
 export function engagementBreakdownText(row, lang) {
   return ENGAGEMENT_BREAKDOWN_KEYS
     .map((key) => (row[key] == null ? null : `${metricLabel(key, lang)} ${count(row[key])}`))

@@ -130,6 +130,8 @@ sequenceDiagram
 | `engagements` | `actions` 중 `post_reaction`+`comment`+`post` 합산 | `likes` + `comments` + `shares` (합산) |
 | `follows` | — (캠페인 레벨 대응 지표 없음) | `follows` |
 | `profileVisits` | — | `profile_visits` |
+| `saves` | `actions` 중 `onsite_conversion.post_save` (게시물 저장) | — (캠페인 레벨 `saves`/`bookmark`/`total_save` 거부됨) |
+| `reposts` | — (광고 지표 없음) | — (광고 지표 없음) — 수기 레코드 전용 |
 | `conversions` | `actions` 중 `offsite_conversion` 등 | `conversion` |
 
 **`hookViews`/`heldViews`/`clicks`는 각 플랫폼 광고 관리자의 정의를 그대로 담는다.**

@@ -240,6 +240,8 @@ const NOTE = {
   avgWatch: 'Average seconds watched per play.',
   follows: 'New followers attributed to the campaign. TikTok only — Meta has no campaign-level equivalent.',
   profileVisits: 'Profile visits from the ad. TikTok only.',
+  saves: 'Post saves. Meta only (Ads Manager "Post saves") — the TikTok ad API does not report saves at campaign level.',
+  reposts: 'Reposts. Neither ad API reports this at campaign level — filled only by manual records.',
 };
 
 /* CPE·Engagements는 goal과 무관하게 모든 표에 붙는다(사용자 요청, 2026-08-26).
@@ -348,6 +350,10 @@ const CREATIVE_ENGAGEMENT_COLUMNS = [
   metricColumn('Shares', (r) => r.shares, fmtNumber, { width: 88 }),
   metricColumn('Follows', (r) => r.follows, fmtNumber, { width: 108, note: NOTE.follows }),
   metricColumn('Visits', (r) => r.profileVisits, fmtNumber, { width: 96, note: `Profile visits. ${NOTE.profileVisits}` }),
+  /* 저장·리포스트(2026-09-11) — 인플루언서 시트가 적는 일곱 가지를 유료 광고도 같은 자리에서 답한다.
+     Saves는 Meta만, Reposts는 수기 레코드만 값이 있다. 값이 전부 빈 표에서는 다른 열과 같이 keep()이 걷어낸다. */
+  metricColumn('Saves', (r) => r.saves, fmtNumber, { width: 88, note: NOTE.saves }),
+  metricColumn('Reposts', (r) => r.reposts, fmtNumber, { width: 96, note: NOTE.reposts }),
 ];
 /**
  * 컬럼 폭 체계. tableLayout:'fixed' + colgroup으로 강제한다.
@@ -550,7 +556,7 @@ function performanceToCsv(rows) {
     'Campaign', 'Platform', 'Goal', 'Spend', 'Impressions', 'Reach', 'Clicks',
     'Engagements', 'Conversions', 'CPM', 'CTR', 'CPC', 'Engagement Rate', 'CPE', 'CPA',
     'Video Plays', 'Hook Rate', 'Hold Rate', 'Held Views', 'Avg Watch (s)',
-    'Likes', 'Comments', 'Shares', 'Follows', 'Profile Visits',
+    'Likes', 'Comments', 'Shares', 'Follows', 'Profile Visits', 'Saves', 'Reposts',
   ];
   const lines = rows.map((r) =>
     toCsvRow([
@@ -568,7 +574,7 @@ function performanceToCsv(rows) {
       r.heldViews ?? '',
       r.avgWatchSeconds != null ? r.avgWatchSeconds.toFixed(2) : '',
       r.likes ?? '', r.comments ?? '', r.shares ?? '',
-      r.follows ?? '', r.profileVisits ?? '',
+      r.follows ?? '', r.profileVisits ?? '', r.saves ?? '', r.reposts ?? '',
     ])
   );
   return [toCsvRow(header), ...lines].join('\n');

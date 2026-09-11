@@ -81,6 +81,9 @@ const FIELDS = [
   { key: 'shares', label: 'Shares', group: 'video', format: fmtNumber },
   { key: 'follows', label: 'Follows', group: 'video', format: fmtNumber },
   { key: 'profileVisits', label: 'Profile Visits', group: 'video', format: fmtNumber },
+  // 저장·리포스트 — 인플루언서 시트와 같은 일곱 가지 참여 내역(2026-09-11). Save는 Meta만(post_save), Repost는 수기 레코드만 값이 있다
+  { key: 'saves', label: 'Saves', group: 'video', format: fmtNumber },
+  { key: 'reposts', label: 'Reposts', group: 'video', format: fmtNumber },
 ];
 
 /**
@@ -99,7 +102,7 @@ const FIELDS = [
  * 뷰포트 기준 4컬럼)를 재사용하지 않고 세로 2단 목록으로 그린다.
  *
  * Props:
- * @param {object} metrics - 성과 레코드. videoPlays/heldViews/avgWatchSeconds/likes/comments/shares/follows/profileVisits(+hasCoreMetrics면 spend/impressions/reach/clicks/engagements/conversions)를 읽는다. 세 그룹(Delivery / Traffic & Engagement / Video & Social)으로 나눠 그린다 [Required]
+ * @param {object} metrics - 성과 레코드. videoPlays/heldViews/avgWatchSeconds/likes/comments/shares/saves/reposts/follows/profileVisits(+hasCoreMetrics면 spend/impressions/reach/clicks/engagements/conversions)를 읽는다. 세 그룹(Delivery / Traffic & Engagement / Video & Social)으로 나눠 그린다 [Required]
  * @param {string} title - 목록 위 소제목(13px 600 문장형 — 위의 PERFORMANCE 라벨보다 한 단 아래) [Optional, 기본값: 'Platform metrics']
  * @param {boolean} hasCoreMetrics - 핵심 지표(Spend·Impressions·Reach·Clicks·CTR·CPM·CPC·Engagements·Conversions·CPA)를 목록 맨 앞에 붙인다. 입력 폼이 없는 동기화 캠페인 드로어에서만 켠다 — 폼이 있으면 같은 값이 필드에 이미 있다 [Optional, 기본값: false]
  * @param {object} sx - 추가 스타일 [Optional]

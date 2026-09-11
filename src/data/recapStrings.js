@@ -109,7 +109,9 @@ export const RECAP_STRINGS = Object.freeze({
   'metric.comments': { en: 'Cmt', ko: '댓글', 'zh-Hant': '留言' },
   'metric.shares': { en: 'Share', ko: '공유', 'zh-Hant': '分享' },
   'metric.follows': { en: 'Follow', ko: '팔로우', 'zh-Hant': '追蹤' },
-  'metric.profileVisits': { en: 'Profile', ko: '프로필', 'zh-Hant': '個人檔案' },
+  'metric.profileVisits': { en: 'Visits', ko: '프로필 방문', 'zh-Hant': '個人檔案' },
+  'metric.saves': { en: 'Save', ko: '저장', 'zh-Hant': '收藏' },
+  'metric.reposts': { en: 'Repost', ko: '리포스트', 'zh-Hant': '轉發' },
   'metric.conversions': { en: 'Results', ko: '결과', 'zh-Hant': '成果' },
 
   // 벤치마크

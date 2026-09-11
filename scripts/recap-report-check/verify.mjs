@@ -26,11 +26,11 @@ const gs = sandbox.module.exports;
 
 // ---- 그리드 만들기: Supabase CSV처럼 snake_case 헤더, 날짜는 시트가 Date로 바꾼 것처럼
 const CAMPAIGN_COLS = ['id', 'name', 'campaign_group', 'platform', 'account_id', 'target_scope', 'target_store_ids', 'start_date', 'end_date', 'budget_planned', 'budget_daily', 'goal'];
-const PERF_COLS = ['id', 'campaign_id', 'recorded_at', 'source', 'spend', 'impressions', 'reach', 'clicks', 'video_plays', 'hook_views', 'held_views', 'avg_watch_seconds', 'likes', 'comments', 'shares', 'engagements', 'follows', 'profile_visits', 'conversions'];
+const PERF_COLS = ['id', 'campaign_id', 'recorded_at', 'source', 'spend', 'impressions', 'reach', 'clicks', 'video_plays', 'hook_views', 'held_views', 'avg_watch_seconds', 'likes', 'comments', 'shares', 'engagements', 'follows', 'profile_visits', 'saves', 'reposts', 'conversions'];
 const toSheetDate = (iso) => (iso ? new Date(`${iso}T00:00:00`) : '');
 function gridsFromModel(campaigns, records) {
   const cRows = campaigns.map((c) => [c.id, c.name, c.campaignGroup ?? '', c.platform, c.accountId ?? '', c.targetScope ?? '', `{${(c.targetStoreIds ?? []).join(',')}}`, toSheetDate(c.startDate), toSheetDate(c.endDate), c.budgetPlanned ?? '', c.budgetDaily ?? '', c.goal]);
-  const pRows = records.map((r) => [r.id ?? '', r.campaignId, toSheetDate(r.recordedAt), r.source ?? '', r.spend ?? '', r.impressions ?? '', r.reach ?? '', r.clicks ?? '', r.videoPlays ?? '', r.hookViews ?? '', r.heldViews ?? '', r.avgWatchSeconds ?? '', r.likes ?? '', r.comments ?? '', r.shares ?? '', r.engagements ?? '', r.follows ?? '', r.profileVisits ?? '', r.conversions ?? '']);
+  const pRows = records.map((r) => [r.id ?? '', r.campaignId, toSheetDate(r.recordedAt), r.source ?? '', r.spend ?? '', r.impressions ?? '', r.reach ?? '', r.clicks ?? '', r.videoPlays ?? '', r.hookViews ?? '', r.heldViews ?? '', r.avgWatchSeconds ?? '', r.likes ?? '', r.comments ?? '', r.shares ?? '', r.engagements ?? '', r.follows ?? '', r.profileVisits ?? '', r.saves ?? '', r.reposts ?? '', r.conversions ?? '']);
   return { campaigns: [CAMPAIGN_COLS, ...cRows], performance: [PERF_COLS, ...pRows] };
 }
 

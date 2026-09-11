@@ -436,6 +436,8 @@ function recapRecord(campaignId, m) {
     shares: m.shares ?? null,
     follows: m.follows ?? null,
     profileVisits: m.profileVisits ?? null,
+    saves: m.saves ?? null,
+    reposts: m.reposts ?? null,
     engagements: m.engagements ?? null,
     conversions: m.conversions ?? null,
   };
@@ -475,7 +477,7 @@ export const mockRecapCampaigns = [
 /** @type {import('./schema').PerformanceRecord[]} */
 export const mockRecapPerformanceRecords = [
   // G10 — Coming Soon(Meta)은 CPM이 비교군 중 가장 싸고 Hook은 중간, Grand Opening(Meta)은 Hook 최고
-  recapRecord('rc-g10-cs-m', { spend: 210.4, impressions: 98000, reach: 61000, clicks: 240, videoPlays: 90000, hookViews: 21600, heldViews: 5400, avgWatchSeconds: 3.1, likes: 180, comments: 6, shares: 40, engagements: 226 }),
+  recapRecord('rc-g10-cs-m', { spend: 210.4, impressions: 98000, reach: 61000, clicks: 240, videoPlays: 90000, hookViews: 21600, heldViews: 5400, avgWatchSeconds: 3.1, likes: 180, comments: 6, shares: 40, saves: 22, engagements: 226 }),
   recapRecord('rc-g10-cs-t', { spend: 205.7, impressions: 120000, reach: 54000, clicks: 130, videoPlays: 118000, hookViews: 11800, heldViews: 3500, avgWatchSeconds: 1.9, likes: 210, comments: 4, shares: 25, engagements: 239 }),
   recapRecord('rc-g10-go-m', { spend: 812.5, impressions: 265000, reach: 151000, clicks: 3900, videoPlays: 250000, hookViews: 92500, heldViews: 30000, avgWatchSeconds: 4.2, likes: 620, comments: 18, shares: 540, engagements: 1178 }),
   recapRecord('rc-g10-go-t', { spend: 776.9, impressions: 340000, reach: 128000, clicks: 1200, videoPlays: 335000, hookViews: 46900, heldViews: 15400, avgWatchSeconds: 2.1, likes: 410, comments: 9, shares: 120, engagements: 539 }),

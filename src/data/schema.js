@@ -142,6 +142,8 @@ export const ALERT_TYPE = Object.freeze({
  * @property {number|null} engagements - Tier 3 · goal=engagement일 때만. likes+comments+shares 합 — 양 플랫폼 동일 정의(Meta의 post_engagement는 영상 조회·클릭까지 포함하는 다른 양이라 쓰지 않는다)
  * @property {number|null} follows - Tier 3 · 팔로우 획득. TikTok 전용(Meta 캠페인 레벨에 대응 지표 없음)
  * @property {number|null} profileVisits - Tier 3 · 프로필 방문. TikTok 전용
+ * @property {number|null} saves - Tier 3 · 게시물 저장. Meta 전용(actions.onsite_conversion.post_save) — TikTok 광고 API는 캠페인 레벨 미제공
+ * @property {number|null} reposts - Tier 3 · 리포스트. 두 광고 API 모두 캠페인 레벨 미제공 — 수기 레코드 전용, API 동기화는 null
  * @property {number|null} conversions - Tier 4 · goal=conversion|store_visit일 때만
  */
 
@@ -748,7 +750,7 @@ export function hasAnyMetricValue(record) {
   if (!record) return false;
   const METRIC_KEYS = [
     'impressions', 'reach', 'clicks', 'spend', 'videoPlays', 'hookViews', 'heldViews',
-    'avgWatchSeconds', 'likes', 'comments', 'shares', 'follows', 'profileVisits',
+    'avgWatchSeconds', 'likes', 'comments', 'shares', 'follows', 'profileVisits', 'saves', 'reposts',
     'engagements', 'conversions',
   ];
   return METRIC_KEYS.some((key) => record[key] != null && record[key] !== 0 && record[key] !== '');
@@ -795,7 +797,7 @@ const ALERT_SEVERITY_RANK = {
  * 그 캠페인은 성과를 내고 있는 것이다(무엇을 목표로 했든).
  * 노출·도달은 여기 없다 — 그건 전달됐다는 뜻이지 반응이 아니다.
  */
-const RESPONSE_FIELDS = ['clicks', 'engagements', 'conversions', 'follows', 'profileVisits', 'likes', 'comments', 'shares'];
+const RESPONSE_FIELDS = ['clicks', 'engagements', 'conversions', 'follows', 'profileVisits', 'likes', 'comments', 'shares', 'saves', 'reposts'];
 
 /**
  * 이 목표가 "성공"으로 세는 대표 지표. 목표마다 무엇이 결과인지가 달라서,
@@ -1219,7 +1221,7 @@ export function buildDailySpendMatrix(campaigns, dailyRows, range) {
  *
  * @param {Campaign} campaign
  * @param {PerformanceRecord} [record]
- * @returns {{ campaignId: string, name: string, platform: string, spend: number|null, impressions: number|null, clicks: number|null, cpm: number|null, ctr: number|null, cpc: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
+ * @returns {{ campaignId: string, name: string, platform: string, spend: number|null, impressions: number|null, clicks: number|null, cpm: number|null, ctr: number|null, cpc: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null, saves: number|null, reposts: number|null }}
  */
 export function getCampaignMetricsRow(campaign, record) {
   const spend = record?.spend ?? null;
@@ -1249,6 +1251,8 @@ export function getCampaignMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
+    saves: record?.saves ?? null,
+    reposts: record?.reposts ?? null,
     hookRate: calcHookRate(record?.hookViews ?? null, record?.videoPlays ?? null),
     holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
@@ -1262,7 +1266,7 @@ export function getCampaignMetricsRow(campaign, record) {
  * 서로 다른 컬럼 구성의 표로 보여줄 때 이 값을 그대로 쓴다.
  * @param {Campaign} campaign
  * @param {PerformanceRecord} [record]
- * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpe: number|null, cpa: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null }}
+ * @returns {{ campaignId: string, name: string, platform: string, goal: string, spend: number|null, impressions: number|null, reach: number|null, clicks: number|null, engagements: number|null, conversions: number|null, cpm: number|null, ctr: number|null, cpc: number|null, engagementRate: number|null, cpe: number|null, cpa: number|null, videoPlays: number|null, heldViews: number|null, avgWatchSeconds: number|null, likes: number|null, comments: number|null, shares: number|null, follows: number|null, profileVisits: number|null, saves: number|null, reposts: number|null }}
  */
 export function getGoalMetricsRow(campaign, record) {
   const spend = record?.spend ?? null;
@@ -1305,6 +1309,8 @@ export function getGoalMetricsRow(campaign, record) {
     shares: record?.shares ?? null,
     follows: record?.follows ?? null,
     profileVisits: record?.profileVisits ?? null,
+    saves: record?.saves ?? null,
+    reposts: record?.reposts ?? null,
     hookRate: calcHookRate(record?.hookViews ?? null, record?.videoPlays ?? null),
     holdRate: calcHoldRate(record?.heldViews ?? null, record?.hookViews ?? null),
   };
