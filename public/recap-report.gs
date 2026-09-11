@@ -255,13 +255,20 @@ function showTabGids() {
 function reportSheet_(ss, name) {
   var props = null;
   try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
-  var savedId = props ? Number(props.getProperty('RECAP_SHEET_ID')) : NaN;
-  var sheet = findSheetByGid_(ss, isNaN(savedId) ? null : savedId) || ss.getSheetByName(name);
+  // 저장값이 없으면 null이다 — Number(null)은 0이라 gid 0(새 시트의 "시트1")을 잘못 잡는다. 있을 때만 숫자로
+  var saved = props ? props.getProperty('RECAP_SHEET_ID') : null;
+  var savedId = saved ? Number(saved) : null;
+  var sheet = (savedId != null && isFinite(savedId) ? findSheetByGid_(ss, savedId) : null)
+    || ss.getSheetByName(name)
+    || ss.getSheetByName(LEGACY_REPORT_SHEET_NAME); // 예전 기본 이름("Recap")으로 만든 탭도 이어받는다
   if (!sheet) sheet = ss.insertSheet(name);
   if (sheet.getName() !== name && !ss.getSheetByName(name)) sheet.setName(name);
   if (props) props.setProperty('RECAP_SHEET_ID', String(sheet.getSheetId()));
   return sheet;
 }
+
+/** 예전 기본 탭 이름 — 이 이름의 탭이 있으면 새 이름으로 바꿔 재사용한다(탭이 둘이 되지 않게) */
+var LEGACY_REPORT_SHEET_NAME = 'Recap';
 
 /** 문서에 저장된 이벤트 선택. 권한이 없는 문맥(onOpen 등)에서는 null */
 function storedEventName_() {
