@@ -9,7 +9,7 @@
  *      이후로는 시트를 열 때마다 자동 갱신되고, 열어 둔 채 최신을 보려면 메뉴의 Refresh만 누른다.
  *
  * 데이터 흐름: 스크립트가 대시보드 데이터베이스(Supabase)의 campaigns · performance_records_latest · ad_accounts를
- * **읽기 전용**으로 가져와 이 스프레드시트 안에 "Recap" 탭을 그린다. 시트의 내용을 밖으로 보내는 요청은 없다
+ * **읽기 전용**으로 가져와 이 스프레드시트 안에 보고서 탭(기본 이름 "<매장코드>_Report", 예: G10_Report)을 그린다. 시트의 내용을 밖으로 보내는 요청은 없다
  * (썸네일 주소를 한 번 받아 보는 것은 그림이 깨지지 않는지 확인하는 읽기다). 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
  * 대시보드 제목 옆 링크로 내려받으면 CONFIG.SUPABASE에 채워져 있다. (직접 복사한 파일이면 거기에 URL·키를 적는다.)
  *
@@ -69,8 +69,11 @@ var CONFIG = {
     campaigns: null,     // Supabase `campaigns` 표를 가져온 탭
     performance: null,   // Supabase `performance_records` 표를 가져온 탭. null이면 campaigns 탭 안의 두 번째 표를 쓴다
   },
-  /** 보고서 탭 이름. 매 실행마다 이 탭을 만들거나 갱신한다 */
-  REPORT_SHEET_NAME: 'Recap',
+  /**
+   * 보고서 탭 이름 틀. {store} = 이벤트의 매장 코드(G10, 여러 곳이면 G10+BF3) · {event} = 이벤트 이름.
+   * 예: '{store}_Report' → "G10_Report". 이벤트가 바뀌면 같은 탭의 이름만 바뀐다(탭이 늘어나지 않는다)
+   */
+  REPORT_SHEET_NAME: '{store}_Report',
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 둔다. null이거나 없으면 맨 왼쪽 */
   ANCHOR_SHEET_NAME: null,
   /** 보고할 이벤트(campaign_group 값). null이면 가장 최근에 끝난 이벤트 — 대시보드 Reports 목록의 첫 줄 */
@@ -245,6 +248,21 @@ function showTabGids() {
   SpreadsheetApp.getUi().alert('Tab gids', lines.join('\n'), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
+/**
+ * 보고서 탭 — 지난 실행이 만든 탭(문서 속성에 sheetId를 적어 둔다)을 찾아 이름을 맞추고 재사용한다. 없으면 만든다.
+ * 이벤트를 바꿔 이름이 달라져도 탭이 하나만 유지되게. 같은 이름의 다른 탭이 이미 있으면 그 탭을 쓴다.
+ */
+function reportSheet_(ss, name) {
+  var props = null;
+  try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
+  var savedId = props ? Number(props.getProperty('RECAP_SHEET_ID')) : NaN;
+  var sheet = findSheetByGid_(ss, isNaN(savedId) ? null : savedId) || ss.getSheetByName(name);
+  if (!sheet) sheet = ss.insertSheet(name);
+  if (sheet.getName() !== name && !ss.getSheetByName(name)) sheet.setName(name);
+  if (props) props.setProperty('RECAP_SHEET_ID', String(sheet.getSheetId()));
+  return sheet;
+}
+
 /** 문서에 저장된 이벤트 선택. 권한이 없는 문맥(onOpen 등)에서는 null */
 function storedEventName_() {
   try {
@@ -265,7 +283,7 @@ function refreshReport_(options) {
     var grids = readGrids_();
     var eventName = storedEventName_() || CONFIG.EVENT_NAME;
     var model = buildReportModel(grids, new Date(), eventName);
-    var sheet = ss.getSheetByName(CONFIG.REPORT_SHEET_NAME) || ss.insertSheet(CONFIG.REPORT_SHEET_NAME);
+    var sheet = reportSheet_(ss, reportSheetName(model));
     renderReport_(sheet, model);
     placeReportSheet_(ss, sheet, previous);
     if (!(options && options.silent)) ensureOpenTrigger_();
@@ -843,6 +861,18 @@ function phaseTotalOf(phases) {
     return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
   };
   return { totalDaily: sum('totalDaily'), totalBudget: sum('totalBudget'), spent: sum('spent') };
+}
+
+/**
+ * 보고서 탭 이름 — CONFIG.REPORT_SHEET_NAME 틀에 {store}·{event}를 채운다. 시트 탭 이름에 못 쓰는 글자([]:*?/\\)는 '-'로.
+ * 매장 코드가 없으면 {store} 자리에 이벤트 이름의 첫 단어를 쓴다.
+ */
+function reportSheetName(model) {
+  var store = (model.stores && model.stores.length) ? model.stores.join('+') : String(model.eventName || '').split(/\s+/)[0];
+  var name = String(CONFIG.REPORT_SHEET_NAME || '{store}_Report')
+    .replace(/\{store\}/g, store)
+    .replace(/\{event\}/g, model.eventName || '');
+  return name.replace(/[\[\]:*?\/\\]/g, '-').trim().slice(0, 100) || 'Report';
 }
 
 /** 이벤트 이름 목록(최근 끝난 순) — 메뉴 "Refresh for event…"가 쓴다 */
@@ -1779,5 +1809,5 @@ function uniqueSorted(list) {
 
 // node 검증용 — Apps Script에서는 module이 없어 무시된다
 if (typeof module === 'object' && module && module.exports) {
-  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
+  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, reportSheetName: reportSheetName, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
 }
