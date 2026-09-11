@@ -446,7 +446,7 @@ function placeReportSheet_(ss, sheet, previous) {
  *
  *   캠페인 표: 썸네일 36 · Campaign 235 · Goal 90 · Budget/Spend 120 · Primary KPI 115 · Video response 270 ·
  *              Engagement/Action 300 · What worked 250 · Could improve 250
- *   타임라인:  Phase 276 · Platforms 110 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105 (B열부터)
+ *   타임라인:  썸네일 36 · Phase 240 · Platforms 110 · Start 100 · End 100 · Days 55 · Daily budget 95 · Planned 95 · Spent 105 (B열부터)
  *   요약:      Period 276 · Campaigns 110 · Total spent 100 · Planned 100 · Stores 55 (B열부터)
  * 제목·요약·타임라인·캠페인 표 전부 B열에서 시작한다 — 왼쪽 시작점이 한 줄로 맞는다.
  */
@@ -483,7 +483,9 @@ var COLUMNS = [
 
 /** 타임라인 표 열 — B열부터(캠페인 표와 같은 시작점), 물리 열 14개에 병합으로 얹는다(합 276·110·100·100·55·95·95·105) */
 var TIMELINE_COLUMNS = [
-  { key: 'name', label: 'Phase', span: 3, align: 'left' },
+  { key: 'thumbnailUrl', label: '', span: 1, align: 'center', thumb: true },
+  // 단계 이름은 첫 캠페인(Meta 우선)의 View ad로 링크. 캠페인이 둘 이상이면 둘째 줄에 플랫폼마다 자기 광고 링크
+  { key: 'phaseCell', label: 'Phase', span: 2, align: 'left', rich: true },
   { key: 'platformLabel', label: 'Platforms', span: 2, align: 'center' },
   { key: 'startDate', label: 'Start', span: 2, align: 'center' },
   { key: 'endDate', label: 'End', span: 1, align: 'center' },
@@ -517,7 +519,7 @@ var STYLE = {
   sectionSize: 12,
   leftGutter: 20,
   left: 2,
-  heights: { blank: 21, title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 28, campaignHeader: 28, campaignRow: 64 },
+  heights: { blank: 21, title: 34, section: 28, kpiHeader: 28, kpiValue: 30, timelineHeader: 28, timelineRow: 40, campaignHeader: 28, campaignRow: 64 },
   /** 섹션 사이 빈 줄 수(기본 높이 21px) */
   sectionGap: 1,
 };
@@ -689,6 +691,9 @@ function richValue_(rich) {
     if (run.end <= run.start) return;
     builder.setTextStyle(run.start, run.end, styles[run.style] || styles.small);
   });
+  (rich.links || []).forEach(function (link) {
+    if (link.end > link.start && link.url) builder.setLinkUrl(link.start, link.end, link.url);
+  });
   return builder.build();
 }
 
@@ -854,9 +859,13 @@ function buildReportModel(grids, today, eventName) {
     if (r.spend != null) spendByPhaseKey[key] = (spendByPhaseKey[key] || 0) + r.spend;
   });
   var phases = buildPhaseTimeline(eventCampaigns).map(function (p) {
+    var first = p.campaigns[0] || null;
     return {
       key: p.key,
       name: phaseDisplayName(p.name),
+      thumbnailUrl: first ? first.thumbnailUrl : null,
+      campaignUrl: first ? viewAdUrl(first) : null,
+      phaseCell: phaseCell(phaseDisplayName(p.name), p.campaigns),
       platformLabel: p.platformLabel,
       startDate: p.startDate,
       endDate: p.endDate,
@@ -1633,6 +1642,32 @@ function richLines(lines) {
   return { text: text, runs: runs };
 }
 
+/**
+ * 타임라인 Phase 칸 — 이름(굵게, 첫 캠페인의 View ad 링크) ⏎ 캠페인이 둘 이상이면 "Meta · TikTok"(작게, 각각 자기 광고 링크).
+ * 링크가 없는 캠페인은 글만. 결과 { text, runs, links }
+ */
+function phaseCell(name, campaigns) {
+  var first = campaigns[0] || null;
+  var text = name;
+  var runs = [{ start: 0, end: name.length, style: 'bold' }];
+  var links = [];
+  var firstUrl = first ? viewAdUrl(first) : null;
+  if (firstUrl) links.push({ start: 0, end: name.length, url: firstUrl });
+  if (campaigns.length > 1) {
+    text += '\n';
+    campaigns.forEach(function (c, i) {
+      if (i > 0) text += ' · ';
+      var label = CONFIG.PLATFORM_LABEL[c.platform] || c.platform;
+      var start = text.length;
+      text += label;
+      var url = viewAdUrl(c);
+      if (url) links.push({ start: start, end: text.length, url: url });
+    });
+    runs.push({ start: name.length + 1, end: text.length, style: 'small' });
+  }
+  return { text: text, runs: runs, links: links };
+}
+
 /** "Jul 6 – Aug 1 (27 days)" (utils/format dateRangeWithDays) */
 function dateRangeWithDays(startIso, endIso) {
   var days = daysBetween(startIso, endIso);
@@ -1869,6 +1904,10 @@ function buildPhaseTimeline(campaigns) {
       endDate: endDate,
       days: daysBetween(startDate, endDate),
       platformLabel: Object.keys(CONFIG.PLATFORM_LABEL).filter(function (p) { return byPlatform[p]; }).map(function (p) { return CONFIG.PLATFORM_LABEL[p]; }).join(' + '),
+      // 이 단계의 캠페인들 — 플랫폼 선언 순서(Meta 먼저). 썸네일·링크 재료
+      campaigns: Object.keys(CONFIG.PLATFORM_LABEL).reduce(function (acc, p) {
+        return acc.concat(group.filter(function (c) { return c.platform === p; }));
+      }, []),
       totalBudget: totalBudget,
       totalDaily: totalDaily,
     };
@@ -1924,5 +1963,5 @@ function uniqueSorted(list) {
 
 // node 검증용 — Apps Script에서는 module이 없어 무시된다
 if (typeof module === 'object' && module && module.exports) {
-  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, reportSheetName: reportSheetName, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
+  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, phaseCell: phaseCell, reportSheetName: reportSheetName, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
 }

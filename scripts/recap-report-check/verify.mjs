@@ -25,7 +25,7 @@ vm.runInNewContext(src, sandbox, { filename: 'recap-report.gs' });
 const gs = sandbox.module.exports;
 
 // ---- 그리드 만들기: Supabase CSV처럼 snake_case 헤더, 날짜는 시트가 Date로 바꾼 것처럼
-const CAMPAIGN_COLS = ['id', 'name', 'campaign_group', 'platform', 'account_id', 'target_scope', 'target_store_ids', 'start_date', 'end_date', 'budget_planned', 'budget_daily', 'goal'];
+const CAMPAIGN_COLS = ['id', 'name', 'campaign_group', 'platform', 'account_id', 'target_scope', 'target_store_ids', 'start_date', 'end_date', 'budget_planned', 'budget_daily', 'goal', 'thumbnail_url', 'creative_url', 'ad_link', 'external_campaign_id'];
 const PERF_COLS = ['id', 'campaign_id', 'recorded_at', 'source', 'spend', 'impressions', 'reach', 'clicks', 'video_plays', 'hook_views', 'held_views', 'avg_watch_seconds', 'likes', 'comments', 'shares', 'engagements', 'follows', 'profile_visits', 'saves', 'reposts', 'conversions'];
 const toSheetDate = (iso) => (iso ? new Date(`${iso}T00:00:00`) : '');
 function gridsFromModel(campaigns, records) {
@@ -98,6 +98,13 @@ function compareEvent(label, eventName, campaigns, records, grids, notesById = {
     check(ps, 'totalDaily', p.totalDaily, s.totalDaily);
     check(ps, 'totalBudget', p.totalBudget || null, s.totalBudget);
     check(ps, 'spent', spendByPhaseKey[p.key] ?? null, s.spent);
+    // 썸네일·링크 — 단계의 첫 캠페인(Meta 우선)의 thumbnail_url · View ad(creativeUrl || adLink). 둘 이상이면 둘째 줄 플랫폼마다 자기 링크
+    const ordered = Object.keys(pageUtils.PLATFORM_LABEL).flatMap((plat) => eventCampaigns.filter((c) => schema.campaignNameKey(c.name) === p.key && c.platform === plat));
+    const first = ordered[0];
+    check(ps, 'thumbnailUrl', first?.thumbnailUrl ?? null, s.thumbnailUrl);
+    check(ps, 'campaignUrl', first ? (first.creativeUrl || first.adLink || null) : null, s.campaignUrl);
+    check(ps, 'phaseCell.text', ordered.length > 1 ? `${rowView.phaseDisplayName(p.name)}\n${ordered.map((c) => pageUtils.PLATFORM_LABEL[c.platform]).join(' · ')}` : rowView.phaseDisplayName(p.name), s.phaseCell?.text);
+    check(ps, 'phaseCell.links', ordered.map((c) => c.creativeUrl || c.adLink || null).filter(Boolean).length + (ordered.length > 1 && (first?.creativeUrl || first?.adLink) ? 1 : 0), s.phaseCell?.links?.length);
   });
 
   // 캠페인 표
