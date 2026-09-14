@@ -13,7 +13,8 @@
  * **읽기 전용**으로 가져와 이 스프레드시트의 "Campaign Recap" 탭 하나에 그린다. 탭 위 드롭다운(C2)에서 이벤트를 고르면 같은
  * 탭이 그 이벤트로 다시 그려진다 — 이벤트별 탭을 만들지 않고, 다른 탭(월간 SNS 보고서 "Report" 등)은 건드리지 않는다.
  * 시트의 내용을 밖으로 보내는 요청은 없다
- * (썸네일 주소를 한 번 받아 보는 것은 그림이 깨지지 않는지 확인하는 읽기다). 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
+ * (썸네일 주소를 한 번 받아 보는 것은 그림이 깨지지 않는지 확인하는 읽기다. 썸네일은 =IMAGE() 수식이라 처음 한 번
+ * "외부 데이터에 접근하려는 수식" 경고가 뜨는데, Allow access를 누르면 그 스프레드시트에서는 다시 묻지 않는다). 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
  * 대시보드 제목 옆 링크로 내려받으면 CONFIG.SUPABASE에 채워져 있다. (직접 복사한 파일이면 거기에 URL·키를 적는다.)
  *
  * 대안 — DB 대신 이 시트의 탭을 읽기: CONFIG.DATA_SOURCE = 'sheet'로 두고 SOURCE_GIDS에 탭 gid를 적는다
@@ -80,10 +81,15 @@ var CONFIG = {
   /** 이벤트 선택 드롭다운이 있는 칸(보고서 탭 위쪽). 이 칸을 바꾸면 같은 탭이 그 이벤트로 다시 그려진다 */
   EVENT_SELECTOR_CELL: 'C2',
   /**
-   * 썸네일 — 'urls'(기본: 주소형만) · 'all'(base64로 박힌 큰 그림까지 — Meta 일부 캠페인, 한 장에 약 3초씩 더 걸린다) · 'none'.
-   * 2026-09-14 실측: base64 두 장이 6.3초로 갱신 시간의 절반이었다
+   * 썸네일 — 'all'(기본: 전부) · 'urls'(주소형만 — base64로 박힌 Meta 일부 캠페인 그림은 뺀다, 한 장에 약 3초) · 'none'
    */
-  THUMBNAILS: 'urls',
+  THUMBNAILS: 'all',
+  /**
+   * 주소형 썸네일을 넣는 방법 — 'formula'(기본: =IMAGE(url, 1) 수식. 쓰기는 즉시, 그림은 화면에서 로드. 처음 한 번
+   * "외부 데이터에 접근하려는 수식" 경고가 뜨면 Allow access를 누른다 — 스프레드시트마다 1회) · 'image'(셀 이미지 —
+   * 경고는 없지만 넣는 순간 Google이 그림을 받아 검증해 장당 수 초). 2026-09-14 실측: 수식이 훨씬 빨랐다
+   */
+  THUMBNAIL_MODE: 'formula',
   /** 시트를 열 때 자동 갱신할지. false면 메뉴 Refresh·드롭다운 변경 때만 갱신한다(열 때 표가 지워졌다 다시 그려지는 시간이 없다) */
   REFRESH_ON_OPEN: true,
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
@@ -704,11 +710,11 @@ function checkThumbnails_(urls) {
 }
 
 /**
- * 썸네일 열 쓰기 — 확인(checkThumbnails_)을 통과한 주소만 셀 이미지로, 열 단위 한 번에. 셀 이미지는 넣는 순간 Google이 그림을
- * 받아 검증하므로 장당 시간이 든다(=IMAGE() 수식은 즉시지만 "외부 데이터" 승인 경고와 #REF!가 떠서 쓰지 않는다, 2026-09-14).
- * base64(data:) 그림은 1MB급이라 특히 느리다 — CONFIG.THUMBNAILS가 'all'일 때만 넣고 시간은 따로 잰다.
+ * 썸네일 열 쓰기 — 확인(checkThumbnails_)을 통과한 주소만. 주소형은 CONFIG.THUMBNAIL_MODE에 따라 =IMAGE(url, 1) 수식(기본, 즉시)
+ * 또는 셀 이미지(장당 수 초). base64(data:) 그림은 수식이 안 되므로 늘 셀 이미지 — THUMBNAILS가 'all'일 때만, 칸마다 따로.
  */
 function writeThumbnails_(sheet, row, col, rows, urlKey, altKey) {
+  var isData = function (source) { return /^data:image\//i.test(source); };
   var build = function (source, alt) {
     try {
       return SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(alt || 'Campaign thumbnail').build();
@@ -717,16 +723,21 @@ function writeThumbnails_(sheet, row, col, rows, urlKey, altKey) {
       return '';
     }
   };
-  var isData = function (source) { return /^data:image\//i.test(source); };
-  // 1) 주소형 — 열 단위 한 번에
+  var okUrl = function (source) { return source && !isData(source) && thumbnailCheckCache_[source]; };
+  var range = sheet.getRange(row, col, rows.length, 1);
   var t0 = Date.now();
-  var values = rows.map(function (r) {
-    var source = r[urlKey] ? String(r[urlKey]) : '';
-    return [source && !isData(source) && thumbnailCheckCache_[source] ? build(source, r[altKey]) : ''];
-  });
-  sheet.getRange(row, col, rows.length, 1).setValues(values);
+  if (CONFIG.THUMBNAIL_MODE === 'image') {
+    range.setValues(rows.map(function (r) {
+      var source = r[urlKey] ? String(r[urlKey]) : '';
+      return [okUrl(source) ? build(source, r[altKey]) : ''];
+    }));
+  } else {
+    range.setFormulas(rows.map(function (r) {
+      var source = r[urlKey] ? String(r[urlKey]) : '';
+      return [okUrl(source) ? '=IMAGE("' + source.replace(/"/g, '""') + '", 1)' : ''];
+    }));
+  }
   thumbnailMs_ += Date.now() - t0;
-  // 2) base64 — 칸마다(실패해도 다른 칸에 번지지 않게)
   rows.forEach(function (r, j) {
     var source = r[urlKey] ? String(r[urlKey]) : '';
     if (!isData(source) || !thumbnailCheckCache_[source]) return;
