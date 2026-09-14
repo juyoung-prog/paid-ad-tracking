@@ -558,6 +558,8 @@ function cellValue_(v) {
 function renderReport_(sheet, model, timing) {
   timing = timing || {};
   thumbnailMs_ = 0;
+  thumbnailMsCheck_ = 0;
+  thumbnailMsData_ = 0;
   // 1) 전부 지운다 — 병합은 clear()가 풀지 않으므로 시트 전체 범위에서 먼저 푼다(이전 실행의 병합이 남으면 다음 병합·쓰기가 깨진다)
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
@@ -638,7 +640,7 @@ function renderReport_(sheet, model, timing) {
   });
 
   // 8) 꼬리말
-  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's, of which thumbnails ' + (thumbnailMs_ / 1000).toFixed(1) + 's)' : '';
+  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's, of which thumbnails ' + (thumbnailMs_ / 1000).toFixed(1) + 's = check ' + (thumbnailMsCheck_ / 1000).toFixed(1) + 's + base64 images ' + (thumbnailMsData_ / 1000).toFixed(1) + 's)' : '';
   sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + elapsed + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
@@ -648,8 +650,10 @@ function renderReport_(sheet, model, timing) {
 
 /** 같은 실행 안에서 썸네일 URL 확인 결과를 기억한다 — 한 이벤트에 같은 소재가 여러 번 나온다 */
 var thumbnailCheckCache_ = {};
-/** 이번 실행에서 썸네일에 쓴 시간(ms) — 꼬리말에 적는다 */
+/** 이번 실행에서 썸네일에 쓴 시간(ms) — 꼬리말에 적는다. check = 주소 확인, urls = 수식 쓰기, data = base64 셀 이미지 쓰기 */
 var thumbnailMs_ = 0;
+var thumbnailMsCheck_ = 0;
+var thumbnailMsData_ = 0;
 
 /**
  * data: 썸네일 최대 길이 — 셀 이미지는 base64 data 주소를 대략 1.5MB까지 받는다. 그보다 길면 넣지 않고 글만 보인다.
@@ -677,7 +681,7 @@ function checkThumbnails_(urls) {
     else if (!/^https?:/i.test(source)) thumbnailCheckCache_[source] = false;
   });
   if (CONFIG.THUMBNAILS === 'none') { pending.forEach(function (u) { thumbnailCheckCache_[u] = false; }); pending = []; }
-  if (pending.length === 0) { thumbnailMs_ += Date.now() - started; return; }
+  if (pending.length === 0) { thumbnailMs_ += Date.now() - started; thumbnailMsCheck_ += Date.now() - started; return; }
   try {
     var responses = UrlFetchApp.fetchAll(pending.map(function (u) {
       return { url: u, muteHttpExceptions: true, followRedirects: true, headers: { Range: 'bytes=0-1023' } };
@@ -693,19 +697,34 @@ function checkThumbnails_(urls) {
     console.warn('Thumbnail check skipped: ' + (e && e.message ? e.message : e));
   }
   thumbnailMs_ += Date.now() - started;
+  thumbnailMsCheck_ += Date.now() - started;
 }
 
-/** 썸네일 셀 값 — 확인을 통과한 주소만 CellImage, 아니면 빈 칸 */
-function thumbnailValue_(url, altText) {
-  if (!url) return '';
-  var source = String(url);
-  if (!thumbnailCheckCache_[source]) return '';
-  try {
-    return SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(altText || 'Campaign thumbnail').build();
-  } catch (e) {
-    console.warn('Thumbnail skipped: ' + (e && e.message ? e.message : e));
-    return '';
-  }
+/**
+ * 썸네일 열 쓰기 — https 주소는 =IMAGE(url, 1) 수식(쓰기는 즉시, 그림은 화면에서 로드), base64(data:) 그림은 셀 이미지.
+ * 셀 이미지는 넣는 순간 Google이 그림을 받아 검증하므로 한 장에 수 초가 걸린다 — 그래서 주소형은 수식으로 간다.
+ * 확인(checkThumbnails_)을 통과하지 못한 주소는 빈 칸.
+ */
+function writeThumbnails_(sheet, row, col, rows, urlKey, altKey) {
+  var formulas = rows.map(function (r) {
+    var source = r[urlKey] ? String(r[urlKey]) : '';
+    return [/^https?:/i.test(source) && thumbnailCheckCache_[source] ? '=IMAGE("' + source.replace(/"/g, '""') + '", 1)' : ''];
+  });
+  var t0 = Date.now();
+  sheet.getRange(row, col, rows.length, 1).setFormulas(formulas);
+  thumbnailMs_ += Date.now() - t0;
+  rows.forEach(function (r, j) {
+    var source = r[urlKey] ? String(r[urlKey]) : '';
+    if (!/^data:image\//i.test(source) || !thumbnailCheckCache_[source]) return;
+    var t1 = Date.now();
+    try {
+      sheet.getRange(row + j, col).setValue(SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(r[altKey] || 'Campaign thumbnail').build());
+    } catch (e) {
+      console.warn('Thumbnail skipped: ' + (e && e.message ? e.message : e));
+    }
+    thumbnailMs_ += Date.now() - t1;
+    thumbnailMsData_ += Date.now() - t1;
+  });
 }
 
 /**
@@ -840,9 +859,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
     // 칸마다 부르지 않고 열 단위로 한 번에 — Apps Script는 호출 수가 곧 시간이다
     if (c.thumb) {
       checkThumbnails_(dataRows.map(function (r) { return r[c.key]; }));
-      var thumbStart = Date.now();
-      dataRange.setValues(dataRows.map(function (r) { return [thumbnailValue_(r[c.key], r.phaseName)]; }));
-      thumbnailMs_ += Date.now() - thumbStart;
+      writeThumbnails_(sheet, row, col, dataRows, c.key, 'phaseName');
     } else if (c.linkKey) {
       dataRange.setRichTextValues(dataRows.map(function (r) { return [linkedTextValue_(String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null)]; }));
     } else if (c.rich) {
