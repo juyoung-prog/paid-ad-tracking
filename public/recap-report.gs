@@ -79,8 +79,11 @@ var CONFIG = {
   REPORT_SHEET_NAME: 'Campaign Recap',
   /** 이벤트 선택 드롭다운이 있는 칸(보고서 탭 위쪽). 이 칸을 바꾸면 같은 탭이 그 이벤트로 다시 그려진다 */
   EVENT_SELECTOR_CELL: 'C2',
-  /** 썸네일 — 'all'(전부) · 'urls'(주소형만, base64로 박힌 큰 그림은 뺀다 — 그리기가 훨씬 빠르다) · 'none' */
-  THUMBNAILS: 'all',
+  /**
+   * 썸네일 — 'urls'(기본: 주소형만) · 'all'(base64로 박힌 큰 그림까지 — Meta 일부 캠페인, 한 장에 약 3초씩 더 걸린다) · 'none'.
+   * 2026-09-14 실측: base64 두 장이 6.3초로 갱신 시간의 절반이었다
+   */
+  THUMBNAILS: 'urls',
   /** 시트를 열 때 자동 갱신할지. false면 메뉴 Refresh·드롭다운 변경 때만 갱신한다(열 때 표가 지워졌다 다시 그려지는 시간이 없다) */
   REFRESH_ON_OPEN: true,
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
@@ -640,7 +643,7 @@ function renderReport_(sheet, model, timing) {
   });
 
   // 8) 꼬리말
-  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's, of which thumbnails ' + (thumbnailMs_ / 1000).toFixed(1) + 's = check ' + (thumbnailMsCheck_ / 1000).toFixed(1) + 's + base64 images ' + (thumbnailMsData_ / 1000).toFixed(1) + 's)' : '';
+  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's, of which thumbnails ' + (thumbnailMs_ / 1000).toFixed(1) + 's = check ' + (thumbnailMsCheck_ / 1000).toFixed(1) + 's + images ' + ((thumbnailMs_ - thumbnailMsCheck_ - thumbnailMsData_) / 1000).toFixed(1) + 's + base64 images ' + (thumbnailMsData_ / 1000).toFixed(1) + 's)' : '';
   sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + elapsed + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
@@ -701,27 +704,35 @@ function checkThumbnails_(urls) {
 }
 
 /**
- * 썸네일 열 쓰기 — https 주소는 =IMAGE(url, 1) 수식(쓰기는 즉시, 그림은 화면에서 로드), base64(data:) 그림은 셀 이미지.
- * 셀 이미지는 넣는 순간 Google이 그림을 받아 검증하므로 한 장에 수 초가 걸린다 — 그래서 주소형은 수식으로 간다.
- * 확인(checkThumbnails_)을 통과하지 못한 주소는 빈 칸.
+ * 썸네일 열 쓰기 — 확인(checkThumbnails_)을 통과한 주소만 셀 이미지로, 열 단위 한 번에. 셀 이미지는 넣는 순간 Google이 그림을
+ * 받아 검증하므로 장당 시간이 든다(=IMAGE() 수식은 즉시지만 "외부 데이터" 승인 경고와 #REF!가 떠서 쓰지 않는다, 2026-09-14).
+ * base64(data:) 그림은 1MB급이라 특히 느리다 — CONFIG.THUMBNAILS가 'all'일 때만 넣고 시간은 따로 잰다.
  */
 function writeThumbnails_(sheet, row, col, rows, urlKey, altKey) {
-  var formulas = rows.map(function (r) {
-    var source = r[urlKey] ? String(r[urlKey]) : '';
-    return [/^https?:/i.test(source) && thumbnailCheckCache_[source] ? '=IMAGE("' + source.replace(/"/g, '""') + '", 1)' : ''];
-  });
-  var t0 = Date.now();
-  sheet.getRange(row, col, rows.length, 1).setFormulas(formulas);
-  thumbnailMs_ += Date.now() - t0;
-  rows.forEach(function (r, j) {
-    var source = r[urlKey] ? String(r[urlKey]) : '';
-    if (!/^data:image\//i.test(source) || !thumbnailCheckCache_[source]) return;
-    var t1 = Date.now();
+  var build = function (source, alt) {
     try {
-      sheet.getRange(row + j, col).setValue(SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(r[altKey] || 'Campaign thumbnail').build());
+      return SpreadsheetApp.newCellImage().setSourceUrl(source).setAltTextTitle(alt || 'Campaign thumbnail').build();
     } catch (e) {
       console.warn('Thumbnail skipped: ' + (e && e.message ? e.message : e));
+      return '';
     }
+  };
+  var isData = function (source) { return /^data:image\//i.test(source); };
+  // 1) 주소형 — 열 단위 한 번에
+  var t0 = Date.now();
+  var values = rows.map(function (r) {
+    var source = r[urlKey] ? String(r[urlKey]) : '';
+    return [source && !isData(source) && thumbnailCheckCache_[source] ? build(source, r[altKey]) : ''];
+  });
+  sheet.getRange(row, col, rows.length, 1).setValues(values);
+  thumbnailMs_ += Date.now() - t0;
+  // 2) base64 — 칸마다(실패해도 다른 칸에 번지지 않게)
+  rows.forEach(function (r, j) {
+    var source = r[urlKey] ? String(r[urlKey]) : '';
+    if (!isData(source) || !thumbnailCheckCache_[source]) return;
+    var t1 = Date.now();
+    var image = build(source, r[altKey]);
+    if (image) sheet.getRange(row + j, col).setValue(image);
     thumbnailMs_ += Date.now() - t1;
     thumbnailMsData_ += Date.now() - t1;
   });
