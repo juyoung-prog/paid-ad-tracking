@@ -79,6 +79,8 @@ var CONFIG = {
   REPORT_SHEET_NAME: 'Campaign Recap',
   /** 이벤트 선택 드롭다운이 있는 칸(보고서 탭 위쪽). 이 칸을 바꾸면 같은 탭이 그 이벤트로 다시 그려진다 */
   EVENT_SELECTOR_CELL: 'C2',
+  /** 썸네일 — 'all'(전부) · 'urls'(주소형만, base64로 박힌 큰 그림은 뺀다 — 그리기가 훨씬 빠르다) · 'none' */
+  THUMBNAILS: 'all',
   /** 시트를 열 때 자동 갱신할지. false면 메뉴 Refresh·드롭다운 변경 때만 갱신한다(열 때 표가 지워졌다 다시 그려지는 시간이 없다) */
   REFRESH_ON_OPEN: true,
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
@@ -555,6 +557,7 @@ function cellValue_(v) {
  */
 function renderReport_(sheet, model, timing) {
   timing = timing || {};
+  thumbnailMs_ = 0;
   // 1) 전부 지운다 — 병합은 clear()가 풀지 않으므로 시트 전체 범위에서 먼저 푼다(이전 실행의 병합이 남으면 다음 병합·쓰기가 깨진다)
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
@@ -572,8 +575,15 @@ function renderReport_(sheet, model, timing) {
   var totalCols = L - 1 + SHEET_COLUMN_WIDTHS.length;
   if (sheet.getMaxColumns() < totalCols) sheet.insertColumnsAfter(sheet.getMaxColumns(), totalCols - sheet.getMaxColumns());
   if (sheet.getMaxColumns() > totalCols) sheet.deleteColumns(totalCols + 1, sheet.getMaxColumns() - totalCols);
-  sheet.setColumnWidth(1, STYLE.leftGutter);
-  SHEET_COLUMN_WIDTHS.forEach(function (w, i) { sheet.setColumnWidth(L + i, w); });
+  // 열 폭은 한 열씩 부르면 열마다 왕복이다 — 지난 실행과 같으면 건너뛴다(서명을 문서 속성에 적어 둔다)
+  var widthSignature = String(sheet.getSheetId()) + ':' + [STYLE.leftGutter].concat(SHEET_COLUMN_WIDTHS).join(',');
+  var widthProps = null;
+  try { widthProps = PropertiesService.getDocumentProperties(); } catch (e) { widthProps = null; }
+  if (!widthProps || widthProps.getProperty('RECAP_WIDTHS') !== widthSignature) {
+    sheet.setColumnWidth(1, STYLE.leftGutter);
+    SHEET_COLUMN_WIDTHS.forEach(function (w, i) { sheet.setColumnWidth(L + i, w); });
+    if (widthProps) widthProps.setProperty('RECAP_WIDTHS', widthSignature);
+  }
   sheet.getRange(1, 1, sheet.getMaxRows(), totalCols).setFontSize(STYLE.fontSize).setVerticalAlignment('middle').setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP);
 
   var T = L; // 제목·요약·타임라인·캠페인 표 전부 B열에서 시작 — 왼쪽 시작점이 맞는다
@@ -638,6 +648,8 @@ function renderReport_(sheet, model, timing) {
 
 /** 같은 실행 안에서 썸네일 URL 확인 결과를 기억한다 — 한 이벤트에 같은 소재가 여러 번 나온다 */
 var thumbnailCheckCache_ = {};
+/** 이번 실행에서 썸네일에 쓴 시간(ms) — 꼬리말에 적는다 */
+var thumbnailMs_ = 0;
 
 /**
  * data: 썸네일 최대 길이 — 셀 이미지는 base64 data 주소를 대략 1.5MB까지 받는다. 그보다 길면 넣지 않고 글만 보인다.
@@ -654,16 +666,18 @@ var MAX_DATA_URL_LENGTH = 1900000;
  * data: 주소는 크기만 본다. 결과는 같은 실행 안에서 기억한다.
  */
 function checkThumbnails_(urls) {
+  var started = Date.now();
   var pending = [];
   urls.forEach(function (u) {
     if (!u) return;
     var source = String(u);
     if (thumbnailCheckCache_[source] !== undefined) return;
-    if (/^data:image\//i.test(source)) { thumbnailCheckCache_[source] = source.length <= MAX_DATA_URL_LENGTH; return; }
+    if (/^data:image\//i.test(source)) { thumbnailCheckCache_[source] = CONFIG.THUMBNAILS === 'all' && source.length <= MAX_DATA_URL_LENGTH; return; }
     if (/^https?:/i.test(source) && pending.indexOf(source) < 0) pending.push(source);
     else if (!/^https?:/i.test(source)) thumbnailCheckCache_[source] = false;
   });
-  if (pending.length === 0) return;
+  if (CONFIG.THUMBNAILS === 'none') { pending.forEach(function (u) { thumbnailCheckCache_[u] = false; }); pending = []; }
+  if (pending.length === 0) { thumbnailMs_ += Date.now() - started; return; }
   try {
     var responses = UrlFetchApp.fetchAll(pending.map(function (u) {
       return { url: u, muteHttpExceptions: true, followRedirects: true, headers: { Range: 'bytes=0-1023' } };
@@ -678,6 +692,7 @@ function checkThumbnails_(urls) {
     pending.forEach(function (u) { thumbnailCheckCache_[u] = false; });
     console.warn('Thumbnail check skipped: ' + (e && e.message ? e.message : e));
   }
+  thumbnailMs_ += Date.now() - started;
 }
 
 /** 썸네일 셀 값 — 확인을 통과한 주소만 CellImage, 아니면 빈 칸 */
@@ -774,8 +789,7 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   var headerRange = sheet.getRange(row, startCol, 1, width);
   headerRange.setValues([lineOf(function (c) { return c.label; })])
     .setFontWeight('bold').setBackground(STYLE.headerBg).setWrapStrategy(SpreadsheetApp.WrapStrategy.CLIP).setVerticalAlignment('middle');
-  borderAll(headerRange);
-  mergeRows(row, 1);
+  // 테두리·병합은 본문과 함께 한 번에(아래)
   headerRange.setHorizontalAlignments([lineOf(function (c) { return c.align || 'center'; })]);
   headerRange.setNotes([lineOf(function (c) { return c.note || ''; })]);
   sheet.setRowHeight(row, options.headerHeight);
@@ -786,6 +800,8 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   if (options.total) { totalIndex = bodyRows.length; bodyRows.push(options.total); }
 
   if (bodyRows.length === 0) {
+    borderAll(headerRange);
+    mergeRows(row - 1, 1);
     var emptyRange = sheet.getRange(row, startCol, 1, width);
     emptyRange.merge().setValue('No campaigns on this platform.').setFontColor(STYLE.secondary).setHorizontalAlignment('left');
     borderAll(emptyRange);
@@ -805,8 +821,9 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   var body = sheet.getRange(row, startCol, bodyRows.length, width);
   body.setValues(values).setVerticalAlignment('middle');
   body.setWrapStrategy(options.wrap ? SpreadsheetApp.WrapStrategy.WRAP : SpreadsheetApp.WrapStrategy.CLIP);
-  borderAll(body);
-  mergeRows(row, bodyRows.length);
+  // 헤더 + 본문을 한 범위로 — 테두리 한 번, 병합은 폭 넓은 열마다 한 번(mergeAcross는 줄마다 따로 병합한다)
+  borderAll(sheet.getRange(row - 1, startCol, bodyRows.length + 1, width));
+  mergeRows(row - 1, bodyRows.length + 1);
   sheet.setRowHeights(row, bodyRows.length, options.rowHeight);
   if (options.valuesBold) body.setFontWeight('bold').setFontSize(11);
   body.setHorizontalAlignments(bodyRows.map(function () { return lineOf(function (c) { return c.align || 'center'; }); }));
@@ -823,7 +840,9 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
     // 칸마다 부르지 않고 열 단위로 한 번에 — Apps Script는 호출 수가 곧 시간이다
     if (c.thumb) {
       checkThumbnails_(dataRows.map(function (r) { return r[c.key]; }));
+      var thumbStart = Date.now();
       dataRange.setValues(dataRows.map(function (r) { return [thumbnailValue_(r[c.key], r.phaseName)]; }));
+      thumbnailMs_ += Date.now() - thumbStart;
     } else if (c.linkKey) {
       dataRange.setRichTextValues(dataRows.map(function (r) { return [linkedTextValue_(String(r[c.key] || ''), r[c.linkLength] || 0, r[c.linkKey] || null)]; }));
     } else if (c.rich) {
