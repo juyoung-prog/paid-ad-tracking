@@ -549,7 +549,7 @@ function renderReport_(sheet, model) {
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
   sheet.clearNotes();
-  sheet.clearDataValidations();
+  sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).clearDataValidations(); // Sheet에는 없고 Range에만 있는 메서드다
   // 행 높이도 clear()가 되돌리지 않는다 — 이전 실행의 높은 줄(캠페인 64px, 깨졌던 실행의 수백 px)이 빈 줄 자리에 남아
   // 섹션 사이가 벌어졌다. 전부 기본 높이로 되돌리고 필요한 줄만 다시 키운다
   sheet.setRowHeights(1, sheet.getMaxRows(), STYLE.heights.blank);
