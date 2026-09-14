@@ -79,6 +79,8 @@ var CONFIG = {
   REPORT_SHEET_NAME: 'Campaign Recap',
   /** 이벤트 선택 드롭다운이 있는 칸(보고서 탭 위쪽). 이 칸을 바꾸면 같은 탭이 그 이벤트로 다시 그려진다 */
   EVENT_SELECTOR_CELL: 'C2',
+  /** 시트를 열 때 자동 갱신할지. false면 메뉴 Refresh·드롭다운 변경 때만 갱신한다(열 때 표가 지워졌다 다시 그려지는 시간이 없다) */
+  REFRESH_ON_OPEN: true,
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
   ANCHOR_SHEET_NAME: null,
   /** 보고할 이벤트(campaign_group 값). null이면 가장 최근에 끝난 이벤트 — 대시보드 Reports 목록의 첫 줄 */
@@ -196,6 +198,7 @@ function onOpen() {
     .addToUi();
   // 단순 트리거에서는 외부 읽기(UrlFetch) 권한이 없어 보통 실패한다 — 그래도 메뉴는 살아 있어야 한다.
   // 첫 Refresh 뒤에는 설치형 트리거(refreshOnOpen)가 열 때마다 대신 갱신한다
+  if (!CONFIG.REFRESH_ON_OPEN) return;
   try {
     refreshReport_({ silent: true });
   } catch (e) {
@@ -205,6 +208,7 @@ function onOpen() {
 
 /** 설치형 onOpen 트리거 — 권한이 있는 문맥이라 DB를 읽어 자동 갱신할 수 있다 */
 function refreshOnOpen() {
+  if (!CONFIG.REFRESH_ON_OPEN) return;
   try {
     refreshReport_({ silent: true });
   } catch (e) {
@@ -297,13 +301,18 @@ function refreshReport_(options) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var previous = ss.getActiveSheet();
   try {
+    // 단계별 시간 — 꼬리말과 실행 로그에 적는다(어디가 느린지 시트에서 바로 보이게)
+    var t0 = Date.now();
     var grids = readGrids_();
+    var t1 = Date.now();
     var eventName = storedEventName_() || CONFIG.EVENT_NAME;
     var model = buildReportModel(grids, new Date(), eventName);
+    var t2 = Date.now();
     var sheet = reportSheet_(ss);
-    renderReport_(sheet, model);
+    renderReport_(sheet, model, { fetchMs: t1 - t0, computeMs: t2 - t1, startedAt: t0 });
     placeReportSheet_(ss, sheet, previous);
     if (!(options && options.silent)) ensureOpenTrigger_();
+    console.log('Recap refresh: fetch ' + (t1 - t0) + 'ms · compute ' + (t2 - t1) + 'ms · render ' + (Date.now() - t2) + 'ms');
   } catch (e) {
     if (options && options.silent) throw e;
     SpreadsheetApp.getUi().alert('Recap report', 'Could not refresh the report.\n\n' + (e && e.message ? e.message : e), SpreadsheetApp.getUi().ButtonSet.OK);
@@ -544,7 +553,8 @@ function cellValue_(v) {
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet
  * @param {Object} model - buildReportModel() 결과
  */
-function renderReport_(sheet, model) {
+function renderReport_(sheet, model, timing) {
+  timing = timing || {};
   // 1) 전부 지운다 — 병합은 clear()가 풀지 않으므로 시트 전체 범위에서 먼저 푼다(이전 실행의 병합이 남으면 다음 병합·쓰기가 깨진다)
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
@@ -618,7 +628,8 @@ function renderReport_(sheet, model) {
   });
 
   // 8) 꼬리말
-  sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
+  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's)' : '';
+  sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + elapsed + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
   // 9) 남는 빈 행은 지운다 — 스크롤 끝이 표 끝이어야 읽기 편하다
@@ -801,11 +812,12 @@ function renderTable_(sheet, row, startCol, columns, rows, options) {
   body.setHorizontalAlignments(bodyRows.map(function () { return lineOf(function (c) { return c.align || 'center'; }); }));
 
   var dataRows = bodyRows.filter(function (r, j) { return j !== totalIndex; });
+  // 숫자 서식 — 표 한 번에(열마다 부르지 않는다)
+  body.setNumberFormats(bodyRows.map(function () {
+    return lineOf(function (c) { return c.fmt ? c.fmt : (c.key === 'startDate' || c.key === 'endDate') ? '@' : 'General'; });
+  }));
   columns.forEach(function (c, i) {
     var col = startCol + offsets[i];
-    var colRange = sheet.getRange(row, col, bodyRows.length, 1);
-    if (c.fmt) colRange.setNumberFormat(c.fmt);
-    else if (c.key === 'startDate' || c.key === 'endDate') colRange.setNumberFormat('@');
     if (dataRows.length === 0) return;
     var dataRange = sheet.getRange(row, col, dataRows.length, 1); // Total 줄은 항상 마지막이라 데이터 줄은 위에서부터 연속
     // 칸마다 부르지 않고 열 단위로 한 번에 — Apps Script는 호출 수가 곧 시간이다
