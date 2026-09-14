@@ -638,7 +638,7 @@ function renderReport_(sheet, model, timing) {
   });
 
   // 8) 꼬리말
-  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's)' : '';
+  var elapsed = timing.startedAt ? ' in ' + ((Date.now() - timing.startedAt) / 1000).toFixed(1) + 's (fetch ' + ((timing.fetchMs || 0) / 1000).toFixed(1) + 's · compute ' + ((timing.computeMs || 0) / 1000).toFixed(1) + 's · draw ' + ((Date.now() - timing.startedAt - (timing.fetchMs || 0) - (timing.computeMs || 0)) / 1000).toFixed(1) + 's, of which thumbnails ' + (thumbnailMs_ / 1000).toFixed(1) + 's)' : '';
   sheet.getRange(row, T).setValue('Refreshed ' + model.refreshedText + elapsed + ' from the dashboard database · rules synced with src/data/schema.js · What worked / Could improve show notes written in the dashboard when present, otherwise generated sentences.')
     .setFontSize(8).setFontColor(STYLE.secondary).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
 
