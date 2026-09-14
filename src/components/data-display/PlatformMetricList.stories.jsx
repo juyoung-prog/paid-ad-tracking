@@ -35,6 +35,13 @@ hold rate = 완주 ÷ 훅시청). 훅시청의 기준이 플랫폼마다 달라(
 목록 위에 \`Metric definitions vary by platform.\` 한 줄 + ⓘ를 두고, 전문은 그
 툴팁에 넣는다 — 설명 세 줄이 지표보다 먼저 읽히면 안 되지만, 같은 이름의 숫자를
 그대로 비교하면 틀리기 때문에 신호 자체는 남긴다.
+
+### 참여 줄 — Saves · Reposts가 더해졌고, Follows · Profile Visits는 감춘다 (2026-09-11 · 12)
+Likes · Comments · Shares 다음에 **Saves**(Meta API post_save / TikTok 수기) · **Reposts**(Meta 수기) 줄이
+온다. **Follows · Profile Visits는 값이 있어도 그리지 않는다**(schema \`HIDDEN_METRIC_KEYS\` — Meta에 같은
+지표가 없어 두 플랫폼이 다른 줄을 보이던 것을 없앴다. 수집·저장은 그대로라 목록에서 빼면 바로 돌아온다).
+\`excludeKeys\`는 호출부가 뺄 key — 동기화 캠페인 드로어는 참여 다섯 칸을 아래 편집 그리드
+(SocialMetricsFields)로 대신 그리므로 이 목록에서는 뺀다(같은 숫자가 두 번 나오지 않게).
         `,
       },
     },
@@ -43,6 +50,7 @@ hold rate = 완주 ÷ 훅시청). 훅시청의 기준이 플랫폼마다 달라(
     metrics: { control: 'object', description: '성과 레코드. 영상·소셜 10개 + (hasCoreMetrics면) 핵심 10개를 읽는다' },
     title: { control: 'text', description: '목록 위 소제목(13px 600 문장형)' },
     hasCoreMetrics: { control: 'boolean', description: 'Spend·Impressions·Reach·CPM·Clicks·CTR·CPC·Engagements·Conversions·CPA를 앞에 붙인다 — 입력 폼이 없는 동기화 캠페인 드로어 전용' },
+    excludeKeys: { control: 'object', description: '목록에서 뺄 지표 key — 동기화 캠페인 드로어가 참여 칸(likes…reposts)을 SocialMetricsFields 편집 그리드로 대신 그릴 때 같은 숫자가 두 번 나오지 않게' },
     sx: { control: 'object', description: '추가 스타일' },
   },
 };

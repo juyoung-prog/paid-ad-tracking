@@ -200,8 +200,10 @@ CPM $2.94\`), 컬럼별 중앙값은 ⓘ 툴팁이 갖는다. 대표 지표는 �
 sticky + 스크롤 그림자)가 이미 있다. 스크롤을 없애겠다고 데이터를 클릭 뒤로
 숨기는 쪽이 오히려 비표준이었다.
 
-전부 비어 있는 컬럼은 표 단위로 자동으로 빠진다 — Meta만 있는 표에서는
-TikTok 전용인 Follows·Visits가 알아서 사라진다.
+전부 비어 있는 컬럼은 표 단위로 자동으로 빠진다. 참여 열은 Likes · Comments · Shares ·
+**Saves · Reposts**(2026-09-11 — Saves는 Meta API의 post_save, Reposts는 드로어 수기)까지이고,
+TikTok 전용 **Follows · Visits는 수집은 하되 표에서 일단 감춘다**(schema HIDDEN_METRIC_KEYS,
+2026-09-12 — Meta에 같은 지표가 없어 두 플랫폼이 다른 칸을 보이던 것을 없앴다).
 
 ### 타임라인 막대를 클릭하면 phase 패널이 열린다
 Event timeline의 한 줄은 캠페인 하나가 아니다 — 같은 단계를 Meta·TikTok에 나눠
@@ -444,13 +446,13 @@ export const RowStates = {
     const blank = {
       reach: null, clicks: null, videoPlays: null, hookViews: null, heldViews: null,
       avgWatchSeconds: null, likes: null, comments: null, shares: null,
-      follows: null, profileVisits: null, engagements: null, conversions: null,
+      follows: null, profileVisits: null, saves: null, reposts: null, engagements: null, conversions: null,
     };
     const performanceRecords = [
       {
         id: 'p-1', campaignId: 'rs-1', ...blank,
         impressions: 125877, reach: 59373, spend: 346.79,
-        videoPlays: 74587, hookViews: 8937, heldViews: 766, avgWatchSeconds: 2, likes: 12,
+        videoPlays: 74587, hookViews: 8937, heldViews: 766, avgWatchSeconds: 2, likes: 12, comments: 1, shares: 3, saves: 2, reposts: 1,
       },
       // rs-2에는 레코드를 아예 안 만든다 → "No performance data yet"
       { id: 'p-3', campaignId: 'rs-3', ...blank, impressions: 0, spend: 0, heldViews: 0, avgWatchSeconds: 0, likes: 0 },

@@ -41,6 +41,9 @@ const PERFORMANCE = {
   shares: 12,
   follows: 26,
   profileVisits: 118,
+  // Saves는 수기(TikTok API 미제공). Follows·Profile Visits는 값이 있어도 목록에서 감춘다(schema HIDDEN_METRIC_KEYS)
+  saves: 41,
+  reposts: null,
   engagements: null,
   conversions: null,
 };

@@ -475,7 +475,8 @@ Paid Ads Dashboard
 | LastUpdatedBar | 캠페인/성과 최근 입력 시각 표시 | 신규 | 카테고리: layout — Influencer Tracking `SyncStatusBar.jsx` 이식(자동 동기화 대신 "최근 수정" 의미로 재해석) |
 | StoreMultiSelect | 단일/복수/전체 매장 타겟 선택기 | 신규 | 카테고리: input |
 | CampaignForm | 캠페인 등록/수정 폼 | 신규 | 카테고리: templates |
-| PerformanceForm | 성과 지표 입력 폼 (goal 기반 Tier 1/2 기본 노출, Tier 3/4 조건부 노출) | 신규 | 카테고리: templates |
+| PerformanceForm | 성과 지표 입력 폼 (goal 기반 Tier 1/2 기본 노출, Tier 3/4 조건부 노출, Social Metrics 항상) | 신규 | 카테고리: templates |
+| SocialMetricsFields (신규 — 2026-09-11) | 참여 내역 중 사람이 고칠 수 있는 칸(Likes · Comments · Shares · Saves · Reposts)의 플랫폼별 입력 그리드 — 수기 폼과 동기화 캠페인 드로어 공용, 고친 칸은 "edited"(performance_records.manual_fields, 동기화가 덮지 않는다) | 신규(구현됨) | 카테고리: templates — 칸 구성은 schema SOCIAL_METRIC_KEYS. Follows·Visits는 수정 금지·화면에서 일단 감춤(HIDDEN_METRIC_KEYS) |
 | PacingIndicator | 예산 소진 속도(pacing) 시각화 | 신규 | 카테고리: data-display |
 | CampaignThumbnail | 캠페인 소재 썸네일 (플랫폼색 이니셜 fallback) | 재활용 | `components/media/CampaignThumbnail.jsx` — 이미 구현됨 |
 | ConnectionCard (API Integration) | Settings에서 계정별 연결 상태 + Connect/재연결 CTA 표시 | 미채택 | 계획은 card 카테고리의 별도 컴포넌트였으나 실제로는 SettingsPage 안에 직접 그렸다 — 계정이 넷뿐이고 다른 화면에서 쓰이지 않아 분리할 이유가 없었다. 상태 Chip(연결됨=success)은 계획대로 |

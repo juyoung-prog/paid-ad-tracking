@@ -256,6 +256,7 @@ export const mockPerformanceRecords = [
     avgWatchSeconds: 3.3,
     follows: 10,
     profileVisits: 588,
+    saves: 12,
     hookViews: 68000,
     heldViews: 15000,
     engagements: null,
@@ -274,6 +275,9 @@ export const mockPerformanceRecords = [
     likes: 1575,
     comments: 42,
     shares: 483,
+    // Saves는 Meta API(post_save), Reposts는 드로어 수기 — Performance 표의 두 열이 스토리에서도 보이게(2026-09-14)
+    saves: 34,
+    reposts: 3,
     follows: 4,
     profileVisits: 266,
     hookViews: 30000,
@@ -477,12 +481,12 @@ export const mockRecapCampaigns = [
 /** @type {import('./schema').PerformanceRecord[]} */
 export const mockRecapPerformanceRecords = [
   // G10 — Coming Soon(Meta)은 CPM이 비교군 중 가장 싸고 Hook은 중간, Grand Opening(Meta)은 Hook 최고
-  recapRecord('rc-g10-cs-m', { spend: 210.4, impressions: 98000, reach: 61000, clicks: 240, videoPlays: 90000, hookViews: 21600, heldViews: 5400, avgWatchSeconds: 3.1, likes: 180, comments: 6, shares: 40, saves: 22, engagements: 226 }),
-  recapRecord('rc-g10-cs-t', { spend: 205.7, impressions: 120000, reach: 54000, clicks: 130, videoPlays: 118000, hookViews: 11800, heldViews: 3500, avgWatchSeconds: 1.9, likes: 210, comments: 4, shares: 25, engagements: 239 }),
-  recapRecord('rc-g10-go-m', { spend: 812.5, impressions: 265000, reach: 151000, clicks: 3900, videoPlays: 250000, hookViews: 92500, heldViews: 30000, avgWatchSeconds: 4.2, likes: 620, comments: 18, shares: 540, engagements: 1178 }),
-  recapRecord('rc-g10-go-t', { spend: 776.9, impressions: 340000, reach: 128000, clicks: 1200, videoPlays: 335000, hookViews: 46900, heldViews: 15400, avgWatchSeconds: 2.1, likes: 410, comments: 9, shares: 120, engagements: 539 }),
-  recapRecord('rc-g10-no-m', { spend: 1119.3, impressions: 464000, reach: 163000, clicks: 2900, videoPlays: 296000, hookViews: 68400, heldViews: 10400, avgWatchSeconds: 3.5, likes: 300, comments: 11, shares: 210, engagements: 521, conversions: 64 }),
-  recapRecord('rc-g10-deals-m', { spend: 771.2, impressions: 301000, reach: 120000, clicks: 4100, videoPlays: 280000, hookViews: 58800, heldViews: 12300, avgWatchSeconds: 3.0, likes: 250, comments: 8, shares: 160, engagements: 418 }),
+  recapRecord('rc-g10-cs-m', { spend: 210.4, impressions: 98000, reach: 61000, clicks: 240, videoPlays: 90000, hookViews: 21600, heldViews: 5400, avgWatchSeconds: 3.1, likes: 180, comments: 6, shares: 40, saves: 22, reposts: 2, engagements: 226 }),
+  recapRecord('rc-g10-cs-t', { spend: 205.7, impressions: 120000, reach: 54000, clicks: 130, videoPlays: 118000, hookViews: 11800, heldViews: 3500, avgWatchSeconds: 1.9, likes: 210, comments: 4, shares: 25, saves: 9, engagements: 239 }),
+  recapRecord('rc-g10-go-m', { spend: 812.5, impressions: 265000, reach: 151000, clicks: 3900, videoPlays: 250000, hookViews: 92500, heldViews: 30000, avgWatchSeconds: 4.2, likes: 620, comments: 18, shares: 540, saves: 61, reposts: 5, engagements: 1178 }),
+  recapRecord('rc-g10-go-t', { spend: 776.9, impressions: 340000, reach: 128000, clicks: 1200, videoPlays: 335000, hookViews: 46900, heldViews: 15400, avgWatchSeconds: 2.1, likes: 410, comments: 9, shares: 120, saves: 157, engagements: 539 }),
+  recapRecord('rc-g10-no-m', { spend: 1119.3, impressions: 464000, reach: 163000, clicks: 2900, videoPlays: 296000, hookViews: 68400, heldViews: 10400, avgWatchSeconds: 3.5, likes: 300, comments: 11, shares: 210, saves: 25, reposts: 3, engagements: 521, conversions: 64 }),
+  recapRecord('rc-g10-deals-m', { spend: 771.2, impressions: 301000, reach: 120000, clicks: 4100, videoPlays: 280000, hookViews: 58800, heldViews: 12300, avgWatchSeconds: 3.0, likes: 250, comments: 8, shares: 160, saves: 15, reposts: 2, engagements: 418 }),
   // BF4
   recapRecord('rc-bf4-cs-m', { spend: 64.3, impressions: 31000, reach: 22700, clicks: 40, videoPlays: 22500, hookViews: 3900, heldViews: 390, avgWatchSeconds: 2.4, likes: 44, comments: 2, shares: 33, engagements: 79 }),
   recapRecord('rc-bf4-go-m', { spend: 755.9, impressions: 165000, reach: 44300, clicks: 4400, videoPlays: 100000, hookViews: 37400, heldViews: 11900, avgWatchSeconds: 4.8, likes: 508, comments: 10, shares: 601, engagements: 1119 }),

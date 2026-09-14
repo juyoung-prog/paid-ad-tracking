@@ -36,7 +36,8 @@
 |---|---|---|
 | Drawer [MUI] | 재활용 | 상세 패널 |
 | CampaignForm | 신규 | 캠페인 필드 수정 |
-| PerformanceForm | 신규 | goal 기반 Tier 1~4 조건부 성과 입력 |
+| PerformanceForm | 신규 | goal 기반 Tier 1~4 조건부 성과 입력 + Social Metrics(항상) |
+| **SocialMetricsFields** | 신규(구현됨, 2026-09-11) | 참여 내역 중 사람이 고칠 수 있는 칸(Likes · Comments · Shares · Saves · Reposts)의 플랫폼별 입력 그리드 — 수기 폼(PerformanceForm)과 동기화 캠페인 드로어(최신 api 행에 덧쓰기, `manual_fields`로 "edited" 표시·동기화 이월) 공용. Follows·Visits는 수정 금지 |
 | CampaignThumbnail | 재활용 | 소재 미리보기 + "View Ad" 외부 링크 |
 
 ## Stores (`/stores`)
