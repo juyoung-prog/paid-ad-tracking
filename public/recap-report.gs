@@ -6,10 +6,13 @@
  *   2. 열린 편집기의 Code.gs 내용을 전부 지우고 이 파일을 붙여 넣는다 → 저장(⌘S / Ctrl+S)
  *   3. 스프레드시트 탭으로 돌아와 새로고침한다 — 상단에 "Report" 메뉴가 생긴다
  *   4. Report → Refresh report. 첫 실행에서 권한 허용 1회(본인 계정, 이 스프레드시트 읽기·쓰기 + 대시보드 DB 읽기).
- *      이후로는 시트를 열 때마다 자동 갱신되고, 열어 둔 채 최신을 보려면 메뉴의 Refresh만 누른다.
+ *      이후로는 시트를 열 때마다 자동 갱신되고, "Campaign Recap" 탭 위 드롭다운에서 이벤트를 고르면 그 이벤트로 바뀐다.
+ *      열어 둔 채 최신을 보려면 메뉴의 Refresh만 누른다.
  *
  * 데이터 흐름: 스크립트가 대시보드 데이터베이스(Supabase)의 campaigns · performance_records_latest · ad_accounts를
- * **읽기 전용**으로 가져와 이 스프레드시트 안에 보고서 탭(기본 이름 "<매장코드>_Report", 예: G10_Report)을 그린다. 시트의 내용을 밖으로 보내는 요청은 없다
+ * **읽기 전용**으로 가져와 이 스프레드시트의 "Campaign Recap" 탭 하나에 그린다. 탭 위 드롭다운(C2)에서 이벤트를 고르면 같은
+ * 탭이 그 이벤트로 다시 그려진다 — 이벤트별 탭을 만들지 않고, 다른 탭(월간 SNS 보고서 "Report" 등)은 건드리지 않는다.
+ * 시트의 내용을 밖으로 보내는 요청은 없다
  * (썸네일 주소를 한 번 받아 보는 것은 그림이 깨지지 않는지 확인하는 읽기다). 읽기 키(anon)는 대시보드 화면이 쓰는 공개 키와 같은 것이고,
  * 대시보드 제목 옆 링크로 내려받으면 CONFIG.SUPABASE에 채워져 있다. (직접 복사한 파일이면 거기에 URL·키를 적는다.)
  *
@@ -44,7 +47,7 @@
  *
  * 구조
  *   · onOpen(단순 트리거) → 메뉴 + 갱신 시도(try/catch). 단순 트리거는 외부 읽기 권한이 없어 첫 갱신은 메뉴에서 해야 하고,
- *     그때 설치형 onOpen 트리거를 만들어 두어 다음 열기부터는 자동 갱신된다
+ *     그때 설치형 onOpen(자동 갱신)·onEdit(드롭다운 변경 → 그 이벤트로 다시 그리기) 트리거를 만들어 둔다
  *   · refreshReport_ → readGrids_(DB 또는 gid 탭 → 2차원 배열) → buildReportModel(순수 계산) → renderReport_(clear 후 재렌더)
  *   · buildReportModel 아래는 Apps Script API를 쓰지 않는 순수 함수다 — node로 떼어 돌려 대시보드와 대조한다:
  *       node --import ./scripts/recap-report-check/register.mjs scripts/recap-report-check/verify.mjs [--real]
@@ -70,10 +73,12 @@ var CONFIG = {
     performance: null,   // Supabase `performance_records` 표를 가져온 탭. null이면 campaigns 탭 안의 두 번째 표를 쓴다
   },
   /**
-   * 보고서 탭 이름 틀. {store} = 이벤트의 매장 코드(G10, 여러 곳이면 G10+BF3) · {event} = 이벤트 이름.
-   * 예: '{store}_Report' → "G10_Report". 이벤트가 바뀌면 같은 탭의 이름만 바뀐다(탭이 늘어나지 않는다)
+   * 보고서 탭 이름 — 이벤트가 바뀌어도 이 탭 하나를 다시 그린다(이벤트별 탭을 만들지 않는다). 이 이름의 탭만 만지고,
+   * 다른 탭(예: 월간 SNS 보고서 "Report", 예전 "G10_Report")은 읽지도 쓰지도 않는다
    */
-  REPORT_SHEET_NAME: '{store}_Report',
+  REPORT_SHEET_NAME: 'Campaign Recap',
+  /** 이벤트 선택 드롭다운이 있는 칸(보고서 탭 위쪽). 이 칸을 바꾸면 같은 탭이 그 이벤트로 다시 그려진다 */
+  EVENT_SELECTOR_CELL: 'C2',
   /** 보고서 탭을 이 이름의 탭 바로 오른쪽에 고정하고 싶을 때만 적는다. null이면 자리를 건드리지 않는다(처음 만들 때는 맨 뒤) */
   ANCHOR_SHEET_NAME: null,
   /** 보고할 이벤트(campaign_group 값). null이면 가장 최근에 끝난 이벤트 — 대시보드 Reports 목록의 첫 줄 */
@@ -207,13 +212,35 @@ function refreshOnOpen() {
   }
 }
 
-/** refreshOnOpen 트리거가 없으면 만든다 — 메뉴 Refresh(권한 있는 문맥)에서만 부른다 */
+/**
+ * 설치형 onEdit 트리거 — 보고서 탭의 이벤트 선택 칸이 바뀔 때만 그 이벤트로 다시 그린다. 다른 탭·다른 칸의 편집은 무시한다.
+ * (단순 onEdit는 외부 읽기 권한이 없어 설치형이어야 한다. 스크립트가 쓰는 값은 onEdit를 일으키지 않으므로 되풀이되지 않는다)
+ */
+function onRecapEdit(e) {
+  try {
+    if (!e || !e.range) return;
+    var sheet = e.range.getSheet();
+    if (sheet.getName() !== CONFIG.REPORT_SHEET_NAME) return;
+    if (e.range.getA1Notation() !== CONFIG.EVENT_SELECTOR_CELL) return;
+    var name = String(e.value == null ? e.range.getValue() : e.value).trim();
+    if (!name) return;
+    var props = PropertiesService.getDocumentProperties();
+    props.setProperty('RECAP_EVENT_NAME', name);
+    refreshReport_({ silent: true });
+  } catch (err) {
+    console.warn('Recap refresh on event change failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+/** refreshOnOpen · onRecapEdit 트리거가 없으면 만든다 — 메뉴 Refresh(권한 있는 문맥)에서만 부른다 */
 function ensureOpenTrigger_() {
   try {
-    var exists = ScriptApp.getProjectTriggers().some(function (tr) { return tr.getHandlerFunction() === 'refreshOnOpen'; });
-    if (!exists) ScriptApp.newTrigger('refreshOnOpen').forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet()).onOpen().create();
+    var handlers = ScriptApp.getProjectTriggers().map(function (tr) { return tr.getHandlerFunction(); });
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    if (handlers.indexOf('refreshOnOpen') < 0) ScriptApp.newTrigger('refreshOnOpen').forSpreadsheet(ss).onOpen().create();
+    if (handlers.indexOf('onRecapEdit') < 0) ScriptApp.newTrigger('onRecapEdit').forSpreadsheet(ss).onEdit().create();
   } catch (e) {
-    console.warn('Could not install the open trigger: ' + (e && e.message ? e.message : e));
+    console.warn('Could not install the triggers: ' + (e && e.message ? e.message : e));
   }
 }
 
@@ -248,27 +275,10 @@ function showTabGids() {
   SpreadsheetApp.getUi().alert('Tab gids', lines.join('\n'), SpreadsheetApp.getUi().ButtonSet.OK);
 }
 
-/**
- * 보고서 탭 — 지난 실행이 만든 탭(문서 속성에 sheetId를 적어 둔다)을 찾아 이름을 맞추고 재사용한다. 없으면 만든다.
- * 이벤트를 바꿔 이름이 달라져도 탭이 하나만 유지되게. 같은 이름의 다른 탭이 이미 있으면 그 탭을 쓴다.
- */
-function reportSheet_(ss, name) {
-  var props = null;
-  try { props = PropertiesService.getDocumentProperties(); } catch (e) { props = null; }
-  // 저장값이 없으면 null이다 — Number(null)은 0이라 gid 0(새 시트의 "시트1")을 잘못 잡는다. 있을 때만 숫자로
-  var saved = props ? props.getProperty('RECAP_SHEET_ID') : null;
-  var savedId = saved ? Number(saved) : null;
-  var sheet = (savedId != null && isFinite(savedId) ? findSheetByGid_(ss, savedId) : null)
-    || ss.getSheetByName(name)
-    || ss.getSheetByName(LEGACY_REPORT_SHEET_NAME); // 예전 기본 이름("Recap")으로 만든 탭도 이어받는다
-  if (!sheet) sheet = ss.insertSheet(name);
-  if (sheet.getName() !== name && !ss.getSheetByName(name)) sheet.setName(name);
-  if (props) props.setProperty('RECAP_SHEET_ID', String(sheet.getSheetId()));
-  return sheet;
+/** 보고서 탭 — CONFIG.REPORT_SHEET_NAME 이름의 탭만 쓴다. 없으면 맨 뒤에 만든다. 다른 탭은 이름이 무엇이든 건드리지 않는다 */
+function reportSheet_(ss) {
+  return ss.getSheetByName(CONFIG.REPORT_SHEET_NAME) || ss.insertSheet(CONFIG.REPORT_SHEET_NAME);
 }
-
-/** 예전 기본 탭 이름 — 이 이름의 탭이 있으면 새 이름으로 바꿔 재사용한다(탭이 둘이 되지 않게) */
-var LEGACY_REPORT_SHEET_NAME = 'Recap';
 
 /** 문서에 저장된 이벤트 선택. 권한이 없는 문맥(onOpen 등)에서는 null */
 function storedEventName_() {
@@ -290,7 +300,7 @@ function refreshReport_(options) {
     var grids = readGrids_();
     var eventName = storedEventName_() || CONFIG.EVENT_NAME;
     var model = buildReportModel(grids, new Date(), eventName);
-    var sheet = reportSheet_(ss, reportSheetName(model));
+    var sheet = reportSheet_(ss);
     renderReport_(sheet, model);
     placeReportSheet_(ss, sheet, previous);
     if (!(options && options.silent)) ensureOpenTrigger_();
@@ -539,6 +549,7 @@ function renderReport_(sheet, model) {
   sheet.getRange(1, 1, sheet.getMaxRows(), sheet.getMaxColumns()).breakApart();
   sheet.clear();
   sheet.clearNotes();
+  sheet.clearDataValidations();
   // 행 높이도 clear()가 되돌리지 않는다 — 이전 실행의 높은 줄(캠페인 64px, 깨졌던 실행의 수백 px)이 빈 줄 자리에 남아
   // 섹션 사이가 벌어졌다. 전부 기본 높이로 되돌리고 필요한 줄만 다시 키운다
   sheet.setRowHeights(1, sheet.getMaxRows(), STYLE.heights.blank);
@@ -559,7 +570,19 @@ function renderReport_(sheet, model) {
   var H = STYLE.heights;
   var row = 2; // 1행은 위 여백
 
-  // 3) 제목 · 메타 줄
+  // 3) 이벤트 선택 — 드롭다운(CONFIG.EVENT_SELECTOR_CELL). 목록은 데이터에 있는 이벤트 전부(최근 끝난 순), 값은 지금 그린 이벤트.
+  //    바꾸면 설치형 onEdit(onRecapEdit)가 같은 탭을 그 이벤트로 다시 그린다
+  var selector = sheet.getRange(CONFIG.EVENT_SELECTOR_CELL);
+  var selectorRow = selector.getRow();
+  selector.setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(model.events, true).setAllowInvalid(false).build())
+    .setValue(model.eventName).setFontWeight('bold').setHorizontalAlignment('left').setBackground(STYLE.headerBg)
+    .setBorder(true, true, true, true, false, false, STYLE.border, SpreadsheetApp.BorderStyle.SOLID)
+    .setNote('Pick an event — this sheet is redrawn for it. Every event from the dashboard is listed (most recently ended first). Report → Refresh report reloads the current one.');
+  sheet.getRange(selectorRow, selector.getColumn() + 1).setValue('← pick an event to redraw this sheet').setFontColor(STYLE.secondary).setFontSize(STYLE.smallFontSize).setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW);
+  sheet.setRowHeight(selectorRow, 30);
+  row = selectorRow + 2;
+
+  // 4) 제목 · 메타 줄
   sheet.getRange(row, T).setValue(model.eventName).setFontSize(STYLE.titleSize).setFontWeight('bold').setHorizontalAlignment('left').setWrapStrategy(SpreadsheetApp.WrapStrategy.OVERFLOW)
     .setNote('Recap — read from the dashboard database (read-only) and drawn by the Report script. Rules match the dashboard (src/data/schema.js). Refresh: Report → Refresh report.');
   sheet.setRowHeight(row, H.title);
@@ -939,18 +962,6 @@ function phaseTotalOf(phases) {
     return vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
   };
   return { totalDaily: sum('totalDaily'), totalBudget: sum('totalBudget'), spent: sum('spent') };
-}
-
-/**
- * 보고서 탭 이름 — CONFIG.REPORT_SHEET_NAME 틀에 {store}·{event}를 채운다. 시트 탭 이름에 못 쓰는 글자([]:*?/\\)는 '-'로.
- * 매장 코드가 없으면 {store} 자리에 이벤트 이름의 첫 단어를 쓴다.
- */
-function reportSheetName(model) {
-  var store = (model.stores && model.stores.length) ? model.stores.join('+') : String(model.eventName || '').split(/\s+/)[0];
-  var name = String(CONFIG.REPORT_SHEET_NAME || '{store}_Report')
-    .replace(/\{store\}/g, store)
-    .replace(/\{event\}/g, model.eventName || '');
-  return name.replace(/[\[\]:*?\/\\]/g, '-').trim().slice(0, 100) || 'Report';
 }
 
 /** 이벤트 이름 목록(최근 끝난 순) — 메뉴 "Refresh for event…"가 쓴다 */
@@ -1963,5 +1974,5 @@ function uniqueSorted(list) {
 
 // node 검증용 — Apps Script에서는 module이 없어 무시된다
 if (typeof module === 'object' && module && module.exports) {
-  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, phaseCell: phaseCell, reportSheetName: reportSheetName, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
+  module.exports = { CONFIG: CONFIG, STRINGS: STRINGS, buildReportModel: buildReportModel, phaseCell: phaseCell, splitBlocks: splitBlocks, rowsToGrid: rowsToGrid, adsManagerUrl: adsManagerUrl, viewAdUrl: viewAdUrl, listEventNames: listEventNames, buildRecapRows: buildRecapRows, buildRecapHeadline: buildRecapHeadline };
 }
