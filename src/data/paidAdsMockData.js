@@ -540,7 +540,8 @@ export const mockRecapCampaignNotes = [
     recapId: 'recap-g10',
     campaignId: 'rc-g10-go-m',
     verdict: 'good',
-    strength: { en: 'Strongest reach efficiency and hook rate among comparable Meta Grand Opening campaigns, with the highest click volume in the event.', ko: null, 'zh-Hant': null },
+    // 줄바꿈이 든 메모 — 사람이 "01. / 02."처럼 줄을 나눠 쓴 글이 표·인쇄·툴팁에서 그대로 줄로 보이는지 스토리에서 확인한다(2026-09-14)
+    strength: { en: '01. Strongest reach efficiency and hook rate among comparable Meta Grand Opening campaigns.\n02. Highest click volume in the event.', ko: null, 'zh-Hant': null },
     weakness: { en: 'Largest spend of the event, so its results carry the most weight in the event total — worth watching if the phase is repeated at this size.', ko: null, 'zh-Hant': null },
     reason: { en: 'Efficient on every comparable metric. The data confirms the result but does not show which factor drove it.', ko: null, 'zh-Hant': null },
     organicViews: 100250,

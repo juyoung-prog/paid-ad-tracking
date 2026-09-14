@@ -66,7 +66,9 @@ const printFont = (size) => ({ '@media print': { fontSize: size } });
 /** 인쇄에서만 사라지는 것 — 썸네일·편집 버튼처럼 종이에서 할 일이 없는 것 */
 const PRINT_HIDE = { '@media print': { display: 'none' } };
 
-/** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음. 인쇄에서는 줄 자르기를 풀어 전문을 찍는다 */
+/** 해석 칸 — 12px, 네 줄에서 잘리고 전문은 hover 툴팁. 상자·배경 없음. 인쇄에서는 줄 자르기를 풀어 전문을 찍는다.
+    사람이 쓴 글의 줄바꿈은 그대로 보인다(pre-wrap, 2026-09-14) — "01. … / 02. …"처럼 줄을 나눠 적은 메모가
+    저장 뒤 한 문단으로 뭉개졌다. 값은 \n 그대로 저장되고 있었고 화면의 white-space: normal이 접고 있었다 */
 const INSIGHT_TEXT_SX = {
   display: '-webkit-box',
   WebkitLineClamp: 4,
@@ -74,7 +76,7 @@ const INSIGHT_TEXT_SX = {
   overflow: 'hidden',
   fontSize: 12,
   lineHeight: 1.45,
-  whiteSpace: 'normal',
+  whiteSpace: 'pre-wrap',
   overflowWrap: 'anywhere',
   '@media print': { display: 'block', WebkitLineClamp: 'unset', overflow: 'visible', fontSize: '6.5pt', lineHeight: 1.3 },
 };
@@ -492,7 +494,7 @@ export function RecapCampaignTable({ rows, lang = 'en', onRowClick, onBenchmarkC
                         />
                       </Tooltip>
                     ) : cell.text ? (
-                      <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360 } } }}>
+                      <Tooltip title={`${cell.text}${cell.isWritten ? ` — ${t('insight.writtenHint', lang)}` : ''}`} placement="top" enterDelay={500} slotProps={{ tooltip: { sx: { maxWidth: 360, whiteSpace: 'pre-wrap' } } }}>
                         <Box component="span" sx={{ cursor: 'help' }}>{insightBody(cell)}</Box>
                       </Tooltip>
                     ) : insightBody(cell)}
