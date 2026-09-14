@@ -484,7 +484,6 @@ Paid Ads Dashboard
 | BenchmarkDelta (신규 — Recap) | 지표 값 + 중앙값 대비 차이 · 백분위 · N. `not enough data` 상태 포함 | 신규(구현됨) | 카테고리: data-display — KpiBar `delta`와 같은 화살표·톤 문법(낮을수록 좋은 지표는 방향과 색이 반대) |
 | VerdictChip (신규 — Recap) | good / mid / bad 판정 표시. 자동 제안이면 점선 테두리 | 신규(구현됨) | 카테고리: data-display — Chip 위에 구성, 색은 success / 중립 / warning |
 | RecapCampaignTable (신규 — Recap) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인 · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동 | 신규(구현됨) | 카테고리: data-display — PerformanceReportTable과 열 정의를 공유하되 보고서용으로 셀에 여러 줄(Reach / Hook·Hold / 조회)을 담는다. 인쇄 시 가로 스크롤 없이 접히는 열 규칙 |
-| RecapNoteEditor (신규 — Recap 2단계) | 캠페인 한 줄의 판정(good/mid/bad, 제안값 "Use suggestion") + 장점·아쉬운 점·이유 + 오가닉 조회·참여 선택 입력 | 신규(구현됨) | 카테고리: templates — LocalizedText의 `lang` 칸 하나만 편집, 저장은 페이지(onChange patch) |
 | SignInDialog (신규 — Recap 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 | 신규(구현됨) | 카테고리: templates — LoginPage와 같은 로직. 앱 전체 게이트는 꺼진 채 "쓰기가 필요한 자리"에서만 연다 |
 | LanguageSwitch (신규 — Recap 3단계) | en / ko / zh-Hant 전환, URL `?lang=` 동기화 | 신규(구현됨) | 카테고리: input — ToggleButton 재활용, Recap에만 노출. 라벨은 각 언어의 자기 이름(EN · 한국어 · 繁中) |
 | Print stylesheet (Recap) | 인쇄/PDF — `@page` Letter 세로 + 대시보드 컴포넌트가 그대로 인쇄된다(인쇄 전용 보고서 없음) | 신규(구현됨, 2026-09-10 단일화) | 컴포넌트가 아니라 `@page` + 각 컴포넌트의 `@media print`. PaidAdsShell GlobalStyles + `data-print` 속성 |

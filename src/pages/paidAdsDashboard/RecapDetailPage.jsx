@@ -4,13 +4,10 @@ import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Link from '@mui/material/Link';
 import Skeleton from '@mui/material/Skeleton';
-import IconButton from '@mui/material/IconButton';
-import Popover from '@mui/material/Popover';
 import Typography from '@mui/material/Typography';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
-import MoreHorizOutlinedIcon from '@mui/icons-material/MoreHorizOutlined';
 import PictureAsPdfOutlinedIcon from '@mui/icons-material/PictureAsPdfOutlined';
 import TableChartOutlinedIcon from '@mui/icons-material/TableChartOutlined';
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined';
@@ -20,7 +17,6 @@ import { PageContainer } from '../../components/layout/PageContainer';
 import { BackendErrorBanner } from '../../components/data-display/BackendErrorBanner';
 import { RecapHeader } from '../../components/data-display/RecapHeader';
 import { RecapCampaignTable } from '../../components/data-display/RecapCampaignTable';
-import { RecapNoteEditor } from '../../components/templates/RecapNoteEditor';
 import { SignInDialog } from '../../components/templates/SignInDialog';
 import { LanguageSwitch } from '../../components/input/LanguageSwitch';
 import { ExportMenu } from '../../components/input/ExportMenu';
@@ -195,9 +191,6 @@ export function RecapDetailPage() {
   }, [phaseSelection]);
   const [isSaving, setIsSaving] = useState(false);
   const [aiMode, setAiMode] = useState(null); // 'draft' | 'translate' | null — 진행 중인 AI 작업
-  /* 수기 입력(이유·오가닉)은 표의 캠페인 칸 버튼으로 여는 팝오버에 — 한 캠페인의 편집 자리를 그 줄 하나로 모은다(2026-09-10).
-     예전엔 표 아래 "Notes — N campaigns" 카드가 따로 있어 같은 캠페인을 두 곳에서 고쳤다 */
-  const [noteAnchor, setNoteAnchor] = useState(null); // { el, campaignId, label } | null
   const [isSignInOpen, setIsSignInOpen] = useState(false);
   const [draft, setDraft] = useState(null);
   // 벤치마크 글자를 눌러 연 비교 대화상자 — { campaignId, metricKey } 또는 null
@@ -274,9 +267,6 @@ export function RecapDetailPage() {
       ...d,
       notesById: { ...d.notesById, [campaignId]: { ...d.notesById[campaignId], [field]: withLang(d.notesById[campaignId]?.[field], lang, value) } },
     }));
-
-  const updateDraftNote = (campaignId, patch) =>
-    setDraft((d) => ({ ...d, notesById: { ...d.notesById, [campaignId]: { ...d.notesById[campaignId], ...patch } } }));
 
   if (isLoading) {
     return (
@@ -515,43 +505,9 @@ export function RecapDetailPage() {
             isEditing={isEditing && Boolean(draft)}
             onNoteChange={updateDraftNoteText}
             isDisabled={isBusy}
-            renderRowExtra={isEditing && draft ? (row) => (
-              <Tooltip title={t('recap.edit.secondaryFields', lang)} placement="top">
-                <IconButton
-                  size="small"
-                  disabled={isBusy}
-                  aria-label={`${t('recap.edit.secondaryFields', lang)} — ${row.phaseName}`}
-                  onClick={(e) => setNoteAnchor({ el: e.currentTarget, campaignId: row.campaignId, label: `${row.phaseName} · ${PLATFORM_LABEL[row.platform] ?? row.platform}` })}
-                  sx={{ p: 0.25, color: 'text.disabled', '&:hover': { color: 'text.secondary' } }}
-                >
-                  <MoreHorizOutlinedIcon sx={(theme) => ({ fontSize: theme.iconSize.inline })} />
-                </IconButton>
-              </Tooltip>
-            ) : undefined}
           />
         </Box>
       ))}
-
-      {/* 수기 입력 팝오버 — 이유·오가닉만. 값은 draft.notesById 하나를 그대로 쓰고 저장은 Save가 한다 */}
-      {noteAnchor && draft && (
-        <Popover
-          open
-          anchorEl={noteAnchor.el}
-          onClose={() => setNoteAnchor(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-          slotProps={{ paper: { sx: { width: 360, maxWidth: '90vw' } } }}
-        >
-          <RecapNoteEditor
-            note={draft.notesById[noteAnchor.campaignId]}
-            campaignLabel={noteAnchor.label}
-            onChange={(patch) => updateDraftNote(noteAnchor.campaignId, patch)}
-            lang={lang}
-            isDisabled={isBusy}
-            sx={{ px: 2, py: 2 }}
-          />
-        </Popover>
-      )}
 
       {detailCampaignId && (() => {
         const detailCampaign = campaigns.find((c) => c.id === detailCampaignId);

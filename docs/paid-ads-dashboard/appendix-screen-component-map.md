@@ -73,7 +73,6 @@
 | **RecapCampaignTable** | 신규(구현됨) | 플랫폼별 캠페인 표 — 순위 · 매장 · 캠페인(썸네일) · 일예산 · 지출 · 판정 · 영상 반응 · 참여 반응 · 행동. 숫자 줄 전체 클릭 → 캠페인 상세 드로어, selectedId로 타임라인 선택 표시. PerformanceReportTable과 열 정의 공유 |
 | **BenchmarkDelta** | 신규(구현됨) | 비율 지표 옆 "중앙값 대비 · 백분위 · N" 표시, `not enough data` 상태 |
 | **VerdictChip** | 신규(구현됨) | good / mid / bad. 자동 제안이면 점선 테두리 |
-| **RecapNoteEditor** | 신규(구현됨, 2단계) | 캠페인별 장점·아쉬운 점·이유, 이벤트 배운 점·다음 제언. 언어 탭 |
 | **LanguageSwitch** | 신규(구현됨, 3단계) | en / ko / zh-Hant 드롭다운 — URL ?lang= 동기화 |
 | **SignInDialog** | 신규(구현됨, 2단계) | Edit를 눌렀는데 세션이 없을 때만 뜨는 로그인 대화상자 |
 | recapSheets (utils) | 신규(구현됨, 3단계) | Google Sheets — 표를 클립보드에 복사하고 sheets.new를 연다(Excel 대신, 사용자 결정) |

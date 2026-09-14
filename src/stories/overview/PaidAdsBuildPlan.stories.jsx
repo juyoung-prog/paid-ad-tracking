@@ -122,7 +122,7 @@ const recapPhases = [
     items: [
       '마이그레이션 2개 — event_recaps, recap_campaign_notes: owner_id 기본값 auth.uid(), anon read 정책(00000000000019 방식), owner write. LocalizedText는 jsonb',
       'usePaidAdsStore — recaps/notes 읽기 + upsert 함수. 저장 실패는 BackendErrorBanner 문법 그대로',
-      'RecapNoteEditor — templates. props: note(RecapCampaignNote|null), campaignLabel, lang, onChange, isDisabled. 평가는 사람이 고르는 것만(자동 제안 없음, 2026-09-08). 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
+      '(2026-09-14 제거 — 캠페인 칸 ⋯ 메뉴·팝오버째 삭제, 해석 두 칸은 표 안 인라인 편집만) RecapNoteEditor — templates. props: note(RecapCampaignNote|null), campaignLabel, lang, onChange, isDisabled. 평가는 사람이 고르는 것만(자동 제안 없음, 2026-09-08). 읽기/편집이 같은 자리, 인쇄는 읽기 모드',
       '로그인 게이트 — Recap 편집 버튼에서만 켠다(읽기는 그대로 공개). 지금 꺼둔 LoginPage 재사용',
     ],
   },
@@ -133,7 +133,7 @@ const recapPhases = [
       'PeerCompareDialog — templates. 벤치마크 글자를 누르면 비교군 캠페인을 나란히(schema.js buildPeerComparison). Reports goal 표에는 열 정렬(TableSortLabel) 추가',
       'Google Sheets 내보내기 — utils/recapSheets.js. 표를 탭 구분 텍스트로 클립보드에 복사하고 sheets.new를 연다(Google 계정 없이 시트를 직접 만들 수는 없다 — OAuth 연동은 별도 단계). 한때 exceljs Excel이었는데 Google Sheets로 바꿈(사용자 결정, 2026-09). ExportMenu 드롭다운에 PDF(인쇄)와 함께',
       'AI 초안/번역 — Edge Function(recap-draft): 숫자·벤치마크를 주면 strength/weakness/reason 초안과 ko/zh-Hant 번역을 돌려준다. 프론트는 결과를 에디터에 채우기만, 최종 문장은 사람이 다듬는다',
-      'RecapNoteEditor에 organicViews/organicEngagements 선택 입력 칸',
+      'RecapNoteEditor의 organicViews/organicEngagements 선택 입력 칸 — 2026-09-14에 편집기째 제거(값은 DB에 남는다)',
     ],
   },
   {
