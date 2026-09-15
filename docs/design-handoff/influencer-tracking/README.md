@@ -76,7 +76,8 @@ pnpm build
 ```
 paid-ad-tracking 저장소의 대시보드 디자인 스타일을 이 저장소(Influencer-Tracking)에 이식한다.
 먼저 https://raw.githubusercontent.com/juyoung-prog/paid-ad-tracking/main/docs/design-handoff/influencer-tracking/README.md 를 읽고,
-1절의 패치를 design/paid-ads-style 브랜치에 적용해 빌드를 확인한 뒤, 4절 순서대로 진행해.
+1절의 패치를 design/paid-ads-style 브랜치에 적용해 빌드를 확인한 뒤, 4절 순서대로 진행하고,
+마지막에 6절(Carbon 디자인 스위치)까지 붙여.
 2단계(Report 뷰)부터는 3절 표의 원천 파일을 raw URL로 받아 참고하되, 컴포넌트는 복사가 아니라
 이 저장소의 기존 컴포넌트(KpiBar, ScheduleTimeline, Saas*View)를 고쳐서 맞춘다.
 UI 문자열은 영어, 대화는 한글. 푸시는 내가 말할 때만.
