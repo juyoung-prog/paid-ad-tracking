@@ -81,3 +81,95 @@ paid-ad-tracking 저장소의 대시보드 디자인 스타일을 이 저장소(
 이 저장소의 기존 컴포넌트(KpiBar, ScheduleTimeline, Saas*View)를 고쳐서 맞춘다.
 UI 문자열은 영어, 대화는 한글. 푸시는 내가 말할 때만.
 ```
+
+## 6. Carbon(IBM) 디자인 스위치 이식
+
+paid-ad-tracking의 레일 **Design** 버튼과 Storybook 툴바 **Design** 스위치는 "MUI 테마 객체
+두 벌 + 컨텍스트 하나"다. 컴포넌트는 토큰 키만 읽으므로 1단계 패치(테마 키 통일)가 끝나면
+Influencer-Tracking에도 그대로 옮겨진다. `@carbon/react`는 들이지 않는다 — 테마 override로만 재현한다.
+
+### 6-1. 패키지
+
+```bash
+pnpm add @carbon/colors @carbon/themes @carbon/type @carbon/motion @carbon/layout @fontsource-variable/ibm-plex-sans
+```
+
+(paid-ad-tracking 기준 버전: colors ^11.57, layout ^11.58, motion ^11.51, themes ^11.80, type ^11.66, ibm-plex-sans 5.3.0)
+
+### 6-2. 그대로 복사하는 파일 (raw URL, 수정 없이)
+
+| 대상 경로 | 역할 |
+|---|---|
+| `src/styles/themes/carbon.js` | Carbon White 테마. 값은 전부 IBM 토큰 패키지에서 읽는다(hex·px 손으로 적지 않음) |
+| `src/styles/themes/index.js` | `themes` 레지스트리(`default`·`carbon`), `themeMeta`, `getTheme`, `getThemeNames` |
+| `src/styles/themes/designSystemContext.js` | 컨텍스트·localStorage 키·`useDesignSystem`·`applyDesignSystemAttribute` |
+| `src/styles/themes/DesignSystemProvider.jsx` | `ThemeProvider`에 선택한 테마를 꽂는 Provider(제어/비제어 모드) |
+| `.storybook/DesignSystemDecorator.jsx` | 툴바 글로벌을 Provider 제어 모드에 연결 |
+
+복사 후 `designSystemContext.js`의 저장 키 `paidAds:designSystem:v1`만
+`influencer:designSystem:v1`로 바꾼다(두 앱이 같은 origin에서 열릴 때 서로 덮어쓰지 않게).
+
+### 6-3. 손으로 잇는 곳 (Influencer-Tracking 파일 4개)
+
+1. `src/main.jsx` — 서체를 앱 진입에서 미리 싣는다(전환 순간 로드하면 글꼴이 늦게 갈아끼워진다).
+   ```js
+   import '@fontsource-variable/ibm-plex-sans';
+   ```
+2. `src/App.jsx` — 지금은 `ThemeProvider theme={theme}`를 직접 쓴다. 이걸 Provider로 바꾼다.
+   ```jsx
+   import { DesignSystemProvider } from './styles/themes/DesignSystemProvider';
+   // <ThemeProvider theme={theme}> … </ThemeProvider>  →
+   <DesignSystemProvider> … </DesignSystemProvider>
+   ```
+3. `src/components/templates/beautymaster/SaasShell.jsx` — 레일 하단 유틸리티 행에 Design 버튼.
+   라벨은 **현재** 시스템을 말한다("Design: Carbon"). 순서는 레지스트리 등록 순으로 순환.
+   ```jsx
+   import PaletteOutlinedIcon from '@mui/icons-material/PaletteOutlined';
+   import { themeMeta, getThemeNames } from '../../../styles/themes';
+   import { useDesignSystem } from '../../../styles/themes/designSystemContext';
+
+   const { themeName, setThemeName } = useDesignSystem();
+   const toggleDesignSystem = () => {
+     const names = getThemeNames();
+     setThemeName(names[(names.indexOf(themeName) + 1) % names.length]);
+   };
+   // 유틸리티 행 자리에:
+   <RailButton icon={ <PaletteOutlinedIcon /> }
+     label={ `Design: ${themeMeta[themeName]?.name ?? themeName}` }
+     onClick={ toggleDesignSystem } />
+   ```
+   원본은 paid-ad-tracking `src/pages/paidAdsDashboard/PaidAdsRail.jsx`의 `RailButton`(266–282행, 456–466행).
+4. `.storybook/preview.jsx` — 지금은 `ThemeProvider theme={defaultTheme}`. 툴바 글로벌 + 데코레이터로 바꾼다.
+   ```jsx
+   import { useGlobals } from 'storybook/preview-api';
+   import { themeMeta } from '../src/styles/themes';
+   import { DesignSystemDecorator, DESIGN_SYSTEM_GLOBAL } from './DesignSystemDecorator';
+
+   globalTypes: {
+     [DESIGN_SYSTEM_GLOBAL]: {
+       description: '디자인 시스템 — 앱 레일의 Design 버튼과 같은 전환',
+       toolbar: { title: 'Design', icon: 'paintbrush', dynamicTitle: true,
+         items: Object.entries(themeMeta).map(([value, meta]) => ({ value, title: meta.name })) },
+     },
+   },
+   initialGlobals: { [DESIGN_SYSTEM_GLOBAL]: 'default' },
+   decorators: [(Story) => {
+     const [globals, updateGlobals] = useGlobals();   // 훅은 데코레이터 함수 본문에서만
+     return (
+       <DesignSystemDecorator globalValue={ globals[DESIGN_SYSTEM_GLOBAL] }
+         onThemeNameChange={ (next) => updateGlobals({ [DESIGN_SYSTEM_GLOBAL]: next }) }>
+         <CssBaseline />
+         <Story />
+       </DesignSystemDecorator>
+     );
+   }],
+   ```
+   원본은 paid-ad-tracking `.storybook/preview.jsx`.
+
+### 6-4. 확인
+
+- 앱: 레일 Design 버튼을 누르면 Default ↔ Carbon이 바뀌고, 새로고침해도 유지된다(localStorage).
+- Storybook: 툴바 Design 스위치와 스토리 안의 레일 버튼이 같은 상태를 본다.
+- 두 테마에서 `undefined` 토큰이 없어야 한다 — 새 토큰은 두 파일에 같은 키로 넣는다.
+- Carbon에서는 radius가 전부 0이고 서체가 IBM Plex Sans다. 컴포넌트에 hex·px radius 리터럴이
+  남아 있으면 Carbon에서만 어긋나 보인다. 그게 곧 찾아야 할 잔여물이다.
